@@ -55,35 +55,21 @@ export function isTrackIconEntryComplete(entry) {
   return !entry.color || !!entry.icon;
 }
 
-// Authors often copy the full federal asset URL instead of just the slug
-// fetchFederalTrackIcon() actually needs (e.g. pasting
-// ".../federal/assets/icons/track-icons/max-accelerating-creativity-ai-track-icon.svg"
-// instead of typing "max-accelerating-creativity-ai-track-icon"). Recognizes any URL
-// whose path ends in /track-icons/<slug>.svg — host-agnostic (prod's www.adobe.com and a
-// staging .aem.page/.aem.live preview both work) — and returns just the slug; anything
-// else (a plain slug already, or an unrelated/mistyped URL) passes through untouched, so
-// a mistake stays visibly wrong rather than silently resolving to the wrong icon.
+// Extracts the slug from a pasted federal track-icon URL; passes a plain slug through untouched.
 export function extractTrackIconSlug(value) {
   const trimmed = (value || '').trim();
   const match = trimmed.match(/\/track-icons\/([^/]+)\.svg(?:[?#].*)?$/i);
   return match ? match[1] : trimmed;
 }
 
-// Same idea as extractTrackIconSlug above, for the product-logo namespace instead
-// (.../federal/assets/svgs/<slug>.svg, see fetchFederalProductIcon) — an author pastes
-// the full URL instead of typing e.g. "creative-cloud-64". The distinguishing path is
-// "/assets/svgs/" with nothing between "assets" and "svgs" — the generic icon namespace
-// (/federal/assets/icons/svgs/) and the track-icon one (/federal/assets/icons/
-// track-icons/) both have a segment in between, so neither can collide with this match.
+// Same as extractTrackIconSlug, for the product-logo namespace (.../federal/assets/svgs/<slug>.svg).
 export function extractProductIconSlug(value) {
   const trimmed = (value || '').trim();
   const match = trimmed.match(/\/assets\/svgs\/([^/]+)\.svg(?:[?#].*)?$/i);
   return match ? match[1] : trimmed;
 }
 
-// Drops any key from `map` that isn't in `validKeys`, preserving every entry that is.
-// Returns the same `map` reference when nothing changed, so callers can cheaply skip a
-// state update when there's nothing to prune.
+// Returns the same `map` reference when nothing changed, so callers can skip a state update.
 function pruneStaleKeys(map, validKeys) {
   if (!map) return { next: map, removed: [] };
   const validSet = new Set(validKeys);
@@ -96,18 +82,8 @@ function pruneStaleKeys(map, validKeys) {
   return { next, removed };
 }
 
-// Config.trackIcons/overrideTrackIcons.byText/products are grow-only maps (see
-// ConfigsContext.js's updateTrackIcon/updateOverrideTrackIcon/updateProduct) — an entry
-// authored for a track/override-text/product that later disappears from the event's
-// sessions (renamed, removed, session deleted) sticks around in the saved config forever,
-// invisible in the editor since those components only ever render the *current* catalog's
-// keys. This is the sync: called once per catalog load with the live track/override-text/
-// product lists, it drops any authored key that no longer matches anything in the current
-// catalog. Deliberately does NOT add entries for new keys — those already show up
-// automatically next time the editor renders (TrackIconEditor etc. iterate the live list),
-// with no icon authored yet, same as any other never-configured entry.
-// Returns the same `config` reference (and `hasChanges: false`) when there's nothing stale,
-// so a no-op sync doesn't trigger a state update.
+// Drops authored trackIcons/overrideTrackIcons/products keys no longer in the live catalog;
+// never adds new keys. Returns the same `config` reference (hasChanges: false) when nothing's stale.
 export function syncIconConfigWithCatalog(config, { tracks = [], overrideTexts = [], products = [] } = {}) {
   const trackResult = pruneStaleKeys(config.trackIcons, tracks);
   const overrideResult = pruneStaleKeys(config.overrideTrackIcons?.byText, overrideTexts);
@@ -136,9 +112,6 @@ export function syncIconConfigWithCatalog(config, { tracks = [], overrideTexts =
   };
 }
 
-// Display title for a row: the author-set config name if set, else the
-// author's alternative event title (Global rows only), else the real
-// backend/ESP title, else the raw Event ID.
 export function getDisplayTitle(row) {
   return row?.config?.configName || row?.config?.eventTitle || row?.backendEventTitle || row?.eventId || '';
 }

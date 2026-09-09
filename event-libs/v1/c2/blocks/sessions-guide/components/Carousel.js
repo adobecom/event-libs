@@ -4,31 +4,24 @@ import { scrollBehavior } from '../utils/motion.js';
 
 export const buildCarousel = () => Carousel;
 
-// CardComponent defaults to LiveCard — session-broadcast passes SessionCard for its Upcoming
-// section instead, whose "no image" styling is a closer match. Both accept the same
-// session/onCardClick shape; SessionCard ignores the props it doesn't use.
+// CardComponent defaults to LiveCard — session-broadcast passes SessionCard instead for its
+// Upcoming section. Both accept the same session/onCardClick shape.
 export function Carousel({
   sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
   CardComponent = LiveCard, timeDisplay, showDurationBadge, showDescription, forceLive,
 }) {
-  // Hooks run before the empty-list bail-out — returning first would change hook order
-  // between an empty and a populated render.
+  // Hooks run before the empty-list bail-out, to keep hook order stable across renders.
   const [offset, setOffset] = useState(0);
-  // Desktop pages the strip with a transform (overflow:visible); narrower
-  // viewports scroll natively, so arrows must drive scrollLeft instead.
+  // Desktop pages the strip with a transform; narrower viewports scroll natively.
   const [paged, setPaged] = useState(false);
   const [edges, setEdges] = useState({ atStart: true, atEnd: false });
   const stripRef = useRef(null);
   const cardWidthRef = useRef(0);
   const visibleCountRef = useRef(1);
-  // Kept current every render so the resize handler below (captured once, on mount) can read
-  // the latest session count without closing over the stale `sessions` prop from mount time.
+  // Kept current every render so the mount-time resize handler below reads the latest value.
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
 
-  // Reads only refs, so it's safe to call from a closure captured on mount (resize handler)
-  // as well as from a fresh per-render closure (the sessionCount effect below) — either way it
-  // always clamps against the current session count and current visibleCountRef.
   const clampOffset = () => {
     const maxOffset = Math.max(0, (sessionsRef.current?.length || 0) - visibleCountRef.current);
     setOffset((o) => Math.min(o, maxOffset));
@@ -63,9 +56,6 @@ export function Carousel({
     measure();
     refreshEdges();
     clampOffset();
-    // A resize can change visibleCountRef (how many cards fit) without the session count ever
-    // changing — re-clamp here too, not just on the sessionCount effect below, otherwise offset
-    // stays stale until some other render happens to fire.
     const onResize = () => { measure(); refreshEdges(); clampOffset(); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -74,11 +64,8 @@ export function Carousel({
   const sessionCount = sessions?.length || 0;
   const maxOffset = Math.max(0, sessionCount - visibleCountRef.current);
 
-  // The list can shrink out from under an already-paged-forward carousel (e.g. several live
-  // sessions ending within the same ~15s tick) — pull `offset` back into range so a stale value
-  // doesn't keep rendering translateX past the remaining content, and re-measure the native-
-  // scroll edges too. `clampedOffset` below covers the same render's visual output immediately;
-  // this corrects the underlying state so the next click doesn't silently no-op.
+  // Re-clamps offset when the list shrinks under an already-paged-forward carousel (e.g.
+  // several live sessions ending in the same tick), so translateX can't overshoot content.
   useEffect(() => {
     refreshEdges();
     clampOffset();
@@ -100,8 +87,6 @@ export function Carousel({
     stripRef.current?.scrollBy({ left: cardWidthRef.current || 300, behavior: scrollBehavior() });
   };
 
-  // Desktop shows the focused card's time in the left gutter; mobile (offset
-  // stays 0 with native scroll) shows the first session's time inline.
   const focused = sessions[Math.min(clampedOffset, sessionCount - 1)];
   const timeLabel = formatTime ? formatTime(focused) : '';
   const tzLabel = formatTimezone ? formatTimezone(focused) : '';

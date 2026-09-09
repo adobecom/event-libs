@@ -22,8 +22,7 @@ export function LiveUpcomingView() {
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const { userTz } = guideConfig;
-  // Read purely to establish a re-render dependency on time-driven session-state
-  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // Read only to trigger a re-render on session-state transitions; value itself is unused.
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
@@ -42,9 +41,7 @@ export function LiveUpcomingView() {
   const upcoming = filterSessions(upcomingRaw, activeFilters, searchQuery);
   const timeSlots = groupByStartTime(upcoming);
 
-  // Previously aired: all sessions for the day, shown when nothing is upcoming or live.
-  // On-demand-only sessions never aired, so they stay out of here too — On Demand owns them.
-  // Filters + search apply here too, same as Upcoming — only Live/Recommended are exempt.
+  // Shown when nothing is upcoming or live; on-demand-only sessions are excluded (On Demand owns them).
   const previouslyAiredRaw = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
   const previouslyAiredSlots = (timeSlots.length === 0 && live.length === 0)
     ? groupByStartTime(filterSessions(previouslyAiredRaw, activeFilters, searchQuery))
@@ -80,10 +77,7 @@ export function LiveUpcomingView() {
           ${previouslyAiredSlots.map((slot) => html`<${TimeSlotRow} key=${slot[0].startTimeUtc} sessions=${slot} forceOnDemand=${true} />`)}
         `}
         ${timeSlots.length === 0 && previouslyAiredSlots.length === 0 && (() => {
-          // Live/Recommended are exempt from search + filters (see comments above), so
-          // they can still be showing above this section even when the search/filter
-          // combination itself matches nothing here — that's still a "no results" case,
-          // not the "day has nothing at all" case, and takes priority whenever active.
+          // Live/Recommended are exempt from search + filters, so "no results" still takes priority here.
           if (hasActiveSearchOrFilters(activeFilters, searchQuery)) return html`<${NoResultsFound} />`;
           if (!live.length && !recommended.length) {
             return html`<div class="sg-empty" role="status" aria-live="polite">No sessions scheduled for this day.</div>`;

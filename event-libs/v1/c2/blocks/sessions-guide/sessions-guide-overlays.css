@@ -11,8 +11,7 @@
   border-radius: var(--s2a-border-radius-round);
   flex-shrink: 0;
 
-  /* Figma's authored value has no matching step in the transparent-black scale below —
-     the closest defined tokens (12/16) are used for the hover/active escalation instead. */
+  /* No matching token step for Figma's authored value — closest 12/16 tokens used below. */
   background: rgb(0 0 0 / 9%);
   color: var(--s2a-color-content-default, #292929);
   transition: background 0.15s ease, opacity 0.15s ease;
@@ -37,18 +36,11 @@
 .sg-download-btn:hover:not(:disabled) { background: var(--s2a-color-transparent-black-12, rgb(0 0 0 / 12%)); }
 .sg-download-btn:active:not(:disabled) { background: var(--s2a-color-transparent-black-16, rgb(0 0 0 / 16%)); }
 
-/* ── Download Button tooltip (Figma 11884:55569) ───────────────
-   Desktop only (matches this block's 1280px breakpoint elsewhere — FilterPanel.js,
-   SessionDetailOverlay.js, use-carousel-row.js): a hover affordance has no equivalent on
-   touch, so it stays off below that width. Pure CSS via the ~ sibling combinator — a
-   disabled <button> never fires :hover/:focus-visible, so it's naturally excluded too. */
+/* ── Download Button tooltip (Figma 11884:55569) — desktop only, no touch equivalent ── */
 .sg-download-btn-wrap {
   position: relative;
 
-  /* inline-flex, not flex: this must hug the button's own width so the tooltip's
-     left: 50% centers on the button, not on whatever width a block box would stretch
-     to fill in its parent (only harmless in the real header because .sg-right-controls
-     happens to be a flex row already sizing it to content — this holds regardless). */
+  /* inline-flex so the tooltip's left:50% centers on the button, not a stretched block box. */
   display: inline-flex;
 }
 
@@ -93,15 +85,8 @@
 
 /* ── Session Detail Overlay (Phase 6) ────────────────────────── */
 
-/* Replaces the old slide-in-from-the-right panel: the header's controls row collapses
-   away first (.sg-header-controls-collapse in sessions-guide.css), then this fades/slides
-   up into the same space, instead of a separate panel sliding over the list — matching the
-   reference prototype's "dismiss the header controls, then display the detail overlay"
-   sequencing rather than animating both at once. The delay below is short enough to read as
-   "right after" rather than a sluggish wait, without literally chaining off the header
-   collapse's own transitionend. Closing (Back) is intentionally instant, no reverse
-   animation — also matches the prototype, and keeps a rapid back-and-forth from queuing up
-   an exit animation behind the next open. */
+/* Header controls collapse first (sessions-guide.css), then this fades/slides up into the
+   same space. Closing (Back) is instant — no reverse animation. */
 .sg-detail-panel {
   position: absolute;
   inset: 0;
@@ -112,10 +97,7 @@
   flex-direction: column;
 }
 
-/* `both` fill-mode holds the "from" keyframe (opacity: 0) during the delay too, instead of
-   flashing the panel's normal (fully visible) style before the animation starts — with no
-   static opacity set outside the keyframes, so prefers-reduced-motion's `animation: none`
-   below just shows the panel instantly rather than stuck invisible. */
+/* `both` fill-mode holds opacity:0 during the delay instead of flashing full visibility. */
 .sg-detail-panel--open {
   display: flex;
   animation: sg-detail-in 0.25s ease 0.15s both;
@@ -176,12 +158,6 @@
 }
 
 /* Tinted body holding white pods. See docs/sessions-guide-implementation-notes.md. */
-
-/* gray-75 is the authored tint and is a primitive, so it does not flip with the theme —
-   the dark override at the bottom of this file swaps it for the darkest surface. */
-
-/* flex: 1 0 auto so the tint fills the panel when the content is shorter than it, without
-   ever being squeezed below its content height when the content is taller and scrolls. */
 .sg-detail__body {
   display: flex;
   flex-direction: column;
@@ -189,9 +165,7 @@
   background: var(--s2a-color-gray-75);
 }
 
-/* Back row. Static — scrolls away with the rest of the panel instead of pinning to the
-   top. Mobile keeps it on the white of the summary pod, which is flush with the header
-   above it; from 768px it becomes its own 60px row on the tinted body. */
+/* Static — scrolls away with the panel instead of pinning to the top. */
 .sg-detail__back-wrap {
   padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) 0;
   background: var(--s2a-color-background-default);
@@ -205,10 +179,6 @@
   flex: 1;
 }
 
-/* Below 1280px SessionDetailOverlay.js renders the pods as one flat stack, so there are no
-   column wrappers to style here — see .sg-detail__cols--split for the desktop layout. */
-
-/* 16px between a pod's heading and its content, every pod, every breakpoint. */
 .sg-detail__group {
   display: flex;
   flex-direction: column;
@@ -233,7 +203,6 @@
   color: var(--s2a-color-content-default);
 }
 
-/* Tops up the pod gap to Figma's wider list-to-toggle gap. */
 .sg-detail__group--products .sg-detail__more {
   margin-top: 4px;
 }
@@ -242,8 +211,6 @@
   margin-top: var(--s2a-spacing-xs);
 }
 
-/* Continues the white of the back row and the header above it. Its sections sit 16px apart
-   on mobile and open up to 24px from 768px (the tablet/desktop frames). */
 .sg-detail__group--summary {
   padding-top: var(--s2a-spacing-md);
   border-radius: 0 0 24px 24px;
@@ -267,8 +234,6 @@
   gap: var(--s2a-spacing-2xs);
 }
 
-/* Primary + additional track: two full rows stacked instead of the single-row badge + count
-   used elsewhere (see CategoryBadge.js's hideCount) -- Figma's "Status tag" component. */
 .sg-detail__channels--stacked {
   display: flex;
   flex-direction: column;
@@ -282,7 +247,6 @@
   flex-shrink: 0;
 }
 
-/* Smaller glyph for each row of the stacked primary + additional track variant. */
 .sg-detail__channel-icon--sm {
   width: 16px;
   height: 16px;
@@ -294,9 +258,6 @@
   color: var(--s2a-color-content-default);
 }
 
-/* Separates the channel badge from the time — only rendered when both are present.
-   Stretches to the tallest sibling (rather than a fixed height) so it still spans the
-   full column when the badge is the two-row stacked variant. */
 .sg-detail__meta-divider {
   align-self: stretch;
   width: 1px;
@@ -320,8 +281,6 @@
   margin: 0;
 }
 
-/* The IPOD/GDPR notice: authored HTML like the disclaimer (see utils/rich-text.js), hidden
-   when unauthored. Sits inside the summary pod, so it needs no inset of its own. */
 .sg-detail__legal {
   margin: 0;
   font-size: var(--s2a-font-size-xs);
@@ -329,8 +288,6 @@
   color: var(--s2a-color-content-default);
 }
 
-/* Neutralise the margins the browser applies to markup we did not author, and make links
-   legible without recolouring them. */
 .sg-detail__legal p {
   margin: 0 0 var(--s2a-spacing-xs);
 }
@@ -456,10 +413,7 @@
   gap: var(--s2a-spacing-md);
 }
 
-/* Tops up .sg-detail__group--summary's own 16px gap to a 48px summary-to-details gap,
-   scoped to just this adjacency rather than the shared container's `gap` — that's read by
-   every pod (Featured products, Speakers, etc), not only this one. Recalculated at 768px+
-   below since .sg-detail__group--summary's own gap widens to 24px there. */
+/* Own margin, not shared gap, since every pod uses the container's gap too. */
 .sg-detail__summary + .sg-detail__details {
   margin-top: calc(var(--s2a-spacing-3xl) - var(--s2a-spacing-md));
 }
@@ -513,7 +467,7 @@
   transform: rotate(180deg);
 }
 
-/* Attribute list (Technical level/Track/AI focus/Audience/Category) — tablet+ only per design. */
+/* Tablet+ only per design. */
 .sg-detail__attrs {
   display: none;
   flex-direction: column;
@@ -612,8 +566,6 @@
   flex-shrink: 0;
 }
 
-/* Tiles whose product has no authored icon in the Tier 1 config keep a neutral glyph
-   rather than a ragged gap where the app icon would be. */
 .sg-detail__product-icon--placeholder {
   border-radius: var(--s2a-border-radius-sm);
   background: var(--s2a-color-gray-800);
@@ -640,8 +592,6 @@
   color: var(--s2a-color-content-default);
 }
 
-/* Marks the tile as leaving the guide — parked in the tile's top-right corner, sized and
-   offset per Figma (10px at right 6.5/top 7). */
 .sg-detail__product-linkout {
   position: absolute;
   top: 7px;
@@ -657,8 +607,6 @@
     padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
   }
 
-  /* Its own row above the pods now, not a left rail. Same tint as the body behind it,
-     so it reads as part of the tinted surface rather than a separate white bar. */
   .sg-detail__back-wrap {
     height: 60px;
     display: flex;
@@ -681,14 +629,11 @@
     margin-top: calc(var(--s2a-spacing-3xl) - var(--s2a-spacing-lg));
   }
 
-  /* Badge and time hug the left together, rather than sitting at opposite ends. */
   .sg-detail__summary-top {
     justify-content: flex-start;
     gap: var(--s2a-spacing-sm);
   }
 
-  /* Primary + additional track sit side by side from tablet up, rather than the mobile
-     vertical stack. */
   .sg-detail__channels--stacked {
     flex-direction: row;
     align-items: center;
@@ -699,8 +644,6 @@
     font-size: var(--s2a-font-size-2xl);
   }
 
-  /* Full description at this width per the frames; only the description's own toggle is
-     dropped — the list pods keep their Show more affordance. */
   .sg-detail__desc-wrap {
     max-height: none;
     overflow: visible;
@@ -731,7 +674,6 @@
     padding-left: var(--s2a-spacing-20);
   }
 
-  /* --split is set by the component at this width, alongside the two-column DOM order. */
   .sg-detail__cols--split {
     flex-direction: row;
     align-items: flex-start;
@@ -741,8 +683,6 @@
     margin: 0 auto;
   }
 
-  /* Each column stacks its own pods 8px apart rather than being row-aligned with the much
-     taller summary pod. */
   .sg-detail__col {
     display: flex;
     flex-direction: column;
@@ -770,8 +710,6 @@
     gap: var(--s2a-spacing-sm);
   }
 
-  /* The desktop frame (1323:139144) sets the CTA row 24px below the title/captions/legal
-     block, where the narrower frames keep the whole summary on one 16px rhythm. */
   .sg-detail__actions {
     margin-top: var(--s2a-spacing-xs);
   }
@@ -780,7 +718,6 @@
     color: var(--s2a-color-gray-700);
   }
 
-  /* Back to a single column: the side column is too narrow for two speakers abreast. */
   .sg-detail__speakers {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -803,15 +740,11 @@
   margin-left: 2px;
 }
 
-/* From 768px, where the pill widens for its "Filter" label and shows the count, an active
-   filter set only darkens the glyph. */
 .sg-filter-btn--active .sg-filter-icon {
   background-color: var(--s2a-color-gray-800);
 }
 
-/* Mobile-only: a solid fill replaces the count, which doesn't fit the 40px circle. max-width
-   rather than mobile-first so this is one guard instead of five undo rules at 768px.
-   See docs/sessions-guide-implementation-notes.md. */
+/* Mobile-only: a solid fill replaces the count, which doesn't fit the 40px circle. */
 @media (max-width: 767px) {
   .sg-filter-count-badge {
     display: none;
@@ -826,13 +759,11 @@
     background-color: var(--s2a-color-content-knockout);
   }
 
-  /* Overrides .sg-filter-btn:hover, which would otherwise wash the fill out to 4% black. */
   .sg-filter-btn.sg-filter-btn--active:hover {
     background: var(--s2a-color-gray-1000);
     opacity: 0.85;
   }
 
-  /* Per-theme pair: *-default tokens don't flip inside .sg-portal. */
   [data-theme="dark"] .sg-filter-btn--active,
   .sg-portal[data-theme="dark"] .sg-filter-btn--active,
   [data-theme="dark"] .sg-filter-btn--active:hover,
@@ -847,11 +778,8 @@
 }
 
 /* ── Filter panel ─────────────────────────────────────────────
-   Grid areas, so one DOM order serves every breakpoint. Per-width layouts in
-   docs/sessions-guide-implementation-notes.md. */
+   Grid areas, so one DOM order serves every breakpoint. */
 .sg-filter-panel {
-  /* Owns the panel's inset so the drilled Save bar can cancel it and bleed its hairline to
-     the panel edges without the two values drifting apart — see __actions--drill. */
   --sg-filter-panel-pad: var(--s2a-spacing-md);
 
   position: fixed;
@@ -864,7 +792,6 @@
   animation: sg-filter-in 0.2s ease;
 }
 
-/* Must follow the rule above: a media query adds no specificity, so order decides. */
 @media (max-width: 767px) {
   .sg-filter-panel {
     --sg-filter-panel-pad: var(--s2a-spacing-lg);
@@ -892,8 +819,6 @@
   gap: var(--s2a-spacing-md);
 }
 
-/* Figma has no close affordance (Apply and click-away dismiss the panel), but the
-   takeover needs a visible one — park it in the top-right corner. */
 .sg-filter-panel__close {
   position: absolute;
   top: var(--s2a-spacing-xs);
@@ -910,7 +835,6 @@
 
 .sg-filter-panel__close:hover { color: var(--s2a-color-content-default); }
 
-/* Title + category switcher. */
 .sg-filter-panel__sidebar {
   grid-area: sidebar;
   min-width: 0;
@@ -944,8 +868,6 @@
   margin-left: var(--s2a-spacing-xs);
 }
 
-/* A horizontally scrolling strip on mobile; a vertical list from 768px up.
-Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. */
 .sg-filter-panel__cats {
   list-style: none;
   margin: 0;
@@ -986,8 +908,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
 
 .sg-filter-panel__cat--active { color: var(--s2a-color-content-default); }
 
-/* Every mobile row reads at full strength — the dimmed state exists to mark the selected
-   category in the sidebar layouts, which the mobile list doesn't have. */
 .sg-filter-panel__cat-label {
   display: inline-flex;
   align-items: center;
@@ -1043,8 +963,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   background-color: currentcolor;
 }
 
-/* Centred in the middle grid column, so it stays optically centred regardless of the
-   back button's width. */
 .sg-filter-panel__drill-title {
   grid-column: 2;
   margin: 0;
@@ -1057,8 +975,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   text-align: center;
 }
 
-/* Options card. One column on mobile so long product names aren't truncated,
-   widening to 2/3/4 as room allows. */
 .sg-filter-panel__options {
   grid-area: options;
   min-width: 0;
@@ -1073,7 +989,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   align-content: start;
 }
 
-/* The options own the scroll; the Save bar stays pinned under them. */
 .sg-filter-panel--drilled .sg-filter-panel__options {
   flex: 1;
   background: transparent;
@@ -1112,8 +1027,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   margin: 0;
 }
 
-/* A full-width stacked pair on mobile, 16px apart (Figma 11519:32627).
-   Becomes Figma's stacked 116x32 pair at 768px. */
 .sg-filter-panel__actions {
   grid-area: actions;
   display: flex;
@@ -1121,8 +1034,7 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   gap: var(--s2a-spacing-md);
 }
 
-/* `flex: none` is load-bearing — in this column, `flex: 1` collapses these to text height.
-   See docs/sessions-guide-implementation-notes.md. */
+/* `flex: none` is load-bearing — `flex: 1` collapses these to text height in this column. */
 .sg-filter-panel__apply,
 .sg-filter-panel__reset {
   flex: none;
@@ -1146,7 +1058,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
 
 .sg-filter-panel__apply:hover { opacity: 0.85; }
 
-/* Figma outlines the secondary buttons in gray-400, a step darker than Apply's 10% black. */
 .sg-filter-panel__reset {
   background: transparent;
   border-color: var(--s2a-color-gray-400);
@@ -1198,7 +1109,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
 /* ── Mobile screen 1: the category list owns the takeover's leftover height ───
    Placed after the base rules it overrides — a media query adds no specificity. */
 @media (max-width: 767px) {
-  /* The category list scrolls so Apply/Reset stay in view. min-height lets it shrink. */
   .sg-filter-panel__body {
     grid-template:
       "sidebar" minmax(0, 1fr)
@@ -1210,14 +1120,11 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
     min-height: 0;
   }
 
-  /* Only the list scrolls, so the "Filters" heading stays put. */
   .sg-filter-panel__cats {
     min-height: 0;
     overflow-y: auto;
   }
 
-  /* Clears the absolute close button on the title's row only, so the category rows below stay
-     full width — hairlines and chevrons reach the panel's padding edge. */
   .sg-filter-panel__title {
     padding-right: var(--s2a-spacing-xl);
   }
@@ -1234,14 +1141,11 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
     row-gap: var(--s2a-spacing-md);
   }
 
-  /* Figma's divider runs the full column height, which spans both sidebar rows —
-     so both carry the hairline and together they read as one line. */
   .sg-filter-panel__sidebar,
   .sg-filter-panel__actions {
     border-right: 1px solid var(--s2a-color-gray-75);
   }
 
-  /* Keeps the count badges clear of the divider and the scrollbar. */
   .sg-filter-panel__sidebar {
     gap: var(--s2a-spacing-xl);
     padding-right: var(--s2a-spacing-sm);
@@ -1267,9 +1171,8 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
 
   .sg-filter-panel__cat-chevron { display: none; }
 
-  /* `anywhere`, not `break-word`: only it lowers min-content size, which is what stops a long
-     label pushing the badge past the column edge.
-     See docs/sessions-guide-implementation-notes.md. */
+  /* `anywhere`, not `break-word`: only it lowers min-content size to stop a long label
+     pushing the badge past the column edge. */
   .sg-filter-panel__cat-label {
     display: flex;
     align-items: flex-start;
@@ -1278,7 +1181,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
     overflow-wrap: anywhere;
   }
 
-  /* margin-top centres the 18px badge on the 24px first line. */
   .sg-filter-panel__cat-badge {
     flex: none;
     margin-top: 3px;
@@ -1291,8 +1193,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
     gap: var(--s2a-spacing-md);
   }
 
-  /* Figma 9145:43768's fixed pair — min-height and the mobile padding have to come back off,
-     or the 32px pill can't hold its height. */
   .sg-filter-panel__apply,
   .sg-filter-panel__reset {
     flex: none;
@@ -1313,9 +1213,7 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   }
 }
 
-/* ── Desktop: anchored popover card ─────────────────────────────
-   Click-away wired in DrawerHeader.js. Fixed rather than max-* so Apply/Reset stay pinned.
-   See docs/sessions-guide-implementation-notes.md. */
+/* ── Desktop: anchored popover card — click-away wired in DrawerHeader.js ────── */
 @media (min-width: 1280px) {
   .sg-filter-panel {
     position: absolute;
@@ -1337,7 +1235,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
       0 217px 87px rgb(0 0 0 / 1%);
   }
 
-  /* Derived from the track width, so pills reflow to 3 rather than squeeze. */
   .sg-filter-panel__options {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     padding: var(--s2a-spacing-lg);
@@ -1355,7 +1252,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   border-color: var(--s2a-color-transparent-white-16);
 }
 
-/* Body drops to the darkest surface and the pods lift, or the two are indistinguishable. */
 [data-theme="dark"] .sg-detail__body,
 .sg-portal[data-theme="dark"] .sg-detail__body {
   background: var(--s2a-color-background-default);
@@ -1374,7 +1270,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   border-color: var(--s2a-color-border-subtle);
 }
 
-/* Default/subtle are near-inverted in dark, so the pair is flipped explicitly. */
 [data-theme="dark"] .sg-filter-panel__options,
 .sg-portal[data-theme="dark"] .sg-filter-panel__options {
   background: var(--s2a-color-background-default);
@@ -1385,8 +1280,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   background: var(--s2a-color-background-subtle);
 }
 
-/* The sidebar divider and button outlines are authored as light-mode black alphas
-   above — invert them rather than let them disappear on dark. */
 [data-theme="dark"] .sg-filter-panel__sidebar,
 .sg-portal[data-theme="dark"] .sg-filter-panel__sidebar {
   border-right-color: var(--s2a-color-transparent-white-08);
@@ -1397,7 +1290,6 @@ Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. 
   border-color: var(--s2a-color-transparent-white-16);
 }
 
-/* Dark frames (9145:44777/44778/44779) flip Apply to a white fill with black label. */
 [data-theme="dark"] .sg-filter-panel__apply,
 .sg-portal[data-theme="dark"] .sg-filter-panel__apply {
   background: var(--s2a-color-gray-25);

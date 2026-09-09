@@ -23,16 +23,12 @@ import { resolveTrackBadge, resolveNamedTrackBadge } from '../utils/session-filt
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 import { scrollBehavior } from '../utils/motion.js';
 
-// Collapsed lengths of the list pods, per the Figma frames (products 1325:141847,
-// speakers 1325:141990). A pod only grows a "Show more" toggle when it actually has more
-// than this.
+// Collapsed list-pod lengths (Figma products 1325:141847, speakers 1325:141990).
 const COLLAPSED_PRODUCTS = 6;
 const COLLAPSED_SPEAKERS = 5;
 
-// Only the desktop frame splits the pods into two columns (1323:139140). Tracked reactively
-// — and used to pick the DOM order rather than CSS `order`, so tab order always follows what
-// is on screen: summary → products → speakers when stacked, column by column when split.
-// Same hook shape as FilterPanel.js's useIsMobile().
+// Desktop splits pods into two columns (1323:139140); tracked reactively so DOM order
+// (used for tab order, not CSS `order`) always matches what's on screen.
 const DESKTOP_QUERY = '(min-width: 1280px)';
 const matchesDesktop = () => !!window.matchMedia?.(DESKTOP_QUERY).matches;
 
@@ -58,13 +54,8 @@ export function SessionDetailOverlay({ onBack }) {
   const [speakersExpanded, setSpeakersExpanded] = useState(false);
   const isDesktop = useIsDesktop();
 
-  // This overlay is only ever mounted while a detail is open (DrawerShell.js), so mount/
-  // unmount lines up exactly with open/close. On open, move focus onto Back before paint —
-  // a layout effect runs in the same synchronous commit as DrawerHeader's `inert` mutation on
-  // the header controls, so this pre-empts the browser's own blur-to-<body> fixup for the
-  // popstate/external-request open paths, where focus can otherwise still be inside the
-  // about-to-be-inert controls. On unmount (Back), restore focus to whatever was focused
-  // before this opened — the card that triggered it, in the common click-to-open case.
+  // On open, move focus to Back before paint (pre-empts the browser's own blur-to-<body>
+  // fixup); on unmount (Back), restore focus to whatever was focused before this opened.
   const backBtnRef = useRef(null);
   useLayoutEffect(() => {
     const previouslyFocused = document.activeElement;
@@ -79,8 +70,7 @@ export function SessionDetailOverlay({ onBack }) {
   const session = sessions.value.find((s) => s.id === activeSessionId);
   if (!session) return null;
 
-  // Read purely to establish a re-render dependency on time-driven session-state
-  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // Establishes a re-render dependency on time-driven session-state transitions.
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
@@ -94,23 +84,15 @@ export function SessionDetailOverlay({ onBack }) {
   const isLive = sessionState === 'live';
   const onDemand = sessionState === 'on-demand';
   const watchHref = safeUrl(getWatchDestination(session, sessionState));
-  // Live / on-demand sessions surface "Watch now" (disabled if there's no real
-  // destination); upcoming sessions surface "Add to schedule". Either can be turned off
-  // entirely via behaviorFlags — showWatchCta/showScheduleCta below gate on that too.
+  // Live/on-demand sessions show "Watch now"; upcoming shows "Add to schedule". Either can
+  // be disabled entirely via behaviorFlags.
   const showWatch = isLive || onDemand;
   const showWatchCta = showWatch && watchNowEnabled;
   const showScheduleCta = !showWatch && schedulingEnabled;
 
   function handleWatch(e) {
-    // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
-    // page itself) — close the widget instead of reloading the page out from under the player.
-    // requestWatchSameSession() asks that page to actually switch, if it's the kind that can
-    // (e.g. Broadcast, with multiple concurrent live sessions) — a no-op on pages with nothing
-    // subscribed (e.g. the homepage, which has only one live stream).
-    // Live-only: once on-demand, watchHref points at the individual session page — a real
-    // navigation is always correct there, so isLive gates this before isSamePage (which
-    // pretend-broadcast=true forces true unconditionally for manual QA on draft pages,
-    // and would otherwise swallow the on-demand navigation too).
+    // Already on the destination page — close the widget and ask it to switch instead of
+    // reloading the page out from under the player.
     if (isLive && isSamePage(watchHref)) {
       e.preventDefault();
       requestWatchSameSession(session.id);
@@ -120,12 +102,9 @@ export function SessionDetailOverlay({ onBack }) {
     }
   }
 
-  // null for a session with neither a primary track nor an override — no "Other" badge,
-  // matching swimlane placement.
   const trackBadge = resolveTrackBadge(session);
-  // Primary/override track badge + an additional track stack as two full rows (Figma's
-  // "Status tag" component) instead of the single-row badge + count used everywhere else --
-  // stackedTracks[0] is always trackBadge itself; only the rest need a fresh icon lookup.
+  // Primary/override track + additional tracks render as two full rows (Figma's "Status
+  // tag"); stackedTracks[0] is always trackBadge itself.
   const stackedTrackBadges = trackBadge?.stackedTracks?.map(
     (name, i) => (i === 0 ? trackBadge : resolveNamedTrackBadge(name)),
   ).filter(Boolean);
@@ -149,9 +128,8 @@ export function SessionDetailOverlay({ onBack }) {
     e.stopPropagation();
     const shareUrl = window.location.origin + setSessionParam(sessionParamValue(session));
     try {
-      // Checked explicitly rather than navigator.clipboard?.writeText(...): optional-chaining
-      // past a missing clipboard API would resolve `await undefined` immediately and fall
-      // through to the success toast below without ever having copied anything.
+      // Explicit check: optional-chaining past a missing clipboard API would resolve
+      // `await undefined` and still show the success toast.
       if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
       await navigator.clipboard.writeText(shareUrl);
       showToast({ message: 'Link copied!', variant: 'positive' });
@@ -160,9 +138,7 @@ export function SessionDetailOverlay({ onBack }) {
     }
   }
 
-  // Fixed order, per design. `AI focus` has no catalog attribute yet, so its row simply does
-  // not render until one is authored — same as any other unauthored attribute here. `Industry`
-  // is deliberately absent: it is not in this list and does not exist in the real catalog.
+  // Fixed order, per design. A row simply doesn't render until its attribute is authored.
   const attrs = [
     ['Technical level', session.technicalLevel],
     ['Track', session.tracks?.join(', ')],
@@ -171,16 +147,12 @@ export function SessionDetailOverlay({ onBack }) {
     ['Category', session.contentCategory?.join(', ')],
   ].filter(([, value]) => value);
 
-  // Each list pod renders its collapsed slice with the full count in the heading, so the
-  // toggle is only offered when it changes what's on screen.
   const products = session.products || [];
   const speakers = session.speakers || [];
   const shownProducts = productsExpanded ? products : products.slice(0, COLLAPSED_PRODUCTS);
   const shownSpeakers = speakersExpanded ? speakers : speakers.slice(0, COLLAPSED_SPEAKERS);
 
-  // Shared "Show more"/"Show less" affordance for the list pods — same markup as the
-  // description's More/Less toggle, with an explicit label for screen readers since the
-  // visible text alone doesn't say what expands.
+  // Shared "Show more"/"Show less" toggle for the list pods.
   const showMoreToggle = (expanded, setExpanded, label, controls) => html`
     <button
       class="sg-detail__more"
@@ -319,9 +291,6 @@ export function SessionDetailOverlay({ onBack }) {
                 </h3>
                 <div class="sg-detail__products" id="sg-detail-products">
                   ${shownProducts.map((p) => {
-    // Product icon and destination both come from the Tier 1 Event Configurator's
-    // authored products map — same resolution FilterPanel.js uses for its pills.
-    // An unmapped product has nowhere to link, so it stays a plain tile.
     const product = getProduct(p);
     const href = safeUrl(product?.pageUrl);
     const inner = html`
@@ -365,14 +334,8 @@ export function SessionDetailOverlay({ onBack }) {
               </div>
   `;
 
-  // Desktop splits into a wide main column and a 383px side column, each stacking its own
-  // pods; every narrower width is one stack in reading order. The order lives here rather
-  // than in CSS so the tab order matches what is on screen at both layouts.
-  //
-  // Session resources and the legal disclaimer are deliberately not rendered here: both are
-  // sourced from the public sessions catalog, which is reachable before an event goes live.
-  // Individual session pages hydrate them directly on page creation instead, where exposure
-  // isn't a pre-event leak.
+  // Desktop splits into a wide main column and a 383px side column; narrower widths are
+  // one stack in reading order. Order lives here, not CSS, so tab order matches the DOM.
   const pods = isDesktop
     ? html`
           <div class="sg-detail__col sg-detail__col--main">

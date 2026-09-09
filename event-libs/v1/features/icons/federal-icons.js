@@ -1,20 +1,14 @@
-// Adobe's shared, cross-site icon CDN ("federal"). Reimplemented here (instead of
-// importing Milo's getIcon()) because this module also runs standalone with no Milo
-// loaded. Federal serves one <svg> file per icon (not a <symbol> sprite), so parsing is a
-// plain DOMParser lookup.
+// Adobe's federal icon CDN, reimplemented here since this module also runs without Milo loaded.
 const PROD_ROOT = 'https://www.adobe.com';
 
 let federalRootOverride = null;
 
-// Test-only escape hatch — same ergonomics as icon-resolver.test.js's
-// setEventConfig({}, { miloLibs }) pattern, kept local to this module rather than routed
-// through the shared miloConfig singleton, since federal isn't Milo's own config.
+// Test-only override; not routed through miloConfig since federal isn't Milo's own config.
 export function setFederalRootOverride(root) {
   federalRootOverride = root;
 }
 
-// Mirrors Milo's own getFederatedContentRoot() (milo/libs/utils/utils.js) without
-// depending on Milo being loaded.
+// Mirrors Milo's getFederatedContentRoot() without requiring Milo to be loaded.
 function resolveFederalRoot() {
   if (federalRootOverride) return federalRootOverride;
   const { hostname, origin } = window.location;
@@ -24,16 +18,7 @@ function resolveFederalRoot() {
   return PROD_ROOT;
 }
 
-// Federal's SVGs are Illustrator exports that reuse generic ids (clip-path, clip-path-2,
-// linear-gradient, ...) across unrelated icons — cloneNode(true) preserves those ids
-// verbatim, so inlining more than one icon on the same page (or the same icon twice)
-// collides: a <clipPath id="clip-path"> from one icon can silently satisfy another
-// icon's (or another instance's) url(#clip-path) reference instead of its own. The
-// result renders broken — wrong clip region, missing gradient — with nothing throwing
-// to explain why. Rewriting every id to be unique per returned instance, and every
-// reference to it within the same tree, makes each clone safe to inline alongside any
-// other. See MWPW ticket for the reported symptom (creative-cloud-64/frame-io-64
-// rendering as a flat, mostly-monochrome smudge instead of their real multi-color art).
+// Rewrites cloned SVG ids per instance to avoid id collisions between inlined icons.
 let nextSvgIdSuffix = 0;
 
 function namespaceSvgIds(svg) {
@@ -45,10 +30,7 @@ function namespaceSvgIds(svg) {
   const idMap = new Map(idEls.map((el) => [el.id, `${el.id}${suffix}`]));
   idEls.forEach((el) => { el.id = idMap.get(el.id); });
 
-  // Covers every attribute that can reference an id: url(#id) (fill, stroke, clip-path,
-  // mask, filter, ...) and the bare #id form (href/xlink:href on <use>, gradient
-  // xlink:href chaining). Attribute-by-attribute rather than a fixed allowlist, so this
-  // doesn't need updating if federal's export starts referencing ids some other way.
+  // Covers every id-referencing attribute (url(#id), href/xlink:href) rather than a fixed allowlist.
   svg.querySelectorAll('*').forEach((el) => {
     [...el.attributes].forEach(({ name, value }) => {
       const urlMatch = value.match(/^url\(#(.+)\)$/);
@@ -64,9 +46,7 @@ function namespaceSvgIds(svg) {
   return svg;
 }
 
-// Map<name, SVGElement|null> — caches misses too, not just hits, since federal is one
-// HTTP request per icon name (no manifest); without this, rendering an icon not yet
-// uploaded to federal would re-fetch a 404 on every render.
+// Caches misses too, since federal has no manifest and a miss would otherwise re-fetch every render.
 const federalIconCache = new Map();
 
 async function fetchSvgFrom(url) {
@@ -82,19 +62,7 @@ async function fetchSvgFrom(url) {
   }
 }
 
-// Federal has three separate SVG namespaces, each with its own function below and never
-// merged into one fallback chain (checking more than one would just double the 404s for
-// a name the wrong namespace doesn't have):
-//   /assets/icons/svgs/    generic UI icons — this function. Has its own icons.json
-//                          manifest (see fetchFederalIconList below).
-//   /assets/svgs/          product logos, curated per-product by the product team, no
-//                          manifest — fetchFederalProductIcon below.
-//   /assets/icons/track-icons/
-//                          track icons, curated per-event by whoever authors the Tier 1
-//                          Event Config — fetchFederalTrackIcon below. Also no manifest:
-//                          same reason as products, an author types the slug rather than
-//                          picking from a list (see TrackIconEditor.js/
-//                          OverrideTrackIconEditor.js in the T1 Event Configurator).
+// Three separate federal SVG namespaces below - not merged into one fallback chain.
 export async function fetchFederalIcon(iconName) {
   if (!iconName) return null;
   if (federalIconCache.has(iconName)) {
@@ -111,9 +79,6 @@ export async function fetchFederalIcon(iconName) {
 
 const federalProductIconCache = new Map();
 
-// Product-logo namespace only — used by the Tier 1 Event Configurator's product-icon
-// preview and the sessions-guide FilterPanel's product filter options, both of which
-// call this directly rather than fetchFederalIcon above.
 export async function fetchFederalProductIcon(iconName) {
   if (!iconName) return null;
   if (federalProductIconCache.has(iconName)) {
@@ -128,16 +93,7 @@ export async function fetchFederalProductIcon(iconName) {
   return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
 }
 
-// Federal's track-icon namespace ships literal fill="black" (occasionally stroke="black")
-// baked into the artwork, unlike the generic /assets/icons/svgs/ namespace (already
-// fill="currentcolor" there) — so neither an author's chosen track color
-// (TrackIconEditor.js's per-track color field, applied via the --sg-badge-icon-color
-// custom property) nor a card's hover-to-white state (sessions-guide.css's
-// .sg-category-badge__icon-color rules) has anything to actually recolor. Rewriting the
-// literal black to currentColor restores both. Deliberately narrow: fill="none" (a
-// transparent hole/the root's own non-painting fill) and fill="white" (an intentional
-// cutout/highlight some of these two-tone icons use) are left untouched — recoloring those
-// too would erase the icon's own internal detail, not just its main silhouette color.
+// Recolors literal black fill/stroke to currentColor; skips white/none (intentional cutouts).
 function useCurrentColorForBlack(svg) {
   svg.querySelectorAll('*').forEach((el) => {
     ['fill', 'stroke'].forEach((attr) => {
@@ -151,13 +107,6 @@ function useCurrentColorForBlack(svg) {
 
 const federalTrackIconCache = new Map();
 
-// Track-icon namespace only — used by the T1 Event Configurator's TrackIconEditor/
-// OverrideTrackIconEditor previews and the live sessions-guide's CategoryBadge/
-// SessionDetailOverlay (whatever renders a track's icon), same pattern as
-// fetchFederalProductIcon above: no manifest to search, so callers resolve a typed slug
-// against this namespace directly instead of cascading through fetchFederalIcon (which
-// would 404 there — track icons never lived in the generic namespace — then fall through
-// to Milo's sprite, which won't have them either).
 export async function fetchFederalTrackIcon(iconName) {
   if (!iconName) return null;
   if (federalTrackIconCache.has(iconName)) {
@@ -175,9 +124,7 @@ export async function fetchFederalTrackIcon(iconName) {
   return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
 }
 
-// icons.json is federal's own manifest of every icon it hosts (a standard Helix sheet
-// export). Used to populate icon pickers with federal's live inventory instead of a
-// hardcoded list that would drift as icons are added there.
+// icons.json is federal's manifest of hosted icons, used to populate icon pickers live.
 let federalIconListPromise = null;
 
 export function fetchFederalIconList() {

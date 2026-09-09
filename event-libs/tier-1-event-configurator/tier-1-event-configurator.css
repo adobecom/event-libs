@@ -442,8 +442,6 @@ select.tec-field {
   min-width: 0;
 }
 
-/* Warning palette, reused for anything flagging a non-prod row — only
-   rendered for a non-prod row, so it stays quiet in the common (prod) case. */
 .tec-library__item-env {
   flex-shrink: 0;
   background: var(--tec-color-warning-bg);

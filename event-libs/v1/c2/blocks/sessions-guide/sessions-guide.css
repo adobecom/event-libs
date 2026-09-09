@@ -100,8 +100,7 @@
   100% { background-position: 0 0; }
 }
 
-/* Screen-reader-only text: used where a visual-only cue (a count badge, a status
-   change) needs a spoken equivalent. */
+/* Screen-reader-only text: visual-only cues (count badges, status changes) need a spoken equivalent. */
 .sg-sr-only {
   position: absolute;
   width: 1px;
@@ -121,8 +120,7 @@
     animation: none;
   }
 
-  /* The drawer's own slide is set inline by DrawerShell.setTop(), so it checks the
-     motion preference in JS instead. */
+  /* The drawer's own slide is set inline by DrawerShell.setTop(), which checks motion prefs in JS. */
   .sg-card,
   .sg-card__actions,
   .sg-live-card,
@@ -145,8 +143,7 @@
   }
 }
 
-/* Icon-only controls draw their glyph as a CSS background, which forced-colors mode
-   discards — keep a visible boundary so the control is still findable. */
+/* Icon-only controls draw their glyph as a CSS background, invisible in forced-colors mode. */
 @media (forced-colors: active) {
   .sg-close-btn,
   .sg-filter-panel__close,
@@ -254,11 +251,7 @@
   gap: var(--s2a-spacing-lg);
 }
 
-/* Collapses the whole controls row away when a session detail opens (replaces the old
-   slide-in-panel transition — see .sg-detail-panel below). A grid-row collapse, not a
-   fixed max-height: .sg-header-controls is a single row on tablet/desktop but stacks
-   taller on mobile, and a hardcoded max-height would either clip the taller mobile layout
-   or animate needlessly slow everywhere else. */
+/* Grid-row collapse, not max-height: row height varies by breakpoint (see .sg-detail-panel). */
 .sg-header-controls-collapse {
   display: grid;
   grid-template-rows: 1fr;
@@ -273,11 +266,7 @@
   min-height: 0;
 }
 
-/* overflow: hidden only while a detail is open/collapsing — not on the base rule. The
-   Filter panel and View dropdown menus are real overflow content that renders well past
-   this row's own height (same reason .sg-drawer::before clips corners without clipping
-   dropdown panels), and both are only ever open while the controls are in their normal,
-   non-collapsed state anyway — inert already blocks interacting with either mid-collapse. */
+/* Only while a detail is open/collapsing: Filter/View dropdowns overflow this row when open. */
 .sg-drawer--detail-open .sg-header-controls-collapse-inner {
   overflow: hidden;
 }
@@ -290,7 +279,6 @@
 
 /* ── Date Tabs ───────────────────────────────────────────── */
 
-/* Date tabs: equal-width tabs filling the container */
 .sg-date-tabs {
   display: flex;
   align-items: center;
@@ -327,7 +315,6 @@
 
 /* ── Right Controls ──────────────────────────────────────── */
 
-/* Filter row: dropdown takes available space, icon btns fixed */
 .sg-right-controls {
   display: flex;
   align-items: center;
@@ -421,8 +408,7 @@
   background: var(--s2a-color-gray-75);
 }
 
-/* Always rendered, empty when unselected, so every label lines up on one left edge
-   whether or not its row owns the checkmark. */
+/* Always rendered, empty when unselected, so every label lines up on the same left edge. */
 .sg-view-menu-item__check {
   display: inline-flex;
   align-items: center;
@@ -449,8 +435,7 @@
   overflow-y: auto;
 }
 
-/* tabindex="-1" is only a Back-to-top landing target, so the UA ring around the whole
-   list is noise. .sg-full-page's own version of this lives with its other rules below. */
+/* tabindex="-1" is only a Back-to-top landing target, so the UA focus ring here is noise. */
 .sg-body-scroll:focus,
 .sg-body-scroll:focus-visible {
   outline: none;
@@ -530,8 +515,7 @@
   mask-position: center;
 }
 
-/* Outlined circle, matching Figma's "Icon Button XL / XL Primary Outline" and the pill
-   treatment on its Filter sibling — 2px gray-100 ring rather than a bare icon. */
+/* Figma "Icon Button XL / XL Primary Outline" — 2px gray-100 ring rather than a bare icon. */
 .sg-search-btn {
   display: flex;
   align-items: center;
@@ -595,8 +579,7 @@
   overflow: hidden;
 }
 
-/* The input's own outline is suppressed in favour of a ring on the wrap, so the
-   indicator surrounds the whole field (icon + input + clear) rather than just the text. */
+/* Ring on the wrap, not the input, so it surrounds the whole field (icon + input + clear). */
 .sg-mobile-search-wrap:focus-within {
   outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
   outline-offset: 2px;
@@ -619,8 +602,7 @@
   color: rgb(0 0 0 / 40%);
 }
 
-/* Suppress the browser's own type="search" cancel button — a custom .sg-search-clear-btn
-   already renders next to it, so without this both appear once the field has a value. */
+/* Suppresses the native type="search" cancel button; .sg-search-clear-btn replaces it. */
 .sg-mobile-search-input::-webkit-search-cancel-button {
   appearance: none;
 }
@@ -642,9 +624,7 @@
   background: rgb(0 0 0 / 7%);
 }
 
-/* ── Desktop Inline Search (1280px+ only — see the 1280px block for the rest). Below
-   1280px this stays out of layout and out of the accessibility tree entirely — sg-search-btn
-   + sg-mobile-search-row is what mobile/tablet use instead. ─────────────────────── */
+/* Desktop-only (1280px+ block has the rest); below that, mobile/tablet use sg-search-btn instead. */
 .sg-search-inline {
   display: none;
 }
@@ -679,14 +659,7 @@
   z-index: 48;
 }
 
-/* Intentional, engineering-owned exception to "no hard-coded vertical spacing" (see
-   MWPW-201396 in CLAUDE.md) — narrowly scoped to real Mobile Safari (class applied by
-   isSafariMobile() in utils/browser.js, never on other browsers, including other iOS
-   browsers). Safari's own floating compact/single-tab address bar paints on top of the
-   page, outside our stacking context entirely, and can overlap this button at its default
-   24px offset. 64px is a starting estimate, not a measured value — Safari's native chrome
-   isn't reachable by any browser-automation tooling, so this needs eyes-on confirmation on
-   a real device and may need tuning. */
+/* Real Mobile Safari only (isSafariMobile()) — clears its floating address bar; see MWPW-201396. */
 .sg-cta-btn--safari-mobile {
   bottom: 64px;
 }
@@ -708,11 +681,7 @@
 
 /* ── View layouts ────────────────────────────────────────── */
 
-/* padding-bottom clears the floating Back to Top button (position: absolute/fixed,
-   bottom: 20px + ~78px tall — see .sg-back-to-top below), which otherwise sits on top of
-   the last row once scrolled to the end. Measured against the real broadcast page via
-   Chrome DevTools MCP; not a spacing token because it's sized to that specific overlay
-   control, not generic page-end spacing. */
+/* Clears the floating Back to Top button (~78px + 20px bottom); not a generic spacing token. */
 .sg-view {
   padding: 0 0 var(--s2a-spacing-80);
 }
@@ -1022,9 +991,7 @@
   transition: color 0.2s;
 }
 
-/* Vertical divider between track and time, matching the Figma meta row — applies at every
-   breakpoint, not just desktop, since a card with a second track badge or a visible time
-   needs the same separator on mobile. */
+/* Divider between track and time (Figma meta row) — applies at every breakpoint, not just desktop. */
 .sg-live-card__time::before,
 .sg-live-card__track-extra::before {
   content: '';
@@ -1036,9 +1003,7 @@
   vertical-align: middle;
 }
 
-/* The hover/focus fill only turns dark at 1024px+ (see .sg-live-card:is(:hover, :focus-within)
-   in the 1024-1279px and 1280px+ blocks) — below that it stays #fff, so this lighter divider
-   color would go invisible against it. Scoped to match, not applied below 1024px. */
+/* Scoped to 1024px+: below that the hover fill stays #fff, where this lighter color would vanish. */
 @media (min-width: 1024px) {
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
@@ -1076,8 +1041,7 @@
   color: var(--s2a-color-content-default);
   transition: color 0.2s;
 
-  /* Clamped to 2 lines and reserved at that height, so a 1-line title doesn't leave its
-     card shorter than a neighboring 2-line one. */
+  /* Reserved at 2 lines' height so a 1-line title doesn't leave its card shorter than a 2-line one. */
   min-height: calc(2 * 1.1em);
   /* stylelint-disable-next-line value-no-vendor-prefix */
   display: -webkit-box;
@@ -1100,9 +1064,7 @@
   margin-top: var(--s2a-spacing-lg);
 }
 
-/* `live` variant only (session-broadcast's Also Live carousel) — pushed to the row's far
-   end via its own margin rather than `justify-content: space-between` on the row itself, so
-   every other consumer of this row (no such element ever renders for them) is unaffected. */
+/* `live` variant only (Also Live carousel) — own margin so other row consumers are unaffected. */
 .sg-live-card__actions-time {
   margin-left: auto;
   color: var(--s2a-color-gray-600, #717171);
@@ -1139,9 +1101,7 @@
   color: #fff;
 }
 
-/* Figma 11658:143458 ("Button / Primary / Solid / On Light") — the upcoming Recommended
-   card's schedule CTA reads "Add to schedule"/"Added to schedule", not "Watch", so it gets
-   the outlined on-light treatment instead of the Watch button's solid dark fill. */
+/* Figma 11658:143458 — schedule CTA gets the outlined treatment, not the Watch button's solid fill. */
 .sg-live-card__btn--schedule-cta {
   background: #fff;
   border: 1px solid #000;
@@ -1152,10 +1112,7 @@
   display: none;
 }
 
-/* Figma 10533:55223 ("Icon Button XL / XL Primary Outline") — a solid dark border at rest,
-   not the near-invisible light gray this used to sit at on white. The heart glyph itself
-   (outline vs filled, see LiveCard.js) already carries the favorited/not distinction, so the
-   border no longer needs its own light/dark toggle. */
+/* Figma 10533:55223 — solid dark border; the heart glyph (see LiveCard.js) carries favorited state. */
 .sg-live-card__btn--favorite {
   background: #fff;
   border: 1px solid #292929;
@@ -1165,7 +1122,6 @@
   flex-shrink: 0;
   justify-content: center;
 }
-
 
 /* ── Time Slot Row ───────────────────────────────────────── */
 
@@ -1209,13 +1165,7 @@
   margin: 0;
 }
 
-/* TrackRow's category name sits directly in .sg-time-row__label (no separate time-value/
-   time-tz split like TimeSlotRow's), so it needs its own font declarations here to match
-   .sg-time-row__time-value -- the text that's actually visible in the Live & upcoming view.
-   font-family is explicit too: this is a real <h3>, which inherits Milo's heading-font-family
-   (Adobe Clean Display) -- .sg-time-row__time-value is a <span>, so it just inherits the
-   page's body-font-family (Adobe Clean) instead. Without this override the two fonts diverge
-   even once every other property here matches. */
+/* Matches .sg-time-row__time-value's font; font-family explicit since this is a real <h3>. */
 .sg-time-row__label--category {
   font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-lg);
@@ -1251,8 +1201,7 @@
   position: relative;
 }
 
-/* Mobile: transparent passthrough — the cards scroll natively inside.
-   Desktop overrides this to be the clipping window for the carousel. */
+/* Mobile: transparent passthrough. Desktop overrides this to clip the carousel. */
 .sg-time-row__viewport {
   width: 100%;
   min-width: 0;
@@ -1319,8 +1268,7 @@
 /* stylelint-disable-next-line no-descending-specificity */
 .sg-time-row__arrow:hover { background: var(--s2a-color-gray-75); }
 
-/* At the ends the arrow stays mounted but disabled (unmounting it would destroy focus),
-   so it must stay invisible even while the row is revealed. */
+/* Stays mounted but disabled at the ends (unmounting would destroy focus) — kept invisible. */
 .sg-time-row:is(:hover, :focus-within) .sg-time-row__arrow:disabled {
   opacity: 0;
   pointer-events: none;
@@ -1525,9 +1473,6 @@
 
 /* stylelint-disable-next-line no-descending-specificity */
 .sg-card__btn:hover { background: rgb(255 255 255 / 100%); }
-
-
-
 
 /* ── My Sessions / My Favorites tabs ────────────────────── */
 
@@ -1741,8 +1686,7 @@
     white-space: normal;
     overflow-wrap: break-word;
 
-    /* .sg-time-row__label's own font-size/color changes at this width -- restate
-       .sg-time-row__time-value's values so the category label keeps matching it. */
+    /* Restates .sg-time-row__time-value's values so the category label keeps matching it. */
     font-size: var(--s2a-font-size-lg);
     color: var(--s2a-color-gray-800);
   }
@@ -1869,9 +1813,7 @@
 /* ── Tablet only: floating carousel arrows ───────────────────────────────── */
 
 @media (min-width: 768px) and (max-width: 1023px) {
-  /* Cards scroll natively here; the arrows float over the strip as glass
-     buttons, vertically centered on the card. Only the actionable direction
-     shows, matching the current scroll position. */
+  /* Cards scroll natively; arrows float over the strip as glass buttons, only actionable ones shown. */
   .sg-carousel__body { position: relative; }
 
   .sg-carousel__nav { display: contents; }
@@ -1916,10 +1858,7 @@
     padding-right: 0;
   }
 
-  /* Cancels .sg-carousel-section's 20px right padding, same trick as the desktop
-     breakpoint below — without it, this rule stays at the 768px+ breakpoint's
-     margin-right:0 and the peeking card gets clipped at the section's padding edge
-     instead of bleeding to the section's true outer edge. */
+  /* Cancels .sg-carousel-section's 20px right padding so the peeking card bleeds to the edge. */
   .sg-carousel__track {
     margin-right: -20px;
   }
@@ -1935,10 +1874,7 @@
     right: 0;
   }
 
-  /* No position here — .sg-carousel__nav (position:absolute) must anchor to the outer,
-     unconditionally-relative .sg-carousel instead, so it lands next to the section title,
-     not on top of the card row below. See the desktop breakpoint, which relies on the same
-     fallback. */
+  /* No position here: .sg-carousel__nav anchors to the relatively-positioned .sg-carousel. */
   .sg-carousel__body {
     align-items: center;
     gap: 36px;
@@ -1973,10 +1909,8 @@
     border-color: #000;
   }
 
-  /* Fixed, not auto (Figma: 425x240) — see the desktop breakpoint's identical rule for
-     why: a real <img>'s height:100% against an auto parent falls back to its own
-     intrinsic aspect ratio instead of matching the text column like the placeholder div
-     does, so two sibling cards could end up different heights depending on photo ratio. */
+  /* Fixed, not auto (Figma: 425x240): an <img> with height:100% keeps its own aspect ratio,
+     so sibling cards could end up different heights depending on photo ratio otherwise. */
   .sg-live-card__image {
     width: 425px;
     height: 240px;
@@ -2046,8 +1980,7 @@
     white-space: normal;
     text-overflow: clip;
 
-    /* Reserved at 2 lines' worth of height, same reasoning as .sg-live-card__title, so a
-       1-line description doesn't leave its card shorter than a neighboring 2-line one. */
+    /* Reserved at 2 lines' height, same reasoning as .sg-live-card__title above. */
     min-height: calc(2 * 1.2em);
 
     /* stylelint-disable-next-line value-no-vendor-prefix */
@@ -2084,8 +2017,7 @@
     padding: 0 var(--s2a-spacing-lg);
   }
 
-  /* The card's hover fill turns black at this breakpoint — flip to a white border/text
-     so the outline stays visible instead of vanishing into it. */
+  /* The hover fill turns black here — flip to a white border/text so it stays visible. */
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--schedule-cta {
     background: transparent;
     border-color: #fff;
@@ -2106,9 +2038,7 @@
     color: #fff;
   }
 
-  /* Same specificity as the base rule's hover+favorited override (which keeps a dark
-     #292929 border for a white hover fill) but declared later, so it wins here — the card's
-     hover fill turns black at this breakpoint, and a dark border on black is invisible. */
+  /* Declared later to win over the base rule's dark border, invisible against this black hover fill. */
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
     border-color: #fff;
   }
@@ -2184,18 +2114,13 @@
     width: auto;
   }
 
-  /* Figma nests Filter + Search in their own 16px-gap group, matching the 16px between
-     the dropdown and that pair. Base stays 8px for the tighter narrow-viewport header. */
+  /* Figma nests Filter + Search in their own 16px-gap group; base stays 8px for narrower headers. */
   .sg-filter-wrap {
     gap: var(--s2a-spacing-md);
   }
 
-  /* ── Desktop Inline Search (Figma 10114:52057) ────────────────
-     The icon morphs in place into the field instead of opening the row below (mobile/
-     tablet's treatment) — sg-search-btn/sg-mobile-search-row are hidden here, and
-     sg-search-inline (display:none below 1280px) takes over. One persistent input, sized
-     by flex layout rather than its own width transition, so overflow:hidden on the pill
-     plus a single width transition on the pill is all that has to animate. */
+  /* ── Desktop Inline Search (Figma 10114:52057) — icon morphs into the field, replacing
+     mobile/tablet's sg-search-btn + sg-mobile-search-row. ──────────────────────────── */
   .sg-search-btn {
     display: none;
   }
@@ -2208,9 +2133,7 @@
     display: inline-flex;
     align-items: center;
 
-    /* Explicit rather than relying on .sg-portal's inherited border-box: with a declared
-       height/width plus a border, content-box would add the border on top (40px -> 44px),
-       throwing the icon off-center relative to the same-height Filter button next to it. */
+    /* border-box: a declared height/width plus a border would otherwise add on top (40->44px). */
     box-sizing: border-box;
     height: 40px;
     width: 40px;
@@ -2233,11 +2156,7 @@
     outline-offset: 2px;
   }
 
-  /* 36px, not the pill's own 40px: .sg-search-inline's 40px already includes its 2px border
-     (box-sizing: border-box), so its content box — what this actually has to fill — is
-     40px minus that border on both sides. Sizing this to the outer 40px overflowed the
-     content box by 2px a side, and overflow:hidden on the pill clipped it asymmetrically —
-     the icon looked pushed off-center rather than actually being centered and cut off. */
+  /* 36px, not 40px: the pill's 40px already includes its 2px border, so the content box is smaller. */
   .sg-search-inline__icon-btn,
   .sg-search-inline__icon {
     display: flex;
@@ -2272,8 +2191,7 @@
     height: 100%;
     padding: 0;
 
-    /* Text/placeholder only fade in once the pill has (mostly) finished widening, rather
-       than appearing instantly and looking like it's popping out of a too-small box. */
+    /* Fades in only once the pill has mostly finished widening, not instantly. */
     opacity: 0;
     transition: opacity 0.15s ease;
   }
@@ -2283,9 +2201,7 @@
     transition-delay: 0.1s;
   }
 
-  /* Suppress the browser's own type="search" cancel button — a custom
-     .sg-search-inline__clear already renders next to it once searchOpen is true, so
-     without this both appear once the field has a value. */
+  /* Suppresses the native cancel button; .sg-search-inline__clear replaces it. */
   .sg-search-inline__input::-webkit-search-cancel-button {
     appearance: none;
   }
@@ -2361,8 +2277,7 @@
     height: 8px;
   }
 
-  /* Figma: 24px above the label, 12px below, on the rows' 20px gutter. No top
-     margin — the drawer header's own bottom padding is the gap above it. */
+  /* No top margin — the drawer header's own bottom padding is the gap above it. */
   .sg-upcoming-title {
     font-size: var(--s2a-font-size-2xl);
     line-height: 110%;
@@ -2374,9 +2289,7 @@
   /* ── Carousel ──────────────────────────────────────────────── */
 
   .sg-carousel__cards {
-    /* The static .sg-carousel__track does the clipping; this is the element
-       that gets the translate transform, so it must stay overflow:visible —
-       otherwise its clip box travels with the transform and hides the cards. */
+    /* Must stay overflow:visible — this gets the translate transform; the static track clips. */
     overflow: visible;
     scroll-snap-type: none;
     -webkit-overflow-scrolling: auto;
@@ -2393,8 +2306,7 @@
     margin-right: -20px;
   }
 
-  /* Nav arrows sit at the top-right of the section header. The nav lives in
-     .sg-carousel__body, so it anchors to the relatively-positioned carousel. */
+  /* Nav lives in .sg-carousel__body, so it anchors to the relatively-positioned carousel. */
   .sg-carousel__nav {
     display: flex;
     position: absolute;
@@ -2441,12 +2353,8 @@
     border-color: #000;
   }
 
-  /* Fixed, not auto (Figma: 560x316). A real <img> with height:100% against an auto
-     parent falls back to its own intrinsic aspect ratio (a replaced-element rule, unlike
-     the thumb-placeholder div, which just collapses to 0 and lets align-items:stretch
-     match the text column instead) — so two sibling cards in the same carousel row could
-     end up different heights depending on each session's own photo ratio. object-fit:cover
-     on the img crops any ratio to this fixed box instead. */
+  /* Fixed, not auto (Figma: 560x316): an <img> with height:100% keeps its own aspect ratio,
+     so sibling cards could differ in height by photo ratio; object-fit:cover crops to this box. */
   .sg-live-card__image {
     width: 560px;
     height: 316px;
@@ -2520,13 +2428,10 @@
     white-space: normal;
     text-overflow: clip;
 
-    /* Reserved at 2 lines' worth of height, same reasoning as .sg-live-card__title, so a
-       1-line description doesn't leave its card shorter than a neighboring 2-line one. */
+    /* Reserved at 2 lines' height, same reasoning as .sg-live-card__title above. */
     min-height: calc(2 * 1.2em);
 
-    /* Shown again from here up — hidden below 1024px (mobile/tablet). Set explicitly rather
-       than relying on the 1024-1279px block's own display: -webkit-box to cascade up, since
-       that block's max-width means it doesn't apply at this breakpoint at all. */
+    /* Set explicitly: the 1024-1279px block's rule doesn't cascade up past its own max-width. */
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -2560,8 +2465,7 @@
     padding: 0 var(--s2a-spacing-lg);
   }
 
-  /* The card's hover fill turns black at this breakpoint — flip to a white border/text
-     so the outline stays visible instead of vanishing into it. */
+  /* The hover fill turns black here — flip to a white border/text so it stays visible. */
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--schedule-cta {
     background: transparent;
     border-color: #fff;
@@ -2585,9 +2489,7 @@
     color: #fff;
   }
 
-  /* Same specificity as the base rule's hover+favorited override (which keeps a dark
-     #292929 border for a white hover fill) but declared later, so it wins here — the card's
-     hover fill turns black at this breakpoint, and a dark border on black is invisible. */
+  /* Declared later to win over the base rule's dark border, invisible against this black hover fill. */
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
     border-color: #fff;
   }
@@ -2599,8 +2501,7 @@
     align-items: center;
     gap: var(--s2a-spacing-3xl);
 
-    /* Left gutter matches .sg-upcoming-title so the label column lines up with the
-       section heading; right side stays 0 for the carousel to run to the edge. */
+    /* Left gutter matches .sg-upcoming-title; right stays 0 so the carousel runs to the edge. */
     padding: var(--s2a-spacing-sm) 0 var(--s2a-spacing-sm) var(--s2a-spacing-20);
     border-bottom: 1px solid #e8e8e8;
     max-height: 600px;
@@ -2626,8 +2527,7 @@
     white-space: normal;
     overflow-wrap: break-word;
 
-    /* .sg-time-row__label's own font-size/color changes at this width -- restate
-       .sg-time-row__time-value's values so the category label keeps matching it. */
+    /* Restates .sg-time-row__time-value's values so the category label keeps matching it. */
     color: var(--s2a-color-gray-800);
     font-size: var(--s2a-font-size-lg);
     font-style: normal;
@@ -2640,8 +2540,7 @@
     width: auto;
   }
 
-  /* The viewport clips, not the track, so the arrows can overhang. clip + visible is an
-     allowed combo, so card shadows still show. */
+  /* The viewport clips, not the track, so the arrows can overhang; clip+visible still shows shadows. */
   .sg-time-row__viewport {
     overflow-x: clip;
     overflow-y: visible;
@@ -2652,9 +2551,7 @@
     flex-direction: row;
     gap: var(--s2a-spacing-md);
 
-    /* This element gets the translateX; it must stay overflow:visible so its
-       clip box doesn't travel with the transform (and so hovered cards can
-       grow past the strip's tight content box). The static viewport clips. */
+    /* Must stay overflow:visible — this gets the translateX; the static viewport clips. */
     overflow: visible;
     width: auto;
     padding: 0;
@@ -2744,8 +2641,7 @@
                 border-width 0.45s ease;
   }
 
-  /* Restated because the resting .is-scheduled/.is-favorited rule ties on specificity and
-     is declared later. :focus-within matters as much as :hover for keyboard users. */
+  /* Restated: the resting .is-scheduled/.is-favorited rule ties on specificity and is later. */
   :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
   :is(.sessions-guide, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
     background: var(--s2a-color-gray-900);
@@ -2848,8 +2744,7 @@
     pointer-events: auto;
   }
 
-  /* Heart slides down into its correct position as schedule reveals above it.
-     Classes set on mouseenter only — prevents re-trigger on state change while hovered. */
+  /* Classes set on mouseenter only, so state changes while hovered don't re-trigger the animation. */
   .sg-card--anim-fav .sg-card__btn--favorite {
     animation: sg-card-heart-slide 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
@@ -2895,8 +2790,7 @@
     overflow: hidden;
   }
 
-  /* max-height is set by JS from the row's real height, so the vertical slide stays in
-     sync with the card's horizontal collapse. */
+  /* max-height is set by JS from the row's real height, keeping the slide in sync with the card. */
   .sg-time-row--collapsing {
     opacity: 0 !important;
     margin-top: 0 !important;
@@ -2910,8 +2804,7 @@
   }
 }
 
-/* ── Suppress card hover on touch desktops (≥1280px, hover: none) ──
-   Below 1280px the base styles already group :hover with the rest state. */
+/* ── Suppress card hover on touch desktops (≥1280px, hover: none) ── */
 
 @media (hover: none) and (min-width: 1280px) {
   /* Kill transitions so tap-triggered :hover resets are instant */
@@ -2984,8 +2877,7 @@
   background: var(--s2a-color-background-default);
 }
 
-/* tabindex="-1" is only a Back-to-top landing target, so the UA ring around the whole
-   page is noise — see .sg-body-scroll's own version of this rule above. */
+/* tabindex="-1" is only a Back-to-top landing target, so the UA focus ring here is noise. */
 .sg-full-page:focus,
 .sg-full-page:focus-visible {
   outline: none;
@@ -3051,9 +2943,7 @@
   font-size: 12px;
 }
 
-/* "+N" indicator for a session's additionalTracks — Figma "Component/S/Bold",
-   full-strength content-default (currentcolor so it inverts with the label on
-   dark card hover), no dimming. */
+/* "+N" indicator for additionalTracks (Figma "Component/S/Bold") — currentcolor, no dimming. */
 .sg-category-badge__count {
   font-size: var(--s2a-font-size-xs);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
@@ -3240,14 +3130,12 @@
 }
 
 
-/* ── Back to Top (Figma 9145:44653 — desktop; same treatment carried to mobile/tablet
-   since the show-on-scroll behavior isn't breakpoint-specific) ─────────────────────── */
+/* ── Back to Top (Figma 9145:44653) — same treatment on mobile/tablet and desktop ─────── */
 
 .sg-back-to-top {
   position: absolute;
 
-  /* Pulled left by the padding below so the arrow and label still sit at the design's
-     20px inset from the drawer edge — only the glass extends further out. */
+  /* Pulled left by the padding below so the arrow/label sit at the design's 20px inset. */
   left: calc(var(--s2a-spacing-20, 20px) - var(--s2a-spacing-xs));
   bottom: var(--s2a-spacing-20, 20px);
   z-index: 40;
@@ -3255,15 +3143,13 @@
   flex-direction: column;
   align-items: flex-start;
 
-  /* Figma leaves the left padding at 0, which cuts the blur off hard against the arrow.
-     Matched to the other three sides instead so the frosting fades in symmetrically. */
+  /* Matched to the other three sides so the frosting fades in symmetrically. */
   gap: var(--s2a-spacing-xs);
   padding: var(--s2a-spacing-xs);
   border: none;
   border-radius: var(--s2a-border-radius-sm);
 
-  /* Otherwise the button's UA default background-color paints solid behind the glass
-     ::before below, and the translucency/blur have nothing to show through. */
+  /* transparent: otherwise the UA default background paints solid behind the glass ::before. */
   background: transparent;
   cursor: pointer;
   opacity: 0;
@@ -3271,11 +3157,8 @@
   transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
-/* Glass fill lives on a pseudo-element (Figma 11889:43436), not the button itself, so its
-   blur/mask don't soften the arrow/label painted on top of it (z-index: -1 keeps it behind
-   them despite painting order). The box extends past the visible content and fades out via
-   a radial mask, rather than blurring the box's own edges — that's what keeps it blending
-   in instead of reading as a soft-but-visible rounded-rect. */
+/* Glass fill on a pseudo-element (Figma 11889:43436) so its blur/mask don't soften the
+   arrow/label; fades out via a radial mask rather than blurring the box's own edges. */
 .sg-back-to-top::before {
   content: '';
   position: absolute;
@@ -3293,8 +3176,7 @@
   visibility: visible;
 }
 
-/* Full-page surface: the window scrolls, so the button anchors to the viewport rather
-   than to the drawer body. */
+/* Full-page surface: the window scrolls, so this anchors to the viewport, not the drawer body. */
 .sg-back-to-top--fixed {
   position: fixed;
   z-index: 60;

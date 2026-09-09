@@ -1,9 +1,5 @@
-// Promoted to ../../../utils/session-state.js since the shared session-state-ticker
-// needs it and utils/ shouldn't reach back into this block's directory. Re-exported here
-// so existing call sites in this block don't need to change their import path.
+// Re-exported so existing call sites in this block don't need to change their import path.
 export { getNowMs } from '../../../../utils/session-state.js';
-// Shared with features/conflict-modal/conflict-modal.js, which can't depend on a
-// block-scoped util — same re-export reasoning as getNowMs above.
 export { formatDuration } from '../../../../utils/date-time-helper.js';
 
 export function detectUserTimezone() {
@@ -14,21 +10,13 @@ export function detectUserTimezone() {
   }
 }
 
-// Some real sessions (canceled, TBD, overflow-room placeholders) have no scheduled
-// sessionTime yet, so startTimeUtc/endTimeUtc can be ''. Intl.DateTimeFormat.format()
-// throws RangeError on an Invalid Date rather than degrading gracefully like
-// Date.parse() (used by isSessionLive() etc. below) — this keeps every formatter here
-// call-site-safe without requiring every caller to guard first.
+// Guards against '' startTimeUtc/endTimeUtc: Intl.DateTimeFormat throws RangeError on an Invalid Date.
 function safeDate(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-// Intl always renders dayPeriod as "AM"/"PM" with a preceding space (e.g. "11:00 AM"); we
-// want it lowercase and attached to the time instead ("11:00am"), so build the string from
-// parts rather than the formatted output. That separator isn't always a plain ASCII space —
-// modern ICU data renders it as a narrow no-break space (U+202F) in many environments — so
-// match on "blank" rather than an exact character to strip it regardless.
+// Builds "11:00am" from parts; matches on "blank" since ICU's AM/PM separator isn't always an ASCII space.
 function joinTimeParts(parts) {
   return parts.reduce((out, part, i) => {
     if (part.type === 'literal' && part.value.trim() === '' && parts[i + 1]?.type === 'dayPeriod') return out;
@@ -98,8 +86,7 @@ export function allSessionsEnded(sessions, nowMs) {
   return sessions.length > 0 && sessions.every((s) => nowMs > Date.parse(s.endTimeUtc));
 }
 
-// Returns null for a session with no valid startTimeUtc, so callers comparing against a
-// real day key (e.g. sessionsForDay()) naturally exclude it instead of crashing.
+// Returns null for a session with no valid startTimeUtc so day-key comparisons exclude it instead of crashing.
 export function getSessionDayKey(session, userTz) {
   const date = safeDate(session.startTimeUtc);
   if (!date) return null;

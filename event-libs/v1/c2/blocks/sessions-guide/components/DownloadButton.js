@@ -4,9 +4,7 @@ import { downloadICS } from '../utils/ics.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { IconDownload } from './icons.js';
 
-// Exported so this is directly unit-testable: the test-time htm-preact mock drops
-// function props entirely (`onclick=${fn}` renders nothing), so a real click can't be
-// simulated against the rendered markup.
+// Exported for testability: the test-time htm-preact mock drops function props, so clicks can't be simulated.
 export function downloadSchedule(sessionList, scheduledIds) {
   const scheduledSessions = sessionList.filter((s) => scheduledIds.has(s.id));
   if (!downloadICS(scheduledSessions)) {
@@ -17,10 +15,7 @@ export function downloadSchedule(sessionList, scheduledIds) {
 export function DownloadButton() {
   const isEmpty = !sessions.value.some((s) => scheduled.value.has(s.id));
 
-  // Custom-styled tooltip (Figma 11884:55569), desktop-only — see sessions-guide-overlays.css.
-  // Pure CSS reveal on :hover/:focus-visible (~ sibling combinator), no JS needed for
-  // something this small. No `title` attribute: it would pop a second, native tooltip
-  // on top of this one, and aria-label already carries the accessible name.
+  // No `title` attribute: it would pop a second, native tooltip on top of this custom one.
   return html`
     <span class="sg-download-btn-wrap">
       <button

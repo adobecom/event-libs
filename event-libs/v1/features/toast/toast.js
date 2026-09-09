@@ -1,15 +1,13 @@
 import { signal } from '../../deps/htm-preact.js';
 import { createTag, loadStyle } from '../../utils/utils.js';
 
-// Page-level, framework-agnostic toast: any block (Preact or vanilla) that touches the
-// shared session-store actions can surface feedback here, not just sessions-guide.
-// Ordered newest-first (index 0) — every toast added is shown, stacked, none wait.
+// Page-level, framework-agnostic toast: any block can surface feedback here, not just sessions-guide.
+// Ordered newest-first (index 0); every toast added is shown, stacked, none wait.
 export const toasts = signal([]);
 
 let nextId = 0;
 
-// Auto-dismiss floor from https://spectrum.adobe.com/page/toast/#Auto-dismissible —
-// enough time to read before it disappears (WCAG 2.2.1).
+// Auto-dismiss floor per WCAG 2.2.1 (enough time to read before it disappears).
 const MIN_TOAST_DURATION = 5000;
 
 function resolveDuration({ ctaLabel, duration }) {
@@ -23,12 +21,7 @@ function resolveDuration({ ctaLabel, duration }) {
 export function showToast({
   message, variant = 'neutral', ctaLabel = null, ctaAction = null, ctaHref = null, duration, key = null,
 } = {}) {
-  // Actionable toasts (ctaLabel set — never auto-dismiss, so the user has to dismiss them
-  // manually) cap at one per `key`: a repeat trigger of the same kind (e.g. mashing an
-  // unauth'd favorite button) is a no-op while one's already showing, rather than stacking a
-  // duplicate or re-announcing an unchanged message to screen readers. A *different* key
-  // (e.g. favorite vs. add to schedule) still gets its own toast. Toasts without a key, or
-  // without ctaLabel (already auto-dismiss on their own), are unaffected and always stack.
+  // Actionable toasts cap at one per `key`: a repeat trigger while one's showing is a no-op.
   if (key && ctaLabel && toasts.value.some((t) => t.key === key)) return null;
 
   nextId += 1;
@@ -46,9 +39,7 @@ export function showToast({
   return id;
 }
 
-// Pure, synchronous removal from the source of truth. Called directly this dismisses
-// instantly (no exit animation) — the renderer's close-button/timer paths animate out
-// first, then call this once the transition finishes. No id clears every toast.
+// Called directly this dismisses instantly (no exit animation); no id clears every toast.
 export function hideToast(id) {
   if (id === undefined) {
     toasts.value = [];
@@ -65,8 +56,7 @@ const ICONS = {
 
 const CLOSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 
-// Mirrors react-stately's useToastState Timer: tracks remaining time across
-// pause/resume so a hover/focus pause doesn't reset or lose the countdown.
+// Tracks remaining time across pause/resume so a hover/focus pause doesn't reset the countdown.
 class Timer {
   constructor(callback, delay) {
     this.callback = callback;
@@ -104,15 +94,9 @@ function renderToastContent(el, data) {
   const icon = ICONS[data.variant];
   if (icon) el.append(createTag('span', { class: 'sg-toast__icon-wrap' }, icon));
 
-  // flex-wrap body: message + CTA share one line when they fit (card just grows to hug
-  // its content, per Figma), and the CTA drops to its own right-aligned line — not a
-  // full-width row — once the card hits its max-width and they no longer fit together.
-  // Mounted aria-hidden, revealed one frame after the enter transition starts — mirrors
-  // react-aria's useToast isVisible-after-layout-effect trick so screen readers announce
-  // reliably once, instead of missing or double-announcing at initial (incomplete) mount.
-  // role="alert" (assertive) is reserved for the negative variant — every other variant
-  // is a routine, often-stacked confirmation, and assertive announcements would interrupt
-  // each other rather than queue politely.
+  // Mounted aria-hidden, revealed one frame after the enter transition starts, so screen readers
+  // announce reliably once instead of missing or double-announcing at initial mount.
+  // role="alert" is reserved for negative; other variants queue politely instead of interrupting.
   const body = createTag('div', {
     class: 'sg-toast__body',
     role: data.variant === 'negative' ? 'alert' : 'status',
@@ -145,8 +129,7 @@ export function mountToast() {
 
   loadStyle(new URL('./toast.css', import.meta.url).href);
 
-  // Landmark region — F6/Shift+F6 navigable, aria-label kept as a live "N notifications"
-  // count instead of a separate visually-hidden announcer element.
+  // Landmark region, F6/Shift+F6 navigable; aria-label doubles as the live announcer.
   const region = createTag('div', {
     class: 'sg-toast-region', role: 'region', 'aria-label': '0 notifications', tabindex: '-1',
   }, '', { parent: document.body });
@@ -155,8 +138,7 @@ export function mountToast() {
   let hovered = false;
   let focused = false;
 
-  // Region-wide: hovering/focusing anywhere in the stack pauses every visible toast's
-  // timer, not just the one under the cursor (mirrors react-aria's useToastRegion).
+  // Region-wide: hovering/focusing anywhere in the stack pauses every visible toast's timer.
   function updateTimers() {
     const shouldPause = hovered || focused;
     items.forEach(({ timer }) => {
@@ -216,8 +198,7 @@ export function mountToast() {
         finalizeDismiss(data.id);
       });
 
-      // Double rAF: first frame mounts hidden, second triggers the transition (no
-      // @keyframes flash) and reveals the content to assistive tech.
+      // Double rAF: first frame mounts hidden, second triggers the transition (no flash).
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           el.classList.add('sg-toast--visible');
@@ -226,8 +207,7 @@ export function mountToast() {
       });
     });
 
-    // Toasts removed directly via hideToast() (not through requestDismiss) have no exit
-    // animation to wait for — clean them up immediately.
+    // Toasts removed directly via hideToast() have no exit animation to wait for.
     items.forEach((item, id) => {
       if (item.leaving || list.some((t) => t.id === id)) return;
       item.timer?.clear();

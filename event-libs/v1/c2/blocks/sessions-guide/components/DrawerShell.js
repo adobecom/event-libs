@@ -21,8 +21,7 @@ const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0
 // UA never changes mid-session, so this is read once rather than on every render.
 const isOnSafariMobile = isSafariMobile();
 
-// Both html and body: which one scrolls depends on the host page, and body's overflow
-// doesn't propagate to the viewport when html is the scroller.
+// Sets both html and body: which one scrolls depends on the host page.
 function lockPageScroll(locked) {
   const value = locked ? 'hidden' : '';
   document.documentElement.style.overflow = value;
@@ -40,7 +39,6 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
   return {
     found: true,
     sessionId: found.id,
-    // Resolved here so the caller doesn't search the same list by the same key again.
     sessionParam: sessionParamValue(found),
     defaultView: getDefaultView(authValue.isRegistered),
   };
@@ -56,7 +54,6 @@ export function DrawerShell() {
   const drawerStateRef = useRef(state.drawerState);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Keep drawerStateRef in sync so gesture handlers always have current value
   useEffect(() => {
     drawerStateRef.current = state.drawerState;
   }, [state.drawerState]);
@@ -75,14 +72,11 @@ export function DrawerShell() {
     currentTopRef.current = top;
   }
 
-  // Animate drawer in response to committed drawerState changes
   useEffect(() => {
     const el = drawerRef.current;
     if (!el) return;
     const { drawerState } = state;
 
-    // Outside the branches below: the expanded branch is skipped when a gesture handler
-    // already flipped expandedRef, which left the page unlocked.
     lockPageScroll(drawerState !== 'hidden');
 
     if (drawerState === 'peek') {
@@ -114,15 +108,13 @@ export function DrawerShell() {
   // Never leave the host page locked if the block unmounts while the drawer is open.
   useEffect(() => () => lockPageScroll(false), []);
 
-  // Commit the peek -> expanded transition. Shared by the drag gestures and the
-  // focus-driven path below so they can't drift apart.
+  // Shared by the drag gestures and the focus-driven path below so they can't drift apart.
   function commitExpanded() {
     expandedRef.current = true;
     setTop(getTopMargin(), true);
     dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
   }
 
-  // Drag the drawer up by `distance` px, committing to expanded once it reaches the top.
   function dragUpBy(distance) {
     const topMargin = getTopMargin();
     const newTop = Math.max(topMargin, currentTopRef.current - distance);
@@ -130,9 +122,8 @@ export function DrawerShell() {
     else setTop(newTop, false);
   }
 
-  // Bound to the window: in peek a wheel over the backdrop never reaches the drawer.
-  // Attached only in peek, and re-checked in the handlers — these are non-passive and
-  // preventDefault, so any wider gate swallows the wheel the expanded drawer needs.
+  // Non-passive + preventDefault, so this only attaches in peek to avoid swallowing the
+  // wheel/touch scroll the expanded drawer needs.
   useEffect(() => {
     if (state.drawerState !== 'peek') return undefined;
 
@@ -167,7 +158,7 @@ export function DrawerShell() {
     };
   }, [state.drawerState]);
 
-  // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=<url-slug>
+  // Deep-linking on mount: open drawer for ?sessions, open detail for ?session=<url-slug>
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('sessions') || params.has('session')) {
@@ -179,7 +170,7 @@ export function DrawerShell() {
     }
   }, []);
 
-  // URL deep-linking: resolve ?session=<url-slug> once sessions are loaded.
+  // Deep-linking: resolve ?session=<url-slug> once sessions are loaded.
   useEffect(() => {
     if (sessionsStatus.value !== 'ready') return;
     const sessionParam = new URLSearchParams(window.location.search).get('session');
@@ -190,8 +181,7 @@ export function DrawerShell() {
     else window.lana?.log(`[sessions-guide] ?session=${encodeURIComponent(sessionParam).slice(0, 100)} matched no session`);
   }, [sessionsStatus.value]);
 
-  // openSessionGuideDetail() from another block. Callers read the same page-level signals,
-  // so sessions are already 'ready' by the time one can be clicked — no buffering needed.
+  // openSessionGuideDetail() from another block.
   useEffect(() => sessionGuideRequest.subscribe((request) => {
     const result = resolveSessionGuideRequest(request, {
       sessionsStatusValue: sessionsStatus.value,
@@ -205,16 +195,13 @@ export function DrawerShell() {
     }
     dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: result.defaultView });
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: result.sessionId });
-    // The url slug, like every other entry point, so the param has one shape.
     history.pushState({}, '', setSessionParam(result.sessionParam));
   }), []);
 
-  // Keep sessionsRef current so the popstate handler always sees the latest list
   const sessionsRef = useRef(sessions.value);
   useEffect(() => sessions.subscribe((v) => { sessionsRef.current = v; }), []);
 
-  // popstate listener — restores state from URL without pushing new history entries
-  // Registered once; reads sessions via ref to avoid re-registering on every poll.
+  // popstate listener — restores state from URL without pushing new history entries.
   useEffect(() => {
     function handlePopState() {
       const params = new URLSearchParams(window.location.search);
@@ -276,9 +263,6 @@ export function DrawerShell() {
     setFilterOpen(false);
   }
 
-  // tabindex="-1" is not a tab stop, but takes BackToTop's programmatic focus after a jump.
-  // data-lenis-prevent opts the whole subtree out of Milo's Lenis smooth-scroll, which
-  // preventDefault()s every wheel and would starve the scroll containers in here.
   return html`
     <div class="sg-shell">
       ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true" data-lenis-prevent></div>`}

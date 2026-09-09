@@ -1,4 +1,4 @@
-// Dev-only, gated behind `?debug` — safe to delete once development wraps up.
+// Dev-only, gated behind `?debug`.
 import { isBroadcastEligible } from '../../../../utils/session-state.js';
 import {
   hasPlayableVideoSource, getSessionBucket, isSessionLiveNow, groupSessionsByStart, sessionEndsAtMs,
@@ -22,11 +22,7 @@ function formatRelativeTime(deltaMs) {
   return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-// Mirrors sessionEndsAtMs's own branching -- 'videoDuration' only when the mpc bucket actually
-// has a usable Video Duration; a bucketed-mpc session with a missing/invalid one still falls
-// back to endTimeUtc there, so it must report 'endTime' here too. Named for the field it reads
-// (session.videoDuration), not the unrelated session.duration (sessionLengthInMinutes) --
-// printing the bare word "duration" here would be ambiguous against that other field.
+// Mirrors sessionEndsAtMs's branching to report which field ('videoDuration'/'endTime') was used.
 function endSource(session) {
   if (getSessionBucket(session) === 'mpc' && parseVideoDurationMs(session.videoDuration) != null) return 'videoDuration';
   return 'endTime';
@@ -39,16 +35,14 @@ function groupRow(group, index, liveStreamActiveIds, nowMs) {
     relativeTime: formatRelativeTime(group.startMs - nowMs),
     startTimeUtc: new Date(group.startMs).toISOString(),
     startMs: group.startMs,
-    // sessionEndsAtMs is the same MPC-video-duration-aware boundary isSessionLiveNow()
-    // itself uses to decide when a session stops counting as live.
+    // sessionEndsAtMs is the same boundary isSessionLiveNow() uses to decide liveness.
     members: group.members.map(
       (m) => `${m.title} (ends ${formatRelativeTime(sessionEndsAtMs(m) - nowMs)}, via ${endSource(m)})`,
     ),
   };
 }
 
-// Every bucket's groups from the raw catalog, independent of what's committed — sanity-checks
-// resolveBucketSchedule's "next group" logic.
+// Sanity-checks resolveBucketSchedule's "next group" logic against the raw catalog.
 export function logBucketGroups(sessionList, liveStreamActiveIds, nowMs) {
   if (!DEBUG_ENABLED) return;
   const eligible = sessionList.filter((s) => isBroadcastEligible(s) && hasPlayableVideoSource(s));
@@ -71,9 +65,7 @@ export function logBucketGroups(sessionList, liveStreamActiveIds, nowMs) {
   });
 }
 
-// Brackets one tick's worth of logBucketGroups/logActiveSession output -- SCHEDULE_REFRESH_MS
-// (BroadcastApp.js) re-fires these every 5s, so without a visible boundary each tick's console
-// output blurs into the previous one.
+// Brackets one tick's console output so repeated 5s ticks don't blur together.
 const TICK_DIVIDER = '='.repeat(20);
 
 export function logTickStart(nowMs) {
@@ -88,9 +80,7 @@ export function logTickEnd() {
   console.log(`${TICK_DIVIDER}\n`);
 }
 
-// The committed/selected session (whichever of the two the schedule is actually surfacing) and
-// its relative time to the *next* state — "ends" while still playing, "next session" once it
-// has ended and something else is queued up in upNext.
+// Logs the active/ended session and its relative time to the next state transition.
 export function logActiveSession(schedule, nowMs) {
   if (!DEBUG_ENABLED) return;
 

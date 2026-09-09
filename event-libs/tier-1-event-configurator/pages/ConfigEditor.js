@@ -40,9 +40,7 @@ export default function ConfigEditor() {
   const isHomepage = isHomepageConfigType(configType);
   const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[configType];
 
-  // getSessionCatalogForRow caches by (eventId, env) — if Library.js already prefetched this
-  // row (Homepage rows are prefetched as soon as the library loads), opening it for edit right
-  // after reuses that result instead of hitting ESP a second time.
+  // Caches by (eventId, env), so a Library.js prefetch is reused instead of re-hitting ESP.
   useEffect(() => {
     if (!eventId) return undefined;
     let cancelled = false;
@@ -63,18 +61,12 @@ export default function ConfigEditor() {
   }, [eventId, eventServiceEnv, getSessionCatalogForRow]);
 
   const primaryTracks = useMemo(() => extractDistinctPrimaryTracks(sessions), [sessions]);
-  // Track icons/colors map every track a session can badge, so it covers Additional Event
-  // Site Tracks too — `primaryTracks` above stays primary-only for the featured-sessions
-  // picker, whose filter matches on the primary track alone.
+  // Includes Additional Event Site Tracks; primaryTracks above stays primary-only.
   const iconTracks = useMemo(() => extractDistinctAllTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
   const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
 
-  // Syncs trackIcons/overrideTrackIcons/products against the freshly loaded catalog, once
-  // per (eventId, env) — not on every render, since syncing mutates activeConfig itself.
-  // Skipped while sessions are loading/errored, and skipped on a catalog that comes back
-  // completely empty (more likely a transient fetch issue than a real "this event has zero
-  // sessions" state — safer to leave authored entries alone than prune against that).
+  // Runs once per (eventId, env); skipped on an empty catalog (likely a transient fetch issue).
   const syncedCatalogKey = useRef(null);
   useEffect(() => {
     if (isHomepage || isLoadingSessions || sessionsError || sessions.length === 0) return;
@@ -88,9 +80,7 @@ export default function ConfigEditor() {
       result.removed.overrideTrackIcons.length && `${result.removed.overrideTrackIcons.length} override icon${result.removed.overrideTrackIcons.length === 1 ? '' : 's'}`,
       result.removed.products.length && `${result.removed.products.length} product icon${result.removed.products.length === 1 ? '' : 's'}`,
     ].filter(Boolean);
-    // Persistent — an author needs to actually notice this and either Save or investigate,
-    // not have it vanish after 6s like a routine confirmation toast (see
-    // TierOneEventConfigurator.js's isToastPersistent).
+    // Persistent — an author needs to notice this and either Save or investigate.
     setToastSuccess({
       message: `Removed ${removedParts.join(', ')} no longer found in this event's sessions — save to apply`,
       persistent: true,
@@ -105,10 +95,7 @@ export default function ConfigEditor() {
     return stringifyConfig(activeConfig.config);
   }, [activeConfig]);
 
-  // A color authored with no icon to apply it to doesn't make sense (icon
-  // alone is fine — color implicitly defaults to black) — flagged here
-  // rather than silently saved in a state that can't render (PLAN.md Phase 4).
-  // Global-only: Homepage configs don't author track icons at all.
+  // A color authored with no icon can't render — flagged before Save. Global-only.
   const incompleteTracks = useMemo(() => {
     if (!activeConfig || isHomepage) return [];
     return iconTracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
@@ -145,8 +132,7 @@ export default function ConfigEditor() {
   };
 
   const handleCopy = async () => {
-    // Minified, not configPreview's pretty-printed form: DA joins a metadata cell's
-    // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
+    // Minified: DA joins a multi-line metadata cell with ", ", corrupting pretty-printed JSON.
     const ok = await copyTextToClipboard(JSON.stringify(activeConfig.config));
     if (ok) setToastSuccess('Config copied — paste it into the page\'s tier-1-event-config metadata');
     else setToastError('Could not copy config — select and copy the JSON block manually');

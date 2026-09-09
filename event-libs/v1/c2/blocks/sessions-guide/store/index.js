@@ -10,12 +10,7 @@ import { excludeOnDemandFormat } from '../utils/session-filters.js';
 
 const SS_LAST_VIEW = 'sg:last-view';
 
-// Excludes hasOnDemandFormat sessions the same way every date-scoped filter already does
-// (liveSessions/upcomingSessions/getRecommendedSessions in session-filters.js) — that
-// format is permanently routed to On demand regardless of its startTimeUtc (see
-// deriveSessionState()), so it never surfaces under Live & upcoming/My sessions/My
-// favorites for any day. A day tab whose only sessions are that format would otherwise
-// show up with nothing to show once selected.
+// Excludes on-demand-format sessions, which are permanently routed to On demand regardless of day.
 export function deriveEventDays(sessionList, userTz) {
   const tz = userTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const daySet = new Set();
@@ -34,11 +29,7 @@ function getDefaultDay(eventDays, userTz) {
   return eventDays[eventDays.length - 1];
 }
 
-// UI-only state for this block's own widget chrome — cross-block data (sessions,
-// favorited, scheduled, auth) lives in event-libs/v1/utils/session-store.js instead.
-// Named guideConfig (not eventConfig) to stay distinct from utils.js's page-wide
-// getEventConfig() and the Tier 1 Event Configurator's tier-1-event-config.js —
-// this is sessions-guide's own block-level authoring config (see parse-config.js).
+// UI-only state for this block's own widget chrome; cross-block data lives in session-store.js.
 export function buildInitialState(guideConfig) {
   return {
     drawerState: 'hidden',
@@ -66,11 +57,7 @@ export function reducer(state, action) {
 
     case 'SET_VIEW': {
       try { sessionStorage.setItem(SS_LAST_VIEW, action.view); } catch { /* unavailable */ }
-      // A real view change (Live & upcoming / On demand / My sessions / My favorites, in any
-      // combination) starts the new view fresh — filters and search are scoped to "what was I
-      // looking at", not a global setting the user meant to carry over. Re-selecting the
-      // already-active view is a no-op, not a change, so it leaves them alone. Date tabs
-      // (SET_DAY) are a different axis entirely and keep both across day changes.
+      // A real view change resets filters/search (scoped to "what was I looking at"); re-selecting doesn't.
       if (action.view === state.activeView) return { ...state, activeView: action.view };
       return {
         ...state, activeView: action.view, activeFilters: {}, searchQuery: '',
@@ -90,8 +77,7 @@ export function reducer(state, action) {
     case 'SET_DRAWER': {
       const next = { ...state, drawerState: action.drawer };
       if (action.drawer !== 'hidden' && state.drawerState === 'hidden') {
-        // Restore the last view the user was on; fall back to auth-appropriate default
-        // (computed by the caller, which can read the shared auth signal).
+        // Restore the last view; fall back to the caller's auth-appropriate default.
         let lastView = null;
         try { lastView = sessionStorage.getItem(SS_LAST_VIEW); } catch { /* unavailable */ }
         next.activeView = lastView || action.defaultView || state.activeView;
@@ -132,9 +118,7 @@ export function SessionGuideProvider({ guideConfig, children }) {
     return sessions.subscribe(recomputeDays);
   }, []);
 
-  // Auto-switch out of "live-upcoming" once every session has gone on-demand, or once
-  // the Tier 1 Event Configurator's authored eventEndDateTime has passed — whichever
-  // comes first.
+  // Auto-switch out of "live-upcoming" once all sessions are on-demand or eventEndDateTime has passed.
   useEffect(() => {
     function checkAutoTransition() {
       if (state.activeView !== 'live-upcoming') return;
@@ -147,8 +131,7 @@ export function SessionGuideProvider({ guideConfig, children }) {
     checkAutoTransition();
     const unsubSessions = sessions.subscribe(checkAutoTransition);
     const unsubLive = liveStreamActiveIds.subscribe(checkAutoTransition);
-    // Catches the case where time alone crosses allEnded/pastManualCutoff, with no
-    // accompanying sessions/liveStreamActiveIds write (e.g. an event with no MR sessions).
+    // Catches time alone crossing the threshold with no accompanying data write (e.g. no MR sessions).
     const unsubVersion = sessionStateVersion.subscribe(checkAutoTransition);
     return () => { unsubSessions(); unsubLive(); unsubVersion(); };
   }, [state.activeView]);
@@ -160,10 +143,7 @@ export function useSessionGuide() {
   return useContext(SessionGuideContext);
 }
 
-// Compatibility shim for tests — returns a store-like object whose
-// SessionGuideContext IS the module-level context, so tests can inject
-// state via store.SessionGuideContext._current and the static-import
-// components will pick it up via useSessionGuide().
+// Compatibility shim for tests to inject state via store.SessionGuideContext._current.
 export function buildStore() {
   return { SessionGuideContext, useSessionGuide };
 }

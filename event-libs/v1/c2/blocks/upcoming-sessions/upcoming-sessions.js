@@ -162,10 +162,7 @@ export function buildCard(session) {
   const topBadge = buildCategoryBadge(session.track);
   if (topBadge) badgeRow.append(topBadge);
 
-  // session.enTitle/primaryCategory(session) below are attacker-influenced (decoded from
-  // the link's hash payload, not hand-authored in DA) — createTag's string `html` argument
-  // runs through insertAdjacentHTML, so these are set via .textContent to keep them as
-  // inert text rather than parsed markup.
+  // session.enTitle is attacker-influenced (decoded from a hash payload) - set via .textContent, not html.
   createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
   const footer = createTag('div', { class: 'sg-card__footer' }, '', { parent: body });
@@ -366,9 +363,7 @@ async function decorate(el) {
   renderTrack(track, sessions);
 
   const header = createTag('div', { class: 'upcoming-sessions-header' }, '', { parent: el });
-  // heading is attacker-influenced (decoded from the link's hash payload) — see the
-  // .textContent note on session.enTitle in buildCard() above for why this isn't passed
-  // as createTag's html argument.
+  // heading is attacker-influenced too - same .textContent handling as session.enTitle above.
   if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, '', { parent: header }).textContent = heading;
   header.append(buildCarouselControls(track));
 

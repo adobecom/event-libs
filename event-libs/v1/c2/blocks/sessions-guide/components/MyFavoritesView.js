@@ -29,19 +29,13 @@ export function MyFavoritesView() {
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const userTz = state.guideConfig?.userTz;
-  // Read purely to establish a re-render dependency on time-driven session-state
-  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // Read only to trigger a re-render on session-state transitions; value itself is unused.
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
   const isPost = useIsPostEvent();
 
-  // Logged-out/unregistered visitors never see this view's content — a toast fires and
-  // they're bounced to a fallback view instead. Re-checked on every auth change, not just
-  // mount, so it also catches URL-driven navigation and a session expiring mid-view.
-  // Gated behind isAuthResolved() so a refresh landing straight on this view (e.g. a
-  // restored ?view=my-favorites) doesn't bounce an already-registered visitor away before
-  // auth has actually finished resolving — see isAuthResolved()'s own comment.
+  // Logged-out/unregistered visitors get bounced to a fallback view with a toast, re-checked on every auth change.
   const { isLoggedIn, isRegistered } = auth.value;
   const authResolved = isAuthResolved(auth.value);
   useEffect(() => {
@@ -49,11 +43,7 @@ export function MyFavoritesView() {
     const fallback = checkViewAccess('my-favorites', { eventConfig: state.guideConfig });
     if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
   }, [authResolved, isLoggedIn, isRegistered]);
-  // Same loading treatment as the shells' own sessionsStatus gate (FullPageShell.js/
-  // DrawerShell.js) — the session catalog can resolve well before registration does, and a
-  // bare blank view in that gap read as broken. Once authResolved is true the visitor is
-  // either confirmed unauthorized (about to be bounced by the effect above) or confirmed
-  // registered (falls through below), so only the pending case gets the loading state.
+  // Avoids a blank view in the gap between the catalog resolving and registration resolving.
   if (!authResolved) {
     return html`
       <div class="sg-sr-only" role="status" aria-live="polite">Loading your favorited sessions…</div>
@@ -62,8 +52,7 @@ export function MyFavoritesView() {
   }
   if (!isLoggedIn || isRegistered !== true) return null;
 
-  // Memoized: this component re-renders on every context dispatch (e.g. opening the
-  // detail overlay), not just when the inputs below actually change.
+  // Memoized: this component re-renders on every context dispatch, not just input changes.
   const { live, timeSlots, filteredOnDemand } = useMemo(() => {
     const favoritedSessions = sessions.filter((s) => favorited.has(s.id));
     const dayFavorited = sessionsForDay(favoritedSessions, activeDay, userTz);

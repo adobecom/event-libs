@@ -4,12 +4,6 @@ import { fetchFederalTrackIcon } from '../../v1/features/icons/federal-icons.js'
 import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { isTrackIconEntryComplete, extractTrackIconSlug } from '../utils.js';
 
-// Icon slug is a plain text field, not a searchable picker — federal's track-icon
-// namespace (/federal/assets/icons/track-icons/) has no manifest to search, unlike the
-// generic icon system (see federal-icons.js). Preview resolves from that namespace only
-// (fetchFederalTrackIcon), so a typed slug never accidentally matches an unrelated icon.
-// Mirrors ProductIconEditor.js's pattern; unlike products, tracks still carry an
-// author-set color (the icon's own art is monochrome, tinted via the color input).
 export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
   if (!tracks || tracks.length === 0) {
     return html`<p class="tec-track-editor__empty">No tracks found in this event's sessions yet.</p>`;

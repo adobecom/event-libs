@@ -15,9 +15,7 @@ import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
 export const buildLiveCard = () => LiveCard;
 
-// A non-MR session only gets a fresh render from the shared session-state ticker when some
-// bucket actually flips, which can leave the progress bar visibly stuck. An MR session gets an
-// equivalent refresh for free every ~30s from the poller reassigning liveStreamActiveIds.
+// Non-MR sessions need this manual tick; MR sessions get an equivalent refresh from the poller.
 export const PROGRESS_REFRESH_MS = 30_000;
 
 export function computeProgressPct(session, nowMs) {
@@ -43,15 +41,9 @@ export function LiveCard({
   const watchNowEnabled = isBehaviorEnabled(guideConfig, 'enableWatchNowCtas');
 
   const nowMs = getNowMs();
-  // forceLive: session-broadcast's Also Live carousel already vetted these via its own,
-  // MPC-video-duration-aware isSessionLiveNow() (broadcast-schedule.js) -- deriveSessionState
-  // only knows endTimeUtc, so an MPC session whose real video runs longer than its authored
-  // slot would otherwise flip to 'on-demand' here well before broadcast-schedule agrees, and
-  // this section must only ever show live sessions.
+  // forceLive: caller already vetted liveness via video duration; deriveSessionState only knows endTimeUtc.
   const sessionState = forceLive ? 'live' : deriveSessionState(session, liveStreamActiveIds.value, nowMs);
 
-  // Forces a re-render every PROGRESS_REFRESH_MS while live so progressPct recomputes against
-  // the current clock — the shared session-state ticker alone isn't enough (see above).
   const [, forceProgressTick] = useState(0);
   useEffect(() => {
     if (sessionState !== 'live') return undefined;
@@ -69,10 +61,7 @@ export function LiveCard({
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
-  // The meta row's second slot is shared: an upcoming Recommended card shows time there, every
-  // other card badges its first additional track instead (live has a progress bar; on-demand
-  // has no meaningful start time). Only the first additional track is used since the badge
-  // model supports one, though the ESP field is multi-select (see resolveTrackBadge).
+  // Meta row's second slot is shared: Recommended+upcoming shows time, others show a track badge.
   const showTime = variant === 'recommended' && sessionState === 'upcoming';
   const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
 
@@ -85,8 +74,7 @@ export function LiveCard({
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    // Captured now — e.currentTarget is nulled out once the event finishes dispatching,
-    // but onBlocked fires later, after the (possibly rejected) action settles.
+    // Captured now: e.currentTarget is nulled once the event finishes dispatching, but onBlocked fires later.
     const btn = e.currentTarget;
     await toggleScheduleWithFeedback(session, {
       eventConfig: guideConfig, isScheduled, onBlocked: () => btn.blur(),
@@ -105,17 +93,10 @@ export function LiveCard({
 
   function handleWatch(e) {
     e.stopPropagation();
-    // Already on the destination page — let the caller decide what "already here" means
-    // (session-broadcast switches its own player instead of closing a drawer that doesn't
-    // exist there), rather than reloading the page out from under what's already playing.
-    // Live-only: once on-demand, watchHref points at the individual session page — a real
-    // navigation is always correct there, so sessionState gates this before isSamePage
-    // (which pretend-broadcast=true forces true unconditionally for manual QA on draft
-    // pages, and would otherwise swallow the on-demand navigation too).
+    // Live-only same-page switch avoids reloading; on-demand always does a real navigation.
     if (sessionState === 'live' && isSamePage(watchHref)) {
       if (onWatchSamePage) { onWatchSamePage(session); return; }
-      // The widget's own instance has no prop-level switch path — ask whatever page this is
-      // to switch itself (a no-op on pages with nothing subscribed, e.g. the homepage).
+      // No-op on pages with nothing subscribed to this request (e.g. the homepage).
       requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
@@ -149,8 +130,7 @@ export function LiveCard({
     ><${IconPlay} />${isOnDemand ? 'Watch on demand' : 'Watch now'}</button>`;
   }
 
-  // On demand: match SessionCard/TrackRow — the whole card always navigates straight to
-  // the session page, regardless of surface, instead of opening the in-widget overlay.
+  // On demand, the whole card always navigates to the session page, regardless of surface.
   function handleCardClick(e) {
     if (sessionState === 'on-demand') { handleWatch(e); return; }
     if (surface === 'widget') {
@@ -158,8 +138,6 @@ export function LiveCard({
       history.pushState({}, '', setSessionParam(sessionParamValue(session)));
       return;
     }
-    // Non-widget surfaces have no in-widget overlay — onCardClick lets a caller like
-    // session-broadcast supply its own "open detail" behavior instead.
     onCardClick?.(session);
   }
 

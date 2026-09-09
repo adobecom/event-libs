@@ -4,10 +4,6 @@ import { fetchFederalTrackIcon } from '../../v1/features/icons/federal-icons.js'
 import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { isTrackIconEntryComplete, extractTrackIconSlug } from '../utils.js';
 
-// Override text is free text, not a real track, and each distinct value is its own swimlane.
-// Mirrors TrackIconEditor: every value is authored explicitly, with no event-wide fallback,
-// and icon slug is a plain text field (not a searchable picker) resolved against federal's
-// track-icon namespace only — see TrackIconEditor.js's own comment for why.
 export default function OverrideTrackIconEditor({
   overrideTexts, overrideTrackIcons, onChangeMapped,
 }) {

@@ -33,8 +33,7 @@ function buildCategoryBadge(track) {
   if (!entry) return null;
 
   const badge = createTag('span', { class: 'mobile-rider-info-bar-category' });
-  // No inline color override — always the CSS default (--s2a-color-content-default),
-  // regardless of what entry.color (the Tier 1 config's per-track color) says.
+  // No inline color override here - always the CSS default, ignoring entry.color.
   const iconColor = createTag('span', {
     class: 'mobile-rider-info-bar-category-icon-color',
   }, '', { parent: badge });
@@ -121,7 +120,6 @@ const CONFIG = {
   STORE: { ATTACH_RETRIES: 20, ATTACH_INTERVAL_MS: 5 },
 };
 
-/** * UTILITIES */
 const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';
 const isProd = () => getEnv() === 'prod';
 const toBool = (v) => {
@@ -286,9 +284,7 @@ class MobileRider {
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
 
     initSessionState();
-    // Share needs the real session's sessionPageUrl — building the button before that
-    // resolves would let a click silently no-op (safeUrl(undefined) is falsy), so it's only
-    // created once the session is known, same as the Favorite button below.
+    // Share button is built only once the session resolves - safeUrl(undefined) would no-op.
     const onSessionResolved = (session) => {
       paintTitle(session);
       paintCategory(session);
@@ -507,9 +503,6 @@ class MobileRider {
   }
 }
 
-/**
- * URL/Anchor Helpers
- */
 function extractVideoParamsFromHref(anchor) {
   try {
     const href = anchor.getAttribute('href');
