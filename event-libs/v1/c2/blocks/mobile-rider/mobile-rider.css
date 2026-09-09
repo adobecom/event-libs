@@ -300,7 +300,12 @@
   }
 }
 
-.mobile-rider :is(h1, h2, h3, h4, h5, h6):not(.mobile-rider-info-bar-title) {
+/* Neutralize the page's global heading styles that leak into the MobileRider player DOM. It must
+   NOT touch MobileRider's OWN skinned overlay headings (.overlays-wrapper .titlecontainer, e.g. the
+   video title / live badge) — those carry MR's intended skin font (AdobeClean-Bold), and reverting
+   font-family there drops them to the browser's generic font (MWPW MR-font issue). So the overlay
+   headings are excluded from the reset and left to MR's own skin CSS. */
+.mobile-rider :is(h1, h2, h3, h4, h5, h6):not(.mobile-rider-info-bar-title, .overlays-wrapper *) {
   font-size: revert;
   font-weight: revert;
   font-family: revert;
