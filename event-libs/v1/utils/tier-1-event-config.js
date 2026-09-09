@@ -65,3 +65,14 @@ export function getHomepagePath() {
 export function getBroadcastPath() {
   return tierOneEventConfig.broadcastPath || '';
 }
+
+export function getEventStartMs() {
+  const startMs = Number(tierOneEventConfig.eventStartDateTime);
+  return Number.isFinite(startMs) && startMs > 0 ? startMs : null;
+}
+
+// Where Broadcast redirects once every session for the event has aired
+// (session-broadcast/components/EndedState.js).
+export function getSessionGuidePath() {
+  return tierOneEventConfig.sessionGuidePath || '';
+}

@@ -133,19 +133,54 @@ describe('upcoming-sessions', () => {
       expect(el.dataset.fewSessions).to.equal('true');
     });
 
-    it('removes itself entirely when the entries array is empty', async () => {
-      const el = buildBlock([]);
+    it('never renders a session whose start time has already passed', async () => {
+      const past = session({
+        sessionId: 'past-session',
+        sessionTime: {
+          startTimeMillis: Date.now() - 60_000,
+          endTimeMillis: Date.now() + 60_000,
+          timezone: 'America/Los_Angeles',
+        },
+      });
+      const upcoming = session({ sessionId: 'upcoming-session' });
+      const el = buildBlock([past, upcoming]);
       await init(el);
-      expect(el.isConnected).to.equal(false);
+      expect(el.querySelector('[data-session-id="past-session"]')).to.not.exist;
+      expect(el.querySelector('[data-session-id="upcoming-session"]')).to.exist;
     });
 
-    it('removes itself entirely when there is no config data attribute at all', async () => {
+    it('drops a mobile-rider session as soon as its start time passes, same as any other session', async () => {
+      const started = session({
+        sessionId: 'mr-session',
+        mrStreamId: 'stream-1',
+        sessionTime: {
+          startTimeMillis: Date.now() - 60_000,
+          endTimeMillis: Date.now() + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      });
+      const el = buildBlock([started]);
+
+      await init(el);
+
+      expect(el.querySelector('[data-session-id="mr-session"]')).to.not.exist;
+    });
+
+    it('keeps the heading rendered when the entries array is empty (removal is manual/operational)', async () => {
+      const el = buildBlock([]);
+      await init(el);
+      expect(el.isConnected).to.equal(true);
+      expect(el.querySelector('.upcoming-sessions-heading')).to.exist;
+    });
+
+    it('keeps the heading rendered when there is no config data attribute at all', async () => {
       const el = document.createElement('div');
       el.className = 'upcoming-sessions carousel clip-end';
       document.body.append(el);
 
       await init(el);
-      expect(el.isConnected).to.equal(false);
+      expect(el.isConnected).to.equal(true);
+      expect(el.querySelector('.upcoming-sessions-heading')).to.exist;
     });
 
     it('removes itself entirely when the config payload fails to parse', async () => {
@@ -315,6 +350,33 @@ describe('upcoming-sessions', () => {
       const card = buildCard(session());
       expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
       expect(card.querySelector('.sg-card__btn--favorite')).to.not.equal(null);
+    });
+
+    it('tags the schedule and favorite buttons as add actions when the session is not yet scheduled/favorited', () => {
+      const card = buildCard(session());
+      const scheduleBtn = card.querySelector('.sg-card__btn--schedule');
+      const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
+      expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('false');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+      expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('false');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
+    });
+
+    it('tags the schedule and favorite buttons as remove actions when the session is already scheduled/favorited', () => {
+      scheduled.value = new Set(['session-1']);
+      favorited.value = new Set(['session-1']);
+      const card = buildCard(session());
+      const scheduleBtn = card.querySelector('.sg-card__btn--schedule');
+      const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
+      expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('true');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule');
+      expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('true');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
+    });
+
+    it('tags the card itself for open-session-detail tracking', () => {
+      const card = buildCard(session());
+      expect(card.getAttribute('daa-ll')).to.equal('Session-Card-Open');
     });
   });
 

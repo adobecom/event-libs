@@ -43,8 +43,10 @@ export function LiveUpcomingView() {
 
   // Previously aired: all sessions for the day, shown when nothing is upcoming or live.
   // On-demand-only sessions never aired, so they stay out of here too — On Demand owns them.
+  // Filters + search apply here too, same as Upcoming — only Live/Recommended are exempt.
+  const previouslyAiredRaw = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
   const previouslyAiredSlots = (timeSlots.length === 0 && live.length === 0)
-    ? groupByStartTime(excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz)))
+    ? groupByStartTime(filterSessions(previouslyAiredRaw, activeFilters, searchQuery))
     : [];
 
   return html`

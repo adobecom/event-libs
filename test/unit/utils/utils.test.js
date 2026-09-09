@@ -1,6 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 
-import { getValidCampaignIdFromUrl, resolveRoutedCampaignId, resetCampaignMapCache, getRsvpToken, shouldForceGuestSignIn } from '../../../event-libs/v1/utils/utils.js';
+import {
+  getValidCampaignIdFromUrl, resolveRoutedCampaignId, resetCampaignMapCache, getRsvpToken,
+  shouldForceGuestSignIn, safeUrl,
+} from '../../../event-libs/v1/utils/utils.js';
 
 function mockCampaignMap(rules) {
   window.fetch = async (url) => {
@@ -26,6 +29,38 @@ describe('getValidCampaignIdFromUrl', () => {
 
   it('returns null when campaign param exceeds 128 chars', () => {
     expect(getValidCampaignIdFromUrl(new URLSearchParams(`?campaign=${'a'.repeat(129)}`))).to.be.null;
+  });
+});
+
+describe('safeUrl', () => {
+  it('returns undefined for a falsy input', () => {
+    expect(safeUrl('')).to.be.undefined;
+    expect(safeUrl(undefined)).to.be.undefined;
+  });
+
+  it('allows an explicit http(s) URL, same-origin or not', () => {
+    expect(safeUrl('https://example.com/session')).to.equal('https://example.com/session');
+    expect(safeUrl('http://example.com/session')).to.equal('http://example.com/session');
+  });
+
+  it('allows a same-origin relative path', () => {
+    expect(safeUrl('/sessions/foo')).to.equal('/sessions/foo');
+  });
+
+  it('blocks a javascript: URI', () => {
+    expect(safeUrl('javascript:alert(1)')).to.be.undefined;
+  });
+
+  it('blocks a protocol-relative URL (//host/path)', () => {
+    expect(safeUrl('//evil.example/phish')).to.be.undefined;
+  });
+
+  // A single leading "/" plus a backslash is textually relative, but browsers normalize
+  // backslashes to slashes when parsing http(s) URLs, so "/\evil.example" resolves to a
+  // different origin — a leading-slash-only check (this function's previous implementation)
+  // would have let it through. Confirmed the bypass against the real URL parser before fixing.
+  it('blocks a backslash-based protocol-relative URL (/\\host/path)', () => {
+    expect(safeUrl('/\\evil.example/phish')).to.be.undefined;
   });
 });
 

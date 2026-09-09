@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import { buildCarousel } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/Carousel.js';
+import { buildSessionCard } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/SessionCard.js';
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles',
@@ -127,5 +128,38 @@ describe('Carousel', () => {
     const html = Carousel({ sessions: [SESSION_A] });
     expect(html).to.include('key="a"');
     expect(html).to.not.include('sg-carousel__arrow');
+  });
+
+  // onCardClick/onWatchSamePage are threaded straight through to LiveCard for
+  // session-broadcast's integration (no local modal/URL handling of its own) — see the
+  // matching describe block in LiveCard.test.js for why this only guards the render
+  // contract rather than exercising the click itself.
+  it('accepts onCardClick/onWatchSamePage without throwing', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    expect(() => Carousel({
+      sessions: [SESSION_A], onCardClick: () => {}, onWatchSamePage: () => {},
+    })).to.not.throw();
+  });
+
+  // session-broadcast's Upcoming section passes SessionCard instead of the default LiveCard —
+  // see UpNextCarousel.js. Like the onCardClick/onWatchSamePage tests above, the card itself
+  // sits inside a multi-sibling template whose first literal isn't a bare `<`, so this mock
+  // doesn't actually invoke it as a component (see LiveCard.test.js's own note on this same
+  // limitation) — this only guards the render contract, not the card's real output. Real
+  // rendering is verified via a preview harness in a real browser instead.
+  describe('CardComponent', () => {
+    it('accepts a CardComponent override without throwing', () => {
+      const store = makeStore();
+      const Carousel = buildCarousel(preact, store);
+      const SessionCard = buildSessionCard(preact, store);
+      expect(() => Carousel({ sessions: [SESSION_A], CardComponent: SessionCard })).to.not.throw();
+    });
+
+    it('defaults to LiveCard when no CardComponent is supplied', () => {
+      const store = makeStore();
+      const Carousel = buildCarousel(preact, store);
+      expect(() => Carousel({ sessions: [SESSION_A] })).to.not.throw();
+    });
   });
 });

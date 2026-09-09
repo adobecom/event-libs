@@ -24,6 +24,10 @@ export const pendingActions = signal(new Set());
 export const sessionStateVersion = signal(0);
 // A new object on every call, even for the same sessionId, so the signal always notifies.
 export const sessionGuideRequest = signal(null);
+// Opposite direction of sessionGuideRequest: the widget asking an already-mounted,
+// multi-session page (e.g. Broadcast) to switch, since it has no other channel back to that
+// page's own player state.
+export const watchSameSessionRequest = signal(null);
 
 let initialized = false;
 let eventApiConfig = null;
@@ -158,6 +162,14 @@ export function getEventApiConfig() {
 // mounted on the page.
 export function openSessionGuideDetail(sessionId) {
   sessionGuideRequest.value = { sessionId };
+}
+
+// The widget calls this instead of navigating when it's already embedded on the destination
+// page (isSamePage()) but has no prop-level way to trigger a switch itself — e.g. Broadcast's
+// standalone drawer/detail instances. No-ops on pages with nothing subscribed (e.g. the
+// homepage, which has only one live stream and just closes the widget instead).
+export function requestWatchSameSession(sessionId) {
+  watchSameSessionRequest.value = { sessionId };
 }
 
 // Parses the Tier 1 Event Configurator's payload (MWPW-200311); null if absent/invalid.

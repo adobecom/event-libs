@@ -919,8 +919,18 @@ export function loadStyle(href, callback) {
   return loadLink(href, { rel: 'stylesheet', callback });
 }
 
-// Returns url only if it starts with https://, http://, or / — blocks javascript: URIs.
+// Returns url only if it's an explicit http(s) URL, or a same-origin relative path — blocks
+// javascript: URIs and open-redirect tricks. A leading-slash check alone isn't enough: browsers
+// normalize backslashes to slashes when parsing "special" schemes, so a textually-relative
+// value like "/\evil.com" still resolves to a different origin (verified against the actual
+// URL parser, not just pattern-matched).
 export function safeUrl(url) {
   if (!url) return undefined;
-  return /^(https?:\/\/|\/)/.test(url) ? url : undefined;
+  if (/^https?:\/\//.test(url)) return url;
+  if (!url.startsWith('/')) return undefined;
+  try {
+    return new URL(url, window.location.origin).origin === window.location.origin ? url : undefined;
+  } catch {
+    return undefined;
+  }
 }

@@ -22,6 +22,12 @@
   font-weight: 400;
 }
 
+.speakers-empty {
+  margin: 0;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-font-size-16, 1rem);
+}
+
 .speakers-list {
   display: flex;
   flex-direction: column;

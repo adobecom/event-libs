@@ -30,6 +30,39 @@ describe('Session Details', () => {
     expect(el.querySelector('.session-title').textContent).to.equal('My Session');
   });
 
+  // The eyebrow divider is a border-left on the status slot, applied only when something
+  // precedes it — otherwise a session with no eyebrow tracks shows a stray leading pipe.
+  // The CSS uses `.session-eyebrow > * + .session-status-slot`, so this asserts the DOM shape
+  // that selector depends on rather than the computed style, which JSDOM-less WTR would need
+  // the real stylesheet for.
+  it('leaves the status slot as the eyebrow first child when there are no tracks', async () => {
+    setMetadata('custom-attributes', JSON.stringify([
+      { name: 'Track', inputType: 'multi-select', enabled: true, values: [{ value: 'x', label: 'X' }] },
+    ]));
+    const el = block();
+    await init(el);
+    const eyebrow = el.querySelector('.session-eyebrow');
+    expect(eyebrow.querySelector('.track-tags')).to.be.null;
+    expect(eyebrow.firstElementChild.classList.contains('session-status-slot')).to.be.true;
+  });
+
+  it('puts track tags before the status slot when the eyebrow has tracks', async () => {
+    setMetadata('custom-attributes', JSON.stringify([
+      {
+        name: 'Primary Event Site Track',
+        inputType: 'single-select',
+        enabled: true,
+        values: [{ value: 'design', label: 'Design' }],
+      },
+    ]));
+    const el = block();
+    await init(el);
+    const eyebrow = el.querySelector('.session-eyebrow');
+    expect(eyebrow.firstElementChild.classList.contains('track-tags')).to.be.true;
+    expect(eyebrow.querySelector('.session-status-slot').previousElementSibling)
+      .to.equal(eyebrow.querySelector('.track-tags'));
+  });
+
   it('applies an authored Background row as the block background and removes the row', async () => {
     setMetadata('title', 'My Session');
     const el = block();

@@ -69,8 +69,10 @@ export function normalizeSessions(rawSessions) {
     isOnline: Boolean(s.isOnline),
     hasOnDemandFormat: Boolean(s.hasOnDemandFormat),
     dvrDelayHours: s.dvrDelayHours ?? null,
+    playlistAssignment: coerceArray(s.playlistAssignment),
+    playlistOnSessionPage: coerceArray(s.playlistOnSessionPage),
     // One field per video source, named for its player. Alternatives, not a fallback chain.
-    // All unread; see "Video sources" in docs/sessions-guide-implementation-notes.md.
+    // See "Video sources" in docs/sessions-guide-implementation-notes.md.
     mpcId: s.mpcId || '',
     youTubeId: s.youTubeId || '',
     mrDvrVideoId: s.mrDvrVideoId || '',
@@ -223,8 +225,16 @@ function extractCustomAttributeValues(session, name) {
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
-function extractCustomAttributeValue(session, name) {
+// Exported so session-video-playlist.js can run this directly on an Individual Session Page's own session object, without having to normalize it first.
+export function extractCustomAttributeValue(session, name) {
   return extractCustomAttributeValues(session, name)[0] || '';
+}
+
+// Same lookup, but returns the machine-readable slug (`v.value`) instead of preferring the human-readable label. Used for playlist assignment and playlist on session page, which are matched against each other across sessions.
+export function extractCustomAttributeSlugs(session, name) {
+  const candidates = Array.isArray(name) ? name : [name];
+  const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
+  return (attr?.values || []).map((v) => v?.value).filter(Boolean);
 }
 
 // attributeId-keyed, built from the raw payload so newly authored filter categories
@@ -386,6 +396,8 @@ export function mapEslPayloadToRawSessions(payload) {
       mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
       mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
+      playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
+      playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),
       ...formatFlags,
       isLivestreamed,
       sessionPageUrl: session.url || '',

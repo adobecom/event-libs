@@ -45,23 +45,102 @@ already ran it.
 The status slot is created as a **persistent live region**
 (`role="status" aria-live="polite"`) — see Accessibility below.
 
+The eyebrow's vertical divider is a `border-left` on the status slot, applied through
+`.session-eyebrow > * + .session-status-slot` — **only when something precedes it**. A session
+with no eyebrow tracks would otherwise render a stray leading pipe and 24px of indent before
+the date. Note this is about the *eyebrow* track attributes (`Primary Event Site Track`,
+`Additional Event Site Tracks`, `Override Primary Event Site Track`); a session can carry a
+`Track` or `Primary Track for Agenda (Digital Agenda)` value and still have no eyebrow tags.
+
 ## Session state engine (`session-state-view.js`)
 
 State is a **pure client-side time comparison**, per the ticket — there is no status
 field to read, so it never waits on the catalog:
 
-| State | Condition | Eyebrow | Primary CTA | Closed captions |
-|---|---|---|---|---|
-| `upcoming` | `now < start` | `Nov 11, 9:00 AM PST` | Add to schedule | hidden |
-| `live` | `start ≤ now ≤ end` | red dot + `Live` | Watch now | hidden |
-| `on-demand` | `now > end` | `On-demand` / `Coming soon` | none | shown |
+| State | Condition | Eyebrow | Closed captions |
+|---|---|---|---|
+| `upcoming` | `now` is before every slot's start | `Nov 11, 9:00 AM PST` | hidden |
+| `live` | `now` is inside **any** slot (inclusive) | red dot + `Live` | hidden |
+| `on-demand` | anything else — after a slot, or between slots | `On-demand` / `Coming soon` | shown |
+
+The **primary CTA is resolved separately from the state**, because "can I still schedule
+this?" is not the same question as "is it on now?":
+
+| Condition | Primary CTA |
+|---|---|
+| `live` | Watch now |
+| **Format has no `online`** | **none** — see below |
+| `now < finalEnd` (the latest slot's end) | Add to schedule |
+| otherwise | none |
+
+### Add to schedule is gated on Format `online`
+
+`addSession` posts `virtual: true` — required, or RainFocus defaults to in-person-only and
+rejects with `responseCode 27`. But RainFocus accepts `virtual: true` **only** for a session
+time flagged `virtualTime`, otherwise failing with *"Cannot schedule virtually for a session
+time that is not virtual"*. So the button must only appear where that flag is set.
+
+**`virtualTime` is not synced to the page** — `session-times` entries carry
+`startTimeMillis` / `endTimeMillis` / `videos` / `location`, and no virtual flag. Format
+`online` predicts it exactly across all 166 published MAX26 sessions, with zero violations:
+
+| Format | Sessions | Has a virtual session time |
+|---|---|---|
+| `In person` | 132 | 0 |
+| `Online` | 31 | 31 |
+| `In person + Online` | 3 | 3 |
+
+So `online` is the gate. It is deliberately **not** keyed on IPOD
+([MWPW-205503](https://jira.corp.adobe.com/browse/MWPW-205503) reports an IPOD page showing a
+pre-event schedule button, and this fixes it, but IPOD is the wrong axis):
+
+- A pure IPOD session has no `online`, so it gets no button — the reported bug.
+- An IPOD session that **is** also online is schedulable, and an IPOD rule would wrongly hide it.
+- A plain `In person` session is **not** IPOD yet is equally unschedulable — an IPOD rule
+  would show a button whose click fails. All 132 of them.
+
+The button is **not built at all** rather than built and withheld, so `renderSchedule()` never
+runs and never subscribes to the `scheduled` signal on a page that could not schedule anyway.
+Favorite and share are unaffected — both are state- and format-independent — and Watch now
+still appears if an unschedulable session goes `live`.
+
+⚠️ Test sessions `1001` and `1002` declare `Online` in Format but have `virtualTime: false`,
+the only violations of the correlation above. They will still error on click; no client-side
+rule can fix that, and they fail in Northstar too. Owner: Sekhar.
 
 Transitions happen with **no reload**: `evaluate()` re-arms a `setTimeout` at the next
 boundary. Delays are clamped to `MAX_TIMEOUT` (`2**31 - 1`) and re-armed, because a
 far-future session would otherwise overflow a 32-bit delay and fire immediately.
 
-`getSessionTimes()` reads the first `session-times` entry and falls back to
-`session-length-in-minutes` for the end time when `endTimeMillis` is absent.
+### Multiple time slots
+
+A session can hold several `session-times` entries — a repeat in-person lab, or a 10am
+session with a 6pm premiere. `getAllSessionTimes()` returns **every** slot, **sorted by
+start**, each with its own `session-length-in-minutes` end fallback. `getSessionTimes()`
+returns the earliest, and is what the `upcoming` eyebrow date renders from.
+
+**Sorting is load-bearing, not tidiness.** RainFocus does not order `sessionTimes`
+chronologically: of the 40 published multi-slot MAX26 sessions, **21 have a first array
+entry that is not the earliest** (e.g. `L6317` is `[Nov 12 13:30, Nov 11 08:00]`). Reading
+index 0 would show the later date in the eyebrow and report `upcoming` straight through the
+session's real first occurrence. `mapEslPayloadToRawSessions()` sorts for the same reason.
+
+`getState()` accepts either a slot array or a single `{start, end}`, so a 10am/6pm session
+walks `upcoming → live → on-demand → live → on-demand`, and `nextBoundary()` finds the
+soonest of every remaining start and end — so the page wakes for the premiere instead of
+stopping at the first slot's end. It returns `null` only once all slots have ended, which
+is what finally cancels the timer.
+
+**The video player is not involved.** `video-player` decides once at init and never
+re-evaluates, gating on `now >= sessionTimes[0].endTimeMillis` — i.e. past the **earliest**
+slot's end, not the final one. That is intentional: the first on-demand window already
+carries the recording, and the player stays put through the premiere. The only thing that
+changes across a premiere boundary is the eyebrow status and the primary CTA.
+
+⚠️ That gate reads `sessionTimes[0]` **unsorted** (the block lives on the unmerged
+`latest-playlist` branch). For a session authored premiere-first — `[{6pm}, {10am}]` — it
+compares against 7pm, so the 10:45–18:00 on-demand window would render **no player at all**,
+contradicting the intended behavior. Sorting there is a prerequisite; owner Hari.
 
 ### "Coming soon" — IPOD sessions with no recording yet
 
@@ -80,9 +159,16 @@ essentially its stream archive and lands immediately, whereas the real MPC templ
 carries `DVR Timing (in hours)` of **772** (~32 days).
 
 **Has a recording** — `hasPlayableVideo()` looks for an entry in `session-times[].videos[]`
-whose `provider` is `mpc` or `youtube`, **excluding `kind: 'liveStream'`**. A session keeps
-its livestream URL after it ends, and that is not the recording; without the exclusion a
-stale entry would claim "On-demand". Real data carries all three kinds on one session:
+whose `provider` is `mpc` or `youtube` **and** whose `kind` is exactly **`onDemand`**.
+
+This deliberately mirrors `video-player`'s `pickEmbeddableVideo()`, which resolves
+`.find((v) => v.kind === 'onDemand')` against the same providers. The eyebrow must not
+promise a recording the player would refuse to embed, so the two predicates are kept
+identical rather than merely similar — an earlier `kind !== 'liveStream'` form was looser
+and would have read "On-demand" for, say, an `mpc`/`dvr` entry that renders no player.
+Excluding `liveStream` matters on its own account too: a session keeps its livestream URL
+after it ends, and that is not the recording. Real data carries all three kinds on one
+session:
 
 ```json
 [ { "provider": "youtube",     "kind": "liveStream", "url": "…/watch?v=…" },
@@ -119,6 +205,30 @@ the link stays on the no-catalog path:
 `BROADCAST_URL` is a **fallback only**, used when the helper yields nothing. The real URL
 is to be sourced from config inside `getWatchDestination` — see known-issues.
 
+## Action row sizing
+
+Per design, the row is 32px tall and the three controls are styled differently:
+
+| Control | Box | Border | Icon |
+|---|---|---|---|
+| Primary CTA (Watch now / Add to schedule) | pill, **height 32** | none | 18px |
+| Favorite | **32×32 circle** | 1px, radius 999px | **16px** |
+| Share | **no box** | none | **20px** |
+
+`.session-action` therefore carries only what favorite and share share — flex centring, no
+padding, `currentColor`, and the focus ring. The circle lives on `.session-favorite` alone, so
+share is a bare icon that aligns via the row's `align-items: center` (all three centre on the
+same y).
+
+The favorite icon is 16px inside a 32px circle while share is a bare 20px, which is why the
+icon sizes are set per control rather than on `.session-action`.
+
+**Both heart states stay optically identical.** The supplied outline heart is a 16-unit
+viewBox and the existing filled heart is 20-unit, but each occupies ~90% of its box
+(14.4/16 vs 18.0/20), so both render to the same 14.4px of visible artwork at 16px — no size
+jump on toggle. Design supplied only the unfavorited outline; if a matching filled 16-unit
+heart arrives it is a drop-in replacement for `ICON_HEART_FILLED`.
+
 ## Favorite, Add to schedule, Share
 
 **Favorite** (`favorite.js`) and **Add to schedule** (`schedule.js`) reuse the production
@@ -132,9 +242,37 @@ Both start from a minimal `{ id }` session so the control renders immediately, t
 subscribe to `sessions` and swap in the real catalog object once it arrives (needed for
 `rfSessionId` / `rfCode`).
 
-**Share** (`share.js`) uses `navigator.share` where available, else copies the link and
-shows the shared `features/toast/toast.js` toast. It reads the published `url` + `title`
-metadata, falling back to the current document.
+**Share** (`share.js`) **always copies the link** and confirms with the shared
+`features/toast/toast.js` toast, reading the published `url` metadata and falling back to
+`window.location.href`.
+
+It deliberately does **not** use `navigator.share`
+([MWPW-205502](https://jira.corp.adobe.com/browse/MWPW-205502)). The native sheet listed a
+long set of OS targets where design wants one predictable action, and because it resolved
+before the toast line was reached, a *successful* share produced no feedback at all — the
+toast only ever appeared on the non-`navigator.share` fallback path. A failed copy now shows a
+negative toast rather than failing silently, so the click always confirms one way or the other.
+
+The toast copy is **"Link copied"**. This block briefly said "Link copied to clipboard",
+because the whole handler was copied from `event-marquee`.
+
+It is deliberately *not* matched to `sessions-guide`, which says "Link copied!" since
+`29ce11db` (MWPW-200314 part 5). The two differ by an exclamation mark only; toast copy is not
+an analytics value, so nothing aggregates on it and the difference is cosmetic.
+
+⚠️ There are **four** share handlers in this repo and **three** different strings:
+
+| Where | Copy | `navigator.share` first? |
+|---|---|---|
+| `event-session-details/share.js` | `Link copied` | no — fixed here |
+| `sessions-guide/components/SessionDetailOverlay.js` | `Link copied!` | **yes** |
+| `c2/blocks/event-marquee/event-marquee.js` | `Link copied to clipboard` | **yes** |
+| `c2/blocks/mobile-rider/mobile-rider.js` | `Link copied to clipboard` | **yes** |
+
+The three that still try `navigator.share` first all carry the defect
+[MWPW-205502](https://jira.corp.adobe.com/browse/MWPW-205502) describes: the OS share sheet,
+and no toast on the path that succeeds. Consolidating into one shared helper would fix all
+three and settle the wording in a single place.
 
 ## Track tags (`track-tags.js`)
 
@@ -186,18 +324,62 @@ a `ResizeObserver` on the paragraph catches width/layout changes and `document.f
 ## `event-session-resources`
 
 Rows of "name … Open/Download" from the top-level `material-list` (RainFocus `files[]`),
-filtered to entries that are published and have a `fileURL`. "No resources" empty state
+filtered to entries that are published and have a `fileURL`. "No materials available for this
+session" empty state
 when none qualify. Links open in a new tab. First 2 shown, rest revealed by Show more;
 two-up grid from 900px.
 
-**Row label** comes from `fileTypeName` ("Session slides"), **not** `fileName` — authored
-file names are frequently unusable (`Screenshot 2026-08-13 at 11.23.26 AM.png`,
-`Magdiel_Lopez_MAX_2026_Session_Outline`). With no `fileTypeName`, it falls back to the
-URL's extension: `Resource (PDF)`, `Resource (PPTX)` (query stripped, uppercased), or
-plain `Resource` when there is no extension.
+Per [MWPW-205400](https://jira.corp.adobe.com/browse/MWPW-205400) resources arrive from
+**two** places, rendered in this order:
+
+**1. `material-list`** — presentation files. The shape the RF → DA sync actually emits,
+verified against `max/2026/sessions/acom-master-test-session-1002`:
+
+```json
+{ "description": "Final Presentation",
+  "title": "MAX 2025 Breakout Recording Process.pdf",
+  "url": "https://static.rainfocus.com/…/finalpresentation/….pdf",
+  "materialId": "4e287893-…", "materialSource": "external", "ordinal": 0 }
+```
+
+Note `url` / `description` / `title` — **not** `fileURL` / `fileTypeName` / `fileName`, and
+no `published` at all: the sync filters unpublished files out upstream, so the block only
+guards an explicit `published: false`. The older spelling is still accepted, so a sync change
+in either direction cannot blank the block. Rows are ordered by `ordinal`, not array order.
+
+**Row label** comes from `description` (RF's `fileTypeName`, e.g. "Final Presentation"),
+**not** `title` — authored file names are frequently unusable
+(`Screenshot 2026-08-13 at 11.23.26 AM.png`, `Magdiel_Lopez_MAX_2026_Session_Outline`). With
+neither, it falls back to the URL's extension: `Resource (PDF)`, `Resource (PPTX)` (query
+stripped, uppercased), or plain `Resource`.
+
+**2. Two single-URL custom attributes**, appended after the files:
+
+| Attribute | Row label | attributeId |
+|---|---|---|
+| `Dropbox Link for Session Page` | `Dropbox Link` | `e485c1c4-9688-4e5a-9891-9563ea5d89ac` |
+| `CC Library Link for Session Page` | `CC Library Link` | `2503567c-d1ce-4be2-bb1e-b0f5678dcd59` |
+
+Matched by name; blank values are skipped. Both are extensionless destinations, so they get
+**Open** rather than Download and are therefore **not** sign-in gated.
+
+The ticket states a session carries at most 3 files. The block does not enforce that — a cap
+would silently hide data — so the count is whatever the sync delivers plus up to two links.
+
+**Empty-state wording** follows the Figma frame verbatim: *"No materials available for this
+session"*. Note it says **materials** while the heading says **Session resources**, and the
+[naming thread](https://www.figma.com/design/716muSMQegdQmIhmDMt24S/Sessions-Detail-VizD-R1-8.17.26?node-id=8-6711&m=dev)
+settled on *resources* as the user-facing noun — *materials* is RainFocus's internal word
+(`material-list`). The shape matches `event-speakers`' *"No speakers available for this
+session"*, so the two blocks are consistent with each other; whether the noun should be
+*resources* is still Kat's call.
 
 **CTA label** is inferred from the file URL — `Download` for known document/media
-extensions, else `Open`. RainFocus may later supply explicit CTA text.
+extensions, else `Open`. RainFocus may later supply explicit CTA text. `Download` CTAs also
+carry the `download` attribute, which is currently **inert**: the assets are cross-origin on
+`static.rainfocus.com`, and browsers honour `download` only same-origin. It is kept so the
+behaviour is already right once the asset is served from an Adobe origin — see known-issues
+item 1, which covers why a `Download` on a PDF opens a preview today.
 
 **Download gating.** `Download` CTAs require sign-in **and** event registration;
 `Open` links are ungated. The click calls `assertAuthorized()` (the shared guard behind
@@ -209,6 +391,11 @@ with no re-render.
 `initSessionState()` **must** be called for this to work — `auth` defaults to
 `{ isLoggedIn: null }` and the guard throws unless `isLoggedIn === true`, so without it
 every click is blocked, including signed-in users.
+
+An authorized `Download` click confirms with a **"Session resource downloaded"** toast. It
+reports that the download *started*, not that it finished — the browser owns the transfer once
+the click goes through and reports nothing back. It fires only on the authorized path, so it
+can never appear alongside the login/registration toast, and never on an `Open` link.
 
 ⚠️ This is a **UX gate, not access control** — see known-issues.
 
@@ -234,12 +421,76 @@ when a speaker has no headshot.
 
 | Block | Shown before "Show more" | Constant |
 |---|---|---|
-| Session resources | 2 | `MOBILE_LIMIT` |
-| Speakers | 5 | `MOBILE_LIMIT` |
+| Session resources | 2 | `VISIBLE_LIMIT` |
+| Speakers | 5 | `VISIBLE_LIMIT` |
 | Featured products | 6 | `VISIBLE_LIMIT` |
 | Description | 6 lines | `--desc-lines` |
 
 Unconfirmed against the ticket — see known-issues.
+
+## Analytics (DAA)
+
+Most of this is **already handled by Milo** and deliberately left alone
+([MWPW-205399](https://jira.corp.adobe.com/browse/MWPW-205399)). Milo's decoration pass
+assigns standard section and block identifiers and auto-derives a `daa-ll` for every link
+and button from its visible text:
+
+| Level | Value | Source |
+|---|---|---|
+| Section | `s1`, `s2` | Milo — standard section naming |
+| Block | `b1\|event-session-d`, `b2\|event-session-r`, … | Milo (block name, truncated) |
+| Product tile | `Photoshop-1--Featured products 7` | Milo — carries the product name |
+| Resource CTA | `Download-1--Session resources` | Milo |
+
+We add an explicit `daa-ll` in exactly three situations, and nowhere else:
+
+**1. The element is created after Milo's pass.** `Watch now` is swapped into the CTA slot at
+a state boundary, long after decoration, so it is never auto-tagged — measured as
+`daa-ll: null` on a page in the `live` state. It carries `Watch-Now` from construction.
+(`Add to schedule` *is* auto-tagged when the page happens to load in `upcoming`, but relying
+on that would leave it untagged whenever the page loads mid-gap and the CTA is inserted
+later.)
+
+**2. The label changes after the first paint.** Favorite and Add to schedule both flip
+visible state, and Milo tags once — so the auto value freezes at whatever it was on load
+(and truncates: `Favorite this sessio-2--…`). Both set `daa-ll` inside their `paint()`, which
+already runs on mount and on every signal change, so add and remove are distinguishable:
+
+| Control | Values |
+|---|---|
+| Favorite | `Add-to-Favorites` / `Remove-from-Favorites` |
+| Add to schedule | `Add-to-Schedule` / `Remove-from-Schedule` |
+| Watch now | `Watch-Now` |
+| Share | `Share` |
+
+**3. The Show more/Show less toggles.** Same freezing problem as situation 2: the visible
+label flips between "Show more" and "Show less" on click, but Milo's
+`decorateSectionAnalytics` derives `daa-ll` from `textContent` once, during
+`documentPostSectionLoading`, and never revisits it
+([MWPW-205937](https://jira.corp.adobe.com/browse/MWPW-205937)). Each toggle sets `daa-ll`
+explicitly at construction (collapsed state) and again in its click handler, so expand and
+collapse are distinguishable regardless of click count:
+
+| Toggle | Values |
+|---|---|
+| Speakers | `Show-More-Speakers` / `Show-Less-Speakers` |
+| Featured products | `Show-More-Products` / `Show-Less-Products` |
+| Session resources | `Show-More-Resources` / `Show-Less-Resources` |
+| Description | `Show-More-Description` / `Show-Less-Description` |
+
+This block's own show-more toggles are covered above; `sessions-guide`'s separate show-more
+controls have a different, unrelated defect (no `daa-ll` at all) tracked separately.
+
+**Labels are copied verbatim from `sessions-guide`** (`components/LiveCard.js`,
+`SessionDetailOverlay.js`) so the same action rolls up across both surfaces rather than
+splitting into two report lines.
+
+Deliberately **not** used here: `updateAnalyticTag()` from `utils/decorate.js`. It appends
+`|<event-title>`, which is right for the RSVP button but would make every session's label
+unique and defeat roll-up. Per-session breakdown comes from the page dimension instead.
+
+Product tiles keep Milo's auto value because it already includes the product name, which is
+more useful than `sessions-guide`'s generic `Featured-Product`.
 
 ## Accessibility decisions
 
@@ -252,12 +503,17 @@ These are deliberate and were verified; changing them regresses a WCAG criterion
 - **The CTA swap defers while focused.** If the boundary fires while the user is on
   "Add to schedule", replacing it would remove the focused element and drop focus to
   `<body>` (2.4.3). `setCta()` holds the new CTA in `pending` and applies it on
-  `focusout`. `apply()` sets the CTA **before** the status so the announcement lands on a
+  `focusout`. `pending` is deliberately tri-state: `undefined` means nothing is deferred,
+  while `null` means "a deferred clear" — so a CTA that should disappear is not mistaken for
+  no pending change. `apply()` sets the CTA **before** the status so the announcement lands on a
   DOM that already offers it.
-- **Favorite:** stable accessible name + `aria-pressed`. **Schedule:** no `aria-pressed`,
-  because its visible label itself flips to "Added to schedule" — setting both
-  double-announces the state, and a fixed name would contradict the visible text (2.5.3
-  Label in Name).
+- **Favorite:** stable accessible name + `aria-pressed`. **Schedule:** `aria-pressed` too,
+  and no `aria-label` — the visible text is the accessible name (2.5.3 Label in Name).
+  This reverses an earlier call to omit `aria-pressed` on the grounds that the visible label
+  already flips to "Added to schedule". That label states a *state*, not an *action*, so
+  nothing in it tells the user the button toggles back off — `aria-pressed` is what carries
+  that, and both `sessions-guide` surfaces set it. The mild redundancy of hearing
+  "Added to schedule, pressed" is worth the affordance.
 - **Injected SVGs get `aria-hidden` + `focusable="false"`.** `resolveIcon` and
   `fetchFederalProductIcon` return raw sprite SVGs that may carry a `<title>`, which would
   otherwise be announced alongside the adjacent label — or added to a tile link's

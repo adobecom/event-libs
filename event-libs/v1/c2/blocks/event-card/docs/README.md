@@ -1,8 +1,8 @@
 # event-card
 
 Generic content card. Renders a media (image) + body (title/description/CTA), with
-five aspect-ratio variants authored via class name: `ratio-1-1`, `ratio-4-3` (default),
-`ratio-3-4`, `ratio-4-5`, `ratio-16-9`.
+six aspect-ratio variants authored via class name: `media-square`, `media-standard` (default),
+`media-standard-rev`, `standard-m`, `media-wide`, `media-tall`.
 
 If no media image is found, the card removes itself — a card with no image is not a
 valid authored card.

@@ -34,7 +34,7 @@ function setRoutingData(card, entry) {
 // never gets safeUrl's own re-check) and would otherwise navigate a raw click straight
 // off the unsanitized href.
 function buildAuthoredCard(entry) {
-  const card = createTag('div', { class: 'event-card ratio-16-9' });
+  const card = createTag('div', { class: 'event-card media-wide' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
     createTag('img', { src: entry.imageUrl, alt: '' }, '', { parent: mediaWrapper });

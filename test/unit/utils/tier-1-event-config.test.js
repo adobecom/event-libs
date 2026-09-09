@@ -6,6 +6,7 @@ import {
   getAllowDoubleBooking,
   getHomepagePath,
   getBroadcastPath,
+  getSessionGuidePath,
 } from '../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const CONFIG = {
@@ -78,6 +79,7 @@ describe('tier-1-event-config', () => {
 
   it('returns empty for an event page the config does not declare — the caller decides the fallback', () => {
     expect(getBroadcastPath()).to.equal('');
+    expect(getSessionGuidePath()).to.equal('');
   });
 
   it('is idempotent — a second init() call does not re-parse or clear the config', () => {

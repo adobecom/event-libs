@@ -87,6 +87,7 @@ function buildFavoriteButton(session, feedbackConfig) {
     btn.innerHTML = isFavorited ? ICON_HEART_FILLED : ICON_HEART_OUTLINE;
     btn.setAttribute('aria-label', isFavorited ? 'Remove from favorites' : 'Add to favorites');
     btn.setAttribute('aria-pressed', String(isFavorited));
+    btn.setAttribute('daa-ll', isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites');
     btn.classList.toggle('is-favorited', isFavorited);
   };
   paint();
@@ -133,6 +134,7 @@ function buildShareButton() {
     type: 'button',
     class: 'event-marquee-action event-marquee-share',
     'aria-label': 'Share',
+    'daa-ll': 'Share',
   }, ICON_SHARE);
 
   btn.addEventListener('click', async () => {

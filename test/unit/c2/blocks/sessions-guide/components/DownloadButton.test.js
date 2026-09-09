@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { DownloadButton, downloadSchedule } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DownloadButton.js';
 import { sessions, scheduled } from '../../../../../../event-libs/v1/utils/session-store.js';
-import { toast } from '../../../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../../../event-libs/v1/features/toast/toast.js';
 
 function session(overrides = {}) {
   return {
@@ -23,7 +23,7 @@ describe('DownloadButton', () => {
   beforeEach(() => {
     sessions.value = [];
     scheduled.value = new Set();
-    toast.value = null;
+    toasts.value = [];
     clicks = [];
     originalClick = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function stubClick() {
@@ -66,12 +66,12 @@ describe('DownloadButton', () => {
     it('shows an error toast and creates no download when nothing is scheduled', () => {
       downloadSchedule([session({ id: 'a' })], new Set());
       expect(clicks).to.have.lengthOf(0);
-      expect(toast.value?.variant).to.equal('negative');
+      expect(toasts.value[0]?.variant).to.equal('negative');
     });
 
     it('does not show a toast on a successful download', () => {
       downloadSchedule([session({ id: 'a' })], new Set(['a']));
-      expect(toast.value).to.be.null;
+      expect(toasts.value).to.have.lengthOf(0);
     });
   });
 });

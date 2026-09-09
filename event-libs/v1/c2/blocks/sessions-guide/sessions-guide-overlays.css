@@ -77,7 +77,7 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-sm);
   color: var(--s2a-color-content-default);
@@ -201,7 +201,7 @@
 }
 
 .sg-detail__title {
-  font-family: var(--s2a-font-family-adobe-clean-display);
+  font-family: var(--heading-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
   font-size: var(--s2a-font-size-xl);
   line-height: 1.1;
@@ -246,7 +246,7 @@
   min-width: 90px;
   padding: 0 18px;
   border-radius: var(--s2a-border-radius-round);
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-md);
   cursor: pointer;
@@ -346,7 +346,7 @@
 }
 
 .sg-detail__section-label {
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-lg);
   font-weight: var(--s2a-font-weight-adobe-clean-extrabold);
   letter-spacing: -0.54px;
@@ -388,7 +388,7 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-sm);
   color: var(--s2a-color-content-default);
@@ -529,7 +529,7 @@
 .sg-detail__product-name {
   flex: 1 0 0;
   min-width: 0;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-black);
   font-size: var(--s2a-font-size-md);
   line-height: 16px;
@@ -805,7 +805,7 @@
 
 .sg-filter-panel__title {
   margin: 0;
-  font-family: var(--s2a-font-family-adobe-clean-display);
+  font-family: var(--heading-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
   font-size: var(--s2a-font-size-2xl);
   line-height: 1;
@@ -858,7 +858,7 @@
   padding: var(--s2a-spacing-md) 0;
   background: transparent;
   border: none;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-md);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   line-height: var(--s2a-font-line-height-24);
@@ -932,7 +932,7 @@
 .sg-filter-panel__drill-title {
   grid-column: 2;
   margin: 0;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-lg);
   line-height: 1.3;
@@ -1015,7 +1015,7 @@
   padding: var(--s2a-spacing-md) var(--s2a-spacing-lg);
   border: 1px solid rgb(0 0 0 / 10%);
   border-radius: var(--s2a-border-radius-round);
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-sm);
   line-height: 1.2;
@@ -1050,7 +1050,7 @@
   background: var(--s2a-color-background-default);
   border: 1px solid transparent;
   border-radius: var(--s2a-border-radius-12);
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-sm);
   line-height: var(--s2a-font-line-height-18);
   color: var(--s2a-color-content-default);

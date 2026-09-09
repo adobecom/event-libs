@@ -1,0 +1,43 @@
+@import '../../styles/tokens.css';
+
+.session-video-player {
+  padding-bottom: var(--s2a-spacing-8, 8px);
+}
+
+@media (min-width: 1024px) {
+  :root:has(meta[name="foundation"][content="c2"]) .session-video-playlist-container .session-video-player .milo-video,
+  :root:has(meta[name="foundation"][content="c2"]) .session-video-container .session-video-player .milo-video {
+    max-width: none;
+    margin: 0;
+  }
+}
+
+.session-video-player-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--s2a-border-radius-md, 16px);
+  background: var(--s2a-color-gray-100, #f5f5f5);
+}
+
+.session-video-player-loader::before {
+  content: '';
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--s2a-color-gray-200, #e0e0e0);
+  border-top-color: var(--s2a-color-gray-600, #6e6e6e);
+  border-radius: 50%;
+  animation: session-video-player-loader-spin 0.8s linear infinite;
+}
+
+@keyframes session-video-player-loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-video-player-loader::before {
+    animation: none;
+  }
+}

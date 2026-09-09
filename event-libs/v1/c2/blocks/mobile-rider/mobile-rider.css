@@ -38,7 +38,7 @@
   box-sizing: border-box;
   background: transparent;
   color: var(--s2a-color-content-default);
-  font-family: var(--s2a-font-family-default);
+  font-family: var(--body-font-family);
   padding: var(--s2a-spacing-lg) 0;
   border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
   overflow: hidden;
@@ -61,7 +61,7 @@
   margin: 0;
   overflow: hidden;
   color: var(--s2a-color-content-default);
-  font-family: var(--s2a-font-family-heading);
+  font-family: var(--heading-font-family);
   font-size: var(--s2a-typography-font-size-heading-5);
   font-weight: 900;
   line-height: var(--s2a-typography-line-height-heading-5);
@@ -173,7 +173,7 @@
 /* Figma: "Component/L/Medium" */
 .mobile-rider-info-bar-category-label {
   color: var(--s2a-color-border-default);
-  font-family: var(--s2a-font-family-default);
+  font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-md, 16px);
   font-weight: 500;
   line-height: 125%;
@@ -185,7 +185,7 @@
   overflow: hidden;
   margin: 0 0 var(--s2a-spacing-md);
   color: var(--s2a-color-content-subtle);
-  font-family: var(--s2a-font-family-default);
+  font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-sm, 14px);
   font-weight: 400;
   line-height: 150%;

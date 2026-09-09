@@ -5,7 +5,7 @@ Open items across the four session page blocks (`event-session-details`,
 the code as of 2026-08-24 so the source can stay comment-free — see
 [README.md](README.md) for how the blocks work.
 
-## 1. Download gating is a UX gate, not access control
+## 1. Download gating is a UX gate, and "Download" does not download
 
 **Files:** `event-session-resources/event-session-resources.js`
 
@@ -25,27 +25,66 @@ URLs; or (c) a token-gated CDN origin.
 If it returns per-session entitlement or gated asset URLs, that is the hook. Owner: Sekhar
 / Daniel.
 
-## 2. `liveStream` handling diverges from `video-player`
+### The same endpoint also fixes "Download" not downloading
 
-**Files:** `event-session-details/session-state-view.js` (`hasPlayableVideo`) vs.
-`c2/blocks/video-player/video-player.js` (`pickEmbeddableVideo`)
+A `Download` CTA does not download a PDF — it opens a preview tab. Measured on a real asset:
 
-**Impact:** two related defects in the player, and a visible disagreement with the eyebrow.
+```
+GET https://static.rainfocus.com/adobe/m26/sess/…/finalpresentation/….pdf
+HTTP/2 200
+content-type: application/pdf
+```
 
-`pickEmbeddableVideo()` accepts **any** `kind` and returns the **first** embeddable entry
-*by array order*. On the real MPC template the youtube `liveStream` sits at index 0, ahead
-of the mpc `onDemand` — and the player only runs post-event, so it embeds the livestream
-URL and never reaches the authored recording, losing that URL's `quality=9`,
-`end=nothing`, `learn=on` params plus MPC captions/analytics. It usually does not *look*
-broken, because YouTube leaves the archived stream at the same watch URL.
+No `Content-Disposition`, and no `Access-Control-Allow-Origin`. Three consequences:
 
-Separately, `hasPlayableVideo()` deliberately excludes `kind: 'liveStream'`, so a session
-whose **only** embeddable entry is a liveStream gets a player while the eyebrow says
-"Coming soon" — a contradiction on one page.
+1. **`Content-Disposition: attachment` is absent**, so the browser previews anything it can
+   render. That header is the authoritative control and it is server-side.
+2. **The `download` attribute cannot help.** It is set on `Download` CTAs, but Chrome and
+   Firefox honour it only for same-origin URLs (plus `blob:`/`data:`) — and these assets are
+   cross-origin from the page. It is deliberately kept as correct intent: it starts working the
+   moment the asset is served same-origin, which is what an Adobe-origin endpoint would do.
+3. **The fetch-to-blob workaround is also blocked**, for want of a CORS header.
 
-**Fix (owner: Hari):** in `pickEmbeddableVideo`, skip `liveStream` post-event, and prefer
-`onDemand` explicitly rather than relying on array order. The array-order dependency is
-the more serious of the two.
+Only renderable types are affected — `pdf`, `mp4`, `mov` and images preview; `zip`, `pptx`,
+`docx`, `xlsx`, `key`, `psd`, `ai`, `indd` download regardless. That still matters, because
+`finalpresentation` is the only attendee-facing type and both real examples are PDFs.
+
+**Fix:** either option (a) above — an auth-checked Adobe-origin endpoint, which sets
+`Content-Disposition: attachment` and makes the asset same-origin, solving gating *and* this in
+one change — or, as a standalone ask to Sekhar / RainFocus, add
+`Content-Disposition: attachment` to those CDN responses, which needs no client change at all.
+
+## 2. `video-player` reads an unsorted `sessionTimes[0]`
+
+**Files:** `c2/blocks/video-player/video-player.js` (`currentSessionHasEnded`) —
+on the unmerged **`latest-playlist`** branch, not on `dev`
+
+**Resolved since first written:** `pickEmbeddableVideo()` used to accept any `kind` and
+return the first embeddable entry by array order, which meant the youtube `liveStream` at
+index 0 won over the mpc `onDemand` on the real MPC template. It now resolves
+`.find((v) => v.kind === 'onDemand')`, so that defect is gone, and
+`hasPlayableVideo()` has been aligned to the same `kind === 'onDemand'` test — the two
+predicates are now identical and cannot disagree.
+
+**Still open:** the player's post-event gate is
+`nowMs >= sessionTimes[0].endTimeMillis`, reading the array **unsorted**. RainFocus does not
+order `sessionTimes` chronologically — 21 of the 40 published multi-slot MAX26 sessions have
+a first entry that is not the earliest. Two consequences:
+
+- A repeat lab authored later-slot-first (`L6317` = `[Nov 12 13:30, Nov 11 08:00]`) hides the
+  player for a full day after its real first occurrence has ended.
+- A 10am session with a 6pm premiere authored premiere-first compares against 7pm, so the
+  intended 10:45–18:00 on-demand window renders **no player at all**.
+
+`mapEslPayloadToRawSessions()` and `session-state-view.js` both sort before taking the
+earliest; this is the remaining place that does not.
+
+**Fix (owner: Hari):** sort by `startTimeMillis` before indexing, or import
+`getAllSessionTimes()` from `session-state-view.js`.
+
+**Also worth confirming:** `currentSessionHasEnded()` returns `true` when there is no entry
+or `endTimeMillis` is not a finite number, so an unscheduled session that has a video would
+pass the gate.
 
 ## 3. `mobilerider` / `dvr` is a recording but is not counted as one
 
@@ -62,17 +101,48 @@ be a player.
 yes, add `mobilerider` to the recording test rather than sniffing the DOM for a
 `.mobile-rider` block, which is timing-fragile during decoration.
 
-## 4. `fileTypeName` can repeat across rows
+## 4. `description` repeats across rows; `material-list` scoping is sync-side
 
-**Files:** `event-session-resources/event-session-resources.js` (`resourceName`)
+**Files:** `event-session-resources/event-session-resources.js` (`readMaterials`)
 
-**Impact:** rows are labelled by `fileTypeName` because `fileName` is often unusable. But
-`fileTypeName` is a *type*, not a name — a session publishing two PDFs both typed
-"Session slides" renders two identical rows, where `fileName` at least distinguished them.
-The `aria-label` inherits the same ambiguity.
+**Impact (label collisions):** rows are labelled by `description` (RF's `fileTypeName`)
+because `title` is often unusable. But it is a *type*, not a name, so two published files of
+the same type render two identical rows — and this is now confirmed at scale rather than
+hypothetical. Across the 275-session MAX26 dump, of 125 files: **107 are typed `Outline`** and
+8 `Draft Presentation`. Any session publishing two of a type collides. The `aria-label`
+inherits the ambiguity.
 
-**Fix:** check real RainFocus data for how often it repeats (owner: Kat). If common,
-disambiguate — e.g. append an index, or fall back to `fileName` on collision.
+**Contract:** everything in `material-list` is rendered. The block does **not** filter by
+type, and deliberately so — the sync is already the gate (RainFocus holds 125 files across
+the event; `acom-master-test-session-1002`'s synced `material-list` holds 1, because the sync
+drops unpublished ones upstream). Which file types are attendee-facing is a content decision
+owned by the data, so adding a second gate here would duplicate that policy in a place it can
+drift from, and make a missing resource require checking two filters instead of one.
+
+**What that puts on the sync (owner: Sekhar):** only attendee-facing files should reach
+`material-list`. Today publish state is the only thing separating them, and most of what
+RainFocus attaches to a session is internal:
+
+| `fileTypeCode` | `fileTypeName` | Count | Attendee-facing? |
+|---|---|---|---|
+| `outline` | Outline | 107 | No — speaker's own `.docx`/`.pdf` submission |
+| `draftpresentation` | Draft Presentation | 8 | No — explicitly a draft |
+| `speaker` | Sponsor Speaker Headshot | 7 | No — a `.jpg`/`.png` portrait |
+| `finalpresentation` | Final Presentation | 2 | **Yes** |
+| `sessionimageupload` | Session Image Upload | 1 | No — the session card image |
+
+Only **1 of 125** is currently `published: true` (a `finalpresentation`), so publish state is
+holding today. The exposure grows as the event nears, when coordinators publish final decks
+across hundreds of sessions and the lists they click through are dominated by those 107
+outlines. A single mis-publish renders `Outline  ⟶ Download` and hands an attendee the
+speaker's raw `.docx`. Not a security hole — the files are on a public CDN either way and
+someone must actively publish them — but we would be advertising internal material.
+
+**Fix (sync-side):** restrict `material-list` to attendee-facing types, almost certainly
+`finalpresentation` alone — confirm the allowlist with Kat. `fileTypeCode` is the stable key
+to gate on; it exists in the RainFocus `files[]` payload but is dropped on the way to the
+page, so the synced entries carry only `description` / `title` / `url` / `ordinal`. Nothing to
+change in the block: if a file reaches `material-list`, it renders.
 
 ## 5. `auth` has a pending window that reads as "not signed in"
 
@@ -90,8 +160,8 @@ pending state) rather than rejecting it outright.
 
 ## 6. Show-more limits are unconfirmed
 
-**Files:** `event-session-resources.js` (`MOBILE_LIMIT` 2), `event-speakers.js`
-(`MOBILE_LIMIT` 5), `event-featured-products.js` (`VISIBLE_LIMIT` 6)
+**Files:** `event-session-resources.js` (`VISIBLE_LIMIT` 2), `event-speakers.js`
+(`VISIBLE_LIMIT` 5), `event-featured-products.js` (`VISIBLE_LIMIT` 6)
 
 **Impact:** Featured Products' acceptance criteria prose says mobile 4 / desktop 6, while
 the Figma appears to show 6 at both. Holding at 6, non-responsive. Session resources now
@@ -102,19 +172,30 @@ single row of two — the desktop limit likely wants to be 4.
 
 ## 7. Desktop behavior is deferred in three places
 
-**Files:** `description-clamp.js`, `event-speakers.js`
+**Files:** `description-clamp.js`, `event-speakers.js`, `event-session-resources.js`
 
-**Impact:** the description clamp and the speakers toggle were specified as mobile-only —
-desktop should show the full text and all speakers with no toggle. Both currently clamp at
-every width. Noted in the original tickets as part of "the desktop pass".
+**Impact:** the description clamp and the speakers/resources toggles were specified as
+mobile-only — desktop should show the full text and all items with no toggle. All of them
+currently truncate at **every** width: none of the `.is-overflow` rules sit inside a media
+query, and `--desc-lines` is unconditional. Noted in the original tickets as part of "the
+desktop pass".
 
-**Fix:** unclamp above the desktop breakpoint once the desktop design is settled.
+Speakers and resources previously named their constant `MOBILE_LIMIT`, which described that
+intent rather than the behaviour and made the gap easy to miss — `event-featured-products`
+already used the accurate `VISIBLE_LIMIT`. All three now use `VISIBLE_LIMIT`. **The rename
+changed no behaviour**; it only stopped the name asserting something untrue.
+
+**Fix:** wrap the `.is-overflow` rules and the clamp in a max-width media query once the
+desktop design is settled. Note this interacts with the count rule — if desktop shows every
+item with no toggle, then per Figma ("no number listed" when the module cannot expand) desktop
+should show no count either, which makes the count condition width-dependent rather than
+purely count-based.
 
 ## 8. Toggle labels are not internationalized
 
 **Files:** all four blocks ("Show more" / "Show less"), `session-state-view.js`
 ("Live", "On-demand", "Coming soon", "Watch now"), `event-session-resources.js`
-("Download", "Open", "No resources", "Session resources")
+("Download", "Open", "No materials available for this session", "Session resources")
 
 **Impact:** every user-facing string is a hardcoded English placeholder.
 

@@ -63,6 +63,8 @@ describe('services/sessions/sessions-api', () => {
             customAttr('Industry', [selectValue('Retail'), selectValue('Media')]),
             customAttr('Closed Caption Information', [textValue('Closed captions available in English and German')]),
             customAttr('IPOD or GDPR Copy', [textValue('Recording notice lorem ipsum.')]),
+            customAttr('Playlist assignment/name', [selectValue('Photography', 'photography'), selectValue('3D', '3d')]),
+            customAttr('Playlist on session page', [selectValue('Photography', 'photography')]),
           ],
         },
         {
@@ -296,6 +298,16 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.industry).to.deep.equal([]);
       expect(bare.closedCaptions).to.equal('');
       expect(bare.ipodOrGdprCopy).to.equal('');
+      expect(bare.playlistAssignment).to.deep.equal([]);
+      expect(bare.playlistOnSessionPage).to.deep.equal([]);
+    });
+
+    // Slugs, not labels: session-video-playlist matches one session's playlistOnSessionPage
+    // against every other session's playlistAssignment, and a display label would never
+    // match the slug the page actually filters on.
+    it('maps the playlist attributes to slugs rather than labels', () => {
+      expect(full.playlistAssignment).to.deep.equal(['photography', '3d']);
+      expect(full.playlistOnSessionPage).to.deep.equal(['photography']);
     });
   });
 
@@ -1004,6 +1016,17 @@ describe('services/sessions/sessions-api', () => {
     it('defaults contentCategory to an empty array when absent (mock fixtures)', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: 'All' }]);
       expect(normalized.contentCategory).to.deep.equal([]);
+    });
+
+    it('coerces the playlist attributes and defaults them to empty arrays', () => {
+      const [withValues] = normalizeSessions([{
+        id: 's-1', playlistAssignment: 'photography', playlistOnSessionPage: ['photography'],
+      }]);
+      const [absent] = normalizeSessions([{ id: 's-2' }]);
+      expect(withValues.playlistAssignment).to.deep.equal(['photography']);
+      expect(withValues.playlistOnSessionPage).to.deep.equal(['photography']);
+      expect(absent.playlistAssignment).to.deep.equal([]);
+      expect(absent.playlistOnSessionPage).to.deep.equal([]);
     });
 
     it('coerces tracks and defaults it to an empty array when absent', () => {

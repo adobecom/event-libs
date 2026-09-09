@@ -63,8 +63,11 @@ export function clearSessionParams() {
 }
 
 // Skips reloading a "Watch now" destination the widget is already embedded on.
+// `?pretend-broadcast=true` is a manual-testing override: a draft page's pathname never
+// matches the authored broadcast/homepage path, so this would otherwise always be false there.
 export function isSamePage(href) {
   if (!href) return false;
+  if (new URLSearchParams(window.location.search).get('pretend-broadcast') === 'true') return true;
   try {
     return new URL(href, window.location.origin).pathname === window.location.pathname;
   } catch {
