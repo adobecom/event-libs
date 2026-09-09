@@ -8,7 +8,7 @@ import {
 } from '../../../utils/session-store.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
-import { resolveIcon } from '../../../features/icons/icon-resolver.js';
+import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 
 const ROTATE_OUT_MS = 350;
@@ -35,13 +35,16 @@ function buildCategoryBadge(track) {
   }, '', { parent: badge });
   createTag('span', { class: 'sg-category-badge__label' }, track, { parent: badge });
 
-  resolveIcon(entry.icon).then((svg) => {
-    if (!svg) return;
-    svg.classList.add('sg-category-badge__icon');
-    iconColor.append(svg);
-  }).catch((error) => {
-    window.lana?.log(`upcoming-sessions: icon resolution failed for "${entry.icon}": ${error.message}`);
-  });
+  (async () => {
+    try {
+      const svg = await fetchFederalTrackIcon(entry.icon);
+      if (!svg) return;
+      svg.classList.add('sg-category-badge__icon');
+      iconColor.append(svg);
+    } catch (error) {
+      window.lana?.log(`upcoming-sessions: icon resolution failed for "${entry.icon}": ${error.message}`);
+    }
+  })();
 
   return badge;
 }
@@ -162,10 +165,7 @@ export function buildCard(session) {
   const topBadge = buildCategoryBadge(session.track);
   if (topBadge) badgeRow.append(topBadge);
 
-  // session.enTitle/primaryCategory(session) below are attacker-influenced (decoded from
-  // the link's hash payload, not hand-authored in DA) — createTag's string `html` argument
-  // runs through insertAdjacentHTML, so these are set via .textContent to keep them as
-  // inert text rather than parsed markup.
+  // session.enTitle is attacker-influenced (decoded from a hash payload) - set via .textContent, not html.
   createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
   const footer = createTag('div', { class: 'sg-card__footer' }, '', { parent: body });
@@ -366,9 +366,7 @@ async function decorate(el) {
   renderTrack(track, sessions);
 
   const header = createTag('div', { class: 'upcoming-sessions-header' }, '', { parent: el });
-  // heading is attacker-influenced (decoded from the link's hash payload) — see the
-  // .textContent note on session.enTitle in buildCard() above for why this isn't passed
-  // as createTag's html argument.
+  // heading is attacker-influenced too - same .textContent handling as session.enTitle above.
   if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, '', { parent: header }).textContent = heading;
   header.append(buildCarouselControls(track));
 

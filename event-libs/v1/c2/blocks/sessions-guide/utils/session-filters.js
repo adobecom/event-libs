@@ -31,16 +31,14 @@ export function resolveNamedTrackBadge(trackName) {
 // ESP set the field up as multi-select, but it was only ever meant to hold one value.
 const additionalTracksOf = (session) => (session.additionalTracks || []).slice(0, 1);
 
-// Lanes a session belongs in, which is not the same question as what badge it gets: with no
-// primary track and no override it gets no badge, but its additional track still places it.
+// Not the same question as the badge: with no primary track and no override there's no badge, but the additional track still places the session.
 export function resolveSwimlanes(session) {
   const badge = resolveTrackBadge(session);
   if (badge) return badge.swimlanes;
   return additionalTracksOf(session);
 }
 
-// An override always wins the lane and badge over the primary track; a session with neither
-// gets no badge at all. Full case table in PLAN.md §16.2.
+// An override always wins the lane and badge over the primary track.
 export function resolveTrackBadge(session) {
   const hasPrimary = !!session.primaryTrack;
   const hasOverride = !!session.trackOverride;
@@ -57,7 +55,7 @@ export function resolveTrackBadge(session) {
       count: additional.length,
       isOverride: true,
       swimlanes: [session.trackOverride, ...additional],
-      stackedTracks: additional.length > 0 ? additional : null,
+      stackedTracks: additional.length > 0 ? [session.trackOverride, ...additional] : null,
     };
   }
 
@@ -73,8 +71,7 @@ export function resolveTrackBadge(session) {
   };
 }
 
-// swimlaneOrder controls a lane's enabled state, name and order; unlisted lanes stay
-// enabled under their raw name, appended last.
+// Unlisted lanes in swimlaneOrder stay enabled under their raw name, appended last.
 export function groupByTrack(sessions, swimlaneOrder) {
   const map = new Map();
   for (const s of sessions) {
@@ -121,10 +118,7 @@ export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userT
   });
 }
 
-// DVR Timing (in hours) is no longer part of this gate (PM, 2026-08-26) — a session lands
-// in On Demand as soon as its state resolves there, full stop. `dvrDelayHours` is still
-// carried on the session for a later "Recording coming soon" display treatment, just not
-// read here.
+// dvrDelayHours isn't read here — a session goes On Demand as soon as its state resolves there.
 export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
   return sessions.filter((s) => {
     if (s.hasOnDemandFormat) return true;
@@ -133,8 +127,7 @@ export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
   });
 }
 
-// Shown in the live carousel when nothing is live. Authored order, not the catalog's, so the
-// configurator's reorder UI takes effect. Falls back to a deterministic pick of up to 3.
+// Shown in the live carousel when nothing is live; falls back to a deterministic pick of up to 3.
 export function getRecommendedSessions(sessions, recommendedIds, activeDay, userTz) {
   const daySessions = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
 
@@ -146,8 +139,7 @@ export function getRecommendedSessions(sessions, recommendedIds, activeDay, user
   return deterministicShuffle(daySessions, activeDay).slice(0, 3);
 }
 
-// Same authored ids and order as getRecommendedSessions, but membership only: no day-scoping
-// and no shuffle fallback.
+// Same authored ids/order as getRecommendedSessions, but membership only: no day-scoping or shuffle.
 export function getOnDemandRecommendedSessions(sessions, recommendedIds) {
   if (!recommendedIds || recommendedIds.length === 0) return [];
   const sessionsById = new Map(sessions.map((s) => [s.id, s]));
@@ -165,18 +157,13 @@ function deterministicShuffle(arr, seed) {
   return result;
 }
 
-// Category ids are ESP attributeIds, resolved against customAttributeValues. The flat-field
-// fallback covers a plain session field, though nothing passes one today.
+// Category ids are ESP attributeIds; the flat-field fallback covers a plain session field.
 export function getFilterValue(session, categoryId) {
   const v = session.customAttributeValues?.[categoryId];
   return v !== undefined ? v : session[categoryId];
 }
 
-/**
- * Apply activeFilters + searchQuery to a session list.
- * activeFilters: { [categoryId]: Set<string> }
- * Returns a new array; does not mutate input.
- */
+// activeFilters: { [categoryId]: Set<string> }. Returns a new array; does not mutate input.
 export function filterSessions(sessions, activeFilters, searchQuery) {
   let result = sessions;
 
@@ -199,6 +186,13 @@ export function filterSessions(sessions, activeFilters, searchQuery) {
   return result;
 }
 
+// True when there's search text or at least one filter checked — signals "No results found" vs. a default empty state.
+export function hasActiveSearchOrFilters(activeFilters, searchQuery) {
+  if (searchQuery) return true;
+  if (!activeFilters) return false;
+  return Object.values(activeFilters).some((values) => values?.size > 0);
+}
+
 function matchesSearch(session, q) {
   return (
     session.title?.toLowerCase().includes(q)
@@ -206,5 +200,6 @@ function matchesSearch(session, q) {
     || session.speakers?.some((sp) => sp.name?.toLowerCase().includes(q))
     || session.primaryTrack?.toLowerCase().includes(q)
     || session.type?.toLowerCase().includes(q)
+    || session.sessionCode?.toLowerCase().includes(q)
   );
 }

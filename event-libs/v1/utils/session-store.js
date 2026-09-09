@@ -10,8 +10,7 @@ import {
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
 
-// Shared, page-level state. Preact components read `.value` directly during
-// render for fine-grained reactivity; non-Preact code uses `.subscribe()`/`.peek()`.
+// Shared, page-level state. Preact reads `.value` directly; non-Preact code uses `.subscribe()`/`.peek()`.
 export const sessions = signal([]);
 export const sessionsStatus = signal('idle'); // idle | loading | ready | error
 export const liveStreamActiveIds = signal(new Set());
@@ -19,15 +18,24 @@ export const favorited = signal(new Set());
 export const scheduled = signal(new Set());
 export const auth = signal({ isLoggedIn: null, isRegistered: undefined, userFirstName: null });
 export const pendingActions = signal(new Set());
-// Bumped only when a derived session state changes. Read purely as a re-render dependency;
-// the value itself carries no meaning.
+// Bumped only when a derived session state changes; read purely as a re-render dependency.
 export const sessionStateVersion = signal(0);
 // A new object on every call, even for the same sessionId, so the signal always notifies.
 export const sessionGuideRequest = signal(null);
-// Opposite direction of sessionGuideRequest: the widget asking an already-mounted,
-// multi-session page (e.g. Broadcast) to switch, since it has no other channel back to that
-// page's own player state.
+// Opposite direction of sessionGuideRequest: an already-mounted multi-session page (e.g.
+// Broadcast) asking to switch, since it has no other channel back to its own player state.
 export const watchSameSessionRequest = signal(null);
+
+// Console debugging only — never runs on a real prod hit. Also checks hostname since
+// getEventServiceEnv() (the ESL/ESP backend env) can default to 'prod' on a preview/draft page.
+const { hostname } = window.location;
+const isPreviewOrDevHost = hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local');
+if (isPreviewOrDevHost || getEventServiceEnv()?.name !== 'prod') {
+  window.__sessionStore = {
+    sessions, sessionsStatus, liveStreamActiveIds, favorited, scheduled, auth, pendingActions,
+    sessionStateVersion, sessionGuideRequest, watchSameSessionRequest, getEventApiConfig,
+  };
+}
 
 let initialized = false;
 let eventApiConfig = null;
@@ -51,9 +59,7 @@ function defaultRfApiUrlForEnv() {
   return isProd ? DEFAULT_RF_API_URL : STAGE_RF_API_URL;
 }
 
-// Exchanges the IMS userId for an rfAuthToken. The response field is unconfirmed, so the
-// likely candidates are tried. rfAuthTokenSettled gates maybeLoadMyData() so it can't fire
-// mid-exchange with a null token.
+// rfAuthTokenSettled gates maybeLoadMyData() so it can't fire mid-exchange with a null token.
 async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
@@ -93,8 +99,7 @@ function mapToSessionIds(entries, idField, matchField) {
   return (entries || []).map((entry) => idByRf.get(entry[idField])).filter(Boolean);
 }
 
-// Needs the catalog loaded for mapToSessionIds(). isRegistered comes from loggedInUser, the
-// only registration signal myData gives — mapping still unverified.
+// Needs the catalog loaded for mapToSessionIds(). isRegistered comes from loggedInUser.
 async function loadMyData() {
   try {
     const data = await fetchMyData(rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
@@ -105,11 +110,12 @@ async function loadMyData() {
     });
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
+    // A failed fetch is still a final, non-retried answer — isRegistered must not stay undefined.
+    auth.value = { ...auth.value, isRegistered: null };
   }
 }
 
-// Per-attendee, so it is skipped for a logged-out visitor, unlike the catalog. Runs once,
-// whichever of catalog/auth/token resolves last.
+// Per-attendee, so skipped for a logged-out visitor. Runs once, whichever input resolves last.
 function maybeLoadMyData() {
   if (myDataAttempted) return;
   if (sessionsStatus.value !== 'ready') return;
@@ -117,8 +123,9 @@ function maybeLoadMyData() {
   if (!rfAuthTokenSettled) return;
   myDataAttempted = true;
   if (!rfAuthToken) {
-    // No token means guaranteed failure. isRegistered stays undefined, not false.
+    // Settle isRegistered to null (not undefined) so isAuthResolved() doesn't spin forever.
     window.lana?.log('[session-store] no RF auth token — skipping myData, registration status unknown');
+    auth.value = { ...auth.value, isRegistered: null };
     return;
   }
   loadMyData();
@@ -158,16 +165,12 @@ export function getEventApiConfig() {
   return eventApiConfig;
 }
 
-// Lets any block open Session Guide straight to a detail view. No-ops if the block isn't
-// mounted on the page.
+// Lets any block open Session Guide straight to a detail view. No-ops if not mounted on the page.
 export function openSessionGuideDetail(sessionId) {
   sessionGuideRequest.value = { sessionId };
 }
 
-// The widget calls this instead of navigating when it's already embedded on the destination
-// page (isSamePage()) but has no prop-level way to trigger a switch itself — e.g. Broadcast's
-// standalone drawer/detail instances. No-ops on pages with nothing subscribed (e.g. the
-// homepage, which has only one live stream and just closes the widget instead).
+// No-ops on pages with nothing subscribed (e.g. the homepage, which just closes the widget instead).
 export function requestWatchSameSession(sessionId) {
   watchSameSessionRequest.value = { sessionId };
 }

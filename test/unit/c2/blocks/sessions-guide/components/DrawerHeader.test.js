@@ -1,5 +1,9 @@
 import { expect } from '@esm-bundle/chai';
-import { resolveDrawerTitle, interpolateHeading, filterButtonLabel } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
+import { resolveDrawerTitle, interpolateHeading, filterButtonLabel, DrawerHeader } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
+import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
+import {
+  auth, sessions, liveStreamActiveIds, sessionStateVersion,
+} from '../../../../../../event-libs/v1/utils/session-store.js';
 
 describe('DrawerHeader resolveDrawerTitle', () => {
   const headings = {
@@ -107,5 +111,41 @@ describe('DrawerHeader interpolateHeading', () => {
   it('passes blank and missing headings straight through', () => {
     expect(interpolateHeading('', 'Dana')).to.equal('');
     expect(interpolateHeading(undefined, 'Dana')).to.equal(undefined);
+  });
+});
+
+// The header controls now always stay mounted (CSS collapses them away when a session
+// detail opens — see sg-header-controls-collapse in sessions-guide.css), so `inert` is
+// what keeps a keyboard/screen-reader user from reaching them while they're invisible.
+// Losing this would silently regress what the old conditional-unmount used to guarantee
+// for free.
+describe('DrawerHeader controlsInert', () => {
+  beforeEach(() => {
+    auth.value = { isLoggedIn: null, isRegistered: undefined, userFirstName: null };
+    sessions.value = [];
+    liveStreamActiveIds.value = new Set();
+    sessionStateVersion.value = 0;
+    SessionGuideContext._current = {
+      state: {
+        activeFilters: {}, activeView: 'live-upcoming', searchQuery: '', guideConfig: {},
+      },
+      dispatch: () => {},
+    };
+  });
+
+  it('marks the controls collapse wrapper inert while a session detail is open', () => {
+    const out = DrawerHeader({ controlsInert: true });
+    expect(out).to.include('sg-header-controls-collapse');
+    expect(out).to.include('inert="true"');
+  });
+
+  it('leaves the controls collapse wrapper interactive otherwise', () => {
+    const out = DrawerHeader({ controlsInert: false });
+    expect(out).to.not.include('inert');
+  });
+
+  it('defaults to interactive when controlsInert is not passed at all', () => {
+    const out = DrawerHeader({});
+    expect(out).to.not.include('inert');
   });
 });

@@ -320,6 +320,9 @@ engine), `Legal Disclaimer` (end of the abstract).
 
 ## Description clamp (`description-clamp.js`)
 
+Reads the full session abstract from the `event-details` metadata — **not** the shorter
+`description`, which is the SEO summary (both are present on a page, with different copy).
+
 The description collapses to `--desc-lines` (6) via a native `line-clamp`, with a Show
 more/less toggle. No character-count truncation — line-based, so it stays responsive.
 
