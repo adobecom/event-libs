@@ -169,7 +169,9 @@ export default function ConfigEditor() {
         <p class="tec-editor__section-hint">
           Name this config so it's easy to find in the library later${!isHomepage ? ' — especially useful now that an event can have more than one Global config' : ''}. Purely a label — never pasted anywhere.
         </p>
+        <label class="tec-editor__field-label" for="tec-config-name">Config name</label>
         <input
+          id="tec-config-name"
           type="text"
           class="tec-field tec-editor__title-input"
           placeholder=${`e.g. "${activeConfig.backendEventTitle}${isHomepage ? ' homepage' : ''} config"`}
@@ -182,7 +184,9 @@ export default function ConfigEditor() {
         <section class="tec-editor__section">
           <h2>Event title</h2>
           <p class="tec-editor__section-hint">Optional alternative display name for this event. Leave blank to use the backend title ("${activeConfig.backendEventTitle}") everywhere this is shown.</p>
+          <label class="tec-editor__field-label" for="tec-event-title">Event title</label>
           <input
+            id="tec-event-title"
             type="text"
             class="tec-field tec-editor__title-input"
             placeholder=${activeConfig.backendEventTitle}

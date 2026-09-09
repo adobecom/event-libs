@@ -303,6 +303,7 @@ export function DrawerShell() {
             ref=${bodyScrollRef}
             tabindex="-1"
             aria-busy=${String(sessionsStatus.value === 'loading')}
+            inert=${hasDetail ? true : undefined}
             onfocusin=${() => { if (!expandedRef.current && drawerStateRef.current === 'peek') commitExpanded(); }}
           >
             <div class="sg-sr-only" role="status" aria-live="polite">${sessionsStatusMessage(sessionsStatus.value)}</div>

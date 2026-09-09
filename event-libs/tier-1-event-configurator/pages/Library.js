@@ -318,7 +318,13 @@ export default function Library() {
             <p class="tec-library__group-desc">Configs for homepage specific blocks like Upcoming Sessions and Featured Sessions.</p>
           </div>
           <div class="tec-library__new-menu">
-            <button type="button" class="tec-btn tec-btn--primary" onClick=${() => setNewHomepageMenuOpen((open) => !open)}>
+            <button
+              type="button"
+              class="tec-btn tec-btn--primary"
+              aria-haspopup="menu"
+              aria-expanded=${String(newHomepageMenuOpen)}
+              onClick=${() => setNewHomepageMenuOpen((open) => !open)}
+            >
               New config ▾
             </button>
             ${newHomepageMenuOpen && html`

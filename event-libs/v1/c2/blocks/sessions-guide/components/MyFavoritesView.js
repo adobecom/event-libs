@@ -54,7 +54,12 @@ export function MyFavoritesView() {
   // bare blank view in that gap read as broken. Once authResolved is true the visitor is
   // either confirmed unauthorized (about to be bounced by the effect above) or confirmed
   // registered (falls through below), so only the pending case gets the loading state.
-  if (!authResolved) return html`<${LoadingState} />`;
+  if (!authResolved) {
+    return html`
+      <div class="sg-sr-only" role="status" aria-live="polite">Loading your favorited sessions…</div>
+      ${html`<${LoadingState} />`}
+    `;
+  }
   if (!isLoggedIn || isRegistered !== true) return null;
 
   // Memoized: this component re-renders on every context dispatch (e.g. opening the

@@ -1,4 +1,6 @@
-import { html, useState, useEffect } from '../../../../deps/htm-preact.js';
+import {
+  html, useState, useEffect, useLayoutEffect, useRef,
+} from '../../../../deps/htm-preact.js';
 import { IconButton } from './IconButton.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
@@ -55,6 +57,24 @@ export function SessionDetailOverlay({ onBack }) {
   const [productsExpanded, setProductsExpanded] = useState(false);
   const [speakersExpanded, setSpeakersExpanded] = useState(false);
   const isDesktop = useIsDesktop();
+
+  // This overlay is only ever mounted while a detail is open (DrawerShell.js), so mount/
+  // unmount lines up exactly with open/close. On open, move focus onto Back before paint —
+  // a layout effect runs in the same synchronous commit as DrawerHeader's `inert` mutation on
+  // the header controls, so this pre-empts the browser's own blur-to-<body> fixup for the
+  // popstate/external-request open paths, where focus can otherwise still be inside the
+  // about-to-be-inert controls. On unmount (Back), restore focus to whatever was focused
+  // before this opened — the card that triggered it, in the common click-to-open case.
+  const backBtnRef = useRef(null);
+  useLayoutEffect(() => {
+    const previouslyFocused = document.activeElement;
+    backBtnRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previouslyFocused?.focus && document.contains(previouslyFocused)) {
+        previouslyFocused.focus({ preventScroll: true });
+      }
+    };
+  }, []);
 
   const session = sessions.value.find((s) => s.id === activeSessionId);
   if (!session) return null;
@@ -373,7 +393,7 @@ export function SessionDetailOverlay({ onBack }) {
     <div class="sg-detail" role="region" aria-label="Session detail">
       <div class="sg-detail__body">
         <div class="sg-detail__back-wrap">
-          <button class="sg-detail__back" onclick=${onBack} type="button" aria-label="Back to sessions list">
+          <button ref=${backBtnRef} class="sg-detail__back" onclick=${onBack} type="button" aria-label="Back to sessions list">
             <span class="sg-detail__back-icon" aria-hidden="true"></span>
             Back
           </button>
