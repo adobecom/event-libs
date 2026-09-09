@@ -149,10 +149,10 @@ instance via `getComponent('notifications')`, never constructing a second instan
 wiki's own prescribed pattern for a page like ours, not a workaround. What the wiki does NOT
 address is whether that reused instance actually exposes the named methods directly — its
 examples only ever show `unc.UpsertReminderFeatureFlag(...)` called on "the instance," without
-distinguishing a freshly-constructed one from one obtained through UNav. The
-`_uncContainer.handleMessageFromInterface` fallback below exists purely to cover the
-possibility that it doesn't, a gap this repo's own investigation found, not something the
-wiki documents or anticipates.
+distinguishing a freshly-constructed one from one obtained through UNav. `unc-client.js`
+briefly carried a `_uncContainer.handleMessageFromInterface` fallback purely to cover the
+possibility that it doesn't — a gap this repo's own investigation found, not something the
+wiki documents or anticipates. See below for why that fallback was later removed.
 
 An earlier pass of this same source-verification cross-check misread
 `_handleDeleteReminderFeatureFlag`'s `channel.channel_details?.local` gate as a "native
