@@ -288,3 +288,104 @@ describe('sessions-hub full session', () => {
     expect(fullCard.querySelector('.sh-btn-register-event').disabled).to.be.true;
   });
 });
+
+describe('sessions-hub speaker display names', () => {
+  let originalFetch;
+
+  function stubFetch(handlers) {
+    window.fetch = async (url) => {
+      const u = typeof url === 'string' ? url : url.url || '';
+      for (const [pattern, handler] of handlers) {
+        if (u.includes(pattern)) {
+          return { ok: true, status: 200, json: async () => handler(u) };
+        }
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+  }
+
+  function stubDefaultFetch(eventOverrides = {}) {
+    stubFetch([
+      ['/v1/events/', () => makeEventData(eventOverrides)],
+      ['/v1/series/', () => ({ speakers: [] })],
+      ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
+      ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
+      ['chimera-api/tags', () => ({ namespaces: {} })],
+      ['dictionary.json', () => ({
+        data: { total: 0, offset: 0, limit: 0, data: [] },
+        ':names': ['data'],
+        ':version': 3,
+        ':type': 'multi-sheet',
+      })],
+    ]);
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = body;
+    document.head.innerHTML = '<meta name="event-id" content="event-123">';
+    originalFetch = window.fetch;
+    DictionaryManager._clearCache();
+    dictionaryManager.resetLoadedSheetsForTests();
+    BlockMediator.set('imsProfile', { userId: 'test-user', account_type: 'type1' });
+    BlockMediator.set('rsvpData', null);
+  });
+
+  afterEach(() => {
+    window.fetch = originalFetch;
+    BlockMediator.set('imsProfile', undefined);
+    BlockMediator.set('rsvpData', undefined);
+  });
+
+  it('renders aria-label and initials without a trailing space for a first-name-only speaker', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({
+      sessionId: 'session-single-name',
+      speakers: [{
+        speakerId: 'sp-1', firstName: 'Cher', lastName: '', title: 'Performer', photo: null,
+      }],
+    })]);
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const btn = el.querySelector('.sh-avatar-btn[data-speaker-id="sp-1"]');
+    expect(btn).to.not.be.null;
+    expect(btn.getAttribute('aria-label')).to.equal('Cher');
+
+    const initials = btn.querySelector('.sh-avatar-initials');
+    expect(initials.textContent).to.equal('C');
+  });
+
+  it('uses the speaker photo altText fallback without a trailing space for a first-name-only speaker', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({
+      sessionId: 'session-single-name-photo',
+      speakers: [{
+        speakerId: 'sp-2', firstName: 'Bono', lastName: '', title: 'Musician', photo: { imageUrl: 'https://example.com/p.jpg' },
+      }],
+    })]);
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const img = el.querySelector('.sh-avatar-btn[data-speaker-id="sp-2"] img');
+    expect(img.getAttribute('alt')).to.equal('Bono');
+  });
+
+  it('still renders full name for a speaker with both first and last name', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({
+      sessionId: 'session-full-name',
+      speakers: [{
+        speakerId: 'sp-3', firstName: 'Jane', lastName: 'Doe', title: 'Speaker', photo: null,
+      }],
+    })]);
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const btn = el.querySelector('.sh-avatar-btn[data-speaker-id="sp-3"]');
+    expect(btn.getAttribute('aria-label')).to.equal('Jane Doe');
+    expect(btn.querySelector('.sh-avatar-initials').textContent).to.equal('JD');
+  });
+});

@@ -121,6 +121,21 @@
   text-decoration: underline;
 }
 
+.event-card.dark-card .card-title,
+.section.dark .event-card .card-title {
+  color: #fff;
+}
+
+.event-card.dark-card .card-description,
+.section.dark .event-card .card-description {
+  color: rgb(255 255 255 / 64%);
+}
+
+.event-card.dark-card .card-cta,
+.section.dark .event-card .card-cta {
+  color: #fff;
+}
+
 @media (width <= 767px) {
   .event-card .card-title {
     font-size: 18px;

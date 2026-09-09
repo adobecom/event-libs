@@ -335,6 +335,10 @@ async function decorate(el) {
 
   attachToPrecedingBlock(el);
 
+  if (!el.classList.contains('dark-card') && el.closest('.section')?.classList.contains('dark')) {
+    el.classList.add('dark-card');
+  }
+
   let config = null;
   try {
     config = el.dataset.upcomingSessionsConfig ? JSON.parse(el.dataset.upcomingSessionsConfig) : null;
