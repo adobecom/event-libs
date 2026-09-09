@@ -34,6 +34,7 @@ export function OnDemandView() {
 
   return html`
     <div class="sg-view sg-view--on-demand">
+      <h3 class="sg-upcoming-title">On-demand</h3>
       ${recommended.length > 0 && html`
         <div class="sg-carousel-section sg-carousel-section--recommended">
           <${Carousel}

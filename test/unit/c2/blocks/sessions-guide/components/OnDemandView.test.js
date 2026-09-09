@@ -53,6 +53,14 @@ describe('OnDemandView', () => {
     expect(View({})).to.include('sg-view--on-demand');
   });
 
+  it('shows an "On-demand" header, styled like the other views\' section headers', () => {
+    const store = makeStore([]);
+    const View = buildOnDemandView(preact, store);
+    const html = View({});
+    expect(html).to.include('sg-upcoming-title');
+    expect(html).to.include('On-demand');
+  });
+
   it('shows empty state when no on-demand sessions', () => {
     const store = makeStore([UPCOMING]);
     const View = buildOnDemandView(preact, store);
