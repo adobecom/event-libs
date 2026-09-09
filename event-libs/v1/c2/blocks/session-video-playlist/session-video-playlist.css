@@ -614,6 +614,9 @@
   .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
   .session-video-playlist-row.is-playing .session-video-playlist-row-play {
     background: var(--vp-playing-bg);
+
+    /* Figma: black (#000) outline on the current row's light card, per the chip spec. */
+    border-color: var(--s2a-color-gray-1000);
     margin: var(--s2a-spacing-xs) 0 var(--s2a-spacing-3xs) 0;
   }
 
