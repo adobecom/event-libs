@@ -574,6 +574,13 @@
     margin: 0 var(--s2a-spacing-xs) 0 0;
   }
 
+  /* Collapsed only shows the header (with the "Up next" peek). Hide the list wrapper so it
+     never pokes out below the header when the up-next title is a single line (the fixed
+     collapsed height can otherwise exceed the header). Revealed when expanded. */
+  .session-video-playlist:not(.is-expanded) .session-video-playlist-wrapper {
+    display: none;
+  }
+
   .session-video-playlist-list {
     margin-right: var(--s2a-spacing-xs);
   }
