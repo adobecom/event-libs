@@ -314,3 +314,11 @@
   margin: revert;
   scroll-margin-top: revert;
 }
+
+/* MobileRider's overlay headings are excluded from the reset above so MR's skin font wins — but
+   the page's global heading rules still leak in for properties MR's skin doesn't set (e.g.
+   letter-spacing). Neutralize just those here (NOT font-family, which MR's skin owns) so the
+   overlay text matches MR's intended styling instead of inheriting the page's heading tokens. */
+.mobile-rider .overlays-wrapper :is(h1, h2, h3, h4, h5, h6) {
+  letter-spacing: normal;
+}
