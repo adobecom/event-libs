@@ -7,14 +7,6 @@ import { buildStageCampaignRule } from '../../../../event-libs/v1/features/swan-
 
 function makeUncInstance() {
   return {
-    _uncContainer: {
-      handleMessageFromInterface: sinon.stub(),
-    },
-  };
-}
-
-function makeDirectMethodInstance() {
-  return {
     UpsertReminderFeatureFlag: sinon.stub(),
     DeleteReminderFeatureFlag: sinon.stub(),
   };
@@ -44,12 +36,6 @@ describe('unc-client', () => {
       expect(await whenUncReady()).to.equal(uncInstance);
     });
 
-    it('trusts an instance exposing the two reminder methods directly, with no _uncContainer', async () => {
-      const uncInstance = makeDirectMethodInstance();
-      stubUniversalNav(async (name) => (name === 'notifications' ? { instance: uncInstance } : undefined));
-      expect(await whenUncReady()).to.equal(uncInstance);
-    });
-
     it('does not trust an instance exposing only one of the two reminder methods directly', async () => {
       const clock = sinon.useFakeTimers();
       stubUniversalNav(async () => ({
@@ -63,16 +49,6 @@ describe('unc-client', () => {
     it('does not trust an instance missing all of the expected methods', async () => {
       const clock = sinon.useFakeTimers();
       stubUniversalNav(async () => ({ instance: { some: 'other-shape' } }));
-      const promise = whenUncReady(1000);
-      await clock.tickAsync(1000);
-      expect(await promise).to.equal(null);
-    });
-
-    it('does not trust an instance whose _uncContainer is missing handleMessageFromInterface', async () => {
-      const clock = sinon.useFakeTimers();
-      stubUniversalNav(async () => ({
-        instance: { _uncContainer: { someOtherMethod: sinon.stub() } },
-      }));
       const promise = whenUncReady(1000);
       await clock.tickAsync(1000);
       expect(await promise).to.equal(null);
@@ -118,8 +94,7 @@ describe('unc-client', () => {
       const campaignRule = { events: [] };
       const result = await registerReminderRule('swan-RF-1-reminder', campaignRule);
       expect(result).to.equal(true);
-      expect(uncInstance._uncContainer.handleMessageFromInterface.calledOnceWith(
-        'UpsertReminderFeatureFlag',
+      expect(uncInstance.UpsertReminderFeatureFlag.calledOnceWith(
         { type: 'rule', action: 'upsert', campaignRules: [{ campaignId: 'swan-RF-1-reminder', campaignRule }] },
       )).to.equal(true);
     });
@@ -127,13 +102,12 @@ describe('unc-client', () => {
     it('deleteReminderRule sends only {campaignId}, no rule body', async () => {
       const result = await deleteReminderRule('swan-RF-1-reminder');
       expect(result).to.equal(true);
-      expect(uncInstance._uncContainer.handleMessageFromInterface.calledOnceWith(
-        'DeleteReminderFeatureFlag',
+      expect(uncInstance.DeleteReminderFeatureFlag.calledOnceWith(
         { type: 'rule', action: 'delete', campaignRules: [{ campaignId: 'swan-RF-1-reminder' }] },
       )).to.equal(true);
     });
 
-    it("carries buildStageCampaignRule()'s real payload shape through to _uncContainer unchanged", async () => {
+    it("carries buildStageCampaignRule()'s real payload shape through to the engine unchanged", async () => {
       const session = {
         rfCode: 'RF-200',
         title: 'Real Session',
@@ -146,8 +120,7 @@ describe('unc-client', () => {
 
       const result = await registerReminderRule(campaignId, campaignRule);
       expect(result).to.equal(true);
-      expect(uncInstance._uncContainer.handleMessageFromInterface.calledOnceWith(
-        'UpsertReminderFeatureFlag',
+      expect(uncInstance.UpsertReminderFeatureFlag.calledOnceWith(
         { type: 'rule', action: 'upsert', campaignRules: [{ campaignId, campaignRule }] },
       )).to.equal(true);
     });
@@ -165,69 +138,34 @@ describe('unc-client', () => {
 
     it('resolves false without throwing when the underlying engine call itself throws on every retry', async () => {
       const clock = sinon.useFakeTimers();
-      uncInstance._uncContainer.handleMessageFromInterface.throws(new Error('engine exploded'));
+      uncInstance.UpsertReminderFeatureFlag.throws(new Error('engine exploded'));
       const promise = registerReminderRule('swan-RF-1-reminder', {});
       await clock.tickAsync(8 * 500);
       expect(await promise).to.equal(false);
-      expect(uncInstance._uncContainer.handleMessageFromInterface.callCount).to.equal(9);
+      expect(uncInstance.UpsertReminderFeatureFlag.callCount).to.equal(9);
     });
 
     it('retries a transient call failure and succeeds once the engine recovers', async () => {
       const clock = sinon.useFakeTimers();
-      uncInstance._uncContainer.handleMessageFromInterface
+      uncInstance.UpsertReminderFeatureFlag
         .onCall(0).throws(new Error('not ready'))
         .onCall(1).throws(new Error('not ready'))
         .onCall(2).returns(undefined);
       const promise = registerReminderRule('swan-RF-1-reminder', {});
       await clock.tickAsync(2 * 500);
       expect(await promise).to.equal(true);
-      expect(uncInstance._uncContainer.handleMessageFromInterface.callCount).to.equal(3);
+      expect(uncInstance.UpsertReminderFeatureFlag.callCount).to.equal(3);
     });
 
     it('deleteReminderRule also retries a transient call failure', async () => {
       const clock = sinon.useFakeTimers();
-      uncInstance._uncContainer.handleMessageFromInterface
+      uncInstance.DeleteReminderFeatureFlag
         .onCall(0).throws(new Error('not ready'))
         .onCall(1).returns(undefined);
       const promise = deleteReminderRule('swan-RF-1-reminder');
       await clock.tickAsync(500);
       expect(await promise).to.equal(true);
-      expect(uncInstance._uncContainer.handleMessageFromInterface.callCount).to.equal(2);
-    });
-  });
-
-  describe('resolution against an instance exposing the reminder methods directly', () => {
-    let directInstance;
-
-    beforeEach(() => {
-      directInstance = makeDirectMethodInstance();
-      stubUniversalNav(async (name) => (name === 'notifications' ? { instance: directInstance } : undefined));
-    });
-
-    it('registerReminderRule calls UpsertReminderFeatureFlag directly, never touching _uncContainer', async () => {
-      const campaignRule = { events: [] };
-      const result = await registerReminderRule('swan-RF-1-reminder', campaignRule);
-      expect(result).to.equal(true);
-      expect(directInstance.UpsertReminderFeatureFlag.calledOnceWith(
-        { type: 'rule', action: 'upsert', campaignRules: [{ campaignId: 'swan-RF-1-reminder', campaignRule }] },
-      )).to.equal(true);
-      expect(directInstance._uncContainer).to.equal(undefined);
-    });
-
-    it('deleteReminderRule calls DeleteReminderFeatureFlag directly', async () => {
-      const result = await deleteReminderRule('swan-RF-1-reminder');
-      expect(result).to.equal(true);
-      expect(directInstance.DeleteReminderFeatureFlag.calledOnceWith(
-        { type: 'rule', action: 'delete', campaignRules: [{ campaignId: 'swan-RF-1-reminder' }] },
-      )).to.equal(true);
-    });
-
-    it('prefers the direct method over a working _uncContainer when both are present', async () => {
-      directInstance._uncContainer = { handleMessageFromInterface: sinon.stub() };
-      const result = await registerReminderRule('swan-RF-1-reminder', { events: [] });
-      expect(result).to.equal(true);
-      expect(directInstance.UpsertReminderFeatureFlag.called).to.equal(true);
-      expect(directInstance._uncContainer.handleMessageFromInterface.called).to.equal(false);
+      expect(uncInstance.DeleteReminderFeatureFlag.callCount).to.equal(2);
     });
   });
 });

@@ -141,7 +141,50 @@ no longer uses it, having switched to `generateNotification: true` +
 `docs/swan-unc-dependencies.md`). The general `_uncContainer`-fallback finding for
 `UpsertReminderFeatureFlag`/`DeleteReminderFeatureFlag` themselves remains valid and in use.
 
-See `docs/swan-unc-dependencies.md`'s "Known upstream bug" section for a real
-`DeleteReminderFeatureFlag` cleanup bug found while cross-checking the wiki against engine
-source on `anjali1/MAX` — unrelated to the direct-call-path question above, but discovered
-during the same source-verification pass.
+**On which instance to call these methods on**: the wiki's own testing guide settles this too
+— its Step 1 explicitly says *"On an Adobe page where UNav is running, UNC is already
+initialized by UNav — use that instance instead"* of constructing a new
+`new window.UNC.default(...)`. This confirms this feature's design (reusing UNav's shared
+instance via `getComponent('notifications')`, never constructing a second instance) is the
+wiki's own prescribed pattern for a page like ours, not a workaround. What the wiki does NOT
+address is whether that reused instance actually exposes the named methods directly — its
+examples only ever show `unc.UpsertReminderFeatureFlag(...)` called on "the instance," without
+distinguishing a freshly-constructed one from one obtained through UNav. The
+`_uncContainer.handleMessageFromInterface` fallback below exists purely to cover the
+possibility that it doesn't, a gap this repo's own investigation found, not something the
+wiki documents or anticipates.
+
+An earlier pass of this same source-verification cross-check misread
+`_handleDeleteReminderFeatureFlag`'s `channel.channel_details?.local` gate as a "native
+OS-notification channel" check distinct from web/local-storage campaigns, and concluded
+`DeleteReminderFeatureFlag` never cleans up a SWAN campaign's persisted record. That gate is
+actually the same `local: true`/`false` field the wiki documents (local vs. server-delivered
+notification), which SWAN sets to `true` on every stage — so the cleanup path is always
+reached for SWAN's campaigns. Live testing against a real UNC engine build confirmed deletes
+succeeding (`LocalStorageStore: deleteTrackingData` removing each superseded stage's record).
+The earlier "known upstream bug" finding was retracted; no bug report was filed with the UNC
+team.
+
+## Independent re-verification against the real engine bundle + the wiki PDF
+
+A later pass re-derived every claim above directly from a fresh download of the production
+engine bundle (`UNC-shared.js`, version `10.0.1067`) and the UNC team's own PDF ("Local
+Storage Reminder Campaigns in UNC Web Host Integration"), rather than relying on the prior
+investigation's notes. All of it held up unchanged: `UpsertReminderFeatureFlag`/
+`DeleteReminderFeatureFlag` are confirmed prototype methods on the `UNC` class (defined via
+`UNC_createClass(UNC, [...])`), each a one-line pass-through to
+`_uncContainer.handleMessageFromInterface`; `schedule_at` is confirmed epoch seconds via
+`AddNotificationManager`'s `parseInt(msgData.schedule_at, 10) * 1000` and `ChannelHandler`'s
+`Math.floor(Date.now() / 1000)` comparison, contradicting the wiki's stated "ms"; and
+`LocalStorageStore.deleteTrackingData` is confirmed to `delete bucket[track]` and
+`saveState(...)`, a real, complete removal — the "known upstream bug" retraction above is
+accurate.
+
+**Following this reconfirmation, `unc-client.js`'s `_uncContainer` fallback has been removed.**
+Now that official support for the wiki's documented direct-method contract is expected, this
+repo commits fully to it: `callUnc()` calls `instance[methodName](payload)` directly, with no
+fallback branch, and `isUncInstance()` gates only on the two named methods existing. This is a
+real behavior change from the "Resolution" section above (which kept the dual-path design) —
+an instance that only exposes `_uncContainer.handleMessageFromInterface`, with no direct
+methods, is no longer treated as ready. All three affected test files were updated to mock
+only the direct-method shape.

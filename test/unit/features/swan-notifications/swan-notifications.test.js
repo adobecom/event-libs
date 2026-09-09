@@ -42,20 +42,15 @@ describe('swan-notifications', () => {
     originalUniversalNav = window.UniversalNav;
     calls = [];
     const uncInstance = {
-      _uncContainer: {
-        handleMessageFromInterface: (methodName, data) => {
-          if (methodName === 'UpsertReminderFeatureFlag') {
-            calls.push({
-              method: 'UpsertReminderFeatureFlag',
-              campaignId: data.campaignRules[0].campaignId,
-              campaignRule: data.campaignRules[0].campaignRule,
-            });
-          } else if (methodName === 'DeleteReminderFeatureFlag') {
-            calls.push({ method: 'DeleteReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
-          } else {
-            calls.push({ method: methodName, data });
-          }
-        },
+      UpsertReminderFeatureFlag: (data) => {
+        calls.push({
+          method: 'UpsertReminderFeatureFlag',
+          campaignId: data.campaignRules[0].campaignId,
+          campaignRule: data.campaignRules[0].campaignRule,
+        });
+      },
+      DeleteReminderFeatureFlag: (data) => {
+        calls.push({ method: 'DeleteReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
       },
     };
     window.UniversalNav = makeUniversalNav(uncInstance);
@@ -159,14 +154,11 @@ describe('swan-notifications', () => {
 
       // Once UNC is available, the very next reconcile should succeed.
       window.UniversalNav = makeUniversalNav({
-        _uncContainer: {
-          handleMessageFromInterface: (methodName, data) => {
-            if (methodName === 'UpsertReminderFeatureFlag') {
-              calls.push({ method: 'UpsertReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
-            }
-            // DeleteReminderFeatureFlag intentionally left a no-op here, matching the original mock.
-          },
+        UpsertReminderFeatureFlag: (data) => {
+          calls.push({ method: 'UpsertReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
         },
+        // DeleteReminderFeatureFlag intentionally left a no-op here, matching the original mock.
+        DeleteReminderFeatureFlag: () => {},
       });
       calls = [];
       await reconcileSwanNotifications(() => [session], () => new Set([session.id]));

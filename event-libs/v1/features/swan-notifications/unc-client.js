@@ -3,24 +3,20 @@
 // a rule), DeleteReminderFeatureFlag (remove). This file's only job is resolving that
 // instance and hiding its raw message shapes from swan-notifications.js.
 //
-// How the instance is exposed is now CONFIRMED, not guessed — fetched and inspected the
-// actual bundles milo loads (prod.adobeccstatic.com/unav/1.6/UniversalNav.js and its
-// lazily-loaded NotificationLoader.<hash>.bundle.js chunk): milo's gnav loads
-// UniversalNav.js, which exposes `window.UniversalNav.getComponent('notifications')` — an
-// async method that lazily loads the real UNC engine bundle
-// (adobeccstatic.com/unc/<version>/UNC-shared.js), constructs it as
-// `new window.UNC.default(config)`, and resolves `{ instance }`. This only ever resolves a
-// real instance once the page's gnav has "notifications" configured as an active component
-// (`universal-nav` metadata) — see docs/swan-unc-dependencies.md for that dependency.
+// How the instance is exposed is CONFIRMED, not guessed — fetched and inspected the actual
+// bundles milo loads (prod.adobeccstatic.com/unav/1.6/UniversalNav.js and its lazily-loaded
+// NotificationLoader.<hash>.bundle.js chunk): milo's gnav loads UniversalNav.js, which
+// exposes `window.UniversalNav.getComponent('notifications')` — an async method that lazily
+// loads the real UNC engine bundle (adobeccstatic.com/unc/<version>/UNC-shared.js),
+// constructs it as `new window.UNC.default(config)`, and resolves `{ instance }`. This only
+// ever resolves a real instance once the page's gnav has "notifications" configured as an
+// active component (`universal-nav` metadata) — see docs/swan-unc-dependencies.md for that
+// dependency.
 //
-// UNC's own web-host wiki documents named methods directly on the instance as the primary
-// contract. An earlier live investigation against the instance UNav hands back found only a
-// shallow copy of the engine's *own* properties (missing prototype methods), reaching the
-// same internal handlers only through `_uncContainer.handleMessageFromInterface(methodName,
-// data)`. Both paths are confirmed (by reading the engine source directly) to dispatch to the
-// exact same internal handler, so this file tries the direct method first and falls back to
-// `_uncContainer` — compatible either way. See docs/swan-unc-investigation-summary.md and
-// docs/swan-unc-dependencies.md.
+// This file relies solely on UNC's own web-host wiki's documented primary contract: named
+// methods (`UpsertReminderFeatureFlag`, `DeleteReminderFeatureFlag`) called directly on the
+// resolved instance. See docs/swan-unc-investigation-summary.md and
+// docs/swan-unc-dependencies.md for the source-level verification history.
 //
 // getComponent() itself internally awaits the chunk load + engine construction once called,
 // but resolves `undefined` (caught internally, not thrown) if called before milo's own gnav
@@ -31,28 +27,13 @@ const POLL_INTERVAL_MS = 250;
 const CALL_MAX_RETRIES = 8;
 const CALL_RETRY_DELAY_MS = 500;
 
-function hasDirectMethods(candidate) {
+function isUncInstance(candidate) {
   return typeof candidate?.UpsertReminderFeatureFlag === 'function'
     && typeof candidate?.DeleteReminderFeatureFlag === 'function';
 }
 
-function hasContainerPath(candidate) {
-  return typeof candidate?._uncContainer?.handleMessageFromInterface === 'function';
-}
-
-function isUncInstance(candidate) {
-  return !!candidate && (hasDirectMethods(candidate) || hasContainerPath(candidate));
-}
-
-// Tries a direct method on the instance first, falling back to `_uncContainer` — an
-// undocumented, underscore-prefixed internal field, not a published contract — kept behind
-// this one call site so a future contract change only touches one function.
 function callUnc(instance, methodName, payload) {
-  if (typeof instance[methodName] === 'function') {
-    instance[methodName](payload);
-    return;
-  }
-  instance._uncContainer.handleMessageFromInterface(methodName, payload);
+  instance[methodName](payload);
 }
 
 function delay(ms) {

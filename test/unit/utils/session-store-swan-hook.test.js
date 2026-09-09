@@ -90,15 +90,12 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
     window.UniversalNav = {
       getComponent: async (name) => (name === 'notifications' ? {
         instance: {
-          _uncContainer: {
-            handleMessageFromInterface: (methodName, data) => {
-              if (methodName === 'UpsertReminderFeatureFlag') {
-                calls.push({ method: 'UpsertReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
-              }
-              // DeleteReminderFeatureFlag intentionally no-op here — this test only
-              // asserts on the reminder registration reaching UNC.
-            },
+          UpsertReminderFeatureFlag: (data) => {
+            calls.push({ method: 'UpsertReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
           },
+          // DeleteReminderFeatureFlag intentionally no-op here — this test only
+          // asserts on the reminder registration reaching UNC.
+          DeleteReminderFeatureFlag: () => {},
         },
       } : undefined),
     };

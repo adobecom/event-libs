@@ -48,10 +48,13 @@ scheduled) and UNC (what's shown) roughly agree on the device/tab the user is us
 ## The real UNC contract (per the official wiki, cross-checked against engine source)
 
 UNC is instantiated on the page as `new window.UNC.default(notificationContext)` by
-whatever hosts the engine — on pages where UNav is already running (which SWAN requires
-anyway), UNC is already initialized by UNav, and this feature uses that shared instance
-rather than creating its own. Once that instance is available, it exposes two relevant
-named methods:
+whatever hosts the engine. The wiki's own testing guide is explicit that a page like ours
+should NOT do this itself: *"On an Adobe page where UNav is running, UNC is already
+initialized by UNav — use that instance instead."* Since SWAN requires UNav anyway (for the
+bell/Widget UI), this feature reuses UNav's already-initialized shared instance
+(`window.UniversalNav.getComponent('notifications')`) rather than constructing a second,
+redundant one — this is the wiki's own prescribed pattern for our exact scenario, not a
+deviation from it. Once that instance is available, it exposes two relevant named methods:
 
 - **`UpsertReminderFeatureFlag({ type: 'rule', action: 'upsert', campaignRules: [{ campaignId, campaignRule }] })`**
   — registers a rule. Confirmed network-free: registration is a pure in-memory write plus
@@ -63,10 +66,16 @@ named methods:
   engine handlers, only by a separate CCD/UXP-only inter-plugin IPC layer unreachable from
   a browser — but included anyway for spec alignment.
 - **`DeleteReminderFeatureFlag({ type: 'rule', action: 'delete', campaignRules: [{ campaignId }] })`**
-  — removes a registered rule's in-memory tracking and (for a rule with a *native*
-  local-notification channel) its localStorage record. **See "Known upstream bug" below —
-  for a typical local-storage-tracked web campaign like SWAN's, this does not actually
-  clear UNC's own persisted rule record.**
+  — removes a registered rule's in-memory tracking and, for a rule whose notification
+  channel has `channel_details.local: true`, its localStorage record too. Confirmed against
+  engine source (`_handleDeleteReminderFeatureFlag`) that this `local` flag is the exact same
+  field the wiki documents (`local: true` = local/instant notification, `false` = server-
+  delivered) — not a separate native-OS-channel concept. SWAN sets `local: true` on every
+  stage's channel, so this cleanup path is always reached; confirmed live via console logs
+  (`LocalStorageStore: deleteTrackingData called` / `removed ... track=swan-...-reminder`)
+  for every superseded stage across a real multi-session test. An earlier draft of this doc
+  wrongly read this gate as native-channel-only and reported a cleanup bug to the UNC team —
+  that finding was a misinterpretation and has been retracted; no bug report was filed.
 
 **The one field that actually enables persistence**: `campaignRule.session_tracking_mechanism`
 must be the literal string `'local_storage'` — confirmed in engine source
@@ -114,8 +123,9 @@ notification, edited three times." So this feature registers **three independent
 single-stage rules per scheduled session** — `swan-<rfCode>-reminder`,
 `swan-<rfCode>-live`, `swan-<rfCode>-ondemand` — and is responsible for calling
 `DeleteReminderFeatureFlag` on the previous stage's rule at the exact moment it registers
-the next one, or bell entries would stack up (see "Known upstream bug" for why this delete
-is currently incomplete on UNC's side). See
+the next one, or bell entries would stack up. Confirmed (both by source and live test) that
+this delete fully cleans up UNC's own persisted record for SWAN's campaigns — see the
+`DeleteReminderFeatureFlag` bullet above. See
 [`swan-payload.js`](../event-libs/v1/features/swan-notifications/swan-payload.js)'s
 `buildStageCampaignRule()` and
 [`swan-notifications.js`](../event-libs/v1/features/swan-notifications/swan-notifications.js)'s
@@ -133,33 +143,6 @@ CDN) — the notification content is always an inline `payload` object (see
 [swan-notification-content-schema.md](./swan-notification-content-schema.md)), keeping this
 feature network-free.
 
-## Known upstream bug: delete doesn't clean up the local-storage rule record
-
-On engine branch `anjali1/MAX`, `_handleDeleteReminderFeatureFlag`'s only storage-cleanup
-call is gated on the deleted campaign having a **native** local-notification channel
-(`channel_details.local`, meant for OS-level notifications) — a flag unrelated to
-`session_tracking_mechanism === 'local_storage'`. A typical web-host local-storage campaign
-(including all three of SWAN's stages) has no native channel, so this gate is false, and
-delete never reaches the engine's localStorage cleanup. The rest of the function only clears
-in-memory maps.
-
-**Consequence**: this feature's `deleteReminderRule()` call on a superseded stage succeeds
-(no error) but doesn't purge UNC's own persisted rule record. On the user's next page reload,
-UNC's own restore-on-init logic reads all persisted campaigns back (matching on the record
-having an `events` array, unrelated to whether it was ever deleted) and re-registers the
-stage — which, since `generateNotification: true`, can self-fire its notification again. **A
-stage this feature explicitly deleted can resurrect itself after a reload.**
-
-This is upstream engine behavior, not something introduced by this feature's payload — no
-client-side workaround has been implemented, since the only known mitigation would depend on
-an undocumented internal filter (`Array.isArray(bucket[track].events)` in
-`LocalStorageStore.getPersistedCampaignRules`) that could change without notice. Flagged to
-the UNC/`anjali1` team as a bug report, separate from this repo's own work. This feature's
-own `swan-notification-state-v2` local state and reconcile ticker remain correct in terms of
-what they *attempt* to register/delete — the risk is purely that UNC's bell/Widget could
-show a stage this feature believes it has deleted, until the browser tab is closed and
-reopened.
-
 ## How the page obtains the live UNC instance
 
 - Milo's `global-navigation.js` loads
@@ -171,16 +154,18 @@ reopened.
   `https://prod.adobeccstatic.com/unc/<version>/UNC-shared.js`, constructs it as
   `new window.UNC.default(config)`, and resolves `getComponent('notifications')` to
   `{ instance }`.
-- An earlier live investigation against that resolved `instance` found only a shallow copy
-  of the engine's *own* properties (`appContext`, `initializeUNC`, `_uncContainer`, etc.) —
-  missing the named prototype methods the wiki now documents as the primary web contract.
-  `_uncContainer.handleMessageFromInterface(methodName, data)` was confirmed live to reach
-  the same internal handlers. Both paths are now confirmed, by reading the engine source
-  directly, to dispatch to byte-identical code — `UNC.UpsertReminderFeatureFlag(data)` is a
-  one-line pass-through to `_uncContainer.handleMessageFromInterface('UpsertReminderFeatureFlag',
-  data)`. `unc-client.js` tries the direct named method first and falls back to
-  `_uncContainer` — compatible with either shape the resolved instance might have. See
-  `docs/swan-unc-investigation-summary.md` for the full writeup.
+- An earlier investigation phase found that one live test of the resolved `instance` showed
+  only a shallow copy of the engine's *own* properties (`appContext`, `initializeUNC`,
+  `_uncContainer`, etc.), missing the named prototype methods the wiki documents as the
+  primary web contract — and, reading the engine source directly, confirmed
+  `UNC.UpsertReminderFeatureFlag(data)` is a one-line pass-through to
+  `_uncContainer.handleMessageFromInterface('UpsertReminderFeatureFlag', data)`, so both
+  shapes dispatch to byte-identical code. `unc-client.js` briefly carried a fallback to call
+  `_uncContainer` directly when the named methods weren't present. That fallback has since
+  been removed: now that official support for the wiki's documented direct-method contract is
+  expected, this repo commits fully to it — `unc-client.js` calls
+  `UpsertReminderFeatureFlag`/`DeleteReminderFeatureFlag` directly and nothing else. See
+  `docs/swan-unc-investigation-summary.md` for the full investigation history.
 - No dedicated "ready" event exists for this (checked milo's `global-navigation.js` for
   any `dispatchEvent` around gnav/unav decoration — found none for this specifically), and
   `getComponent()` itself resolves `undefined` (caught internally, not thrown) if called
@@ -221,5 +206,4 @@ been set yet) in
 6. Unschedule the session at any stage; confirm its currently-active bell entry is removed.
 7. Reload mid-cycle; confirm no duplicate entry is created (the local
    `swan-notification-state-v2` `localStorage` key prevents re-registering a stage
-   already reached) — but also see "Known upstream bug" above: a *superseded* stage's
-   UNC-side record may still restore on reload independent of this feature's own state.
+   already reached).
