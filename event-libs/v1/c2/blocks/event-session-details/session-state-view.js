@@ -158,9 +158,18 @@ export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
     if (ccEl) ccEl.hidden = state !== 'on-demand';
   };
 
+  let lastState;
   const evaluate = () => {
     const now = getNowMs();
-    apply(getState(now, slots), now);
+    const state = getState(now, slots);
+    apply(state, now);
+    // Broadcast every state transition (upcoming→live→on-demand) so blocks that render off the
+    // same schedule — the video player and playlist — can re-check and load the player the moment
+    // this session flips to on-demand, without each running its own duplicate boundary timer.
+    if (state !== lastState) {
+      lastState = state;
+      window.dispatchEvent(new CustomEvent('session-state:changed', { detail: { state, nowMs: now } }));
+    }
     const boundary = nextBoundary(now, slots);
     if (boundary !== null) setTimeout(evaluate, Math.min((boundary - now) + 500, MAX_TIMEOUT));
   };

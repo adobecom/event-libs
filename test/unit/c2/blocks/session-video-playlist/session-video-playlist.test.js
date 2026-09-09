@@ -14,6 +14,7 @@ import init, {
 import {
   sessions, sessionsStatus, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../event-libs/v1/utils/session-store.js';
+import BlockMediator from '../../../../../event-libs/v1/deps/block-mediator.min.js';
 
 const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
 const AUTOPLAY_STORAGE_KEY = 'session-video-playlist:play-all';
@@ -399,14 +400,74 @@ describe('session-video-playlist', () => {
       expect(playlist.isConnected).to.be.false;
     });
 
-    it('removes the block when the session has not ended', async () => {
+    it('waits (does not remove or render) while the session has not ended', async () => {
+      const before = BlockMediator.get('videoLayoutDecision');
       const { playlist } = buildPage();
       setMeta('session-id', 'cur');
       setMeta('session-times', sessionTimesMeta({ endTimeMillis: Date.now() + HOUR_MS }));
 
       await init(playlist);
+      await flush();
 
-      expect(playlist.isConnected).to.be.false;
+      // Not removed — the block stays to render once the session ends. And crucially it must NOT
+      // announce a decision of its own while merely waiting (which would strand the player behind
+      // a permanent full-width layout). BlockMediator is a module singleton with no reset, so we
+      // assert the decision is UNCHANGED from before this init rather than a fixed value.
+      expect(playlist.isConnected).to.be.true;
+      expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
+      expect(BlockMediator.get('videoLayoutDecision')).to.deep.equal(before);
+    });
+
+    it('renders once the session has ended and a session-state:changed tick fires', async () => {
+      const clock = sinon.useFakeTimers({ now: Date.now(), shouldAdvanceTime: true });
+      const endTimeMillis = Date.now() + 1000;
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta({ endTimeMillis }));
+      setMeta('custom-attributes', playlistAttribute());
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+
+      await init(playlist);
+      await flush();
+      // Still pre-end → not rendered.
+      expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
+
+      // Advance past the end time and fire the shared schedule tick the way event-session-details
+      // does when the session flips to on-demand.
+      clock.tick(1200);
+      window.dispatchEvent(new CustomEvent('session-state:changed', { detail: { state: 'on-demand' } }));
+      await flush();
+
+      expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
+      expect(BlockMediator.get('videoLayoutDecision')).to.deep.equal({ hasPlaylist: true });
+      clock.restore();
+    });
+
+    it('renders when the player fires session-video-player:playable, even before its own tick', async () => {
+      const clock = sinon.useFakeTimers({ now: Date.now(), shouldAdvanceTime: true });
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta({ endTimeMillis: Date.now() + 1000 }));
+      setMeta('custom-attributes', playlistAttribute());
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+
+      await init(playlist);
+      await flush();
+
+      clock.tick(1200);
+      window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId: 'cur' } }));
+      await flush();
+
+      expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
+      clock.restore();
     });
 
     it('removes the block when the catalog is already ready but empty', async () => {

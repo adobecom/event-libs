@@ -164,18 +164,9 @@ describe('session-video-player', () => {
       expect(playlistPlayer.querySelector('iframe')).to.not.exist;
     });
 
-    it('falls back to the full-width instance after the 4s timeout', async () => {
-      clock = sinon.useFakeTimers({ now: Date.now(), shouldAdvanceTime: true });
-      const { fullWidthPlayer, playlistPlayer } = buildPage();
-      await init(fullWidthPlayer);
-      await init(playlistPlayer);
-
-      clock.tick(4000);
-      await flush();
-
-      expect(fullWidthPlayer.querySelector('iframe.adobetv')).to.exist;
-      expect(playlistPlayer.querySelector('iframe')).to.not.exist;
-    });
+    // NOTE: there is no longer a timed fallback. The player waits indefinitely for the playlist
+    // to announce videoLayoutDecision (the playlist is always present on a session page and always
+    // resolves to a terminal decision), so a "falls back after 4s" test no longer applies.
   });
 
   describe('progress persistence', () => {

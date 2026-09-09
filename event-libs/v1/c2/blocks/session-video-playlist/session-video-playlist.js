@@ -712,10 +712,10 @@ function resolveRenderContext(el) {
     return null;
   }
 
-  if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
-    logError('current session has not ended yet — nothing to render');
-    return null;
-  }
+  // NB: the "has the current session ended yet?" gate is NOT here — it's time-dependent, so it's
+  // re-checked on a timer in init() (see currentSessionPlayable). Failing it is a "wait", not a
+  // terminal "nothing to render", so it must not collapse to null here (which would removeBlock →
+  // announce hasPlaylist:false and strand the player behind a permanent full-width layout).
 
   return {
     config,
@@ -875,13 +875,25 @@ export default async function init(el) {
     el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
   };
 
-  const existing = sessions.value;
-  if (existing.length) {
-    render(existing);
-  } else if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
-    removeBlock(el);
-  } else {
+  // The playlist only shows related videos once the current session has ended (a simple
+  // end-time gate — the playlist doesn't need the player's finer playback-phase classification).
+  // Failing it is "wait", not "give up": while the session hasn't ended we must NOT removeBlock
+  // (that announces hasPlaylist:false and would strand the player behind a permanent full-width
+  // layout), so we re-check on the shared session-state tick and on the player's transition.
+  const currentSessionEnded = () => currentSessionHasEnded(sessionTimes, getNowMs());
 
+  // The actual render flow, run once the current session has ended — the catalog may be ready
+  // now, still loading (subscribe), or empty (removeBlock).
+  const runRenderFlow = () => {
+    const existing = sessions.value;
+    if (existing.length) {
+      render(existing);
+      return;
+    }
+    if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
+      removeBlock(el);
+      return;
+    }
     let unsubscribeSessions = () => {};
     let unsubscribeStatus = () => {};
     const stopWaiting = () => {
@@ -902,5 +914,29 @@ export default async function init(el) {
       stopWaiting();
       removeBlock(el);
     });
-  }
+  };
+
+  // Render only once the current session is playable. While it isn't, DON'T removeBlock (that
+  // announces hasPlaylist:false and strands the player behind a permanent full-width layout) —
+  // just wait. The wait is driven by the SAME signals the player uses, so no duplicate timer here:
+  //  - session-state:changed, fired by event-session-details' shared schedule timer at each
+  //    start/end transition (exactly when a session flips to on-demand), and
+  //  - session-video-player:playable, fired by the player when IT becomes playable (covers the
+  //    live-poll / DVR cases the session-times schedule doesn't tick for).
+  let started = false;
+  const gateAndRender = () => {
+    if (started || !el.isConnected || !currentSessionEnded()) return;
+    started = true;
+    runRenderFlow();
+  };
+
+  const onTick = () => gateAndRender();
+  window.addEventListener('session-state:changed', onTick);
+  window.addEventListener('session-video-player:playable', onTick);
+  onElementDetached(el, () => {
+    window.removeEventListener('session-state:changed', onTick);
+    window.removeEventListener('session-video-player:playable', onTick);
+  });
+
+  gateAndRender();
 }

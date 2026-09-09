@@ -482,8 +482,6 @@ function loadVideoPlayer(el, sessionId, video) {
   el.dataset.embedded = 'true';
 }
 
-const DECISION_FALLBACK_MS = 4000;
-
 function isInsidePlaylistContainer(el) {
 
   return Boolean(closestSectionWithStyle(el, VIDEO_PLAYLIST_CONTAINER_CLASS));
@@ -493,6 +491,11 @@ function isWinningInstance(el, hasPlaylist) {
   return isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist;
 }
 
+// The playlist block is present on every session page and always resolves to a terminal
+// decision (renders rows → announces hasPlaylist:true, or removes itself → false). So the player
+// simply WAITS for that announcement — there is no timed fallback that could guess "no playlist"
+// before the playlist has decided (which previously stranded the playlist behind a full-width
+// player when both blocks resolved on their own timers).
 function awaitEmbedDecision(el) {
   const existingDecision = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
   if (existingDecision != null) {
@@ -500,41 +503,11 @@ function awaitEmbedDecision(el) {
   }
 
   return new Promise((resolve) => {
-    let settled = false;
-    let unsubscribe = () => {};
-
-    const settle = (hasPlaylist) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(fallbackTimer);
-      unsubscribe();
-      resolve(isWinningInstance(el, hasPlaylist));
-    };
-
-    unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
-
+    const unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
       if (newValue == null) return;
-      settle(Boolean(newValue.hasPlaylist));
-    });
-
-    const fallbackTimer = setTimeout(() => settle(false), DECISION_FALLBACK_MS);
-  });
-}
-
-// A live poll is only meaningful for a session with its own mrStreamId — same registry
-// session-routing.js's card-level polling uses, so this batches into the same underlying
-// fetchLiveStatus() call rather than starting a second, independent poller. Deliberately NOT
-// routed through session-store.js's initSessionState()/startPolling() — those require the
-// full session catalog fetch, which this metadata-only block has no other reason to make.
-function waitForLiveStatus(mrStreamId) {
-  if (!mrStreamId) return Promise.resolve(new Set());
-  return new Promise((resolve) => {
-    const unsubscribe = subscribeToPoller(({ active }) => {
       unsubscribe();
-      unregisterStreamIds([mrStreamId]);
-      resolve(new Set(active));
-    }, [mrStreamId]);
-    registerStreamIds([mrStreamId], { env: deriveMrEnv() });
+      resolve(isWinningInstance(el, Boolean(newValue.hasPlaylist)));
+    });
   });
 }
 
@@ -559,64 +532,52 @@ function resolveVideoForPhase(phase, sessionTimes, session) {
   return null;
 }
 
-async function resolveRenderContext(el) {
-  const config = readAuthoredConfig(el);
+// pre-event and watch-live are deliberately not this block's job — session-broadcast/
+// mobile-rider own the live-watching experience; this block only ever plays a video.
+const PLAYABLE_PHASES = [PLAYBACK_PHASE.SIMULIVE, PLAYBACK_PHASE.DVR_BUFFER, PLAYBACK_PHASE.ON_DEMAND];
 
+// Reads page metadata once (no catalog fetch). Returns null only for the genuine never-render
+// case (no session-id); otherwise the caller re-evaluates the phase on a timer, so pre-event is
+// a valid, non-terminal result rather than a reason to remove the block.
+function buildRenderModel(el) {
+  const config = readAuthoredConfig(el);
   const sessionId = resolveSessionId(config);
   if (!sessionId) {
     logError('no session-id (page metadata or authored) — nothing to render');
     return null;
   }
 
-  // Metadata-only — no session catalog fetch. `custom-attributes`/`session-times` are
-  // already authored on this page (same source session-video-playlist.js already reads),
-  // so this block never has to wait on the async catalog just to learn about the one
-  // session its own page is already about.
+  // Metadata-only — `custom-attributes`/`session-times` are already authored on this page (same
+  // source session-video-playlist.js reads), so this block never waits on the async catalog.
   const sessionTimes = parseJsonMetadata('session-times');
   const session = buildSessionFromMetadata(sessionTimes);
 
-  // Idempotent; other blocks that read event-start-anchored config (session-video-playlist,
-  // mobile-rider) call this defensively too, in case decorateEvent hasn't run it yet —
-  // otherwise getEventStartMs() silently returns null and IPOD/live DVR gates never open.
+  // Idempotent; other blocks call this defensively too, in case decorateEvent hasn't run it yet
+  // — otherwise getEventStartMs() silently returns null and IPOD/live DVR gates never open.
   initTierOneEventConfig();
 
-  // A poll is only relevant/started for a genuinely live-identified session — resolves
-  // immediately (empty set) for IPOD/Simulive sessions, which never read it anyway.
-  const liveStreamActiveIds = await waitForLiveStatus(session.mrStreamId);
+  return { sessionId, sessionTimes, session };
+}
+
+// Resolves the phase for `now` against the latest known live-stream set, then the video for that
+// phase. Returns { phase, video } where video is null when the phase isn't playable yet or has
+// no embeddable asset — the caller decides whether that means "wait" or "give up".
+function evaluatePhase({ session, sessionTimes }, liveStreamActiveIds) {
   const phase = getPlaybackPhase(session, {
     nowMs: getNowMs(),
     eventStartMs: getEventStartMs(),
     liveStreamActiveIds,
   });
-  // pre-event and watch-live are deliberately not this block's job — session-broadcast/
-  // mobile-rider own the live-watching experience; this block only ever plays a video.
-  if (phase !== PLAYBACK_PHASE.SIMULIVE
-    && phase !== PLAYBACK_PHASE.DVR_BUFFER
-    && phase !== PLAYBACK_PHASE.ON_DEMAND) {
-    logError(`session is in "${phase}" phase — nothing to render`);
-    return null;
-  }
-
-  const currentVideo = resolveVideoForPhase(phase, sessionTimes, session);
-  if (!currentVideo) {
-    logError('no embeddable video available for the current phase — nothing to render');
-    return null;
-  }
-
-  return { sessionId, currentVideo };
+  const video = PLAYABLE_PHASES.includes(phase)
+    ? resolveVideoForPhase(phase, sessionTimes, session)
+    : null;
+  return { phase, video };
 }
 
-export default async function init(el) {
-  ensureStylesheet('session-video-player-css', BLOCK_CSS_URL);
-
-  const context = await resolveRenderContext(el);
-  if (!context) {
-    el.remove();
-    return;
-  }
-  const { sessionId, currentVideo } = context;
-
-  preconnectVideoProvider(currentVideo.provider);
+// The current tail of init() — preconnect, loader, layout-decision wait, embed — kept as a
+// one-shot so the timer loop can call it exactly once at the transition to a playable phase.
+function loadWhenDecided(el, sessionId, video) {
+  preconnectVideoProvider(video.provider);
 
   if (!isInsidePlaylistContainer(el)) {
     showVideoLayoutLoader(el);
@@ -627,11 +588,83 @@ export default async function init(el) {
       const isWinner = await awaitEmbedDecision(el);
       hideVideoLayoutLoader();
       if (!isWinner) return;
-      loadVideoPlayer(el, sessionId, currentVideo);
+      loadVideoPlayer(el, sessionId, video);
     } catch (error) {
-
       hideVideoLayoutLoader();
       logError(`could not resolve the video layout decision: ${error.message}`);
     }
   })();
 }
+
+export default async function init(el) {
+  ensureStylesheet('session-video-player-css', BLOCK_CSS_URL);
+
+  const model = buildRenderModel(el);
+  if (!model) {
+    el.remove();
+    return;
+  }
+  const { sessionId, session, sessionTimes } = model;
+
+  // Updated by the live poll (below) for mrStreamId sessions; stays empty for everything else,
+  // exactly as the old one-shot waitForLiveStatus resolved for non-live sessions.
+  let liveStreamActiveIds = new Set();
+  let embedded = false;
+
+  // Re-evaluate the phase against the current clock/live state. Called on load, on each
+  // session-state:changed tick (from event-session-details, the single shared schedule timer), and
+  // on each live-poll result. embedded/isConnected guards keep it idempotent across all triggers.
+  const evaluate = () => {
+    if (embedded || !el.isConnected) return;
+    const { phase, video } = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
+
+    if (video) {
+      embedded = true;
+      // Tell the playlist the session just became playable so it renders alongside us on the same
+      // tick. Fired before the layout-decision wait so the playlist can announce the decision this
+      // block is about to await.
+      window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
+      loadWhenDecided(el, sessionId, video);
+      return;
+    }
+
+    // A playable phase that yields no embeddable asset is terminal — nothing will ever appear
+    // (e.g. on-demand with no mpc/youtube id and no session-times video; or DVR-buffer with no
+    // mrDvrVideoId). Remove the block, as before. Non-playable phases (pre-event / watch-live) are
+    // NOT terminal: the block stays (empty) to receive the next shared tick / poll result when the
+    // session flips to a playable phase.
+    if (PLAYABLE_PHASES.includes(phase)) {
+      logError(`session is in "${phase}" phase with no embeddable video — removing`);
+      el.remove();
+    }
+  };
+
+  // The shared schedule tick: event-session-details' status timer fires session-state:changed at
+  // every start/end transition, which is exactly when a session flips to on-demand. Re-evaluate on
+  // it instead of running a second, duplicate boundary timer here.
+  const onStateChanged = () => evaluate();
+  window.addEventListener('session-state:changed', onStateChanged);
+
+  // A live mrStreamId session's live→on-demand flip is driven by the poll (stream inactive), not a
+  // timestamp — subscribe persistently and re-evaluate on each poll result. Non-live sessions never
+  // poll (liveStreamActiveIds stays empty, as the old one-shot waitForLiveStatus resolved for them).
+  let unsubscribePoll = () => {};
+  if (session.mrStreamId) {
+    unsubscribePoll = subscribeToPoller(({ active }) => {
+      liveStreamActiveIds = new Set(active);
+      evaluate();
+    }, [session.mrStreamId]);
+    registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
+  }
+
+  onDetached(el, () => {
+    window.removeEventListener('session-state:changed', onStateChanged);
+    if (session.mrStreamId) {
+      unsubscribePoll();
+      unregisterStreamIds([session.mrStreamId]);
+    }
+  });
+
+  evaluate();
+}
+
