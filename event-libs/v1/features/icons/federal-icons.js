@@ -128,6 +128,27 @@ export async function fetchFederalProductIcon(iconName) {
   return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
 }
 
+// Federal's track-icon namespace ships literal fill="black" (occasionally stroke="black")
+// baked into the artwork, unlike the generic /assets/icons/svgs/ namespace (already
+// fill="currentcolor" there) — so neither an author's chosen track color
+// (TrackIconEditor.js's per-track color field, applied via the --sg-badge-icon-color
+// custom property) nor a card's hover-to-white state (sessions-guide.css's
+// .sg-category-badge__icon-color rules) has anything to actually recolor. Rewriting the
+// literal black to currentColor restores both. Deliberately narrow: fill="none" (a
+// transparent hole/the root's own non-painting fill) and fill="white" (an intentional
+// cutout/highlight some of these two-tone icons use) are left untouched — recoloring those
+// too would erase the icon's own internal detail, not just its main silhouette color.
+function useCurrentColorForBlack(svg) {
+  svg.querySelectorAll('*').forEach((el) => {
+    ['fill', 'stroke'].forEach((attr) => {
+      if ((el.getAttribute(attr) || '').toLowerCase() === 'black') {
+        el.setAttribute(attr, 'currentColor');
+      }
+    });
+  });
+  return svg;
+}
+
 const federalTrackIconCache = new Map();
 
 // Track-icon namespace only — used by the T1 Event Configurator's TrackIconEditor/
@@ -145,7 +166,10 @@ export async function fetchFederalTrackIcon(iconName) {
   }
 
   const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/icons/track-icons/${iconName}.svg`);
-  if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
+  if (svg) {
+    svg.classList.add('icon-federal', `icon-federal-${iconName}`);
+    useCurrentColorForBlack(svg);
+  }
 
   federalTrackIconCache.set(iconName, svg);
   return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;

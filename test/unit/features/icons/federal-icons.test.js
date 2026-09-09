@@ -106,6 +106,25 @@ describe('federal-icons — fetchFederalTrackIcon (track-icon namespace only)', 
   it('returns null for an empty icon name', async () => {
     expect(await fetchFederalTrackIcon('')).to.equal(null);
   });
+
+  // Real track-icon artwork ships literal fill="black"/stroke="black" (Illustrator export),
+  // not fill="currentcolor" like the generic /assets/icons/svgs/ namespace — so neither an
+  // author's chosen track color nor a card's hover-to-white state had anything to actually
+  // recolor. two-tone.svg reproduces that shape: a black fill, a stroke, a white cutout,
+  // and the root's own fill="none".
+  it('rewrites literal black fill/stroke to currentColor, so track color and hover-to-white keep working', async () => {
+    const svg = await fetchFederalTrackIcon('two-tone');
+    const [path, , strokedPath] = svg.querySelectorAll('*');
+    expect(path.getAttribute('fill')).to.equal('currentColor');
+    expect(strokedPath.getAttribute('stroke')).to.equal('currentColor');
+  });
+
+  it('leaves an intentional white cutout and the root\'s fill="none" untouched', async () => {
+    const svg = await fetchFederalTrackIcon('two-tone');
+    const circle = svg.querySelector('circle');
+    expect(circle.getAttribute('fill')).to.equal('white');
+    expect(svg.getAttribute('fill')).to.equal('none');
+  });
 });
 
 // MWPW: creative-cloud-64/frame-io-64 rendered as a flat, mostly-monochrome smudge
