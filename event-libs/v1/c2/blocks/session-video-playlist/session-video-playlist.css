@@ -659,7 +659,7 @@
 
   .session-video-playlist-top {
     flex-wrap: nowrap;
-    padding: 9px var(--s2a-spacing-md) var(--s2a-spacing-8, 8px);
+    padding: var(--s2a-spacing-xs) var(--s2a-spacing-md);
     cursor: pointer;
   }
 
