@@ -575,11 +575,13 @@ function evaluatePhase({ session, sessionTimes }, liveStreamActiveIds) {
 }
 
 // The current tail of init() — preconnect, loader, layout-decision wait, embed — kept as a
-// one-shot so the timer loop can call it exactly once at the transition to a playable phase.
-function loadWhenDecided(el, sessionId, video) {
+// one-shot so the evaluate loop can call it exactly once at the transition to a playable phase.
+// showLoader is true only on a cold page load (the loader covers the brief full-width-vs-playlist
+// layout race); on a later on-demand transition we show nothing and just reveal the player.
+function loadWhenDecided(el, sessionId, video, { showLoader = false } = {}) {
   preconnectVideoProvider(video.provider);
 
-  if (!isInsidePlaylistContainer(el)) {
+  if (showLoader && !isInsidePlaylistContainer(el)) {
     showVideoLayoutLoader(el);
   }
 
@@ -614,7 +616,11 @@ export default async function init(el) {
   // Re-evaluate the phase against the current clock/live state. Called on load, on each
   // session-state:changed tick (from event-session-details, the single shared schedule timer), and
   // on each live-poll result. embedded/isConnected guards keep it idempotent across all triggers.
-  const evaluate = () => {
+  // `isInitialLoad` is true only for the first, synchronous call: the layout-decision loader is a
+  // cold-page-load affordance (covers the brief player-vs-playlist race so the page doesn't jump).
+  // On a LATER transition (session flips to on-demand while the user waits), we show nothing —
+  // the player just appears when ready — so the loader is suppressed for those.
+  const evaluate = (isInitialLoad = false) => {
     if (embedded || !el.isConnected) return;
     const { phase, video } = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
 
@@ -624,7 +630,7 @@ export default async function init(el) {
       // tick. Fired before the layout-decision wait so the playlist can announce the decision this
       // block is about to await.
       window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
-      loadWhenDecided(el, sessionId, video);
+      loadWhenDecided(el, sessionId, video, { showLoader: isInitialLoad });
       return;
     }
 
@@ -665,6 +671,8 @@ export default async function init(el) {
     }
   });
 
-  evaluate();
+  // Only this first, synchronous evaluation is a cold page load — pass the flag so its loader can
+  // show. The onStateChanged/poll re-evaluations are transitions and show nothing until ready.
+  evaluate(true);
 }
 
