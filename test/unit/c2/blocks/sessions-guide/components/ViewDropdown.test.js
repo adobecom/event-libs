@@ -30,13 +30,13 @@ describe('ViewDropdown resolveViewSelection', () => {
   it('redirects to the fallback and shows a register/sign-in toast when logged out', () => {
     auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
     expect(resolveViewSelection('my-sessions', { eventConfig })).to.equal('live-upcoming');
-    expect(toasts.value[0].message).to.equal('Register or sign in to view My sessions.');
+    expect(toasts.value[0].message).to.equal('Register or sign in to view my sessions.');
   });
 
   it('redirects to the fallback and shows a register/sign-in toast when unregistered', () => {
     auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
     expect(resolveViewSelection('my-favorites', { eventConfig })).to.equal('live-upcoming');
-    expect(toasts.value[0].message).to.equal('Register or sign in to view My favorites.');
+    expect(toasts.value[0].message).to.equal('Register or sign in to view my favorites.');
   });
 });
 

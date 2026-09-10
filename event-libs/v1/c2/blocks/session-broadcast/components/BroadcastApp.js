@@ -19,7 +19,9 @@ import {
   readWatchParam, stripWatchParam, pushSessionState, getHistorySessionId,
   persistActiveSession, getPersistedSessionId, clearPersistedSession,
 } from '../utils/broadcast-url.js';
-import { logBroadcastSchedule, logBucketGroups } from '../utils/broadcast-debug.js';
+import {
+  logBucketGroups, logActiveSession, logTickStart, logTickEnd,
+} from '../utils/broadcast-debug.js';
 import { trackBroadcastEvent, getEntryPoint } from '../utils/broadcast-analytics.js';
 import { PlayerHost } from './PlayerHost.js';
 import { SessionInfoPanel } from './SessionInfoPanel.js';
@@ -27,14 +29,15 @@ import { EndedState } from './EndedState.js';
 import { AlsoLiveCarousel } from './AlsoLiveCarousel.js';
 import { UpNextCarousel } from './UpNextCarousel.js';
 
-// LiveCard/Carousel hard-depend on useSessionGuide(); surface: 'page' routes click/watch
-// handling through onCardClick/onWatchSamePage below instead of LiveCard's own.
+// surface:'page' routes clicks through onCardClick/onWatchSamePage instead of LiveCard's own.
 const GUIDE_CONFIG = { userTz: detectUserTimezone(), surface: 'page', theme: 'light' };
+
+// Exported for tests; see the effect below for why this needs its own tick.
+export const SCHEDULE_REFRESH_MS = 5_000;
 
 // Exported separately so tests can call it without mounting the Provider tree.
 export function BroadcastBody({ config }) {
-  // sessionStorage backs up history.state — the latter isn't guaranteed to survive a hard
-  // refresh (see broadcast-url.js).
+  // sessionStorage backs up history.state, which isn't guaranteed to survive a hard refresh.
   const [manualSessionId, setManualSessionId] = useState(
     () => getHistorySessionId() || getPersistedSessionId(),
   );
@@ -56,8 +59,7 @@ export function BroadcastBody({ config }) {
     if (manualSessionId) persistActiveSession(manualSessionId);
   }, [manualSessionId]);
 
-  // One-shot ?watch= resolution (named to avoid colliding with sessions-guide's own ?session=).
-  // Must resolve to something live now or get discarded — it's new intent, not a resumed one.
+  // One-shot ?watch= resolution; must resolve to something live now or get discarded.
   useEffect(() => {
     if (entryResolved || sessionsStatus.value !== 'ready') return;
     setEntryResolved(true);
@@ -83,9 +85,7 @@ export function BroadcastBody({ config }) {
     trackBroadcastEvent(`Broadcast-Session-Switch | ${session.id}`);
   }
 
-  // Session Guide's widget is a separate mount with no prop-level path into Broadcast's state —
-  // requestWatchSameSession() is the only channel. Re-validated live since the request could be
-  // stale by the time it fires.
+  // Session Guide's widget has no prop path in - watchSameSessionRequest is the only channel.
   useEffect(() => watchSameSessionRequest.subscribe((request) => {
     if (!request) return;
     const requested = sessions.value.find((s) => s.id === request.sessionId);
@@ -94,6 +94,14 @@ export function BroadcastBody({ config }) {
     }
   }), []);
 
+  // This page's own tick re-checks MPC video-duration liveness, which the shared ticker can miss.
+  const [, forceScheduleTick] = useState(0);
+  useEffect(() => {
+    if (sessionsStatus.value !== 'ready') return undefined;
+    const id = setInterval(() => forceScheduleTick((n) => n + 1), SCHEDULE_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [sessionsStatus.value]);
+
   // Forces a re-render on time-driven state transitions; value itself unused.
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
@@ -101,12 +109,12 @@ export function BroadcastBody({ config }) {
   const schedule = getBroadcastSchedule(sessions.value, liveStreamActiveIds.value, nowMs, {
     activeSessionId: manualSessionId,
   });
-  logBroadcastSchedule(schedule);
+  logTickStart(nowMs);
   logBucketGroups(sessions.value, liveStreamActiveIds.value, nowMs);
+  logActiveSession(schedule, nowMs);
+  logTickEnd();
 
-  // getBroadcastSchedule returns pendingCandidates instead of picking — this is the one place
-  // Math.random() runs. Depends on length, not the array, since a fresh reference every render
-  // would otherwise re-roll.
+  // Depends on length, not the array, so a fresh reference each render doesn't re-roll the pick.
   useEffect(() => {
     if (!entryResolved) return;
     if (schedule.pendingCandidates?.length) {
@@ -118,8 +126,7 @@ export function BroadcastBody({ config }) {
       setManualSessionId(schedule.activeSession.id);
       return;
     }
-    // First-time visitor on a gap: endedSession is synthesized though nothing was committed —
-    // locking it in lets resolveBucketSchedule's ended/next-group walk-forward take over.
+    // Locks in the synthesized endedSession so the next-group walk-forward can take over.
     if (schedule.endedSession && schedule.endedSession.id !== manualSessionId) {
       setManualSessionId(schedule.endedSession.id);
     }
@@ -138,14 +145,11 @@ export function BroadcastBody({ config }) {
     }
   });
 
-  // pendingCandidates counts as "something" — it resolves to activeSession within the same
-  // tick, so the empty state mustn't flash in between (alsoLive excludes pending candidates
-  // now, so this can't be inferred from it alone).
+  // pendingCandidates counts as "something" so the empty state doesn't flash before it resolves.
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
     && !schedule.pendingCandidates?.length && !schedule.alsoLive.length && !schedule.upNext.length;
 
-  // Feeds .sb-app:has(.sb-ended) in session-broadcast.css. --sb-app-ended-bg-lg is optional;
-  // tablet CSS falls back to --sb-app-ended-bg when absent.
+  // Feeds .sb-app:has(.sb-ended) in the CSS; --sb-app-ended-bg-lg falls back to --sb-app-ended-bg.
   const endedActive = !schedule.activeSession && !!schedule.endedSession;
   const endedBgUrl = endedActive ? safeUrl(config.sessionEndedImageUrl) : '';
   const endedBgUrlLarge = endedActive ? safeUrl(config.sessionEndedImageUrlLarge) : '';
@@ -174,8 +178,7 @@ export function BroadcastBody({ config }) {
   `;
 }
 
-// h(), not the html tag — Context.Provider needs h()'s lazy-vnode timing to set its context
-// value before children evaluate.
+// h(), not the html tag - Context.Provider needs h()'s lazy-vnode timing to set context first.
 export function BroadcastApp({ config = {} }) {
   return h(SessionGuideProvider, { guideConfig: GUIDE_CONFIG }, h(BroadcastBody, { config }));
 }

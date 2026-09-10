@@ -5,6 +5,7 @@ import {
 } from '../../../../../event-libs/v1/utils/session-store.js';
 import { setEventConfig } from '../../../../../event-libs/v1/utils/utils.js';
 import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
+import { setFederalRootOverride } from '../../../../../event-libs/v1/features/icons/federal-icons.js';
 
 // Mirrors the real auto-built shape: decorate.js's tec-homepage auto-block builder
 // replaces the authored link with a bare div carrying the decoded { heading, entries }
@@ -48,6 +49,10 @@ function session(overrides = {}) {
 describe('upcoming-sessions', () => {
   before(() => {
     setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs' });
+    // The track icon authored below now resolves against federal's dedicated
+    // track-icon namespace, not the generic/Milo cascade — see fetchFederalTrackIcon()
+    // in federal-icons.js.
+    setFederalRootOverride('/test/unit/features/icons/mocks/federal');
     // No built-in track defaults (see tier-1-event-config.js) — author the one track
     // these tests actually need a badge for.
     const meta = document.createElement('meta');

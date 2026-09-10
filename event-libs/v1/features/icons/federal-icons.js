@@ -1,20 +1,14 @@
-// Adobe's shared, cross-site icon CDN ("federal"). Reimplemented here (instead of
-// importing Milo's getIcon()) because this module also runs standalone with no Milo
-// loaded. Federal serves one <svg> file per icon (not a <symbol> sprite), so parsing is a
-// plain DOMParser lookup.
+// Adobe's federal icon CDN, reimplemented here since this module also runs without Milo loaded.
 const PROD_ROOT = 'https://www.adobe.com';
 
 let federalRootOverride = null;
 
-// Test-only escape hatch — same ergonomics as icon-resolver.test.js's
-// setEventConfig({}, { miloLibs }) pattern, kept local to this module rather than routed
-// through the shared miloConfig singleton, since federal isn't Milo's own config.
+// Test-only override; not routed through miloConfig since federal isn't Milo's own config.
 export function setFederalRootOverride(root) {
   federalRootOverride = root;
 }
 
-// Mirrors Milo's own getFederatedContentRoot() (milo/libs/utils/utils.js) without
-// depending on Milo being loaded.
+// Mirrors Milo's getFederatedContentRoot() without requiring Milo to be loaded.
 function resolveFederalRoot() {
   if (federalRootOverride) return federalRootOverride;
   const { hostname, origin } = window.location;
@@ -24,10 +18,33 @@ function resolveFederalRoot() {
   return PROD_ROOT;
 }
 
-// Map<name, SVGElement|null> — caches misses too, not just hits, since federal is one
-// HTTP request per icon name (no manifest); without this, rendering an icon not yet
-// uploaded to federal would re-fetch a 404 on every render.
-const federalIconCache = new Map();
+// Rewrites cloned SVG ids per instance to avoid id collisions between inlined icons.
+let nextSvgIdSuffix = 0;
+
+function namespaceSvgIds(svg) {
+  const idEls = [...svg.querySelectorAll('[id]')];
+  if (!idEls.length) return svg;
+
+  nextSvgIdSuffix += 1;
+  const suffix = `-fedicon${nextSvgIdSuffix}`;
+  const idMap = new Map(idEls.map((el) => [el.id, `${el.id}${suffix}`]));
+  idEls.forEach((el) => { el.id = idMap.get(el.id); });
+
+  // Covers every id-referencing attribute (url(#id), href/xlink:href) rather than a fixed allowlist.
+  svg.querySelectorAll('*').forEach((el) => {
+    [...el.attributes].forEach(({ name, value }) => {
+      const urlMatch = value.match(/^url\(#(.+)\)$/);
+      if (urlMatch && idMap.has(urlMatch[1])) {
+        el.setAttribute(name, `url(#${idMap.get(urlMatch[1])})`);
+        return;
+      }
+      if (/^(xlink:)?href$/.test(name) && value.startsWith('#') && idMap.has(value.slice(1))) {
+        el.setAttribute(name, `#${idMap.get(value.slice(1))}`);
+      }
+    });
+  });
+  return svg;
+}
 
 async function fetchSvgFrom(url) {
   try {
@@ -42,50 +59,57 @@ async function fetchSvgFrom(url) {
   }
 }
 
-// Federal has two separate SVG namespaces: /assets/icons/svgs/ here, for generic
-// UI/track icons (has its own icons.json manifest, see fetchFederalIconList below);
-// /assets/svgs/ (fetchFederalProductIcon below) for product logos, curated per-product
-// by the product team, no manifest. Deliberately not merged into one fallback chain —
-// nothing today ever needs to resolve a name against both namespaces (tracks/overrides
-// only ever live in this one; products only ever live in the other, via a separate,
-// not-yet-built consumer), so checking both here would just double the 404s for every
-// track/override name federal doesn't have yet.
-export async function fetchFederalIcon(iconName) {
-  if (!iconName) return null;
-  if (federalIconCache.has(iconName)) {
-    const cached = federalIconCache.get(iconName);
-    return cached ? cached.cloneNode(true) : null;
-  }
+// Shared shape for all three federal namespaces below: cache (misses too, since federal has
+// no manifest and a miss would otherwise re-fetch every render), fetch, tag, optional
+// per-namespace transform, then a freshly id-namespaced clone per call.
+function createFederalIconFetcher(buildUrl, { transform } = {}) {
+  const cache = new Map();
+  return async function fetchIcon(iconName) {
+    if (!iconName) return null;
+    if (cache.has(iconName)) {
+      const cached = cache.get(iconName);
+      return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
+    }
 
-  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/icons/svgs/${iconName}.svg`);
-  if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
+    const svg = await fetchSvgFrom(buildUrl(iconName));
+    if (svg) {
+      svg.classList.add('icon-federal', `icon-federal-${iconName}`);
+      transform?.(svg);
+    }
 
-  federalIconCache.set(iconName, svg);
-  return svg ? svg.cloneNode(true) : null;
+    cache.set(iconName, svg);
+    return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
+  };
 }
 
-const federalProductIconCache = new Map();
+// Three separate federal SVG namespaces below - not merged into one fallback chain.
+export const fetchFederalIcon = createFederalIconFetcher(
+  (iconName) => `${resolveFederalRoot()}/federal/assets/icons/svgs/${iconName}.svg`,
+);
 
-// Product-logo namespace only — used by the Tier 1 Event Configurator's product-icon
-// preview today; whatever eventually renders products on the live page (a separate,
-// not-yet-built ticket) should call this directly too, rather than fetchFederalIcon above.
-export async function fetchFederalProductIcon(iconName) {
-  if (!iconName) return null;
-  if (federalProductIconCache.has(iconName)) {
-    const cached = federalProductIconCache.get(iconName);
-    return cached ? cached.cloneNode(true) : null;
-  }
+export const fetchFederalProductIcon = createFederalIconFetcher(
+  (iconName) => `${resolveFederalRoot()}/federal/assets/svgs/${iconName}.svg`,
+);
 
-  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/svgs/${iconName}.svg`);
-  if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
-
-  federalProductIconCache.set(iconName, svg);
-  return svg ? svg.cloneNode(true) : null;
+// Recolors literal black fill/stroke to currentColor (root element included); skips
+// white/none (intentional cutouts).
+function useCurrentColorForBlack(svg) {
+  [svg, ...svg.querySelectorAll('*')].forEach((el) => {
+    ['fill', 'stroke'].forEach((attr) => {
+      if ((el.getAttribute(attr) || '').toLowerCase() === 'black') {
+        el.setAttribute(attr, 'currentColor');
+      }
+    });
+  });
+  return svg;
 }
 
-// icons.json is federal's own manifest of every icon it hosts (a standard Helix sheet
-// export). Used to populate icon pickers with federal's live inventory instead of a
-// hardcoded list that would drift as icons are added there.
+export const fetchFederalTrackIcon = createFederalIconFetcher(
+  (iconName) => `${resolveFederalRoot()}/federal/assets/icons/track-icons/${iconName}.svg`,
+  { transform: useCurrentColorForBlack },
+);
+
+// icons.json is federal's manifest of hosted icons, used to populate icon pickers live.
 let federalIconListPromise = null;
 
 export function fetchFederalIconList() {

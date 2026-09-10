@@ -9,21 +9,22 @@ import {
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useDA } from './DAContext.js';
 import { useEventEnv } from './EventEnvContext.js';
-import { getDisplayTitle } from '../utils.js';
+import { getDisplayTitle, syncIconConfigWithCatalog } from '../utils.js';
 import {
   CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType,
 } from '../constants.js';
 
 const ConfigsContext = createContext();
 
-// Scoped per config type — a Global row never carries configName or Homepage session-pick
-// fields; each Homepage sub-type only carries its own field+meta pair.
+// Scoped per config type: Global never carries Homepage session-pick fields, and vice versa.
 function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
   if (isHomepageConfigType(configType)) {
     const { field, metaField } = HOMEPAGE_SESSION_FIELDS[configType];
     return { configName: '', [field]: [], [metaField]: {} };
   }
   return {
+    // Purely a label; blank falls through to eventTitle/backendEventTitle/eventId in getDisplayTitle.
+    configName: '',
     eventTitle: '',
     eventStartDateTime: null,
     eventEndDateTime: null,
@@ -44,19 +45,13 @@ const ConfigsProvider = ({ children }) => {
   const { org, repo } = useDA();
   const { envName, setEnv } = useEventEnv();
 
-  // Shared by Library.js (prefetching every Homepage row up front) and ConfigEditor.js
-  // (loading the active row's sessions) so opening a row for edit right after Library
-  // already warmed its catalog doesn't re-hit ESP for data that's already in hand.
-  // Keyed by (eventId, env) — a row's config type doesn't affect what session-catalog data
-  // comes back for its event.
+  // Keyed by (eventId, env); shared with Library.js so a warmed catalog isn't re-fetched.
   const sessionCatalogCache = useRef(new Map());
   const getSessionCatalogForRow = useCallback((row) => {
     const key = `${row.eventId}:${row.eventServiceEnv || 'prod'}`;
     let promise = sessionCatalogCache.current.get(key);
     if (!promise) {
-      // getEventSessionCatalog reads the ESP env from this shared global override, not from
-      // an argument — flip it to the row's own authored env for the fetch, then restore
-      // whatever the caller had active, mirroring Library.js's per-row env switch on Edit.
+      // getEventSessionCatalog reads env from a shared global, so flip/restore it around the fetch.
       promise = (async () => {
         const currentEnv = envName;
         setEnv(row.eventServiceEnv || 'prod');
@@ -75,12 +70,10 @@ const ConfigsProvider = ({ children }) => {
   const [isInitialLoading, setIsInitialLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState(null);
+  // persistent: true keeps the toast up until manually dismissed instead of auto-timing out.
   const [toastSuccess, setToastSuccess] = useState(null);
   const [toastError, setToastError] = useState(null);
 
-  // The row currently open in the editor — always a full row shape
-  // ({ eventId, backendEventTitle, eventServiceEnv, config }), whether
-  // freshly created (New/Duplicate) or loaded from the library (Edit).
   const [activeConfig, setActiveConfig] = useState(null);
 
   const loadConfigs = useCallback(async () => {
@@ -104,12 +97,7 @@ const ConfigsProvider = ({ children }) => {
     if (org && repo && !hasLoaded) loadConfigs();
   }, [org, repo, hasLoaded, loadConfigs]);
 
-  // Global-only lookup: Global rows are keyed on (eventId, configType)
-  // together — absent configType means Global, for rows saved before this
-  // field existed. Homepage rows are never looked up this way (their
-  // identity is `configId`, since one event can carry several named
-  // Upcoming/Featured Sessions rows side by side) — see Library.js's
-  // handlePickEvent.
+  // Returns only the first match — can't disambiguate multiple rows sharing one event+type.
   const findConfigByEventId = useCallback(
     (eventId, configType = CONFIG_TYPES.GLOBAL) => configs.find(
       (c) => c.eventId === eventId && (c.configType || CONFIG_TYPES.GLOBAL) === configType,
@@ -117,22 +105,11 @@ const ConfigsProvider = ({ children }) => {
     [configs],
   );
 
-  // Starts a fresh row for a newly picked event + config type. For Global,
-  // dedup (routing to Edit when a row already exists for the picked event) is
-  // the picker's responsibility — see PLAN.md Phase 4 — so this always
-  // assumes no prior row. Homepage rows get their own `configId` instead:
-  // there's no dedup to assume away, since a single event is expected to
-  // carry several named Homepage rows (Upcoming/Featured Sessions) side by
-  // side. `eventServiceEnv` is whatever ESP tier was active when the event
-  // was picked (Library.js reads it from EventEnvContext) — row-level only,
-  // never pasted into the page's Config, since it's purely an authoring-time
-  // detail of where this event's data came from, re-applied automatically
-  // when the row is edited later (see Library.js's openEdit) so a
-  // session-catalog refetch doesn't silently default back to prod after a
-  // page reload resets the override.
+  // eventServiceEnv is row-only, never in config — Library.js's openEdit re-applies it on edit.
   const startNewConfig = useCallback((event, eventServiceEnv, configType = CONFIG_TYPES.GLOBAL) => {
     setActiveConfig({
-      ...(isHomepageConfigType(configType) ? { configId: crypto.randomUUID() } : {}),
+      // configId lets multiple Global rows per Event ID save without colliding (see da-controller.js's rowMatches).
+      configId: crypto.randomUUID(),
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
@@ -141,12 +118,7 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Builds from a fresh, type-scoped emptyConfig() rather than cloning wholesale — only
-  // reusable style settings (trackIcons, overrideTrackIcons, products, allowDoubleBooking)
-  // carry forward, Global only. Everything else is event-specific identity data (title,
-  // dates, RF credentials, session picks) that would mislabel/misroute the new event.
-  // Homepage duplicates get their own fresh `configId`, same as startNewConfig — a
-  // duplicate is always a new row, never a second write to the source row's identity.
+  // Only style settings carry forward (trackIcons/overrideTrackIcons/products/allowDoubleBooking).
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const configType = sourceRow.configType || CONFIG_TYPES.GLOBAL;
     const sourceConfig = sourceRow.config || {};
@@ -167,7 +139,7 @@ const ConfigsProvider = ({ children }) => {
         allowDoubleBooking: !!sourceConfig.allowDoubleBooking,
       };
     setActiveConfig({
-      ...(isHomepageConfigType(configType) ? { configId: crypto.randomUUID() } : {}),
+      configId: crypto.randomUUID(),
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
@@ -182,9 +154,6 @@ const ConfigsProvider = ({ children }) => {
 
   const clearActiveConfig = useCallback(() => setActiveConfig(null), []);
 
-  // Merges { icon, color } updates into config.trackIcons[track] for the
-  // active config, immutably, so the Config JSON preview (reading
-  // activeConfig.config directly) stays in sync automatically.
   const updateTrackIcon = useCallback((track, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
@@ -201,8 +170,7 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Keyed by override text instead of track name; every value is authored explicitly, with
-  // no event-wide fallback.
+  // Keyed by override text instead of track name, with no event-wide fallback.
   const updateOverrideTrackIcon = useCallback((overrideText, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
@@ -223,7 +191,6 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Same merge pattern as updateTrackIcon — { icon, pageUrl } per product, no color.
   const updateProduct = useCallback((product, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
@@ -240,14 +207,27 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Sets a single top-level config field (e.g. allowDoubleBooking,
-  // featuredSessions, rfApiUrl, rfProfileId) immutably, so the Config JSON
-  // preview stays in sync.
   const updateConfigField = useCallback((key, value) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
       return { ...prev, config: { ...prev.config, [key]: value } };
     });
+  }, []);
+
+  // Read via a ref (not a reactive dep) so this callback's identity stays stable across
+  // every keystroke — ConfigEditor.js's effect lists it as a dependency.
+  const activeConfigRef = useRef(activeConfig);
+  activeConfigRef.current = activeConfig;
+
+  // Global only — Homepage configs don't author trackIcons/overrideTrackIcons/products.
+  const syncActiveConfigWithCatalog = useCallback((lists) => {
+    const current = activeConfigRef.current;
+    if (!current || isHomepageConfigType(current.configType || CONFIG_TYPES.GLOBAL)) return null;
+    const result = syncIconConfigWithCatalog(current.config, lists);
+    if (result.hasChanges) {
+      setActiveConfig((prev) => (prev ? { ...prev, config: result.config } : prev));
+    }
+    return result;
   }, []);
 
   const saveActiveConfig = useCallback(async () => {
@@ -259,8 +239,7 @@ const ConfigsProvider = ({ children }) => {
     }
     setConfigs((prev) => {
       const savedType = result.data.configType || CONFIG_TYPES.GLOBAL;
-      // Homepage rows match by configId alone (several can share one event+type);
-      // Global rows have no configId, so fall back to eventId+configType.
+      // Homepage rows match by configId alone; Global rows fall back to eventId+configType.
       const idx = prev.findIndex((r) => (result.data.configId
         ? r.configId === result.data.configId
         : r.eventId === result.data.eventId && (r.configType || CONFIG_TYPES.GLOBAL) === savedType));
@@ -274,8 +253,7 @@ const ConfigsProvider = ({ children }) => {
     return result;
   }, [activeConfig, org, repo]);
 
-  // `row` carries whatever identity it has — configId for Homepage rows,
-  // eventId+configType for Global rows — mirroring da-controller.js's rowMatches.
+  // row carries configId (Homepage) or eventId+configType (Global), per da-controller.js's rowMatches.
   const removeConfig = useCallback(async (row) => {
     if (!org || !repo) return { ok: false };
     const { eventId, configType = CONFIG_TYPES.GLOBAL, configId } = row;
@@ -314,6 +292,7 @@ const ConfigsProvider = ({ children }) => {
     updateOverrideTrackIcon,
     updateProduct,
     updateConfigField,
+    syncActiveConfigWithCatalog,
     saveActiveConfig,
     removeConfig,
     getSessionCatalogForRow,

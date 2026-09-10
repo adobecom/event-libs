@@ -4,7 +4,7 @@ import {
   sessions, favorited, pendingActions, initSessionState, openSessionGuideDetail, getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { getTrackIcon, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
-import { resolveIcon } from '../../../features/icons/icon-resolver.js';
+import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
 
@@ -33,20 +33,22 @@ function buildCategoryBadge(track) {
   if (!entry) return null;
 
   const badge = createTag('span', { class: 'mobile-rider-info-bar-category' });
-  // No inline color override — always the CSS default (--s2a-color-content-default),
-  // regardless of what entry.color (the Tier 1 config's per-track color) says.
+  // No inline color override here - always the CSS default, ignoring entry.color.
   const iconColor = createTag('span', {
     class: 'mobile-rider-info-bar-category-icon-color',
   }, '', { parent: badge });
   createTag('span', { class: 'mobile-rider-info-bar-category-label' }, track, { parent: badge });
 
-  resolveIcon(entry.icon).then((svg) => {
-    if (!svg) return;
-    svg.classList.add('mobile-rider-info-bar-category-icon');
-    iconColor.append(svg);
-  }).catch((error) => {
-    window.lana?.log(`[MobileRider] category icon resolution failed for "${entry.icon}": ${error.message}`);
-  });
+  (async () => {
+    try {
+      const svg = await fetchFederalTrackIcon(entry.icon);
+      if (!svg) return;
+      svg.classList.add('mobile-rider-info-bar-category-icon');
+      iconColor.append(svg);
+    } catch (error) {
+      window.lana?.log(`[MobileRider] category icon resolution failed for "${entry.icon}": ${error.message}`);
+    }
+  })();
 
   return badge;
 }
@@ -121,7 +123,6 @@ const CONFIG = {
   STORE: { ATTACH_RETRIES: 20, ATTACH_INTERVAL_MS: 5 },
 };
 
-/** * UTILITIES */
 const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';
 const isProd = () => getEnv() === 'prod';
 const toBool = (v) => {
@@ -286,9 +287,7 @@ class MobileRider {
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
 
     initSessionState();
-    // Share needs the real session's sessionPageUrl — building the button before that
-    // resolves would let a click silently no-op (safeUrl(undefined) is falsy), so it's only
-    // created once the session is known, same as the Favorite button below.
+    // Share button is built only once the session resolves - safeUrl(undefined) would no-op.
     const onSessionResolved = (session) => {
       paintTitle(session);
       paintCategory(session);
@@ -507,9 +506,6 @@ class MobileRider {
   }
 }
 
-/**
- * URL/Anchor Helpers
- */
 function extractVideoParamsFromHref(anchor) {
   try {
     const href = anchor.getAttribute('href');

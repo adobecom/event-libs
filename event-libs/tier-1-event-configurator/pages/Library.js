@@ -21,9 +21,7 @@ function configTypeLabel(configType) {
   return HOMEPAGE_CONFIG_TYPE_OPTIONS.find((opt) => opt.value === configType)?.label || null;
 }
 
-// Homepage rows are keyed by (eventId, env) for session-catalog caching/readiness — a config
-// row's own key (eventId, configType) isn't enough, since the same event's Upcoming Sessions
-// and Featured Sessions rows share one identical catalog fetch.
+// Keyed by (eventId, env): Upcoming Sessions and Featured Sessions rows share one catalog fetch.
 function rowCatalogKey(row) {
   return `${row.eventId}:${row.eventServiceEnv || 'prod'}`;
 }
@@ -85,7 +83,6 @@ export default function Library() {
   const { goToEditor } = useNavigation();
   const {
     configs,
-    findConfigByEventId,
     startNewConfig,
     startDuplicateConfig,
     startEditConfig,
@@ -97,24 +94,13 @@ export default function Library() {
   const { envName, setEnv } = useEventEnv();
   const { org, repo } = useDA();
 
-  // The ESP session-catalog fetch that "Copy Link" needs (row.config only stores session IDs,
-  // not the titles/tracks/times the link is built from) can take several seconds — long enough
-  // that browsers drop the click's clipboard-write permission by the time it resolves.
-  // ConfigEditor.js's own "Copy Link" avoids this because its session data is already loaded
-  // before the click; here there's no equivalent "already open" moment, so instead every
-  // Homepage row's catalog is prefetched up front (below) and its "Copy Link" button stays
-  // disabled until that row's fetch lands — a click only ever awaits an already-resolved
-  // promise, so the clipboard write always runs inside that click's own activation window.
-  // getSessionCatalogForRow (from ConfigsContext) caches by (eventId, env), so if you then
-  // click "Edit" on a row already prefetched here, ConfigEditor.js reuses this same result
-  // instead of hitting ESP again.
+  // Prefetched so "Copy Link"'s click always awaits an already-resolved promise — the fetch
+  // can take long enough to drop the click's clipboard-write permission otherwise.
   const [readyCatalogKeys, setReadyCatalogKeys] = useState(() => new Set());
 
   useEffect(() => {
     const homepageConfigs = configs.filter((row) => isHomepageConfigType(row.configType));
-    // Sequential, not Promise.all: getSessionCatalogForRow flips the shared env-override
-    // global for the duration of an uncached fetch, so concurrent calls for rows on
-    // different envs would race and could fetch one row's catalog against another row's env.
+    // Sequential: getSessionCatalogForRow flips a shared global env-override during a fetch.
     let cancelled = false;
     (async () => {
       for (const row of homepageConfigs) {
@@ -136,9 +122,7 @@ export default function Library() {
   const [duplicateSource, setDuplicateSource] = useState(null);
   const [rowPendingDelete, setRowPendingDelete] = useState(null);
   const [newHomepageMenuOpen, setNewHomepageMenuOpen] = useState(false);
-  // If EventPicker's listAllEvents() fails, fail over to ManualEventLookup (sticky per
-  // open, not per keystroke). Scoped to the env that failed — switching env clears it,
-  // since failure on one tier says nothing about another.
+  // Fails over to ManualEventLookup if EventPicker's listAllEvents() fails; cleared on env switch.
   const [browseFailed, setBrowseFailed] = useState(false);
 
   useEffect(() => setBrowseFailed(false), [envName]);
@@ -191,31 +175,23 @@ export default function Library() {
     setPickerOpen(true);
   }, []);
 
-  // Restores the ESP env this row was created against before opening it —
-  // a full page reload resets EventEnvContext's override to its default
-  // (prod), so without this an edit of a non-prod-authored row would
-  // silently refetch its session catalog from the wrong tier.
+  // Restores the row's authored env — a reload resets EventEnvContext's override to prod.
   const openEdit = useCallback((row) => {
     setEnv(row.eventServiceEnv || 'prod');
     startEditConfig(row);
     goToEditor();
   }, [setEnv, startEditConfig, goToEditor]);
 
-  // Event-ID+type collision guard: picking an event that already has a Global
-  // row routes to Edit for that row instead of creating a second one — Global
-  // is genuinely one config per Event ID (PLAN.md Phase 4). Homepage config
-  // types are exempt: a single event can carry several named Upcoming/Featured
-  // Sessions configs side by side (see `configName`), so New always creates a
-  // fresh row there regardless of what already exists for that event+type.
   const handlePickEvent = useCallback((event) => {
     setPickerOpen(false);
     const isNewFlow = pickerMode !== 'duplicate' || !duplicateSource;
-    const guardApplies = isNewFlow && pendingConfigType === CONFIG_TYPES.GLOBAL;
-    const existing = guardApplies ? findConfigByEventId(event.eventId, pendingConfigType) : null;
-    if (existing) {
-      setToastSuccess('A config already exists for this event — editing it');
-      openEdit(existing);
-      return;
+    if (isNewFlow && pendingConfigType === CONFIG_TYPES.GLOBAL) {
+      const existingCount = configs.filter(
+        (row) => row.eventId === event.eventId && (row.configType || CONFIG_TYPES.GLOBAL) === CONFIG_TYPES.GLOBAL,
+      ).length;
+      if (existingCount > 0) {
+        setToastSuccess(`This event already has ${existingCount} Global config${existingCount === 1 ? '' : 's'} — creating another one. Give it a name so it's easy to tell them apart.`);
+      }
     }
     if (pickerMode === 'duplicate' && duplicateSource) {
       startDuplicateConfig(duplicateSource, event, envName);
@@ -224,7 +200,7 @@ export default function Library() {
     }
     goToEditor();
   }, [
-    findConfigByEventId, openEdit, pickerMode, pendingConfigType, duplicateSource, envName,
+    configs, pickerMode, pendingConfigType, duplicateSource, envName,
     startDuplicateConfig, startNewConfig, goToEditor, setToastSuccess,
   ]);
 
@@ -233,15 +209,9 @@ export default function Library() {
     window.lana?.log(`tier-1-event-configurator: EventPicker failed, falling back to ManualEventLookup. ${message}`);
   }, []);
 
-  // Homepage rows aren't pasted into tier-1-event-config as JSON — they're shared as the
-  // single authored link decoded by upcoming-sessions.js/featured-sessions.js, same as
-  // ConfigEditor.js's own "Copy Link" button (copyHomepageConfigLink is the shared
-  // implementation both call, so a link copied from either place is identical).
   const handleCopyHomepageLink = useCallback(async (row) => {
     const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[row.configType];
-    // The button is disabled until this row's key is in readyCatalogKeys, so this is always
-    // already resolved (and cached) by the time a click can happen — no fresh fetch (and no
-    // stale clipboard activation) is possible here.
+    // Disabled until readyCatalogKeys has this row's key, so this is always already resolved.
     const result = await getSessionCatalogForRow(row);
     if (!result.ok) {
       setToastError('Could not load this event\'s sessions — copy the link from the editor instead');
@@ -253,8 +223,7 @@ export default function Library() {
   }, [org, repo, getSessionCatalogForRow, setToastSuccess, setToastError]);
 
   const handleCopyGlobalConfig = useCallback(async (row) => {
-    // Minified, not stringifyConfig's pretty-printed form: DA joins a metadata cell's
-    // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
+    // Minified: DA joins a multi-line metadata cell with ", ", corrupting pretty-printed JSON.
     const ok = await copyTextToClipboard(JSON.stringify(row.config));
     if (!ok) {
       setToastError('Could not copy config — copy it manually from the editor instead');
@@ -291,7 +260,7 @@ export default function Library() {
           <span class="tec-library__group-icon" aria-hidden="true">🌐</span>
           <div class="tec-library__group-heading">
             <h2>Global Configs <span class="tec-library__group-badge tec-library__group-badge--global">Global</span></h2>
-            <p class="tec-library__group-desc">Per-event configs used across the event experience (e.g., Session Guide, Event App, etc.).</p>
+            <p class="tec-library__group-desc">Per-event configs used across the event experience (e.g., Session Guide, Event App, etc.). An event can have more than one — name each one (Config name) to tell them apart.</p>
           </div>
           <button type="button" class="tec-btn tec-btn--primary" onClick=${openNewGlobalPicker}>New config</button>
         </div>
@@ -317,7 +286,13 @@ export default function Library() {
             <p class="tec-library__group-desc">Configs for homepage specific blocks like Upcoming Sessions and Featured Sessions.</p>
           </div>
           <div class="tec-library__new-menu">
-            <button type="button" class="tec-btn tec-btn--primary" onClick=${() => setNewHomepageMenuOpen((open) => !open)}>
+            <button
+              type="button"
+              class="tec-btn tec-btn--primary"
+              aria-haspopup="menu"
+              aria-expanded=${String(newHomepageMenuOpen)}
+              onClick=${() => setNewHomepageMenuOpen((open) => !open)}
+            >
               New config ▾
             </button>
             ${newHomepageMenuOpen && html`
