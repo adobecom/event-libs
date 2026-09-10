@@ -422,7 +422,10 @@ can never appear alongside the login/registration toast, and never on an `Open` 
 Tiles (colored product logo + name + ↗ arrow) from the `Product` custom-attribute. Icon
 and page link per product come from the Tier 1 Event Configurator's `products` map
 (`getProduct` → `{ icon, pageUrl }`); logos are colored SVGs resolved via
-`fetchFederalProductIcon`. Icons only render for products present in that map. A product
+`fetchFederalProductIcon`. The icon slot is rendered **only** when the product has a
+configured icon that resolves — a product with no icon (e.g. `Not Product Specific`) or one
+whose icon fails to resolve renders label-only, with no reserved blank space
+([MWPW-206819](https://jira.corp.adobe.com/browse/MWPW-206819)). A product
 with no `pageUrl` renders as a non-interactive `<span>` rather than a fake link. Count
 shown next to the title; 2-col grid; links open in a new tab.
 
