@@ -6,7 +6,7 @@
 // (utils.js) instead of loading imslib and polling for window.adobeIMS — so the RF call fires the
 // instant the IMS token is available, with no custom event dance and no polling.
 
-import { getEventServiceEnv, waitForAdobeIMS } from './utils.js';
+import { getEventConfig, waitForAdobeIMS } from './utils.js';
 
 const DEFAULT_RESULT = { isRegistered: false };
 const TTL_REGISTERED_MS = 24 * 60 * 60 * 1000;
@@ -122,7 +122,11 @@ async function fetchAndCacheAuth(eventCode, userId) {
   const accessToken = window.adobeIMS.getAccessToken()?.token;
   if (!accessToken) return null;
 
-  const domainSuffix = getEventServiceEnv()?.name === 'prod' ? '' : '.stage';
+  // www[.stage].adobe.com is an adobe.com PAGE domain, so it tracks Milo's page env (the domain
+  // the page is served from), not the ESP service env. This is the same source the rest of
+  // event-libs uses for prod/stage host decisions (session-store, sessions-api, mobile-rider), and
+  // matches the da-events original (getConfig()?.env?.name).
+  const domainSuffix = getEventConfig()?.miloConfig?.env?.name === 'prod' ? '' : '.stage';
   const url = `https://www${domainSuffix}.adobe.com/events/api/rf-auth-seq-generic/${eventCode}?user_id=${encodeURIComponent(userId)}`;
   try {
     const response = await fetch(url, {

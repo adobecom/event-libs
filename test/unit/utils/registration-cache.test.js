@@ -11,7 +11,11 @@ import {
   exposeRegistrationStatus,
   setEventOriginCookie,
 } from '../../../event-libs/v1/utils/registration-cache.js';
-import { setEventServiceEnvOverride } from '../../../event-libs/v1/utils/utils.js';
+import { setEventConfig } from '../../../event-libs/v1/utils/utils.js';
+
+// The RF-auth URL's stage/prod host is chosen from Milo's page env (getEventConfig().miloConfig
+// .env.name), so stub that via setEventConfig rather than the ESP service env.
+const setMiloEnv = (name) => setEventConfig({}, { env: { name } });
 
 const EVENT_CODE = 'max2025';
 const USER_ID = 'user-123';
@@ -38,13 +42,12 @@ describe('registration-cache', () => {
     sessionStorage.clear();
     delete window.adobeIMS;
     delete window.events;
-    setEventServiceEnvOverride('stage');
+    setMiloEnv('stage');
   });
 
   afterEach(() => {
     clearCookie(`feds_${EVENT_CODE}_registeredByRedirect`);
     delete window.fetch;
-    setEventServiceEnvOverride(null);
   });
 
   describe('status cache (localStorage: isRegistered/inPersonAttendee)', () => {
@@ -198,8 +201,8 @@ describe('registration-cache', () => {
       expect(result.isRegistered).to.equal(false);
     });
 
-    it('builds a .stage RF URL off getEventServiceEnv when not prod', async () => {
-      setEventServiceEnvOverride('stage');
+    it('builds a .stage RF URL off Milo page env when not prod', async () => {
+      setMiloEnv('stage');
       window.adobeIMS = signedInIms();
       let calledUrl = '';
       window.fetch = async (url) => {
@@ -211,8 +214,8 @@ describe('registration-cache', () => {
       expect(calledUrl).to.include('https://www.stage.adobe.com/events/api/rf-auth-seq-generic/');
     });
 
-    it('builds a prod RF URL (no .stage) when env is prod', async () => {
-      setEventServiceEnvOverride('prod');
+    it('builds a prod RF URL (no .stage) when Milo page env is prod', async () => {
+      setMiloEnv('prod');
       window.adobeIMS = signedInIms();
       let calledUrl = '';
       window.fetch = async (url) => {
