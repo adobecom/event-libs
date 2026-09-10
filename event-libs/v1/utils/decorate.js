@@ -31,6 +31,7 @@ import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
 import { initTierOneEventConfig } from './tier-1-event-config.js';
+import { exposeRegistrationStatus, setEventOriginCookie } from './registration-cache.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -1242,6 +1243,18 @@ export function decorateEvent(parent) {
     initTierOneEventConfig();
     initSessionState();
   }
+
+  // Kick off registration-status resolution as early as possible — independent of MEP and of
+  // event-id (a page can carry event-code without event-id). Fire-and-forget: it never blocks
+  // decoration, and it exposes window.events.getRegistrationStatus/getRegistrationDetails for FEDS/
+  // GNAV/in-person-banner. The RF call fires the instant IMS is ready (reactive waitForAdobeIMS,
+  // no polling). Runs before the event-id return below so event-code-only pages still resolve.
+  const eventCode = getMetadata('event-code');
+  if (eventCode) {
+    setEventOriginCookie();
+    exposeRegistrationStatus(eventCode);
+  }
+
   if (!getMetadata('event-id')) return;
 
   // Hydrate metadata with user-friendly transformations
