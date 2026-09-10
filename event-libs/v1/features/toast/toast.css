@@ -36,7 +36,7 @@
   transition: opacity 400ms ease, transform 400ms ease;
   display: flex;
   align-items: flex-start;
-  width: min(600px, calc(100vw - 32px));
+  width: min(485px, calc(100vw - 32px));
   min-width: 220px;
   border-radius: 10px;
   font-family: var(--s2a-font-family-adobe-clean);
