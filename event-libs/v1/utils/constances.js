@@ -84,7 +84,7 @@ const SESSION_CATALOG_CDN_MAP = {
   dev: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
   local: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
   stage: 'https://events-platform-stage-cdn.aws125.adobeitc.com',
-  prod: 'https://events-platform-cdn.aws122.adobeitc.com',
+  prod: 'https://events-platform-prod-cdn.aws122.adobeitc.com',
 };
 
 // The only call sites that should ever read SESSION_CATALOG_CDN_MAP — every session-catalog

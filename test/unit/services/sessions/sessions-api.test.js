@@ -1241,7 +1241,7 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.equal('https://events-platform-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
+    expect(url).to.equal('https://events-platform-prod-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
   });
 
   it('fetches from the stage CDN domain on stage', async () => {
