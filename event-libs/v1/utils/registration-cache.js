@@ -2,12 +2,15 @@
 // on the RainFocus (RF) call. Ported from da-events (PR #51/#64) into event-libs so this library
 // owns the resolution and exposes it on `window.events` for consumers (FEDS/GNAV showing/hiding
 // the Register button, sessionGuide, in-person-banner). The ONLY behavioral change from the
-// da-events original: IMS readiness comes from Milo's memoized loadIms() (which resolves on
-// imslib's onReady, after the profile is populated) instead of loading imslib ourselves and
-// polling for window.adobeIMS — so the RF call fires as soon as the profile is ready, with no
-// custom event dance and no polling.
+// da-events original: IMS readiness comes from event-libs' reactive waitForAdobeIMS() observer
+// (utils.js) instead of loading imslib and polling for window.adobeIMS.
+//
+// KNOWN ISSUE (to fix): waitForAdobeIMS() resolves as soon as window.adobeIMS exists with a
+// getAccessToken method — which is BEFORE imslib finishes loading the profile. So on a first login
+// getProfile().userId comes back undefined and we bail with no RF call; it only works from the
+// second load. Proper fix is to await Milo's loadIms() (resolves on imslib onReady = profile ready).
 
-import { getEventConfig, LIBS } from './utils.js';
+import { getEventConfig, waitForAdobeIMS } from './utils.js';
 
 const DEFAULT_RESULT = { isRegistered: false };
 const TTL_REGISTERED_MS = 24 * 60 * 60 * 1000;
@@ -111,8 +114,7 @@ export function setEventOriginCookie() {
 // registration check uses (libs/features/mep/addons/event.js), and it's memoized — it reuses the
 // IMS init the host already kicked off, so there's no extra imslib load and no polling.
 async function getUserId() {
-  const { loadIms } = await import(`${LIBS}/utils/utils.js`);
-  await loadIms().catch(() => {});
+  await waitForAdobeIMS();
   if (!window.adobeIMS?.isSignedInUser?.()) return false;
   try {
     const { userId } = await window.adobeIMS.getProfile();
