@@ -106,11 +106,14 @@ export function setEventOriginCookie() {
 // custom event/poll: the moment the token is available, the caller fires the RF call.
 async function getUserId() {
   await waitForAdobeIMS().catch(() => {});
+  console.log('[reg-cache] IMS ready; isSignedInUser =', window.adobeIMS?.isSignedInUser?.()); // TEMP DEBUG
   if (!window.adobeIMS?.isSignedInUser?.()) return false;
   try {
     const { userId } = await window.adobeIMS.getProfile();
+    console.log('[reg-cache] resolved userId =', userId); // TEMP DEBUG
     return userId;
-  } catch {
+  } catch (e) {
+    console.log('[reg-cache] getProfile() failed:', e); // TEMP DEBUG
     return false;
   }
 }
@@ -120,6 +123,7 @@ async function getUserId() {
 // decide whether/how to write that themselves.
 async function fetchAndCacheAuth(eventCode, userId) {
   const accessToken = window.adobeIMS.getAccessToken()?.token;
+  console.log('[reg-cache] fetchAndCacheAuth: accessToken present =', !!accessToken); // TEMP DEBUG
   if (!accessToken) return null;
 
   // www[.stage].adobe.com is an adobe.com PAGE domain, so it tracks Milo's page env (the domain
@@ -128,6 +132,7 @@ async function fetchAndCacheAuth(eventCode, userId) {
   // matches the da-events original (getConfig()?.env?.name).
   const domainSuffix = getEventConfig()?.miloConfig?.env?.name === 'prod' ? '' : '.stage';
   const url = `https://www${domainSuffix}.adobe.com/events/api/rf-auth-seq-generic/${eventCode}?user_id=${encodeURIComponent(userId)}`;
+  console.log('[reg-cache] calling RF API →', url); // TEMP DEBUG
   try {
     const response = await fetch(url, {
       method: 'GET',
@@ -158,9 +163,13 @@ async function fetchAndCacheAuth(eventCode, userId) {
 
 export async function fetchRegistrationStatus(eventCode) {
   const userId = await getUserId();
-  if (!userId) return DEFAULT_RESULT;
+  if (!userId) {
+    console.log('[reg-cache] no userId (not signed in) → default not-registered, no API call'); // TEMP DEBUG
+    return DEFAULT_RESULT;
+  }
 
   if (justRegistered(eventCode)) {
+    console.log('[reg-cache] redirect-cookie fast path: isRegistered:true without a status call (warming auth in background)'); // TEMP DEBUG
     clearRegisteredFlag(eventCode);
     const data = { isRegistered: true };
     writeCache(eventCode, userId, data);
@@ -174,14 +183,23 @@ export async function fetchRegistrationStatus(eventCode) {
 
   const cachedStatus = readCache(eventCode, userId);
   const cachedAuth = readAuthCache(eventCode, userId);
-  if (cachedStatus && cachedAuth) return { ...cachedStatus, ...cachedAuth };
+  if (cachedStatus && cachedAuth) {
+    console.log('[reg-cache] SERVED FROM CACHE (no API call):', { ...cachedStatus, ...cachedAuth }); // TEMP DEBUG
+    return { ...cachedStatus, ...cachedAuth };
+  }
+  console.log('[reg-cache] cache miss (cachedStatus =', cachedStatus, ', cachedAuth =', cachedAuth, ') → calling RF API'); // TEMP DEBUG
 
   const auth = await fetchAndCacheAuth(eventCode, userId);
-  if (!auth) return cachedStatus || DEFAULT_RESULT;
+  if (!auth) {
+    console.log('[reg-cache] API returned nothing → falling back to', cachedStatus || DEFAULT_RESULT); // TEMP DEBUG
+    return cachedStatus || DEFAULT_RESULT;
+  }
 
   writeCache(eventCode, userId, auth.status);
 
-  return { ...auth.status, authToken: auth.authToken, userKey: auth.userKey };
+  const result = { ...auth.status, authToken: auth.authToken, userKey: auth.userKey };
+  console.log('[reg-cache] SERVED FROM API and cached:', result); // TEMP DEBUG
+  return result;
 }
 
 export async function preloadRegistrationStatus(eventCode) {
