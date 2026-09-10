@@ -757,7 +757,7 @@ function matchesSearch(session, q) {
 **Goal:** A standalone block that shares all components with the widget.
 
 ### 9.1 Full page surface ✅
-There **is** a separate block entry, `sessions-guide-full-page.js`, registered as its own `EVENT_BLOCKS` name (`'sessions-guide-full-page'`) alongside `'sessions-guide'` — this section previously claimed otherwise, which was already stale before this refactor. Authors write either `sessions-guide (page)` (surface detected from the `page` class, same block as the widget) or a dedicated `sessions-guide-full-page` block (surface forced to `'page'` in its own `parseConfig()`). Both entry points mount the same `SessionGuideProvider`/`App` tree and read `registerUrl` from the shared `session-store.js` the same way.
+There **is** a separate block entry, `sessions-guide-full-page.js`, registered as its own `EVENT_BLOCKS_C2` name (`'sessions-guide-full-page'`) alongside `'sessions-guide'` — this section previously claimed otherwise, which was already stale before this refactor. It lives in its own `v1/c2/blocks/sessions-guide-full-page/` folder (Milo requires `<base>/blocks/<name>/<name>.js`; it 404s silently if the file sits under a different block's folder) and imports the shared store/components/utils back from `../sessions-guide/`. Authors write either `sessions-guide (page)` (surface detected from the `page` class, same block as the widget) or a dedicated `sessions-guide-full-page` block (surface forced to `'page'` in its own `parseConfig()`). Both entry points mount the same `SessionGuideProvider`/`App` tree and read `registerUrl` from the shared `session-store.js` the same way.
 
 `FullPageShell` renders `DrawerHeader` (with `hideClose={true}`) + `ViewRouter` + optional `FilterPanel`.
 
@@ -1217,9 +1217,14 @@ event-libs/v1/services/sessions/  # SHARED service layer (moved out of this bloc
   session-actions.js              # toggleScheduleAction, toggleFavoriteAction, hasTimeConflict, resolveScheduleConflict, SessionActionError — UI-agnostic; throws instead of dispatching toasts
   action-feedback.js              # runSessionAction(), toggleScheduleWithFeedback(), toggleFavoriteWithFeedback() — translate SessionActionError into showToast()/showConflictModal() calls; no dispatch argument, usable by any block
 
+event-libs/v1/c2/blocks/sessions-guide-full-page/
+  sessions-guide-full-page.js     # separate block entry, registered as 'sessions-guide-full-page' in EVENT_BLOCKS_C2; forces surface='page'.
+                                   # Own folder is required — Milo loads `<base>/blocks/<name>/<name>.js`, so this can't
+                                   # live inside sessions-guide/ despite reusing that block's store/components/utils.
+  sessions-guide-full-page.css    # `@import`s sessions-guide/sessions-guide.css (also auto-loaded by block name); full-page-only overrides go here
+
 event-libs/v1/c2/blocks/sessions-guide/
   sessions-guide.js               # block entry (widget default, page via CSS class)
-  sessions-guide-full-page.js     # separate block entry, registered as 'sessions-guide-full-page' in EVENT_BLOCKS; forces surface='page'
   sessions-guide.css              # all styles
   PLAN.md                         # this document
   REAL-API-CHECKLIST.md           # current mock → real API status
