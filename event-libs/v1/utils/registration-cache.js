@@ -115,7 +115,7 @@ async function getUserId() {
   await loadIms().catch(() => {});
   if (!window.adobeIMS?.isSignedInUser?.()) return false;
   try {
-    const { userId } = await window.adobeIMS.getProfile();
+    const { userId } = window.adobeIMS.getProfile();
     console.debug('registration-cache: got userId', userId);
     return userId;
   } catch {
