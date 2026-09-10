@@ -48,10 +48,10 @@ export function nextBoundary(nowMs, slots) {
   return points.length ? Math.min(...points) : null;
 }
 
-export function formatDateTime(ms, timeZone) {
-  const date = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone }).format(ms);
+export function formatDateTime(ms) {
+  const date = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(ms);
   const time = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short', timeZone,
+    hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short',
   }).format(ms);
   return `${date}, ${time}`;
 }
@@ -122,7 +122,7 @@ export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc =
   } else if (state === 'on-demand') {
     el.textContent = labels.onDemand;
   } else {
-    el.textContent = formatDateTime(times.start, times.timezone);
+    el.textContent = formatDateTime(times.start);
   }
   return el;
 }
