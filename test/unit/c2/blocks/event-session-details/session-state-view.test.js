@@ -202,6 +202,12 @@ describe('session-state-view', () => {
       expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
     });
 
+    it('IPOD with a recording but the session has not ended yet -> Available soon', () => {
+      setMetadata('custom-attributes', JSON.stringify([{ name: 'Format', values: IPOD }]));
+      setMetadata('session-times', JSON.stringify([{ endTimeMillis: Date.now() + 3600000, videos: [MPC_RECORDING] }]));
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
+    });
+
     it('IPOD with only a leftover liveStream entry -> Available soon', () => {
       setPage({
         videos: [{ provider: 'youtube', url: 'https://youtube.com/watch?v=x', kind: 'liveStream' }],
@@ -398,12 +404,12 @@ describe('session-state-view', () => {
       expect(statusSlot.textContent).to.equal('Available soon');
     });
 
-    it('IPOD session with a recording shows On-demand and still no CTA', () => {
+    it('IPOD session with a recording, once ended, shows On-demand and still no CTA', () => {
       ipodFormat();
-      const start = Date.now() + 150;
+      const start = Date.now() - 3600000;
       setMetadata('session-times', JSON.stringify([{
         startTimeMillis: start,
-        endTimeMillis: start + 3600000,
+        endTimeMillis: start + 60000,
         timezone: 'UTC',
         videos: [{ provider: 'mpc', url: 'x', kind: 'onDemand' }],
       }]));

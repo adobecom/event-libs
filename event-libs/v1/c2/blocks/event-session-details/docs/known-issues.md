@@ -59,12 +59,13 @@ one change — or, as a standalone ask to Sekhar / RainFocus, add
 **Files:** `c2/blocks/video-player/video-player.js` (`currentSessionHasEnded`) —
 on the unmerged **`latest-playlist`** branch, not on `dev`
 
-**Resolved since first written:** `pickEmbeddableVideo()` used to accept any `kind` and
-return the first embeddable entry by array order, which meant the youtube `liveStream` at
-index 0 won over the mpc `onDemand` on the real MPC template. It now resolves
-`.find((v) => v.kind === 'onDemand')`, so that defect is gone, and
-`hasPlayableVideo()` has been aligned to the same `kind === 'onDemand'` test — the two
-predicates are now identical and cannot disagree.
+**Eyebrow ↔ player alignment.** The eyebrow's `hasPlayableVideo()` reuses the player's own
+`currentSessionHasEnded()` time gate (from `c2/utils/video-session.js`), so it can no longer read
+`On-demand` before the player would mount the video (the mismatch seen on fixture 1003: recording
+present, session dated in the future). It keeps a stricter `kind === 'onDemand'` filter that the dev
+player's provider-only `findEmbeddableVideos()` lacks; that residual divergence — a `liveStream`/`dvr`
+-only ended session reads `Available soon` while the player would embed it — is covered in the block
+README, and folding a `kind` filter into `findEmbeddableVideos()` would re-align both.
 
 **Still open:** the player's post-event gate is
 `nowMs >= sessionTimes[0].endTimeMillis`, reading the array **unsorted**. RainFocus does not

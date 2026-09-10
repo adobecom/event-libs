@@ -1,6 +1,7 @@
 import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
 import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
+import { currentSessionHasEnded, EMBEDDABLE_PROVIDERS } from '../../utils/video-session.js';
 import { renderSchedule } from './schedule.js';
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
@@ -55,8 +56,6 @@ export function formatDateTime(ms, timeZone) {
   return `${date}, ${time}`;
 }
 
-const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
-
 export function hasPlayableVideo(doc = document) {
   let entries;
   try {
@@ -64,6 +63,7 @@ export function hasPlayableVideo(doc = document) {
   } catch {
     return false;
   }
+  if (!currentSessionHasEnded(entries, getNowMs())) return false;
   return (entries || [])
     .flatMap((t) => t?.videos || [])
     .some((v) => EMBEDDABLE_PROVIDERS.includes(v?.provider) && v?.kind === 'onDemand');
