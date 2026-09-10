@@ -1260,8 +1260,6 @@ describe('additional event site tracks', () => {
   });
 });
 
-// MWPW-206486: session-catalog is fronted by a CDN, per env. Every other ESP call (auth,
-// myData, add/removeSession, ...) is untouched — this only covers fetchSessions' own host.
 describe('fetchSessions CDN routing (MWPW-206486)', () => {
   let sandbox;
 
@@ -1310,8 +1308,7 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
   });
 
-  // dev02/stage02 are one-off ethos test deploys with no CDN distribution of their own —
-  // session-catalog falls back to their existing origin, unchanged.
+  // dev02/stage02 have no CDN — fall back to origin ESP.
   it('falls back to the origin ESP host on dev02, which has no CDN', async () => {
     setEventServiceEnvOverride('dev02');
     const fetchStub = stubEmptyCatalog();

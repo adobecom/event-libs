@@ -409,9 +409,7 @@ export function mapEslPayloadToRawSessions(payload) {
   return mapped;
 }
 
-// `/session-catalog` is a confirmed-public ESP endpoint — no auth token or group-id
-// header required (skipAuth: true), same pattern as esp-controller.js's getEspEvent().
-// Fronted by a CDN (MWPW-206486) — see sessionCatalogHost() in constances.js.
+// Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost.
 async function fetchEslSessions(eventId) {
   const options = await constructRequestOptions('GET', null, false, true);
   const res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, options);

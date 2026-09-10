@@ -808,9 +808,6 @@ describe('Adobe Event Service API', () => {
       }
     });
 
-    // MWPW-206486: session-catalog is fronted by a CDN, per env — every other ESP call
-    // (getEspEvent/listEvents/etc., covered elsewhere in this file) is unaffected and keeps
-    // hitting the origin host.
     describe('CDN routing (MWPW-206486)', () => {
       afterEach(() => setEventServiceEnvOverride(null));
 
@@ -846,8 +843,7 @@ describe('Adobe Event Service API', () => {
         expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
       });
 
-      // dev02/stage02 are one-off ethos test deploys with no CDN distribution of their
-      // own — session-catalog falls back to their existing origin, unchanged.
+      // dev02/stage02 have no CDN — fall back to origin ESP.
       it('falls back to the origin ESP host on dev02, which has no CDN', async () => {
         setEventServiceEnvOverride('dev02');
         const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
