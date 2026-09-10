@@ -7,6 +7,22 @@ import {
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
 
+// Simulates the viewer's browser-local timezone for a run of code: injects a default
+// `timeZone` into any Intl.DateTimeFormat call that doesn't already pass one explicitly,
+// so an explicit override (e.g. a regression that reintroduces the session's authored
+// venue timezone) still wins, exactly like a real browser's ambient default would.
+function withViewerTimezone(tz, run) {
+  const OriginalDateTimeFormat = Intl.DateTimeFormat;
+  Intl.DateTimeFormat = function DateTimeFormat(locale, options) {
+    return new OriginalDateTimeFormat(locale, { timeZone: tz, ...options });
+  };
+  try {
+    return run();
+  } finally {
+    Intl.DateTimeFormat = OriginalDateTimeFormat;
+  }
+}
+
 describe('session-state-view', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
@@ -149,18 +165,44 @@ describe('session-state-view', () => {
   });
 
   describe('formatDateTime', () => {
-    it('formats short month + time + tz abbreviation', () => {
-      expect(formatDateTime(1794518100000, 'America/Los_Angeles')).to.equal('Nov 12, 1:15 PM PST');
+    // Nov 12, 2026 21:15 UTC — well clear of the Nov 1, 2026 US DST-end transition, so
+    // America/New_York (EST) and America/Chicago (CST) are both in stable standard time,
+    // exactly 1 hour apart: 'Nov 12, 4:15 PM EST' vs 'Nov 12, 3:15 PM CST'.
+    const ms = 1794518100000;
+
+    it('formats short month + time + tz abbreviation in the viewer\'s local timezone', () => {
+      const result = withViewerTimezone('America/New_York', () => formatDateTime(ms));
+      expect(result).to.equal('Nov 12, 4:15 PM EST');
+    });
+
+    // Regression guard for MWPW-206824: the session's authored venue timezone must not
+    // leak back into the display, which should always auto-detect the viewer's own zone.
+    it('does not render in an explicitly-authored venue timezone', () => {
+      const result = withViewerTimezone('America/New_York', () => formatDateTime(ms));
+      const venueFormatted = new Intl.DateTimeFormat('en-US', {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short', timeZone: 'America/Chicago',
+      }).format(ms); // 'Nov 12, 3:15 PM CST'
+      expect(result).to.not.equal(venueFormatted);
+    });
+
+    it('ignores any extra timezone argument', () => {
+      const withoutExtraArg = withViewerTimezone('America/New_York', () => formatDateTime(ms));
+      const withExtraArg = withViewerTimezone('America/New_York', () => formatDateTime(ms, 'America/Los_Angeles'));
+      expect(withExtraArg).to.equal(withoutExtraArg);
     });
   });
 
   describe('renderStatus', () => {
-    const times = { start: 1794518100000, timezone: 'America/Los_Angeles' };
+    // Authored/venue timezone (America/Chicago) differs from the simulated viewer
+    // timezone (America/New_York) so a leaked venue timezone is visibly wrong, not
+    // coincidentally correct.
+    const times = { start: 1794518100000, timezone: 'America/Chicago' };
 
-    it('upcoming renders the date/time', () => {
-      const el = renderStatus('upcoming', times);
+    it('upcoming renders the date/time in the viewer\'s local timezone, not the authored venue timezone', () => {
+      const el = withViewerTimezone('America/New_York', () => renderStatus('upcoming', times));
       expect(el.classList.contains('session-status--upcoming')).to.be.true;
-      expect(el.textContent).to.equal('Nov 12, 1:15 PM PST');
+      expect(el.textContent).to.equal('Nov 12, 4:15 PM EST');
+      expect(el.textContent).to.not.equal('Nov 12, 3:15 PM CST');
     });
 
     it('live renders a dot + Live', () => {
@@ -434,6 +476,33 @@ describe('session-state-view', () => {
       mountSessionState({ statusSlot, primaryCtaSlot });
       expect(statusSlot.querySelector('.session-status--upcoming')).to.not.be.null;
       expect(primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
+    });
+
+    // End-to-end regression guard for MWPW-206824: exercises the real mount -> apply ->
+    // renderStatus -> formatDateTime path (not just the isolated function), confirming the
+    // authored venue timezone never leaks into what actually lands in the DOM. The start
+    // time is offset from Date.now() (not a fixed calendar date) so the test stays valid
+    // regardless of when it runs, and America/New_York vs America/Chicago are always
+    // exactly 1 hour apart (they transition DST together), so there's no seasonal edge case.
+    it('renders the upcoming time in the viewer\'s local timezone, not the authored venue timezone', () => {
+      setMetadata('session-id', 'sid');
+      onlineFormat();
+      const start = Date.now() + (10 * 24 * 60 * 60 * 1000); // 10 days out: reliably 'upcoming'
+      setMetadata('session-times', JSON.stringify([{
+        startTimeMillis: start, endTimeMillis: start + 3600000, timezone: 'America/Chicago',
+      }]));
+      const { statusSlot, primaryCtaSlot } = slots();
+
+      withViewerTimezone('America/New_York', () => mountSessionState({ statusSlot, primaryCtaSlot }));
+
+      const expected = withViewerTimezone('America/New_York', () => formatDateTime(start));
+      const venueFormatted = new Intl.DateTimeFormat('en-US', {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short', timeZone: 'America/Chicago',
+      }).format(start);
+
+      expect(statusSlot.querySelector('.session-status--upcoming')).to.not.be.null;
+      expect(statusSlot.textContent).to.equal(expected);
+      expect(statusSlot.textContent).to.not.equal(venueFormatted);
     });
 
     it('defers the CTA swap while the old CTA has focus, then flushes on focusout', async () => {
