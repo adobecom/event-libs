@@ -72,6 +72,19 @@ export const ENV_MAP = {
     },
   },
 };
+// CDN fronting session-catalog only, GET-only (MWPW-206486). dev02/stage02 have no CDN.
+const SESSION_CATALOG_CDN_MAP = {
+  dev: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
+  local: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
+  stage: 'https://events-platform-stage-cdn.aws125.adobeitc.com',
+  prod: 'https://events-platform-prod-cdn.aws122.adobeitc.com',
+};
+
+// Host for session-catalog fetches; CDN where available, else origin ESP.
+export function sessionCatalogHost(envName) {
+  return SESSION_CATALOG_CDN_MAP[envName] || ENV_MAP[envName].serviceApiEndpoints.esp;
+}
+
 export const FALLBACK_LOCALES = {
   '': { ietf: 'en-US', tk: 'hah7vzn.css' },
   ae_ar: { ietf: 'ar', tk: 'qxw8hzm.css', dir: 'rtl' },

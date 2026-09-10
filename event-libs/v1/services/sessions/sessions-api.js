@@ -1,6 +1,6 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
-import { ENV_MAP, ADOBE_PROD_HOST } from '../../utils/constances.js';
+import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
 
 // Catalog URLs always carry prod's host; on non-prod pages point them at the current origin instead.
 export function sessionPageUrlForEnv(
@@ -409,11 +409,10 @@ export function mapEslPayloadToRawSessions(payload) {
   return mapped;
 }
 
-// `/session-catalog` is a confirmed-public ESP endpoint — no auth token or group-id header required.
+// Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost.
 async function fetchEslSessions(eventId) {
-  const { serviceApiEndpoints } = ENV_MAP[getEventServiceEnv().name];
   const options = await constructRequestOptions('GET', null, false, true);
-  const res = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/session-catalog`, options);
+  const res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, options);
   if (!res.ok) {
     throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
   }
