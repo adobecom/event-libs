@@ -182,7 +182,7 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
 
 /* Positioned out of the row's flex flow (not a flex item) — it's an outlier sitting to the
    left of the thumbnail/content column, not part of its layout. Per the Figma spec, it's
-   offset 7px further left than that column's own 20px inset, i.e. 13px from the row's edge.
+   offset 7px further left than that column's own 20px inset, i.e. 7px from the row's edge.
    `top` is a fixed offset keyed to the thumbnail's own vertical center (row's 8px top padding
    + half of the icon's 48px height), not 50% of the row — the row's height now varies with its
    text content (e.g. reminder rows carry an extra start-time line), which would otherwise pull
