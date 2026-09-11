@@ -56,6 +56,9 @@ field to read, so it never waits on the catalog:
 | `live` | `now` is inside **any** slot (inclusive) | red dot + `Live` | hidden |
 | `on-demand` | anything else — after a slot, or between slots | `On-demand` / `Available soon` | shown |
 
+**Pure in-person IPOD sessions override this table entirely** — no date, no `Live`, and no CTA;
+the eyebrow reflects only whether the recording exists yet. See *In-person IPOD sessions* below.
+
 #### Authored status labels
 
 The three status **labels** are author-overridable via optional rows on the
@@ -66,7 +69,7 @@ case-insensitive; an absent or empty row falls back to the default:
 |---|---|---|
 | `Live label` | `Live` | state is `live` |
 | `On-demand label` | `On-demand` | state is `on-demand` and a recording exists |
-| `IPOD pending label` | `Available soon` | IPOD session whose recording isn't posted yet |
+| `IPOD pending label` | `Available soon` | in-person IPOD session whose recording isn't posted yet |
 
 `readStatusLabels(el)` reads these before the block clears its children; `mountSessionState`
 threads them into `renderStatus`. Because session pages are template-generated, putting these
@@ -87,6 +90,10 @@ this?" is not the same question as "is it on now?":
 | **Format has no `online`** | **none** — see below |
 | `now < finalEnd` (the latest slot's end) | Add to schedule |
 | otherwise | none |
+
+A **pure in-person IPOD** session (IPOD **and not** `online`) short-circuits this table: its CTA
+is always **none**. An IPOD session that is *also* `online` is a hybrid — it keeps the normal
+CTA logic and stays schedulable (its session time is virtual).
 
 ### Add to schedule is gated on Format `online`
 
@@ -157,33 +164,48 @@ changes across a premiere boundary is the eyebrow status and the primary CTA.
 compares against 7pm, so the 10:45–18:00 on-demand window would render **no player at all**,
 contradicting the intended behavior. Sorting there is a prerequisite; owner Hari.
 
-### "Available soon" — IPOD sessions with no recording yet
+### In-person IPOD sessions
 
-An `on-demand` session reads **"Available soon"** instead of "On-demand" when it is an IPOD
-session whose recording has not been attached. Both signals come from page metadata.
+A **pure in-person IPOD** session (`isInPersonIpodSession`) is handled specially: it drops the
+`upcoming`/`live` eyebrow (no date, no `Live`) and has **no CTA** (no Watch now, no Add to schedule).
+The eyebrow is binary — `Available soon` until the recording is available to watch, then `On-demand`:
 
-**IPOD (In-Person On Demand)** — delivered in person, then posted as a recording. There
-is **no explicit IPOD attribute**; the classifier is the `Format` custom attribute
-carrying **both** `in-person` **and** `on-demand-post-event`. Format values are compared
-on an alphanumeric-only normalization, because the same value appears as the slug
-`on-demand-post-event` and the label `On demand, post event`, and real data includes
-values with an empty label.
+| Recording available to watch? | Eyebrow | CTA | Closed captions |
+|---|---|---|---|
+| no | `Available soon` (`IPOD pending label`) | none | hidden |
+| yes | `On-demand` (`On-demand label`) | none | shown |
 
-Only IPOD qualifies because only IPOD has a real gap: an online session's recording is
-essentially its stream archive and lands immediately, whereas the real MPC template
-carries `DVR Timing (in hours)` of **772** (~32 days).
+**"Available" matches the video player's render gate.** `hasPlayableVideo()` is true only when the
+session **has ended** *and* an embeddable recording exists — the same two conditions the player uses
+to mount the video, reusing the shared `currentSessionHasEnded` + `EMBEDDABLE_PROVIDERS` from
+`c2/utils/video-session.js`. So the eyebrow can never read `On-demand` while the player shows nothing
+(the bug seen on fixture 1003: a recording present but the session dated in the future → the eyebrow
+led the player). The `On-demand` transition is therefore time-gated, unlike the `upcoming`/`live`
+distinction the IPOD path ignores. No ticker is scheduled — matching the player, which also only
+resolves on load, so neither updates across the boundary without a reload
+([MWPW-206828](https://jira.corp.adobe.com/browse/MWPW-206828)). Moot on real data: the recording
+only enters `session-times` post-event via a sync that reloads the page anyway.
 
-**Has a recording** — `hasPlayableVideo()` looks for an entry in `session-times[].videos[]`
-whose `provider` is `mpc` or `youtube` **and** whose `kind` is exactly **`onDemand`**.
+**IPOD (In-Person On Demand)** — delivered in person, then posted as a recording. There is **no
+explicit IPOD attribute**; the classifier is the `Format` custom attribute carrying **both**
+`in-person` **and** `on-demand-post-event`. Format values are compared on an alphanumeric-only
+normalization, because the same value appears as the slug `on-demand-post-event` and the label
+`On demand, post event`, and real data includes values with an empty label.
 
-This deliberately mirrors `video-player`'s `pickEmbeddableVideo()`, which resolves
-`.find((v) => v.kind === 'onDemand')` against the same providers. The eyebrow must not
-promise a recording the player would refuse to embed, so the two predicates are kept
-identical rather than merely similar — an earlier `kind !== 'liveStream'` form was looser
-and would have read "On-demand" for, say, an `mpc`/`dvr` entry that renders no player.
-Excluding `liveStream` matters on its own account too: a session keeps its livestream URL
-after it ends, and that is not the recording. Real data carries all three kinds on one
-session:
+**"Pure" means not `online`.** An IPOD session that is *also* `online` is a hybrid with a virtual
+session time — it stays on the normal state machine (date → live/Watch now → on-demand) and is
+schedulable, so it is **excluded** here: the gate is `isIpodSession && !isSchedulableSession`.
+
+Only IPOD needs this because only IPOD has a real gap: an online session's recording is essentially
+its stream archive and lands immediately, whereas the real MPC template carries
+`DVR Timing (in hours)` of **772** (~32 days).
+
+**Aligned with the player.** `hasPlayableVideo` reuses the player's own `findEmbeddableVideos`
+(provider-only: `mpc`/`youtube`, **no `kind` filter**), so the eyebrow says `On-demand` exactly when
+the player would embed a video. Per product (Sekhar): the presence of an MPC/YouTube id means there is
+an on-demand recording, so a leftover `liveStream`- or `dvr`-tagged `mpc`/`youtube` entry on an ended
+session reads `On-demand`, not `Available soon`. Only a non-embeddable provider (`mobilerider`) or no
+video at all stays pending. Real data carries all three kinds on one session:
 
 ```json
 [ { "provider": "youtube",     "kind": "liveStream", "url": "…/watch?v=…" },
@@ -191,21 +213,19 @@ session:
   { "provider": "mobilerider", "kind": "dvr",        "url": "…/video/…" } ]
 ```
 
-Behavior matrix:
-
-| Format | Recording | Status |
-|---|---|---|
-| in-person + on-demand-post-event | none | **Available soon** |
-| in-person + on-demand-post-event | present | On-demand |
-| online / post-event only / in-person only / no Format | either | On-demand |
+**Still open — DVR timing offset.** Per Sekhar the recording should appear at **session end +
+`DVR Timing (in hours)`** (e.g. the MPC template's **772h ≈ 32 days**), but `hasPlayableVideo` (and the
+player's `currentSessionHasEnded`) currently gate on session end alone, with no DVR offset. Applying
+`end + DVR` needs to happen in the shared `video-session.js` gate so the eyebrow, player, and playlist
+stay aligned — tracked toward MWPW-206782.
 
 `renderStatus` adds `session-status--ipod-pending` for the pending case; it carries no
 styling of its own, so the state is targetable if design wants it differentiated. It is named
 for the state (not the label text), so it stays accurate when the `IPOD pending label` is
 re-authored.
 
-See [known-issues.md](known-issues.md) for the `liveStream` divergence from
-`video-player` and the `mobilerider`/`dvr` question.
+See [known-issues.md](known-issues.md) for the eyebrow ↔ `video-player` alignment
+and the `mobilerider`/`dvr` question.
 
 ### Watch now destination
 
@@ -408,7 +428,10 @@ can never appear alongside the login/registration toast, and never on an `Open` 
 Tiles (colored product logo + name + ↗ arrow) from the `Product` custom-attribute. Icon
 and page link per product come from the Tier 1 Event Configurator's `products` map
 (`getProduct` → `{ icon, pageUrl }`); logos are colored SVGs resolved via
-`fetchFederalProductIcon`. Icons only render for products present in that map. A product
+`fetchFederalProductIcon`. The icon slot is rendered **only** when the product has a
+configured icon that resolves — a product with no icon (e.g. `Not Product Specific`) or one
+whose icon fails to resolve renders label-only, with no reserved blank space
+([MWPW-206819](https://jira.corp.adobe.com/browse/MWPW-206819)). A product
 with no `pageUrl` renders as a non-interactive `<span>` rather than a fake link. Count
 shown next to the title; 2-col grid; links open in a new tab.
 

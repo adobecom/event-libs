@@ -1,6 +1,7 @@
 import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
 import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
+import { currentSessionHasEnded, findEmbeddableVideos } from '../../utils/video-session.js';
 import { renderSchedule } from './schedule.js';
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
@@ -47,15 +48,13 @@ export function nextBoundary(nowMs, slots) {
   return points.length ? Math.min(...points) : null;
 }
 
-export function formatDateTime(ms, timeZone) {
-  const date = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone }).format(ms);
+export function formatDateTime(ms) {
+  const date = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(ms);
   const time = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short', timeZone,
+    hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short',
   }).format(ms);
   return `${date}, ${time}`;
 }
-
-const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
 
 export function hasPlayableVideo(doc = document) {
   let entries;
@@ -64,9 +63,8 @@ export function hasPlayableVideo(doc = document) {
   } catch {
     return false;
   }
-  return (entries || [])
-    .flatMap((t) => t?.videos || [])
-    .some((v) => EMBEDDABLE_PROVIDERS.includes(v?.provider) && v?.kind === 'onDemand');
+  if (!currentSessionHasEnded(entries, getNowMs())) return false;
+  return findEmbeddableVideos(entries).length > 0;
 }
 
 const normalizeAttr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -85,6 +83,10 @@ function isSchedulableSession(doc = document) {
   return hasFormat(doc, 'online');
 }
 
+function isInPersonIpodSession(doc = document) {
+  return isIpodSession(doc) && !isSchedulableSession(doc);
+}
+
 export const DEFAULT_STATUS_LABELS = { live: 'Live', onDemand: 'On-demand', ipodPending: 'Available soon' };
 
 const STATUS_LABEL_ROWS = { live: 'live-label', onDemand: 'on-demand-label', ipodPending: 'ipod-pending-label' };
@@ -101,6 +103,14 @@ export function readStatusLabels(el) {
 }
 
 export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc = document) {
+  if (isInPersonIpodSession(doc)) {
+    const available = hasPlayableVideo(doc);
+    const el = createTag('span', {
+      class: `session-status session-status--${available ? 'on-demand' : 'ipod-pending'}`,
+    });
+    el.textContent = available ? labels.onDemand : labels.ipodPending;
+    return el;
+  }
   const el = createTag('span', { class: `session-status session-status--${state}` });
   if (state === 'live') {
     el.append(createTag('span', { class: 'session-status-dot', 'aria-hidden': 'true' }));
@@ -108,11 +118,9 @@ export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc =
     liveLabel.textContent = labels.live;
     el.append(liveLabel);
   } else if (state === 'on-demand') {
-    const pending = isIpodSession(doc) && !hasPlayableVideo(doc);
-    el.classList.toggle('session-status--ipod-pending', pending);
-    el.textContent = pending ? labels.ipodPending : labels.onDemand;
+    el.textContent = labels.onDemand;
   } else {
-    el.textContent = formatDateTime(times.start, times.timezone);
+    el.textContent = formatDateTime(times.start);
   }
   return el;
 }
@@ -140,6 +148,14 @@ export function mountSessionState({
   const slots = getAllSessionTimes();
   if (!slots.length) return;
   const earliest = slots[0];
+
+  if (isInPersonIpodSession()) {
+    if (primaryCtaSlot) primaryCtaSlot.replaceChildren();
+    if (statusSlot) statusSlot.replaceChildren(renderStatus(null, earliest, statusLabels));
+    if (ccEl) ccEl.hidden = !hasPlayableVideo();
+    return;
+  }
+
   const finalEnd = Math.max(...slots.map(({ end }) => end));
 
   const scheduleBtn = isSchedulableSession() ? renderSchedule() : null;

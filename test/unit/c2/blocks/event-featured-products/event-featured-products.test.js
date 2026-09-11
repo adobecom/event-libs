@@ -7,8 +7,9 @@ import init from '../../../../../event-libs/v1/c2/blocks/event-featured-products
 // first load, so keep it constant and vary only the Product attribute per test.
 const CONFIG = {
   products: {
-    Photoshop: { icon: 'photoshop', pageUrl: 'https://www.adobe.com/products/photoshop' },
-    Illustrator: { icon: 'illustrator' }, // icon, no pageUrl
+    Photoshop: { icon: 'photoshop-64', pageUrl: 'https://www.adobe.com/products/photoshop' },
+    Illustrator: { icon: 'frame-io-64' }, // icon (resolves in mock), no pageUrl
+    'Not Product Specific': {}, // no icon, no pageUrl
   },
 };
 
@@ -87,6 +88,17 @@ describe('Featured Products', () => {
     expect(tile.tagName).to.equal('SPAN');
     expect(tile.querySelector('.featured-product-name').textContent).to.equal('Unknown Product');
     expect(tile.querySelector('.featured-product-arrow')).to.be.null;
+    expect(tile.querySelector('.featured-product-icon')).to.be.null;
+  });
+
+  it('omits the icon slot for a product with no icon so the label fills the space', async () => {
+    setProducts(['Not Product Specific']);
+    const el = block();
+    await init(el);
+    const tile = el.querySelector('.featured-product-tile');
+    expect(tile.querySelector('.featured-product-icon')).to.be.null;
+    expect(tile.querySelector('.featured-product-name').textContent).to.equal('Not Product Specific');
+    expect(tile.firstElementChild.classList.contains('featured-product-name')).to.be.true;
   });
 
   it('shows a working Show more toggle only when over the limit (6)', async () => {
