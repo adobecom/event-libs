@@ -47,4 +47,11 @@ describe('isDvrPending', () => {
     expect(isDvrPending({ dvrDelayHours: null }, EVENT_START, EVENT_START)).to.be.false;
     expect(isDvrPending(session, EVENT_START, null)).to.be.false;
   });
+
+  // Mobile Rider livestreamed sessions have no delay window to wait out — DVR is available
+  // the moment the stream ends, so dvrDelayHours never gates them, even mid-window.
+  it('is false for a Mobile Rider livestreamed session, even before its window would open', () => {
+    const mrSession = { ...session, mrStreamId: 'QqsopWFnrC' };
+    expect(isDvrPending(mrSession, EVENT_START + 9 * HOUR, EVENT_START)).to.be.false;
+  });
 });

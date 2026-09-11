@@ -1,24 +1,22 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
-import { renderTrackTags } from './track-tags.js';
 import { renderGdprCopy, renderClosedCaption, renderLegalDisclaimer } from './disclaimer-cc-legal.js';
 import { renderDescriptionClamp } from './description-clamp.js';
 import { renderQuickFacts } from './quick-facts.js';
 import { renderShare } from './share.js';
 import { renderFavorite } from './favorite.js';
-import { mountSessionState } from './session-state-view.js';
+import { mountSessionState, readStatusLabels } from './session-state-view.js';
 
 export default async function init(el) {
   const background = readBackgroundConfig(el);
+  const statusLabels = readStatusLabels(el);
   el.replaceChildren();
   if (background) el.style.background = background;
 
   initTierOneEventConfig();
 
   const eyebrow = createTag('div', { class: 'session-eyebrow' });
-  const trackTags = renderTrackTags();
-  if (trackTags) eyebrow.append(trackTags);
   const statusSlot = createTag('span', {
     class: 'session-status-slot', role: 'status', 'aria-live': 'polite',
   });
@@ -42,7 +40,9 @@ export default async function init(el) {
   if (share) actions.append(share);
   el.append(actions);
 
-  mountSessionState({ statusSlot, primaryCtaSlot, ccEl: closedCaption });
+  mountSessionState({
+    statusSlot, primaryCtaSlot, ccEl: closedCaption, statusLabels,
+  });
 
   const description = renderDescriptionClamp();
   if (description) el.append(description);

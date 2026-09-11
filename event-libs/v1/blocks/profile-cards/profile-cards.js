@@ -169,7 +169,7 @@ function decorateContent(cardContainer, data) {
 
   const textContainer = createTag('div', { class: 'card-text-container' });
   const title = createTag('p', { class: 'card-title' }, data.title);
-  const name = createTag('h2', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
+  const name = createTag('h2', { class: 'card-name' }, getProfileName(data));
 
   textContainer.append(title, name);
 
@@ -198,14 +198,14 @@ function decorateContentSimple(cardContainer, data) {
   const contentContainer = createTag('div', { class: 'card-content' });
   const textContainer = createTag('div', { class: 'card-text-container' });
   const title = createTag('p', { class: 'card-title' }, data.title);
-  const name = createTag('h2', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
+  const name = createTag('h2', { class: 'card-name' }, getProfileName(data));
 
   textContainer.append(title, name);
   contentContainer.append(textContainer);
   cardContainer.append(contentContainer);
 }
 
-function getProfileName(data) {
+export function getProfileName(data) {
   return `${data?.firstName || ''} ${data?.lastName || ''}`.trim();
 }
 

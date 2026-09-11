@@ -4,9 +4,14 @@ Remove or replace every item below once real IMS login and Rainfocus registratio
 
 > **Note (MWPW-199065):** the dev-mock scaffolding and the Rainfocus/Mobile Rider/sessions services all moved out of this block into shared, page-level modules (`event-libs/v1/utils/session-store.js` and `event-libs/v1/services/sessions/`) so other blocks on the same page can read the same session/auth state. The steps below reference the new locations.
 
-> **Status (MWPW-200311, 2026-08-04):** items 1, 2, 4, and 7 are done — real IMS profile + a real jwt-exchanged `rfAuthToken` now drive every Rainfocus call, with the dev-mock localStorage scaffolding fully removed. Item 3 is superseded: `rainfocus-api-url`/`rainfocus-api-profile-id` no longer live in separate flat metadata — they're `rfApiUrl`/`rfProfileId` fields inside the Tier 1 Event Configurator's single `tier-1-event-config` JSON payload instead. Item 6 is done. Item 5 (Mobile Rider) remains open.
+> **Status (MWPW-200311, 2026-08-04):** items 1, 2, 4, and 7 are done — real IMS profile + a real jwt-exchanged `rfAuthToken` now drive every Rainfocus call, with the dev-mock localStorage scaffolding fully removed. Item 3 is superseded: `rainfocus-api-url`/`rainfocus-api-profile-id` no longer live in separate flat metadata — they're `rfApiUrl`/`rfProfileId` fields inside the Tier 1 Event Configurator's single `tier-1-event-config` JSON payload instead. Item 6 is done.
 >
 > **Update (MWPW-200314):** the standalone `tier-1-event-state-enabled` opt-in flag referenced below was retired — the shared store now gates on `tier-1-event-config` metadata being present instead (see item 3).
+>
+> **Update (2026-09-03):** item 5 (Mobile Rider) is also done — `fetchLiveStatus` already called
+> the real MR endpoint (this doc just hadn't been updated to say so), and the catalog's
+> `Mobilerider Video ID (Livestream)` attribute has now arrived and is mapped to `mrStreamId`
+> in `sessions-api.js`. Not yet verified against a real live Mobile Rider stream in the browser.
 
 ---
 
@@ -89,11 +94,16 @@ Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS user
 
 ---
 
-## 5. Implement the real Mobile Rider API call
+## 5. Implement the real Mobile Rider API call ✅ Done
 
 **File:** `event-libs/v1/services/sessions/mobile-rider.js`
 
-`fetchLiveStatus(mrStreamIds, env)` currently returns `{ active: new Set(), inactive: new Set(mrStreamIds) }` (always inactive). Replace with the real MR batch status endpoint.
+`fetchLiveStatus(mrStreamIds, env)` calls the real MR batch `media-status` endpoint
+(`overlay-admin-{prod,integration}.mobilerider.com`) — this stub was already replaced; this
+checklist entry was just never updated to say so. The real blocker to live polling actually
+mattering was §6's `mrStreamId` gap below, not this call — that's now closed too, so the two
+together should switch live polling on end-to-end. Not yet verified against a real live
+Mobile Rider stream in the browser.
 
 ---
 
@@ -110,11 +120,12 @@ has none.
 
 Known gaps in the real mapping (not blockers, just incomplete real-data coverage):
 - `resources[]` always `[]` — backend hasn't shipped this field yet.
-- `mrStreamId` always `null` — the catalog carries no attribute for it yet. It is the Mobile
-  Rider **live** stream id that `poller.js` keys on, authored in RainFocus and inbound as a new
-  attribute, tentatively named **`Mobilerider Live Stream ID`**. Mapping it in
-  `mapEslPayloadToRawSessions()` is the single change that turns stream polling on, so it stays
-  unmapped until the name is confirmed.
+- ~~`mrStreamId` always `null`~~ — **resolved 2026-09-03.** The catalog now carries
+  `Mobilerider Video ID (Livestream)` (the real name, confirmed against a live capture — not
+  the earlier tentative `Mobilerider Live Stream ID` guess), and `mapEslPayloadToRawSessions()`
+  maps it. Combined with §5 above (`fetchLiveStatus` already real), live polling should be
+  wired end-to-end for any session carrying this attribute — not yet verified against an
+  actual live stream in the browser.
 
 - Sessions with multiple `sessionTimes` (recurring/repeated) only surface their earliest
   occurrence.
@@ -130,13 +141,13 @@ empty field means "not this source", never "try another".
 
 | Attribute | Field | Player | State |
 |---|---|---|---|
-| `Mobilerider Live Stream ID` | `mrStreamId` | Mobile Rider **live** | inbound; name tentative |
-| `MPC ID` | `mpcId` | **Adobe Video TV** | mapped, unread |
-| `YouTube ID` | `youTubeId` | **YouTube** | mapped, unread |
-| `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider **post-stream recording**, gated by `DVR Timing (in hours)` | mapped, unread |
+| `Mobilerider Video ID (Livestream)` | `mrStreamId` | Mobile Rider **live** | mapped 2026-09-03 |
+| `MPC ID` | `mpcId` | **Adobe Video TV** | mapped; read by session-broadcast's `PlayerHost.js`/`MpcPlayerAdapter.js` |
+| `YouTube ID` | `youTubeId` | **YouTube** | mapped; read by session-broadcast's `PlayerHost.js`/`YouTubePlayerAdapter.js` |
+| `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider **post-stream recording**, gated by `DVR Timing (in hours)` | mapped, read for presence only (`session-video-playlist.js`) — no DVR player built yet |
 
-`Skin ID` → `mrSkinId` is the Mobile Rider player skin, and applies only to the two Mobile
-Rider sources. All of the above are mapped ahead of the playback work and read by nothing yet.
+`Skin ID` → `mrSkinId` is the Mobile Rider player skin, and applies to all three Mobile Rider
+sources; it remains mapped but unread anywhere.
 
 ---
 

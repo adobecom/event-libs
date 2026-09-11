@@ -4,9 +4,7 @@ import { downloadICS } from '../utils/ics.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { IconDownload } from './icons.js';
 
-// Exported so this is directly unit-testable: the test-time htm-preact mock drops
-// function props entirely (`onclick=${fn}` renders nothing), so a real click can't be
-// simulated against the rendered markup.
+// Exported for testability: the test-time htm-preact mock drops function props, so clicks can't be simulated.
 export function downloadSchedule(sessionList, scheduledIds) {
   const scheduledSessions = sessionList.filter((s) => scheduledIds.has(s.id));
   if (!downloadICS(scheduledSessions)) {
@@ -17,15 +15,21 @@ export function downloadSchedule(sessionList, scheduledIds) {
 export function DownloadButton() {
   const isEmpty = !sessions.value.some((s) => scheduled.value.has(s.id));
 
+  // No `title` attribute: it would pop a second, native tooltip on top of this custom one.
   return html`
-    <button
-      class="sg-download-btn"
-      onclick=${() => downloadSchedule(sessions.value, scheduled.value)}
-      aria-label="Download schedule as .ics calendar file"
-      title="Download"
-      disabled=${isEmpty}
-      daa-ll="Download-Schedule"
-      type="button"
-    ><${IconDownload} /></button>
+    <span class="sg-download-btn-wrap">
+      <button
+        class="sg-download-btn"
+        onclick=${() => downloadSchedule(sessions.value, scheduled.value)}
+        aria-label="Download schedule as .ics calendar file"
+        disabled=${isEmpty}
+        daa-ll="Download-Schedule"
+        type="button"
+      ><${IconDownload} /></button>
+      <span class="sg-download-btn__tooltip" aria-hidden="true">
+        <span class="sg-download-btn__tooltip-label">Download</span>
+        <span class="sg-download-btn__tooltip-tip"></span>
+      </span>
+    </span>
   `;
 }

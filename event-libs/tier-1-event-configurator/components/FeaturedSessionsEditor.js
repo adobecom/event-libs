@@ -2,6 +2,7 @@ import {
   useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
 import { getSessionPrimaryTrack, formatSessionTime } from '../utils.js';
+import { WATCH_DESTINATION_OPTIONS } from '../constants.js';
 import SearchInput from './SearchInput.js';
 import ImagePickerModal from './ImagePickerModal.js';
 
@@ -44,44 +45,47 @@ function DragHandleIcon() {
   `;
 }
 
-// Pointer-based drag reorder. Each handle also responds to ArrowUp/ArrowDown
-// when focused, since native drag isn't keyboard-operable.
-//
-// Tracks pointermove/up on window, not via setPointerCapture on the handle —
-// capture doesn't survive the handle's DOM node moving mid-drag (which
-// happens every reorder swap), so it was ending drags after one swap.
-//
-// Assumes every row is the same height: the dragged row's target slot is
-// arithmetic on the pointer delta, and other rows FLIP-animate into place.
-// Every possible per-session override field this editor knows how to render —
-// callers pick a subset via `metaFields` (below) to match what their own
-// consuming block actually reads, rather than always showing both.
+function GlobeIcon() {
+  return html`
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
+      <ellipse cx="8" cy="8" rx="2.75" ry="6.5" stroke="currentColor" stroke-width="1.3" />
+      <path d="M1.7 6h12.6M1.7 10h12.6" stroke="currentColor" stroke-width="1.3" />
+    </svg>
+  `;
+}
+
+function InfoIcon() {
+  return html`
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
+      <path d="M8 7.25v4M8 5v.01" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    </svg>
+  `;
+}
+
 const META_FIELD_DEFS = {
-  watchUrl: { label: 'Watch URL', placeholder: 'Watch URL (optional)' },
   mrStreamId: { label: 'Mobile Rider stream ID', placeholder: 'Mobile Rider stream ID (optional)' },
-  // type: 'image' additionally gets a thumbnail + "Upload…" button (see the meta-fields
-  // render below) — the text input still works standalone for pasting an already-uploaded
-  // or externally hosted URL directly, no upload required.
   imageUrl: { label: 'Image', placeholder: 'Image URL (optional)', type: 'image' },
+  watchDestination: {
+    label: 'Watch destination', type: 'select', icon: GlobeIcon, options: WATCH_DESTINATION_OPTIONS,
+  },
+  homepageAnchorId: {
+    label: 'Homepage jump id',
+    placeholder: 'e.g. live-marquee',
+    tooltip: 'The id set on that section\'s own Section Metadata "anchor" row — the homepage jumps there once this session goes live.',
+  },
 };
 
 export default function FeaturedSessionsEditor({
   sessions, sessionTimes, tracks, featuredSessions, onChange,
   heading = 'Featured (display order)', emptyHint = 'No sessions featured yet — add some from the list on the right.',
-  // Optional per-session overrides — neither field has a source in the ESP
-  // session catalog (see MOBILE-RIDER-STREAM-ID-GAP.md), so when a caller
-  // needs one in its output JSON, it's authored here by hand instead.
-  // `metaFields` (e.g. ['mrStreamId']) picks which of META_FIELD_DEFS to
-  // show — only the ones the caller's own block actually reads. Omitted
-  // entirely (along with onMetaChange) for callers that don't need any.
   meta, onMetaChange, metaFields = [],
 }) {
   const [search, setSearch] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
   const [draggedId, setDraggedId] = useState(null);
   const [announcement, setAnnouncement] = useState('');
-  // Which row's image-upload modal is open — one shared modal instance rather than one per
-  // row, since at most one can be open at a time.
   const [imagePickerFor, setImagePickerFor] = useState(null);
 
   const sessionsById = useMemo(() => {
@@ -90,7 +94,6 @@ export default function FeaturedSessionsEditor({
     return map;
   }, [sessions]);
 
-  // A session can have more than one sessionTime (e.g. live + on-demand) — use the earliest.
   const earliestTimeBySessionId = useMemo(() => {
     const map = new Map();
     (sessionTimes || []).forEach((time) => {
@@ -113,13 +116,9 @@ export default function FeaturedSessionsEditor({
     [sessionsById],
   );
 
-  // Memoized so the FLIP effect's prevOrder !== featuredIds check reflects a
-  // real order change, not a fresh [] recreated whenever featuredSessions is falsy.
   const featuredIds = useMemo(() => featuredSessions || [], [featuredSessions]);
   const featuredSet = useMemo(() => new Set(featuredIds), [featuredIds]);
 
-  // Full client-side filter over the already-fetched catalog — no second
-  // /session-facets call, no pagination.
   const availableSessions = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (sessions || []).filter((session) => {
@@ -158,10 +157,9 @@ export default function FeaturedSessionsEditor({
     }
   }, [handleMove]);
 
-  // Refs, not state — pointermove reads/writes these without re-rendering per pixel.
   const listRef = useRef(null);
   const itemRefs = useRef(new Map());
-  const dragInfo = useRef(null); // { sessionId, startClientY, startIndex, rowHeight }
+  const dragInfo = useRef(null);
   const orderRef = useRef(featuredIds);
   orderRef.current = featuredIds;
 
@@ -179,8 +177,6 @@ export default function FeaturedSessionsEditor({
     return rect.height + gap;
   }, []);
 
-  // Latest-ref pattern: stableMove/stableEnd never change identity, so a
-  // listener added at drag-start stays removable later even if the handlers do.
   const handlePointerMoveRef = useRef(() => {});
   const endDragRef = useRef(() => {});
   const stableMove = useRef((e) => handlePointerMoveRef.current(e)).current;
@@ -220,8 +216,6 @@ export default function FeaturedSessionsEditor({
 
     const draggedNode = itemRefs.current.get(info.sessionId);
     if (draggedNode) {
-      // Layout already covers whole-slot shifts from the reorder above; this
-      // only supplies the remaining sub-slot distance.
       const visualOffset = deltaY - (targetIndex - info.startIndex) * info.rowHeight;
       draggedNode.style.transform = `translateY(${visualOffset}px)`;
     }
@@ -247,23 +241,18 @@ export default function FeaturedSessionsEditor({
     setDraggedId(null);
   };
 
-  // Safety net: don't leave window listeners registered if unmounted mid-drag.
   useEffect(() => () => {
     window.removeEventListener('pointermove', stableMove);
     window.removeEventListener('pointerup', stableEnd);
     window.removeEventListener('pointercancel', stableEnd);
   }, [stableMove, stableEnd]);
 
-  // FLIP-lite: when the order changes, animate every row except the one
-  // being dragged (already positioned above) from its old slot to its new one.
   const prevOrderRef = useRef(featuredIds);
   useLayoutEffect(() => {
     const prevOrder = prevOrderRef.current;
     if (prevOrder !== featuredIds) {
       const rowHeight = measureRowHeight();
       if (rowHeight) {
-        // Two passes (write all "from", one reflow, write all "to") to avoid
-        // layout thrashing from interleaving reads/writes per row.
         const movedNodes = [];
         prevOrder.forEach((sessionId) => {
           if (sessionId === dragInfo.current?.sessionId) return;
@@ -279,7 +268,7 @@ export default function FeaturedSessionsEditor({
 
         if (movedNodes.length > 0) {
           // eslint-disable-next-line no-unused-expressions
-          document.body.offsetHeight; // one shared reflow for the whole batch
+          document.body.offsetHeight;
           movedNodes.forEach((node) => {
             node.style.transition = 'transform 0.2s ease';
             node.style.transform = '';
@@ -292,39 +281,88 @@ export default function FeaturedSessionsEditor({
 
   const renderMetaField = (field, sessionId, title) => {
     const value = meta?.[sessionId]?.[field] || '';
-    const isImage = META_FIELD_DEFS[field].type === 'image';
+    const def = META_FIELD_DEFS[field];
+    const isImage = def.type === 'image';
+    const isSelect = def.type === 'select';
+    const fieldId = `tec-meta-${field}-${sessionId}`;
+
+    if (isSelect) {
+      return html`
+        <div key=${field} class="tec-featured-editor__meta-field tec-featured-editor__meta-field--fixed">
+          <label class="tec-featured-editor__meta-label" for=${fieldId}>${def.label}</label>
+          <div class="tec-featured-editor__field-control tec-featured-editor__field-control--select">
+            <${def.icon} />
+            <select \
+              id=${fieldId} \
+              class="tec-field tec-field--s" \
+              aria-label="${def.label} for ${title}" \
+              value=${value} \
+              onChange=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+            >
+              <option value="" disabled selected=${!value}>Select…</option>
+              ${def.options.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
+            </select>
+          </div>
+        </div>
+      `;
+    }
+
+    if (isImage) {
+      return html`
+        <div key=${field} class="tec-featured-editor__meta-field tec-featured-editor__meta-field--inline">
+          ${value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
+          <input \
+            type="text" \
+            class="tec-field tec-field--s" \
+            placeholder=${def.placeholder} \
+            aria-label="${def.label} for ${title}" \
+            value=${value} \
+            onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+          />
+          ${!value && html`
+            <button \
+              type="button" \
+              class="tec-btn tec-btn--outline tec-btn--s" \
+              onClick=${() => setImagePickerFor(sessionId)} \
+            >Add image…</button>
+          `}
+          ${value && html`
+            <button \
+              type="button" \
+              class="tec-btn tec-btn--icon tec-btn--icon-s" \
+              aria-label="Replace ${def.label} for ${title}" \
+              onClick=${() => setImagePickerFor(sessionId)} \
+            ><${ReplaceIcon} /></button>
+            <button \
+              type="button" \
+              class="tec-btn tec-btn--icon tec-btn--icon-s tec-btn--danger" \
+              aria-label="Remove ${def.label} for ${title}" \
+              onClick=${() => onMetaChange(sessionId, { [field]: '' })} \
+            ><${TrashIcon} /></button>
+          `}
+        </div>
+      `;
+    }
+
     return html`
       <div key=${field} class="tec-featured-editor__meta-field">
-        ${isImage && value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
-        <input \
-          type="text" \
-          class="tec-field tec-field--s" \
-          placeholder=${META_FIELD_DEFS[field].placeholder} \
-          aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
-          value=${value} \
-          onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
-        />
-        ${isImage && !value && html`
-          <button \
-            type="button" \
-            class="tec-btn tec-btn--outline tec-btn--s" \
-            onClick=${() => setImagePickerFor(sessionId)} \
-          >Add image…</button>
-        `}
-        ${isImage && value && html`
-          <button \
-            type="button" \
-            class="tec-btn tec-btn--icon tec-btn--icon-s" \
-            aria-label="Replace ${META_FIELD_DEFS[field].label} for ${title}" \
-            onClick=${() => setImagePickerFor(sessionId)} \
-          ><${ReplaceIcon} /></button>
-          <button \
-            type="button" \
-            class="tec-btn tec-btn--icon tec-btn--icon-s tec-btn--danger" \
-            aria-label="Remove ${META_FIELD_DEFS[field].label} for ${title}" \
-            onClick=${() => onMetaChange(sessionId, { [field]: '' })} \
-          ><${TrashIcon} /></button>
-        `}
+        <label class="tec-featured-editor__meta-label" for=${fieldId}>${def.label}</label>
+        <div class="tec-featured-editor__field-control">
+          <input \
+            id=${fieldId} \
+            type="text" \
+            class="tec-field tec-field--s" \
+            placeholder=${def.placeholder} \
+            aria-label="${def.label} for ${title}" \
+            value=${value} \
+            onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+          />
+          ${def.tooltip && html`
+            <span class="tec-featured-editor__info-icon" title=${def.tooltip}>
+              <${InfoIcon} />
+            </span>
+          `}
+        </div>
       </div>
     `;
   };
@@ -358,11 +396,20 @@ export default function FeaturedSessionsEditor({
                   <span class="tec-featured-editor__title">${title}</span>
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
                   ${onMetaChange && metaFields.length > 0 && html`
-                    <div class="tec-featured-editor__meta-fields">
-                      ${metaFields.filter((field) => META_FIELD_DEFS[field].type !== 'image').map(
-                        (field) => renderMetaField(field, sessionId, title),
-                      )}
-                    </div>
+                    ${metaFields.includes('mrStreamId') && html`
+                      <div class="tec-featured-editor__meta-fields">
+                        ${renderMetaField('mrStreamId', sessionId, title)}
+                      </div>
+                    `}
+                    ${(metaFields.includes('watchDestination') || metaFields.includes('homepageAnchorId')) && html`
+                      <div class="tec-featured-editor__meta-fields">
+                        ${metaFields
+                          .filter((field) => field === 'watchDestination' || field === 'homepageAnchorId')
+                          .filter((field) => field !== 'homepageAnchorId'
+                            || meta?.[sessionId]?.watchDestination === 'homepage')
+                          .map((field) => renderMetaField(field, sessionId, title))}
+                      </div>
+                    `}
                     ${metaFields.some((field) => META_FIELD_DEFS[field].type === 'image') && html`
                       <div class="tec-featured-editor__meta-fields">
                         ${metaFields.filter((field) => META_FIELD_DEFS[field].type === 'image').map(
