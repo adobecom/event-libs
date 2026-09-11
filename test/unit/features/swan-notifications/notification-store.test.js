@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  notifications, getEntry, getEntries, upsertEntry, removeEntry, markRead, markAllRead, pruneStale,
+  notifications, getEntry, getEntries, upsertEntry, removeEntry, markRead, markAllRead, pruneStale, dismissEntry,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
 
 const LOCAL_STATE_KEY = 'swan-notification-state-v3';
@@ -62,6 +62,46 @@ describe('notification-store', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'Session One', actionUrl: '/a' });
       upsertEntry('RF-1', { stage: 'live', title: 'Session One' });
       expect(getEntry('RF-1').actionUrl).to.equal('/a');
+    });
+
+    it('un-dismisses an entry when its stage actually changes', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
+      dismissEntry('RF-1');
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+
+      upsertEntry('RF-1', { stage: 'live', title: 'Session One' });
+      expect(getEntry('RF-1').dismissed).to.equal(false);
+    });
+
+    it('leaves an already-dismissed entry dismissed on a no-op re-write of the same stage', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
+      dismissEntry('RF-1');
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+    });
+  });
+
+  describe('dismissEntry', () => {
+    it('flags the entry dismissed without removing it from the store', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
+      dismissEntry('RF-1');
+      expect(getEntry('RF-1')).to.not.equal(undefined);
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+    });
+
+    it('no-ops for an unknown rfCode', () => {
+      expect(() => dismissEntry('RF-never')).to.not.throw();
+    });
+
+    it('is a no-op (no extra signal notification) when the entry is already dismissed', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
+      dismissEntry('RF-1');
+      const seen = [];
+      const unsubscribe = notifications.subscribe((entries) => seen.push(entries));
+      dismissEntry('RF-1');
+      unsubscribe();
+      // subscribe() itself fires once immediately — a genuine second write would mean two.
+      expect(seen).to.have.lengthOf(1);
     });
   });
 

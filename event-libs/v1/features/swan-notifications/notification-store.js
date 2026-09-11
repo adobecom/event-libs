@@ -87,6 +87,8 @@ export function getEntries() {
 
 // Marks unread again whenever the stage actually advances (a genuinely new thing to show
 // the attendee), but leaves an already-read entry's read flag alone on a no-op re-write.
+// Same rule for `dismissed`: a stage advance is worth surfacing again even if the attendee
+// dismissed it at its previous stage (e.g. dismissed the reminder, then it goes live).
 export function upsertEntry(rfCode, entry) {
   const prev = state[rfCode];
   const stageChanged = !prev || prev.stage !== entry.stage;
@@ -97,6 +99,7 @@ export function upsertEntry(rfCode, entry) {
       ...prev,
       ...entry,
       read: stageChanged ? false : (prev?.read ?? false),
+      dismissed: stageChanged ? false : (prev?.dismissed ?? false),
       updatedAt: Date.now(),
       seq: sequence,
     },
@@ -109,6 +112,17 @@ export function removeEntry(rfCode) {
   const next = { ...state };
   delete next[rfCode];
   state = next;
+  persistAndSync();
+}
+
+// User-initiated dismiss: unlike removeEntry (used for orphan cleanup, where the session is
+// truly gone from the schedule), this keeps the entry — just hidden from the widget — so
+// swan-notifications.js's forward-only stage guard still has something to compare against.
+// Without this, a still-scheduled session's next reconcile tick would see no existing entry
+// at all and recreate it as unread, resurrecting a dismissal within one ~15s ticker cycle.
+export function dismissEntry(rfCode) {
+  if (!state[rfCode] || state[rfCode].dismissed) return;
+  state = { ...state, [rfCode]: { ...state[rfCode], dismissed: true } };
   persistAndSync();
 }
 

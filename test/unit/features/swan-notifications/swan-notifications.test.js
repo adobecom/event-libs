@@ -3,7 +3,7 @@ import {
   notifySessionScheduled, notifySessionUnscheduled, reconcileSwanNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/swan-notifications.js';
 import {
-  getEntry, getEntries, removeEntry, markRead,
+  getEntry, getEntries, removeEntry, markRead, dismissEntry,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
 
 // now + offsetMs, as an ISO string — startOffsetMs/endOffsetMs are negative for "in the past".
@@ -191,6 +191,40 @@ describe('swan-notifications', () => {
       expect(getEntry(rfCode).stage).to.equal('on-demand');
 
       expect(getEntries().filter((e) => e.rfCode === rfCode)).to.have.lengthOf(1);
+    });
+
+    it('does not resurrect a dismissed entry while the session stays at the same stage', () => {
+      // Reproduces a real regression: dismissing a notification used to call removeEntry
+      // directly, which left no entry for applyStage's forward-only guard to compare
+      // against — the very next reconcile tick would see a still-scheduled session with no
+      // known entry and recreate it as unread.
+      const session = makeSession('RF-dismissed', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      notifySessionScheduled(session);
+      expect(getEntry('RF-dismissed').stage).to.equal('live');
+      markRead('RF-dismissed');
+
+      dismissEntry('RF-dismissed');
+      expect(getEntry('RF-dismissed').dismissed).to.equal(true);
+
+      reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      expect(getEntry('RF-dismissed').dismissed).to.equal(true);
+      expect(getEntry('RF-dismissed').read).to.equal(true); // still marked read, from before dismiss
+    });
+
+    it('resurfaces (undismissed, unread) an entry once its stage genuinely advances after being dismissed', () => {
+      const rfCode = 'RF-dismissed-then-live';
+      const reminderSession = makeSession(rfCode, { startOffsetMs: 2 * MIN, endOffsetMs: 120 * MIN });
+      notifySessionScheduled(reminderSession);
+      markRead(rfCode);
+      dismissEntry(rfCode);
+      expect(getEntry(rfCode).dismissed).to.equal(true);
+
+      const liveSession = makeSession(rfCode, { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      reconcileSwanNotifications(() => [liveSession], () => new Set([liveSession.id]));
+
+      expect(getEntry(rfCode).stage).to.equal('live');
+      expect(getEntry(rfCode).dismissed).to.equal(false);
+      expect(getEntry(rfCode).read).to.equal(false);
     });
 
     it('is a no-op entirely when SWAN is not enabled on the page', () => {

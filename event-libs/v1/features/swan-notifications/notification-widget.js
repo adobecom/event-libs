@@ -5,7 +5,7 @@ import { FALLBACK_LOCALES } from '../../utils/constances.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getRelativeTime, createTemplatedDateRange } from '../../utils/date-time-helper.js';
 import {
-  notifications, markRead, markAllRead, removeEntry, getEntries,
+  notifications, markRead, markAllRead, dismissEntry, getEntries,
 } from './notification-store.js';
 import { STAGE_COPY } from './swan-payload.js';
 import { waitForElement } from './gnav-wait.js';
@@ -246,10 +246,12 @@ function buildWidget(mount) {
   // a keyboard user "in the flow" of dismissing several in a row), falling back to the
   // previous row, then to the bell button once the list is empty.
   function dismissAndRefocus(rfCode) {
-    const current = getEntries();
+    // Neighbor lookup must match what's actually rendered (dismissed entries are filtered
+    // out below, not deleted — see dismissEntry's own doc comment for why).
+    const current = getEntries().filter((e) => !e.dismissed);
     const idx = current.findIndex((e) => e.rfCode === rfCode);
     const neighborRfCode = current[idx + 1]?.rfCode ?? current[idx - 1]?.rfCode ?? null;
-    removeEntry(rfCode);
+    dismissEntry(rfCode);
     const neighborRow = neighborRfCode
       && [...list.querySelectorAll('.swan-notif__row')].find((row) => row.dataset.rfcode === neighborRfCode);
     (neighborRow?.querySelector('.swan-notif__dismiss') || button).focus();
@@ -262,7 +264,10 @@ function buildWidget(mount) {
   // which must never be announced as "new" on this first call.
   let previousUnreadCount = null;
   notifications.subscribe((entries) => {
-    const unreadCount = renderList(sectionTitle, list, badge, entries, locale, timezone, dismissAndRefocus);
+    // Dismissed entries stay in the store (so the stage guard in swan-notifications.js can
+    // still see them) but must never render or count toward the badge/announcer.
+    const visibleEntries = entries.filter((entry) => !entry.dismissed);
+    const unreadCount = renderList(sectionTitle, list, badge, visibleEntries, locale, timezone, dismissAndRefocus);
     if (previousUnreadCount !== null && unreadCount > previousUnreadCount) {
       const key = unreadCount === 1 ? '{count} new notification' : '{count} new notifications';
       announcer.textContent = dictionaryManager.getValue(key).replace('{count}', unreadCount);

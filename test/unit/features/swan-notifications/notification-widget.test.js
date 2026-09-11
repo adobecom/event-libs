@@ -201,21 +201,27 @@ describe('notification-widget', () => {
       expect(rows()[0].querySelectorAll('.swan-notif__dismiss')).to.have.lengthOf(1);
     });
 
-    it('removes only the dismissed entry from the store', () => {
+    it('hides only the dismissed entry\'s row, without deleting it from the store', () => {
       addEntry('RF-1', { stage: 'reminder', title: 'First' });
       addEntry('RF-2', { stage: 'reminder', title: 'Second' });
       // Same stage, so rows()[0] is the more recently added one (RF-2) — see the sort-order
       // tests in notification-store.test.js.
       rows()[0].querySelector('.swan-notif__dismiss').click();
-      expect(getEntries().map((e) => e.rfCode)).to.deep.equal(['RF-1']);
+      // Dismiss keeps the entry (marked dismissed) rather than deleting it — a still-scheduled
+      // session's next reconcile tick needs it to avoid resurrecting the notification. See
+      // swan-notifications.test.js's dismiss-resurrection regression tests.
+      expect(getEntries().find((e) => e.rfCode === 'RF-2').dismissed).to.equal(true);
+      expect(rows().map((row) => row.dataset.rfcode)).to.deep.equal(['RF-1']);
     });
 
     it('does not mark the entry read or navigate — only the row itself does that', () => {
       addEntry('RF-1', { stage: 'reminder', title: 'First', actionUrl: '' });
       rows()[0].querySelector('.swan-notif__dismiss').click();
-      // The entry is gone entirely (removed, not read-then-kept), proving the row's own
-      // click-through handler never ran as a side effect of the dismiss click.
-      expect(getEntries()).to.have.lengthOf(0);
+      const entry = getEntries().find((e) => e.rfCode === 'RF-1');
+      expect(entry.dismissed).to.equal(true);
+      // read stays false, proving the row's own click-through handler never ran as a side
+      // effect of the dismiss click (it would have called markRead first).
+      expect(entry.read).to.equal(false);
     });
 
     // .focus() (unlike .click()) is a no-op on an element inside a hidden ancestor, so these
