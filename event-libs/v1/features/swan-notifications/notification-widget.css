@@ -1,0 +1,341 @@
+/* ── SWAN notification widget ─────────────────────────────────────
+   Injected directly into UniversalNav's own rendered container, in place of UNC's own
+   notifications icon. Colors reuse the shared --s2a-* design tokens (see
+   c2/styles/tokens.css) already used elsewhere in event-libs, with hardcoded
+   fallbacks matching the exact hex values pulled from the Figma spec (node
+   9690:20849) in case this widget ever mounts on a page those tokens aren't loaded on. */
+
+.swan-notif {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  /* The real UNC icons live in the same container, rendered by a third-party script we
+     don't control the box model of (no source access) — this guards against being visually
+     compressed or buried by whatever that script does. */
+  flex-shrink: 0;
+  z-index: 4;
+}
+
+.swan-notif__bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.swan-notif__bell:hover,
+.swan-notif__bell:focus-visible {
+  background: var(--s2a-color-transparent-white-12, rgb(255 255 255 / 12%));
+}
+
+.swan-notif__bell-icon {
+  display: inline-flex;
+}
+
+/* Mirrors federal's own real UNC icon theming 1:1 (styles.css:493-536) — same states, same
+   ancestor (header.global-navigation, not .feds-utilities), same fill-based approach (the
+   bell SVG is filled, not stroked, specifically so these rules control its color). Targets
+   `svg path`, not just `svg` — the bell's single <path> carries its own fill="currentColor"
+   attribute, so a `fill` declaration on the ancestor <svg> can't override it; gnav's own
+   notifications icon (structurally identical: one path, its own fill) targets `svg path`
+   for the same reason, while its app-switcher/cart icons (no per-path fill) target plain `svg`. */
+header.global-navigation .swan-notif__bell svg path {
+  fill: var(--s2a-color-gray-25, #fff);
+}
+
+header.global-navigation.dark-font .swan-notif__bell svg path,
+header.global-navigation.feds-header-scrolled .swan-notif__bell svg path,
+header.global-navigation:has(.feds-popup.is-open:not(.small-menu), .feds-menu-wrapper.is-open) .swan-notif__bell svg path,
+header.global-navigation .swan-notif__bell:hover svg path,
+header.global-navigation .swan-notif__bell:focus-visible svg path {
+  fill: var(--s2a-color-gray-1000, #000);
+}
+
+header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__bell svg path {
+  fill: inherit;
+}
+
+.swan-notif__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--s2a-color-red-900, #d73220);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.swan-notif__badge[hidden] {
+  display: none;
+}
+
+.swan-notif__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  max-height: 480px;
+  overflow-y: auto;
+  background: var(--s2a-color-gray-25, #fff);
+  color: var(--s2a-color-gray-900, #131313);
+  border-radius: 8px;
+  box-shadow:
+    0 4px 16px rgb(0 0 0 / 8%),
+    0 3px 8px rgb(0 0 0 / 4%),
+    0 0 3px rgb(0 0 0 / 12%);
+  /* Deliberately not matching gnav's own z-index:3 for .feds-utilities (see
+     global-navigation.css:948) — this widget doesn't control gnav's stacking context,
+     so it uses a generously high value to guarantee it sits above the mobile hamburger
+     drawer regardless of gnav's own internal z-index values. */
+  z-index: 9999;
+}
+
+.swan-notif__panel[hidden] {
+  display: none;
+}
+
+.swan-notif__panel-title {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  margin: 0;
+  padding: 0 20px;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+  color: #222;
+}
+
+.swan-notif__divider {
+  height: 2px;
+  margin: 0 20px;
+  border-radius: 1px;
+  background: var(--s2a-color-gray-300, #d5d5d5);
+}
+
+.swan-notif__section-title {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  margin: 0;
+  padding: 0 20px;
+  background: var(--s2a-color-gray-25, #fff);
+  font-size: 15px;
+  font-weight: 700;
+  color: #222;
+}
+
+.swan-notif__section-title[hidden] {
+  display: none;
+}
+
+.swan-notif__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px;
+}
+
+.swan-notif__row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  /* 20px both sides — matches the section header's own inset, so the thumbnail (the row's
+     first flex child) lines up flush with "Important" above it. The unread dot is pulled out
+     of flow (see below) and hangs further left than this column, as an outlier. */
+  padding: 8px 20px;
+  cursor: pointer;
+}
+
+.swan-notif__row:hover,
+.swan-notif__row:focus-visible {
+  background: var(--s2a-color-gray-75, #f3f3f3);
+  outline: none;
+}
+
+/* Unread state is signaled two ways, both driven by the same class: a tinted row
+   background (the primary signal, per the Figma spec) and the dot below (kept as a
+   secondary/at-a-glance cue, visible in the design's screenshot reference). */
+.swan-notif__row--unread {
+  background: var(--s2a-color-gray-75, #f8f8f8);
+}
+
+.swan-notif__row--unread:hover,
+.swan-notif__row--unread:focus-visible {
+  background: var(--s2a-color-gray-100, #e9e9e9);
+}
+
+/* Positioned out of the row's flex flow (not a flex item) — it's an outlier sitting to the
+   left of the thumbnail/content column, not part of its layout. Per the Figma spec, it's
+   offset 7px further left than that column's own 20px inset, i.e. 7px from the row's edge.
+   `top` is a fixed offset keyed to the thumbnail's own vertical center (row's 8px top padding
+   + half of the icon's 48px height), not 50% of the row — the row's height now varies with its
+   text content (e.g. reminder rows carry an extra start-time line), which would otherwise pull
+   the dot away from the thumbnail it's meant to sit beside. */
+.swan-notif__dot {
+  position: absolute;
+  top: 32px;
+  left: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #147af3;
+  transform: translateY(-50%);
+  visibility: hidden;
+}
+
+.swan-notif__row--unread .swan-notif__dot {
+  visibility: visible;
+}
+
+.swan-notif__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--s2a-color-red-900, #d31510);
+}
+
+/* A resolved track icon (fetchFederalTrackIcon recolors its literal black fill/stroke to
+   currentColor) needs this to read white against the tile's red background, matching
+   SESSION_ICON_FALLBACK's own hardcoded fill="#fff" — same tile, no per-track color variant. */
+.swan-notif__icon--placeholder {
+  color: #fff;
+}
+
+.swan-notif__body {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Mirrors features/toast/toast.js's own close button: a flex sibling (not absolutely
+   positioned), transparent circular hover state, shrunk to this row's more compact scale
+   (24px vs. the toast's 32px). */
+.swan-notif__dismiss {
+  display: flex;
+  flex-shrink: 0;
+  align-self: flex-start;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--s2a-color-gray-700, #464646);
+  cursor: pointer;
+}
+
+.swan-notif__dismiss:hover,
+.swan-notif__dismiss:focus-visible {
+  background: var(--s2a-color-gray-200, #e1e1e1);
+}
+
+/* Screen-reader-only text: an aria-live announcer with no visual presence of its own —
+   same properties as sessions-guide's .sg-sr-only. */
+.swan-notif__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.swan-notif__category-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 3px;
+}
+
+.swan-notif__category {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--s2a-color-gray-700, #464646);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swan-notif__title {
+  margin: 0 0 3px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 15px;
+  color: #222;
+}
+
+.swan-notif__time {
+  margin: 0;
+  font-size: 12px;
+  color: var(--s2a-color-gray-700, #464646);
+}
+
+/* Small rounded-rect badges, not full pill capsules — corrected to match the Figma spec
+   (2px radius / 15px height / 12px text), which is much smaller/squarer than a typical
+   pill shape. Live/Upcoming colors and Live's white-vs-Upcoming's black text are both
+   taken directly from the spec; On-Demand isn't in the Figma export (it only shows
+   Live/Upcoming) so it's a neutral gray kept visually consistent with its siblings. */
+.swan-notif__pill {
+  display: inline-flex;
+  align-items: center;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.swan-notif__pill--live { background: #d31510; color: #fff; }
+.swan-notif__pill--reminder { background: #f68511; color: #000; }
+.swan-notif__pill--on-demand { background: var(--s2a-color-gray-600, #717171); color: #fff; }
+
+.swan-notif__empty {
+  padding: 24px 20px;
+  text-align: center;
+  color: var(--s2a-color-gray-600, #717171);
+  list-style: none;
+}
+
+/* Mobile / collapsed gnav: full-width sheet anchored under the fixed top bar, at milo's
+   own gnav breakpoint (global-navigation.css:569,627) rather than inventing a new one.
+   `.feds-utilities` (the outer container `#universal-nav`/`.universal-nav-container` live
+   in) is the same DOM node in both desktop and mobile/hamburger gnav — this widget needs
+   only this one CSS-driven layout switch, not a second injection point, as long as that
+   holds for the more specific mount point too. --swan-notif-mobile-top lets a consumer page
+   override the assumed gnav height if it differs from the default. */
+@media (max-width: 900px) {
+  .swan-notif__panel {
+    position: fixed;
+    top: var(--swan-notif-mobile-top, 56px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+  }
+}

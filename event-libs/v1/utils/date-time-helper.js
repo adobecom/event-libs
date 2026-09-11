@@ -380,6 +380,37 @@ export function createSmartDateRange(startTimestamp, endTimestamp, locale, timez
   return `${startDateTime} - ${endDateTime}`;
 }
 
+const RELATIVE_TIME_UNIT_MS = [
+  ['day', 86400000],
+  ['hour', 3600000],
+  ['minute', 60000],
+];
+
+/**
+ * Locale-aware "N minutes/hours/days ago" phrasing for a past timestamp, via
+ * Intl.RelativeTimeFormat. Buckets match the same minute/hour/day boundaries a caller would
+ * otherwise hand-roll in English.
+ * @param {number} pastMs - Timestamp in milliseconds to describe relative to `nowMs`
+ * @param {string} locale - Locale string (e.g., 'en-US')
+ * @param {number} [nowMs] - Reference "now" timestamp in milliseconds; defaults to Date.now()
+ * @returns {string} Localized relative-time phrase (e.g., '5 minutes ago', 'now')
+ */
+export function getRelativeTime(pastMs, locale = 'en-US', nowMs = Date.now()) {
+  if (!Number.isFinite(pastMs)) return '';
+
+  try {
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    const diffMs = nowMs - pastMs;
+    if (diffMs < 60000) return rtf.format(0, 'second');
+
+    const [unit, unitMs] = RELATIVE_TIME_UNIT_MS.find(([, ms]) => diffMs >= ms) || RELATIVE_TIME_UNIT_MS[RELATIVE_TIME_UNIT_MS.length - 1];
+    return rtf.format(-Math.round(diffMs / unitMs), unit);
+  } catch (error) {
+    window.lana?.log(`Error formatting relative time: ${JSON.stringify(error)}`);
+    return '';
+  }
+}
+
 /**
  * Metadata hydration rules for transforming raw metadata into user-friendly formats.
  * Each rule defines how to transform a specific metadata field.
