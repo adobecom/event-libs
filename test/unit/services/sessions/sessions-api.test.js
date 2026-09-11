@@ -1284,31 +1284,31 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.equal('https://events-platform-prod-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
   });
 
-  it('fetches from the stage CDN domain on stage', async () => {
+  it('falls back to the origin ESP host on stage, which has no CDN', async () => {
     setEventServiceEnvOverride('stage');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-stage-cdn.aws125.adobeitc.com');
+    expect(url).to.include('events-service-platform-stage.adobe.io');
   });
 
-  it('fetches from the dev CDN domain on dev', async () => {
+  it('falls back to the origin ESP host on dev, which has no CDN', async () => {
     setEventServiceEnvOverride('dev');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
+    expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io');
   });
 
-  it('reuses the dev CDN domain on local, same as its origin ESP alias', async () => {
+  it('falls back to the origin ESP host on local, which has no CDN', async () => {
     setEventServiceEnvOverride('local');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
+    expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io');
   });
 
-  // dev02/stage02 have no CDN — fall back to origin ESP.
+  // dev/local/stage/dev02/stage02 have no CDN — fall back to origin ESP.
   it('falls back to the origin ESP host on dev02, which has no CDN', async () => {
     setEventServiceEnvOverride('dev02');
     const fetchStub = stubEmptyCatalog();
