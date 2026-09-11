@@ -1,11 +1,30 @@
 # `mrStreamId` has no backend source yet — resolved via manual input field
 
-**Resolved:** option 1 below was implemented — `FeaturedSessionsEditor.js`'s
-`META_FIELD_DEFS.mrStreamId` renders a per-session "Mobile Rider stream ID"
-text field, and `buildSessionAuthorEntry()` (`tier-1-event-configurator/utils.js`)
-now includes it in the copied JSON when set. The backend gap itself is
-unchanged — this is a configurator-side workaround, not a real data source —
-so the rest of this doc is kept as the historical record of why.
+**Backend gap resolved 2026-09-03, for Session Guide's real-catalog path.** The
+ESP `session-catalog` payload now carries `Mobilerider Video ID (Livestream)` (the
+real attribute name, confirmed against a live capture — not the tentative
+`Mobilerider Live Stream ID` guess below), and `mapEslPayloadToRawSessions()`
+(`event-libs/v1/services/sessions/sessions-api.js`) maps it to `mrStreamId`. That
+was the single remaining step to switch MR live polling on for Session Guide (see
+option 3's closing note below) — `fetchLiveStatus()` was already hitting the real
+Mobile Rider endpoint. **Not yet verified against an actual live stream in the
+browser.**
+>
+> This does **not** by itself retire the Homepage configurator's manual field
+> below — that workaround exists because `buildSessionAuthorEntry()` builds a
+> static, author-time JSON blob, a separate data path from Session Guide's
+> per-page-load catalog fetch. Whether the configurator can now read the real
+> attribute the same way depends on whether its own session-picker data source
+> also carries `customAttributes` — not verified as part of this change.
+
+**Resolved (configurator workaround):** option 1 below was implemented —
+`FeaturedSessionsEditor.js`'s `META_FIELD_DEFS.mrStreamId` renders a per-session
+"Mobile Rider stream ID" text field, and `buildSessionAuthorEntry()`
+(`tier-1-event-configurator/utils.js`) now includes it in the copied JSON when
+set. Per the update above, the underlying backend gap this workaround was built
+around is now resolved on Session Guide's side — the rest of this doc is kept as
+the historical record of why the workaround exists, and to flag re-evaluating it
+now that real data exists.
 
 Both `upcoming-sessions.js` (Homepage) and Session Guide rely on a per-session
 `mrStreamId` field to know a session is livestreamed via Mobile Rider — it drives
@@ -38,20 +57,23 @@ substitutes for the live id:
 | `MPC ID` | `mpcId` | **Adobe Video TV** (Adobe Media Publishing Cloud asset) |
 | `YouTube ID` | `youTubeId` | **YouTube**-hosted sessions |
 | `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider recording of a **finished** stream — what some sessions become watchable from after the live window closes, delayed by `DVR Timing (in hours)` |
-| *(inbound)* | `mrStreamId` | Mobile Rider **live** — what `poller.js` polls for on-air status |
+| `Mobilerider Video ID (Livestream)` | `mrStreamId` | Mobile Rider **live** — what `poller.js` polls for on-air status |
 
 Four sources, four players, and they are **alternatives rather than a fallback chain**: a session
 carries whichever it was produced for, so an empty field means "not this source", never "try
-another". All three VOD ids are mapped today and read by nothing; only the live id is missing.
+another". All four are now mapped in `mapEslPayloadToRawSessions()`, though only `mrStreamId`
+is actually read downstream today (`mpcId`/`youTubeId` by session-broadcast's player adapters;
+`mrDvrVideoId` for presence only).
 
-A new custom attribute is expected to carry the live id, tentatively named
-**`Mobilerider Live Stream ID`**. So the thing to wait for is a *pending attribute*
-on a payload we already fetch — not access to a locked-down one.
+**Resolved 2026-09-03:** the custom attribute carrying the live id arrived under the name
+**`Mobilerider Video ID (Livestream)`** — close to, but not exactly, the tentative
+`Mobilerider Live Stream ID` guess. It is now mapped.
 
-This still means **Session Guide has no live Mobile Rider integration wired up from
-real ESP/ESL data today** — mock data aside — so there's no existing "correct"
-configured pattern to copy for the Homepage configurator either. Both surfaces are
-blocked on the same missing attribute.
+**For Session Guide, real ESP/ESL data now includes the live Mobile Rider id** — this
+paragraph previously said otherwise; see the update at the top of this doc. Whether the
+Homepage configurator's own session-picker data source also carries `customAttributes` (and
+so could read the real attribute the same way, retiring the manual field below) has not been
+checked.
 
 ## Current state in the Homepage configurator
 
@@ -78,8 +100,11 @@ field either).
    should consume it the same way, so building a workaround now risks being
    thrown away.
 
-Revisit once **`Mobilerider Live Stream ID`** (name tentative) appears on the
-catalog: map it in `mapEslPayloadToRawSessions()`, at which point this manual
-configurator field becomes redundant and both surfaces should read it directly.
-Note that mapping it is also what switches MR polling on, letting sessions show as
-Live — see A1 in the session-guide PM questions before flipping it.
+**Done, for Session Guide, 2026-09-03:** the attribute arrived as
+`Mobilerider Video ID (Livestream)` and is mapped in `mapEslPayloadToRawSessions()`
+— see the update at the top of this doc. Mapping it is also what switches MR
+polling on, letting sessions show as Live — not yet verified against a real
+live stream in the browser (see A1 in the session-guide PM questions).
+**Still open:** whether this manual configurator field is now actually redundant
+for the Homepage surface too depends on that picker's own data source also
+carrying `customAttributes` — not checked as part of this change.

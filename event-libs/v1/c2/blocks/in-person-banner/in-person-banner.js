@@ -1,4 +1,7 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
+import BlockMediator from '../../../deps/block-mediator.min.js';
+
+const AUDIENCE = { ALL: 'all', SIGNED_IN: 'signed-in', IN_PERSON: 'in-person' };
 
 const DISMISSED_STORAGE_KEY = 'in-person-banner:dismissed';
 const CLOSE_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8.84849 8.0001L13.0137 3.83526C13.248 3.60088 13.248 3.22119 13.0137 2.98682C12.7793 2.75244 12.3996 2.75244 12.1652 2.98682L8 7.15166L3.83477 2.98682C3.60039 2.75244 3.2207 2.75244 2.98633 2.98682C2.75195 3.22119 2.75195 3.60088 2.98633 3.83526L7.15151 8.0001L2.98633 12.1649C2.75195 12.3993 2.75195 12.779 2.98633 13.0134C3.10351 13.1306 3.25703 13.1892 3.41054 13.1892C3.56406 13.1892 3.71758 13.1306 3.83476 13.0134L7.99999 8.84854L12.1652 13.0134C12.2824 13.1306 12.4359 13.1892 12.5894 13.1892C12.743 13.1892 12.8965 13.1306 13.0137 13.0134C13.248 12.779 13.248 12.3993 13.0137 12.1649L8.84849 8.0001Z" fill="currentColor"/></svg>';
@@ -23,26 +26,47 @@ function setDismissed(bannerId) {
     all[bannerId] = true;
     window.localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify(all));
   } catch {
-    // storage unavailable (private browsing, quota) — non-fatal, banner just
-    // reappears next visit rather than blocking dismissal of the current one.
+    return;
   }
+}
+
+function resolveProfile() {
+  const profile = BlockMediator.get('imsProfile');
+  if (profile !== undefined) return Promise.resolve(profile);
+  return new Promise((resolve) => {
+    // subscribe returns an unsubscribe fn; call it so this one-shot listener doesn't leak
+    // and fire on every later imsProfile write.
+    const unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => {
+      unsubscribe();
+      resolve(newValue);
+    });
+  });
+}
+
+function isSignedIn(profile) {
+  return Boolean(profile) && !profile.noProfile && profile.account_type !== 'guest';
 }
 
 async function isRegisteredInPerson() {
-  if (!window.events?.getRegistrationStatus) return true;
+  if (!window.events?.getRegistrationStatus) return false;
   try {
     const { isRegistered, inPersonAttendee } = await window.events.getRegistrationStatus();
-    return isRegistered !== false && inPersonAttendee !== false;
+    return isRegistered === true && inPersonAttendee === true;
   } catch (e) {
     window.lana?.log(`[in-person-banner] registration status check failed: ${e.message}`);
-    return true;
+    return false;
   }
 }
 
-function buildBanner(contentEl, bannerId) {
-  // role="status" + aria-live="polite" — same live-region primitive as
-  // features/toast/toast.js — so assistive tech both perceives the message on render
-  // and gets an announcement when dismissal removes this container from the DOM.
+async function isAudienceMatch(audience) {
+  if (audience === AUDIENCE.ALL) return true;
+  const profile = await resolveProfile();
+  if (!isSignedIn(profile)) return false;
+  if (audience === AUDIENCE.SIGNED_IN) return true;
+  return isRegisteredInPerson();
+}
+
+function buildBanner(contentEl, bannerId, onDismiss) {
   const banner = createTag('div', { class: 'in-person-banner-inner', role: 'status', 'aria-live': 'polite' });
   const copy = createTag('div', { class: 'in-person-banner-copy' }, contentEl.innerHTML, { parent: banner });
   copy.querySelectorAll('a').forEach((a) => a.classList.add('in-person-banner-link'));
@@ -54,22 +78,75 @@ function buildBanner(contentEl, bannerId) {
   }, CLOSE_ICON_SVG, { parent: banner });
   closeBtn.addEventListener('click', () => {
     setDismissed(bannerId);
+    onDismiss?.();
     banner.closest('.in-person-banner')?.remove();
   });
 
   return banner;
 }
 
-const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'below-nav', 'message']);
+// Returns a teardown fn — callers must invoke it once the banner is dismissed/removed, or
+// this listener keeps firing on every scroll indefinitely, reading offsetHeight on a
+// detached element and writing stale CSS custom properties forever.
+function observeScrollReveal(el) {
+  let ticking = false;
+  const update = () => {
+    const bannerHeight = el.offsetHeight;
+    const progress = Math.min(window.scrollY, bannerHeight);
+    document.documentElement.style.setProperty('--in-person-banner-scroll-progress', `${progress}px`);
+    el.classList.toggle('in-person-banner-scrolled', progress >= bannerHeight);
+    ticking = false;
+  };
+  const onScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(update);
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  update();
+  return () => window.removeEventListener('scroll', onScroll);
+}
 
-// Authors write the literal word "false" for an off boolean row (see below-nav in the
-// README example) — Boolean(str) can't tell that apart from any other non-empty string,
-// so this parses the actual authored value instead of just checking presence.
+function syncBannerHeightVar(el) {
+  const setHeightVar = () => {
+    document.documentElement.style.setProperty('--in-person-banner-height', `${el.offsetHeight}px`);
+  };
+  setHeightVar();
+  new ResizeObserver(setHeightVar).observe(el);
+}
+
+const CONFIG_KEYS = new Set(['banner-id', 'audience', 'rf-data-check', 'nav-overlay', 'message']);
+
+// `audience` is authoritative; legacy `rf-data-check: true` is sugar for `in-person`.
+function resolveAudience(config) {
+  const authored = (config.audience ?? getMetadata('audience') ?? '').trim().toLowerCase();
+  if (authored === AUDIENCE.SIGNED_IN || authored === AUDIENCE.IN_PERSON) return authored;
+  if (isTruthyConfigValue(config['rf-data-check'] ?? getMetadata('rf-data-check'))) {
+    return AUDIENCE.IN_PERSON;
+  }
+  return AUDIENCE.ALL;
+}
+
 function isTruthyConfigValue(value) {
   return (value ?? '').trim().toLowerCase() === 'true';
 }
 
-export default async function init(el) {
+function renderBanner(el, contentCell, bannerId, navOverlay) {
+  el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
+  el.classList.toggle('in-person-banner-nav-overlay', navOverlay);
+
+  let stopScrollReveal;
+  const banner = buildBanner(contentCell, bannerId, () => stopScrollReveal?.());
+  el.replaceChildren(banner);
+
+  if (navOverlay) {
+    document.body.prepend(el);
+    syncBannerHeightVar(el);
+    stopScrollReveal = observeScrollReveal(el);
+  }
+}
+
+export default function init(el) {
   const rows = [...el.querySelectorAll(':scope > div')];
   const config = {};
   let contentCell = null;
@@ -86,22 +163,32 @@ export default async function init(el) {
   if (!contentCell) return;
 
   const bannerId = config['banner-id'] || getMetadata('banner-id') || '';
-  const rfGateEnabled = isTruthyConfigValue(config['rf-data-check'] ?? getMetadata('rf-data-check'));
-  const belowNav = isTruthyConfigValue(config['below-nav'] ?? getMetadata('below-nav'));
+  const audience = resolveAudience(config);
+  const navOverlay = isTruthyConfigValue(config['nav-overlay'] ?? getMetadata('nav-overlay'));
 
   if (isDismissed(bannerId)) {
     el.remove();
     return;
   }
 
-  if (rfGateEnabled && !(await isRegisteredInPerson())) {
-    el.remove();
+  // `all` is known synchronously, so render immediately with no wait. Gated modes need an
+  // async sign-in / registration check — never await it in init (that would block the block
+  // from decorating and hold up the page). Keep the banner hidden until the check passes so
+  // it doesn't flash for users who shouldn't see it, then reveal or remove once resolved.
+  if (audience === AUDIENCE.ALL) {
+    renderBanner(el, contentCell, bannerId, navOverlay);
     return;
   }
 
-  el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
-  el.classList.toggle('in-person-banner-below-nav', belowNav);
-
-  const banner = buildBanner(contentCell, bannerId);
-  el.replaceChildren(banner);
+  el.hidden = true;
+  isAudienceMatch(audience).then((matches) => {
+    // Re-check: a duplicate instance of this same banner elsewhere on the page could have
+    // been dismissed while this instance's async audience check was still pending.
+    if (!matches || isDismissed(bannerId)) {
+      el.remove();
+      return;
+    }
+    el.hidden = false;
+    renderBanner(el, contentCell, bannerId, navOverlay);
+  });
 }

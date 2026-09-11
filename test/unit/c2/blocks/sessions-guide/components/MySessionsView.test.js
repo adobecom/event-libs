@@ -51,6 +51,8 @@ function makeStore({
   scheduledIds = new Set(),
   mySessionsTab = 'upcoming',
   activeDay = new Intl.DateTimeFormat('en-CA', { timeZone: BASE_CONFIG.userTz }).format(new Date()),
+  activeFilters = {},
+  searchQuery = '',
 } = {}) {
   auth.value = { isLoggedIn, isRegistered, userFirstName: null };
   sessions.value = sessionList;
@@ -60,7 +62,9 @@ function makeStore({
 
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { mySessionsTab, activeDay, guideConfig: { ...BASE_CONFIG } },
+    state: {
+      mySessionsTab, activeDay, activeFilters, searchQuery, guideConfig: { ...BASE_CONFIG },
+    },
     dispatch: () => {},
   };
   return store;
@@ -81,6 +85,20 @@ describe('MySessionsView', () => {
     const store = makeStore({ isRegistered: false, isLoggedIn: true });
     const View = buildMySessionsView(preact, store);
     expect(View({})).to.be.null;
+  });
+
+  // Regression for the refresh-on-My-sessions bounce: while auth is still resolving
+  // (isLoggedIn null, isRegistered undefined — see isAuthResolved()'s own comment), the
+  // view shows the same loading treatment as the shells' own sessionsStatus gate, rather
+  // than asserting the visitor is unauthorized (or leaving a bare blank view) either way.
+  // makeStore()'s own default would coerce an explicit `isRegistered: undefined` back to
+  // `true` (a destructuring default triggers on undefined, not just a missing key), so
+  // isRegistered is reset directly on the signal after construction instead.
+  it('shows the loading state while auth is still resolving, not yet an unauthorized verdict', () => {
+    const store = makeStore({ isLoggedIn: null });
+    auth.value = { ...auth.value, isRegistered: undefined };
+    const View = buildMySessionsView(preact, store);
+    expect(View({})).to.include('sg-loading-state');
   });
 
   it('renders the my-sessions view when registered', () => {
@@ -124,5 +142,29 @@ describe('MySessionsView', () => {
     const store = makeStore({ mySessionsTab: 'on-demand' });
     const View = buildMySessionsView(preact, store);
     expect(View({})).to.include('sg-my-sessions__empty');
+  });
+
+  it('shows "No results found" instead of the default empty state when search excludes every scheduled session', () => {
+    const store = makeStore({
+      sessionList: [UPCOMING_SESSION, PAST_SESSION],
+      scheduledIds: new Set(['u-1', 'p-1']),
+      searchQuery: 'nonexistent term',
+    });
+    const View = buildMySessionsView(preact, store);
+    const html = View({});
+    expect(html).to.include('No results found');
+    expect(html).to.not.include('sg-my-sessions__empty');
+  });
+
+  it('shows "No results found" instead of the default empty state when a filter excludes every scheduled session', () => {
+    const store = makeStore({
+      sessionList: [UPCOMING_SESSION, PAST_SESSION],
+      scheduledIds: new Set(['u-1', 'p-1']),
+      activeFilters: { primaryTrack: new Set(['Nonexistent']) },
+    });
+    const View = buildMySessionsView(preact, store);
+    const html = View({});
+    expect(html).to.include('No results found');
+    expect(html).to.not.include('sg-my-sessions__empty');
   });
 });

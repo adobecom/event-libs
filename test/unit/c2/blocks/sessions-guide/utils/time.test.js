@@ -39,6 +39,10 @@ describe('utils/time', () => {
       expect(result).to.be.a('string').and.not.empty;
     });
 
+    it('renders am/pm lowercase and attached to the time, with a space before the tz abbreviation', () => {
+      expect(formatSessionTime(SESSION.startTimeUtc, TZ)).to.equal('10:00am PDT');
+    });
+
     it('returns an empty string instead of throwing for a session with no scheduled time', () => {
       expect(formatSessionTime('', TZ)).to.equal('');
       expect(formatSessionTime(undefined, TZ)).to.equal('');
@@ -49,6 +53,11 @@ describe('utils/time', () => {
     it('returns a non-empty string for valid input', () => {
       const result = formatShortTime(SESSION.startTimeUtc, TZ);
       expect(result).to.be.a('string').and.not.empty;
+    });
+
+    it('renders am/pm lowercase and attached to the time', () => {
+      expect(formatShortTime(SESSION.startTimeUtc, TZ)).to.equal('10:00am');
+      expect(formatShortTime('2026-10-28T22:00:00Z', TZ)).to.equal('3:00pm');
     });
 
     it('returns an empty string instead of throwing for a session with no scheduled time', () => {

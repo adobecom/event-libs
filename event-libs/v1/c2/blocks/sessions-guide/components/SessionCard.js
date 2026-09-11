@@ -183,7 +183,7 @@ export function SessionCard({
       <div class="sg-card__actions" data-time=${timeLabel} onclick=${(e) => e.stopPropagation()} ontouchend=${handleActionsTouchEnd}>
         ${forceOnDemand && html`<${IconButton}
           variant="solid"
-          context="on-dark"
+          context="on-light"
           size="md"
           extraClass="sg-card__btn--play"
           label=${`Play ${session.title}`}
@@ -193,8 +193,8 @@ export function SessionCard({
           <${IconPlay} />
         </${IconButton}>`}
         ${!forceOnDemand && !onDemand && schedulingEnabled && html`<${IconButton}
-          variant="solid"
-          context="on-dark"
+          variant=${isScheduled ? 'solid' : 'outlined'}
+          context="on-light"
           size="md"
           extraClass="sg-card__btn--schedule"
           label=${isScheduled ? `Remove ${session.title} from schedule` : `Add ${session.title} to schedule`}
@@ -206,8 +206,8 @@ export function SessionCard({
           ${isScheduled ? html`<${IconCalendarCheck} />` : html`<${IconCalendarPlus} />`}
         </${IconButton}>`}
         ${favoritingEnabled && html`<${IconButton}
-          variant="solid"
-          context="on-dark"
+          variant=${isFavorited ? 'solid' : 'outlined'}
+          context="on-light"
           size="md"
           extraClass="sg-card__btn--favorite"
           label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}

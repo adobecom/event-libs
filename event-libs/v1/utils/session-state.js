@@ -1,8 +1,7 @@
 import { getHomepagePath, getBroadcastPath } from './tier-1-event-config.js';
 import { MAX_EVENT_PAGES } from './constances.js';
 
-// `?serverTime=<ms>` simulates landing at a given instant. An origin, not a freeze — the
-// clock keeps advancing, so a tester can park just before a transition and watch it happen.
+// `?serverTime=<ms>` simulates landing at a given instant; an origin, not a freeze — the clock keeps advancing.
 const SERVER_TIME_ORIGIN = (() => {
   try {
     const raw = new URLSearchParams(window.location.search).get('serverTime');
@@ -27,16 +26,15 @@ export function dvrAvailableAtMs(session, eventStartMs) {
   return eventStartMs + session.dvrDelayHours * HOUR_MS;
 }
 
-// Not read by sessions-guide's own filtering (see onDemandSessions() in
-// sessions-guide/utils/session-filters.js) — kept as a shared utility for any block that
-// needs it. Fails open when either input is missing.
+// Not read by sessions-guide's own filtering — kept as a shared utility for other blocks. Fails open.
 export function isDvrPending(session, nowMs, eventStartMs) {
+  // mrStreamId sessions go straight from live to DVR recording; dvrDelayHours never applies to them.
+  if (session?.mrStreamId) return false;
   const availableAt = dvrAvailableAtMs(session, eventStartMs);
   return availableAt !== null && nowMs < availableAt;
 }
 
-// MR poll results for mrStreamId sessions, pure time-window for the rest. Never stored in
-// the reducer — computed fresh at render time.
+// MR poll results for mrStreamId sessions, pure time-window for the rest. Computed fresh, never stored.
 export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
   // Never airing, so neither the clock nor an active MR stream applies.
   if (session.hasOnDemandFormat) return 'on-demand';
@@ -64,8 +62,7 @@ export function isInLiveNow(session, liveStreamActiveIds, nowMs) {
   return nowMs >= start && liveStreamActiveIds.has(session.mrStreamId);
 }
 
-// Every session on-demand, or the authored eventEndMs has passed. An empty list alone never
-// satisfies the former; eventEndMs is independently sufficient.
+// Every session on-demand, or the authored eventEndMs has passed (either is independently sufficient).
 export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs) {
   const pastEventEnd = eventEndMs ? nowMs >= eventEndMs : false;
   const allEnded = sessionList.length > 0 && sessionList.every(
@@ -74,21 +71,13 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs)
   return allEnded || pastEventEnd;
 }
 
-// A session belongs on the Broadcast page only if getWatchDestination() would actually route
-// there once live — mainstage/keynote sessions (isLivestreamed) are homepage content
-// regardless of isOnline. broadcast-schedule.js filters its pool through this so a live
-// keynote never occupies a Broadcast slot.
+// Must match getWatchDestination()'s routing: isLivestreamed sessions are homepage content, not Broadcast.
 export function isBroadcastEligible(session) {
   return !session.isLivestreamed && !!session.isOnline;
 }
 
-// Root-relative: the destinations live on whatever domain is serving this page. Falls back
-// to MAX's pages for configs predating the authorable homepagePath/broadcastPath. The
-// Broadcast page hosts many sessions at once, so `?watch=<id>` (broadcast-url.js's
-// ENTRY_PARAM) tells it which one to commit to on arrival — without it, Broadcast falls back
-// to its own default schedule pick, which may not be the session the viewer actually clicked.
-// `session.id` is absent for event-session-details' metadata-scraped pseudo-session, which
-// has no catalog id to send — that caller keeps landing on the bare broadcast path.
+// Root-relative, falls back to MAX's pages for pre-authorable configs. `?watch=<id>` tells the
+// Broadcast page which session to commit to; omitted when session.id is absent (pseudo-sessions).
 export function getWatchDestination(session, sessionState) {
   if (sessionState === 'on-demand') return session.sessionPageUrl || '';
   if (sessionState !== 'live') return '';

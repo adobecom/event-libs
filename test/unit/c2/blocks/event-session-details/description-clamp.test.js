@@ -8,7 +8,7 @@ describe('Description "More" Clamp', () => {
   });
 
   it('renders the description text', () => {
-    setMetadata('description', 'A session about creative workflows.');
+    setMetadata('event-details', 'A session about creative workflows.');
     const el = renderDescriptionClamp();
     expect(el.classList.contains('session-description')).to.be.true;
     expect(el.querySelector('.session-description-text').textContent)
@@ -16,12 +16,12 @@ describe('Description "More" Clamp', () => {
   });
 
   it('returns null when the description is empty', () => {
-    setMetadata('description', '   ');
+    setMetadata('event-details', '   ');
     expect(renderDescriptionClamp()).to.be.null;
   });
 
   it('starts collapsed and the toggle flips expanded state + label', () => {
-    setMetadata('description', 'Long description text.');
+    setMetadata('event-details', 'Long description text.');
     const el = renderDescriptionClamp();
     const toggle = el.querySelector('.session-description-toggle');
     expect(toggle.getAttribute('aria-expanded')).to.equal('false');

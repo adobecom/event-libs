@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import init, { parseBroadcastConfig } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
+import init, { parseBroadcastConfig, observeFillHeight } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
 import { sessionsStatus } from '../../../../../event-libs/v1/utils/session-store.js';
 
 // "Session ended image" supports two authoring styles (see extractSessionEndedImageUrl's
@@ -182,5 +182,99 @@ describe('session-broadcast init()', () => {
     expect(el.classList.contains('session-broadcast')).to.be.true;
     expect(el.innerHTML).to.include('sb-app');
     expect(el.innerHTML).to.not.include('Also live title');
+  });
+});
+
+// --sb-fill-height (read by .sb-app's min-height in session-broadcast.css) keeps a short state
+// (e.g. Ended with no Also Live/Upcoming sessions) reaching exactly the footer's top edge,
+// instead of leaving a gap of the page's default background under it — see session-broadcast.js.
+describe('observeFillHeight', () => {
+  let footer;
+  let originalInnerHeight;
+
+  beforeEach(() => {
+    footer = document.createElement('footer');
+    document.body.append(footer);
+    originalInnerHeight = window.innerHeight;
+  });
+
+  afterEach(() => {
+    footer.remove();
+    Object.defineProperty(window, 'innerHeight', { value: originalInnerHeight, configurable: true });
+  });
+
+  function stubEl(top) {
+    const el = document.createElement('div');
+    el.getBoundingClientRect = () => ({ top });
+    return el;
+  }
+
+  function stubViewport({ innerHeight, footerHeight }) {
+    Object.defineProperty(window, 'innerHeight', { value: innerHeight, configurable: true });
+    Object.defineProperty(footer, 'offsetHeight', { value: footerHeight, configurable: true });
+  }
+
+  it('fills exactly the gap between the block and the footer', () => {
+    const el = stubEl(100);
+    stubViewport({ innerHeight: 900, footerHeight: 200 });
+    observeFillHeight(el);
+    expect(el.style.getPropertyValue('--sb-fill-height')).to.equal('600px');
+  });
+
+  it('floors at 0 when the block and footer already exceed the viewport', () => {
+    const el = stubEl(700);
+    stubViewport({ innerHeight: 900, footerHeight: 300 });
+    observeFillHeight(el);
+    expect(el.style.getPropertyValue('--sb-fill-height')).to.equal('0px');
+  });
+
+  it('treats a missing footer as zero height instead of throwing', () => {
+    footer.remove();
+    const el = stubEl(100);
+    Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
+    expect(() => observeFillHeight(el)).to.not.throw();
+    expect(el.style.getPropertyValue('--sb-fill-height')).to.equal('800px');
+  });
+
+  it('recomputes on window resize', () => {
+    const el = stubEl(0);
+    stubViewport({ innerHeight: 900, footerHeight: 100 });
+    observeFillHeight(el);
+    expect(el.style.getPropertyValue('--sb-fill-height')).to.equal('800px');
+
+    Object.defineProperty(window, 'innerHeight', { value: 1200, configurable: true });
+    window.dispatchEvent(new Event('resize'));
+    expect(el.style.getPropertyValue('--sb-fill-height')).to.equal('1100px');
+  });
+
+  // The footer mounts empty and hydrates asynchronously (see the comment on observeFillHeight),
+  // which is why a ResizeObserver watches it instead of computing once. Stubs the constructor
+  // to invoke its callback synchronously and deterministically, rather than waiting on a real
+  // layout change and an unpredictable number of animation frames.
+  it('recomputes when the footer resizes after mounting empty', () => {
+    const el = stubEl(0);
+    stubViewport({ innerHeight: 900, footerHeight: 0 });
+
+    let observedCallback;
+    let observedTarget;
+    const OriginalResizeObserver = window.ResizeObserver;
+    window.ResizeObserver = class {
+      constructor(callback) { observedCallback = callback; }
+
+      observe(target) { observedTarget = target; }
+    };
+
+    try {
+      observeFillHeight(el);
+      expect(observedTarget).to.equal(footer);
+      expect(el.style.getPropertyValue('--sb-fill-height')).to.equal('900px');
+
+      Object.defineProperty(footer, 'offsetHeight', { value: 150, configurable: true });
+      observedCallback();
+
+      expect(el.style.getPropertyValue('--sb-fill-height')).to.equal('750px');
+    } finally {
+      window.ResizeObserver = OriginalResizeObserver;
+    }
   });
 });

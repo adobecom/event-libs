@@ -56,6 +56,32 @@ describe('features/toast', () => {
       expect(toasts.value[1].message).to.equal('First');
     });
 
+    it('caps actionable toasts sharing a key at one — a repeat trigger is a no-op', () => {
+      const firstId = showToast({ message: 'Register to favorite.', ctaLabel: 'Register', key: 'favorite' });
+      const secondId = showToast({ message: 'Register to favorite.', ctaLabel: 'Register', key: 'favorite' });
+      expect(secondId).to.be.null;
+      expect(toasts.value).to.have.lengthOf(1);
+      expect(toasts.value[0].id).to.equal(firstId);
+    });
+
+    it('lets a different key stack alongside an existing actionable toast', () => {
+      showToast({ message: 'Register to favorite.', ctaLabel: 'Register', key: 'favorite' });
+      showToast({ message: 'Register to add to schedule.', ctaLabel: 'Register', key: 'schedule' });
+      expect(toasts.value).to.have.lengthOf(2);
+    });
+
+    it('does not cap toasts without a key, even with the same message/ctaLabel', () => {
+      showToast({ message: 'Register.', ctaLabel: 'Register' });
+      showToast({ message: 'Register.', ctaLabel: 'Register' });
+      expect(toasts.value).to.have.lengthOf(2);
+    });
+
+    it('does not cap non-actionable (no ctaLabel) toasts sharing a key', () => {
+      showToast({ message: 'Added to favorites', key: 'favorite' });
+      showToast({ message: 'Added to favorites', key: 'favorite' });
+      expect(toasts.value).to.have.lengthOf(2);
+    });
+
     it('hideToast(id) removes only the matching toast', () => {
       const firstId = showToast({ message: 'First' });
       showToast({ message: 'Second' });
@@ -104,18 +130,26 @@ describe('features/toast', () => {
     });
 
     it('sets alertdialog/status roles and reveals content to assistive tech after mount', async () => {
-      showToast({ message: 'Link copied', variant: 'positive' });
-      const el = region.querySelector('.sg-toast');
-      expect(el.getAttribute('role')).to.equal('alertdialog');
-      expect(el.getAttribute('tabindex')).to.equal('0');
+      // Real rAF can be suspended indefinitely on a backgrounded page when many WTR sessions
+      // share a browser (see profile-cards.test.js's own stubRaf note) — stub it so the
+      // double-rAF reveal in mountToast() resolves deterministically instead of racing that.
+      const raf = sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+      try {
+        showToast({ message: 'Link copied', variant: 'positive' });
+        const el = region.querySelector('.sg-toast');
+        expect(el.getAttribute('role')).to.equal('alertdialog');
+        expect(el.getAttribute('tabindex')).to.equal('0');
 
-      const content = el.querySelector('.sg-toast__body');
-      expect(content.getAttribute('role')).to.equal('status');
-      expect(content.getAttribute('aria-hidden')).to.equal('true');
+        const content = el.querySelector('.sg-toast__body');
+        expect(content.getAttribute('role')).to.equal('status');
+        expect(content.getAttribute('aria-hidden')).to.equal('true');
 
-      await nextFrames();
-      expect(el.classList.contains('sg-toast--visible')).to.be.true;
-      expect(content.hasAttribute('aria-hidden')).to.be.false;
+        await nextFrames();
+        expect(el.classList.contains('sg-toast--visible')).to.be.true;
+        expect(content.hasAttribute('aria-hidden')).to.be.false;
+      } finally {
+        raf.restore();
+      }
     });
 
     it('uses role="status" (polite) for informative/positive/neutral, reserving role="alert" (assertive) for negative', () => {

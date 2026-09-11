@@ -120,4 +120,42 @@ describe('LiveUpcomingView', () => {
     const View = buildLiveUpcomingView(preact, store);
     expect(View({})).to.not.include('Previously aired');
   });
+
+  it('shows "No results found" instead of the default empty state when search matches nothing', () => {
+    const store = makeStore([AIRED_SESSION], AIRED_DAY, { searchQuery: 'nonexistent term' });
+    const View = buildLiveUpcomingView(preact, store);
+    const html = View({});
+    expect(html).to.include('No results found');
+    expect(html).to.not.include('No sessions scheduled for this day.');
+  });
+
+  it('shows "No results found" instead of the default empty state when a filter excludes everything', () => {
+    const store = makeStore([AIRED_SESSION], AIRED_DAY, {
+      activeFilters: { primaryTrack: new Set(['Video']) },
+    });
+    const View = buildLiveUpcomingView(preact, store);
+    const html = View({});
+    expect(html).to.include('No results found');
+    expect(html).to.not.include('No sessions scheduled for this day.');
+  });
+
+  // Regression: Live sessions are exempt from search/filters (shown above regardless),
+  // which previously masked "No results found" below whenever a live session was
+  // present — the empty-state check incorrectly required the Live section to also be
+  // empty before it would render.
+  it('shows "No results found" below the Live sessions carousel when search matches nothing else', () => {
+    const store = makeStore([LIVE_SESSION], TODAY, { searchQuery: 'nonexistent term' });
+    const View = buildLiveUpcomingView(preact, store);
+    const html = View({});
+    expect(html).to.include('Live sessions');
+    expect(html).to.include('No results found');
+  });
+
+  it('keeps the default empty state when no search or filters are active', () => {
+    const store = makeStore([]);
+    const View = buildLiveUpcomingView(preact, store);
+    const html = View({});
+    expect(html).to.include('No sessions scheduled for this day.');
+    expect(html).to.not.include('No results found');
+  });
 });

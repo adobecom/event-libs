@@ -9,22 +9,19 @@ import {
 } from '../../utils/session-store.js';
 import { getNowMs, isPostEvent } from '../../utils/session-state.js';
 
-// Shared toast copy for gated actions — used both by runSessionAction's action failures
-// and checkViewAccess's navigation gate. Login and registration are treated as a single
-// pool now (no more auth-required vs registration-required distinction in the copy), so
-// every gated action gets the same message/CTA, always pointing at the registration link.
+// Shared toast copy for gated actions, used by both runSessionAction's failures and checkViewAccess.
 export function showAuthToast({ eventConfig, actionLabel }) {
   showToast({
     message: `Register or sign in to ${actionLabel}.`,
     variant: 'informative',
     ctaLabel: 'Register/Sign in',
     ctaHref: eventConfig.registerUrl || '/register',
+    // Caps at one toast per gated action; actionLabel is already the natural per-action key.
+    key: actionLabel,
   });
 }
 
-// Translates a SessionActionError (thrown by the shared, UI-agnostic session-actions
-// layer) into a toast or conflict modal via the shared, page-level modules — usable by
-// both Preact and vanilla blocks.
+// Translates a SessionActionError into a toast or conflict modal — usable by both Preact and vanilla blocks.
 export async function runSessionAction(actionFn, {
   eventConfig, actionLabel, successMessage, successVariant = 'positive', onBlocked,
 }) {
@@ -34,9 +31,7 @@ export async function runSessionAction(actionFn, {
   } catch (err) {
     if (err.reason === 'auth-required' || err.reason === 'registration-required') {
       showAuthToast({ eventConfig, actionLabel });
-      // The triggering button still has native focus, which keeps a hover-styled card
-      // looking "stuck" via :focus-within long after the pointer has moved away —
-      // give the caller a chance to blur it now that the action didn't go through.
+      // Blurs the triggering button so a hover-styled card doesn't look stuck via :focus-within.
       onBlocked?.();
     } else if (err.reason === 'conflict') {
       const { conflict, incoming } = err.meta;
@@ -59,13 +54,11 @@ export async function runSessionAction(actionFn, {
   }
 }
 
-// Thin, pre-labeled wrappers around runSessionAction so every schedule/favorite call
-// site shares the same success copy instead of repeating it at each call site.
+// Thin, pre-labeled wrappers so every schedule/favorite call site shares the same success copy.
 export function toggleScheduleWithFeedback(session, {
   eventConfig, isScheduled, onBlocked,
 }) {
-  // One shared, page-level read (not eventConfig, which is per-block) — inverted,
-  // since allowing double booking means suppressing the conflict modal.
+  // Inverted: allowing double booking means suppressing the conflict modal.
   return runSessionAction(
     () => toggleScheduleAction(session, { showConflictModal: !getAllowDoubleBooking() }),
     {
@@ -93,10 +86,10 @@ export function toggleFavoriteWithFeedback(session, {
   );
 }
 
-const GATED_VIEW_LABELS = { 'my-sessions': 'My sessions', 'my-favorites': 'My favorites' };
+// Lowercase mid-sentence: only used inside toast copy, never as a standalone label.
+const GATED_VIEW_LABELS = { 'my-sessions': 'my sessions', 'my-favorites': 'my favorites' };
 
-// Where an unauthorized visitor should land instead of a gated view — Live & upcoming
-// during the event, On demand once isPostEvent() (shared with the auto-transition below).
+// Where an unauthorized visitor lands: Live & upcoming during the event, On demand once isPostEvent().
 function fallbackViewForUnauthorized() {
   if (sessionsStatus.value !== 'ready' || !sessions.value.length) return 'live-upcoming';
   const eventEndMs = getEventApiConfig()?.eventEndMs;
@@ -105,9 +98,13 @@ function fallbackViewForUnauthorized() {
     : 'live-upcoming';
 }
 
-// Gates navigation to My Sessions/My Favorites, reusing the schedule/favorite actions'
-// login/registration toast. Returns the fallback view when blocked (toast already shown),
-// or null when accessible.
+// isRegistered stays `undefined` until session-store.js settles it (possibly to `null` on failure) —
+// resolving here too early would bounce an about-to-be-confirmed visitor away.
+export function isAuthResolved({ isLoggedIn, isRegistered }) {
+  return isLoggedIn === false || (isLoggedIn === true && isRegistered !== undefined);
+}
+
+// Returns the fallback view when blocked (toast already shown), or null when accessible.
 export function checkViewAccess(view, { eventConfig }) {
   const label = GATED_VIEW_LABELS[view];
   if (!label) return null;

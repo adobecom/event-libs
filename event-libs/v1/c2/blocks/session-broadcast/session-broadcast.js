@@ -77,9 +77,27 @@ export function parseBroadcastConfig(el) {
   return config;
 }
 
+// Keeps --sb-fill-height (read by .sb-app's min-height in session-broadcast.css) equal to the
+// gap between el and the global footer's top edge, so a short state never leaves a stretch of
+// the page's default background between the block and the footer. Recomputed on resize and
+// whenever the footer's own size changes — it mounts empty and hydrates asynchronously.
+export function observeFillHeight(el) {
+  const footer = document.querySelector('body > footer');
+  const recompute = () => {
+    const top = el.getBoundingClientRect().top + window.scrollY;
+    const footerHeight = footer?.offsetHeight || 0;
+    const fillHeight = Math.max(0, window.innerHeight - top - footerHeight);
+    el.style.setProperty('--sb-fill-height', `${fillHeight}px`);
+  };
+  recompute();
+  window.addEventListener('resize', recompute);
+  if (footer) new ResizeObserver(recompute).observe(footer);
+}
+
 export default async function init(el) {
   const config = parseBroadcastConfig(el);
   el.innerHTML = '';
   el.classList.add('session-broadcast');
   render(h(BroadcastApp, { config }), el);
+  observeFillHeight(el);
 }

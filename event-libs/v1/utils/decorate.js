@@ -1247,7 +1247,7 @@ export function decorateEvent(parent) {
   // Hydrate metadata with user-friendly transformations
   addStylesToEventPage();
   const miloConfig = getEventConfig().miloConfig;
-  const locale = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
+  const locale = miloConfig?.locale?.ietf || getFallbackLocale(FALLBACK_LOCALES)?.ietf;
   const massagedMetadata = massageMetadata(locale);
 
   processTemplateInAllNodes(parent, { ...photosData, ...massagedMetadata });
