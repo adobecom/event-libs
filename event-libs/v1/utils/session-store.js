@@ -9,6 +9,11 @@ import {
   DEFAULT_RF_API_URL, STAGE_RF_API_URL, DEFAULT_RF_PROFILE_ID,
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
+import {
+  reconcileSwanNotifications, notifySessionScheduled, notifySessionUnscheduled,
+} from '../features/swan-notifications/swan-notifications.js';
+import { isSwanEnabled } from '../features/swan-notifications/swan-config.js';
+import { mountNotificationWidget } from '../features/swan-notifications/notification-widget.js';
 
 // Shared, page-level state. Preact reads `.value` directly; non-Preact code uses `.subscribe()`/`.peek()`.
 export const sessions = signal([]);
@@ -44,6 +49,11 @@ let realAuthConfirmed = false;
 let rfAuthToken = null;
 let rfAuthTokenStarted = false;
 let rfAuthTokenSettled = false;
+// True once `scheduled` reflects a real answer (fetched, or definitively never going to be
+// fetched — e.g. logged out) rather than just its empty initial value. Gates SWAN's orphan
+// cleanup (see reconcileSwanNotifications) so an empty `scheduled` before myData has loaded
+// is never mistaken for "the user has nothing scheduled."
+let scheduleKnown = false;
 
 // The media-relay backend only has dev/stage/prod, so the finer-grained envs collapse.
 function deriveMrEnv() {
@@ -84,11 +94,21 @@ function syncAuth() {
     isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
     userFirstName: profile?.first_name ?? null,
   };
+  // Gated on real login, not just isSwanEnabled(): scheduling (the only thing that ever
+  // populates the notification store) requires an RF auth token from a real IMS profile,
+  // so an anonymous visitor's bell would only ever render empty. This also matches real
+  // UNC's own behavior — its notifications icon is excluded from SIGNED_OUT_ICONS too.
+  // mountNotificationWidget() is itself idempotent, so re-firing on every syncAuth() call
+  // (e.g. a later profile update) is harmless.
+  if (auth.value.isLoggedIn && isSwanEnabled()) mountNotificationWidget();
   if (auth.value.isLoggedIn && profile.userId) {
     exchangeRfAuthToken(profile.userId);
   } else {
-    // Mark settled either way, so maybeLoadMyData() isn't blocked forever.
+    // Mark settled either way, so maybeLoadMyData() isn't blocked forever. Also: not logged
+    // in (or no userId) means there is definitively no schedule to fetch for this visitor,
+    // which is itself a real, final answer — not "still don't know."
     rfAuthTokenSettled = true;
+    scheduleKnown = true;
     maybeLoadMyData();
   }
 }
@@ -108,6 +128,12 @@ async function loadMyData() {
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
       auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
     });
+    scheduleKnown = true;
+    // Immediate reconciliation now that both the session catalog and the user's
+    // confirmed schedule have settled, rather than waiting for the next
+    // session-state-ticker.js tick (up to intervalMs away) to apply any stage
+    // transition that's already due.
+    reconcileSwanNotifications(() => sessions.value, () => scheduled.value, () => scheduleKnown);
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
     // A failed fetch is still a final, non-retried answer — isRegistered must not stay undefined.
@@ -124,8 +150,11 @@ function maybeLoadMyData() {
   myDataAttempted = true;
   if (!rfAuthToken) {
     // Settle isRegistered to null (not undefined) so isAuthResolved() doesn't spin forever.
+    // There's no schedule fetch coming either way, so treat it as known (empty) rather than
+    // leaving SWAN's orphan cleanup gated forever on a fetch that will never happen.
     window.lana?.log('[session-store] no RF auth token — skipping myData, registration status unknown');
     auth.value = { ...auth.value, isRegistered: null };
+    scheduleKnown = true;
     return;
   }
   loadMyData();
@@ -147,6 +176,15 @@ async function loadSessions() {
       () => sessions.value,
       () => liveStreamActiveIds.value,
       () => { sessionStateVersion.value += 1; },
+      {
+        // Must be onTick, not onChange: onChange only fires when a session's coarse
+        // upcoming/live/on-demand bucket flips, which has no boundary at SWAN's
+        // reminder lead time (start minus a few minutes) — gating reconcile on it would
+        // mean the T-5-minute reminder is never applied by the periodic tick at all,
+        // only ever by the one-shot call below or by a schedule action that happens to
+        // land after the trigger time already passed.
+        onTick: () => reconcileSwanNotifications(() => sessions.value, () => scheduled.value, () => scheduleKnown),
+      },
     );
     maybeLoadMyData();
   } catch (err) {
@@ -254,6 +292,10 @@ export async function toggleSchedule(session) {
     else addToSet(scheduled, session.id);
     setPending(session.id, false);
   });
+  // Fire-and-forget: a SWAN failure must never fail or roll back an already-successful
+  // RainFocus schedule mutation — each function swallows its own errors.
+  if (isScheduled) notifySessionUnscheduled(session);
+  else notifySessionScheduled(session);
 }
 
 export async function toggleFavorite(session) {
