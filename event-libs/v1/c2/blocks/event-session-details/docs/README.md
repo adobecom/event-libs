@@ -200,12 +200,12 @@ Only IPOD needs this because only IPOD has a real gap: an online session's recor
 its stream archive and lands immediately, whereas the real MPC template carries
 `DVR Timing (in hours)` of **772** (~32 days).
 
-**One residual divergence from the player:** `hasPlayableVideo` still requires `kind === 'onDemand'`,
-while the player's `findEmbeddableVideos` filters by provider only. So on an ended session whose only
-embeddable entry is a leftover `liveStream` or a `dvr`, the eyebrow reads `Available soon` while the
-player would try to embed that non-recording — arguably a player-side bug (it should prefer the
-recording). If `findEmbeddableVideos` gains a `kind` filter, the eyebrow follows for free. Real data
-carries all three kinds on one session:
+**Aligned with the player.** `hasPlayableVideo` reuses the player's own `findEmbeddableVideos`
+(provider-only: `mpc`/`youtube`, **no `kind` filter**), so the eyebrow says `On-demand` exactly when
+the player would embed a video. Per product (Sekhar): the presence of an MPC/YouTube id means there is
+an on-demand recording, so a leftover `liveStream`- or `dvr`-tagged `mpc`/`youtube` entry on an ended
+session reads `On-demand`, not `Available soon`. Only a non-embeddable provider (`mobilerider`) or no
+video at all stays pending. Real data carries all three kinds on one session:
 
 ```json
 [ { "provider": "youtube",     "kind": "liveStream", "url": "…/watch?v=…" },
@@ -213,13 +213,19 @@ carries all three kinds on one session:
   { "provider": "mobilerider", "kind": "dvr",        "url": "…/video/…" } ]
 ```
 
+**Still open — DVR timing offset.** Per Sekhar the recording should appear at **session end +
+`DVR Timing (in hours)`** (e.g. the MPC template's **772h ≈ 32 days**), but `hasPlayableVideo` (and the
+player's `currentSessionHasEnded`) currently gate on session end alone, with no DVR offset. Applying
+`end + DVR` needs to happen in the shared `video-session.js` gate so the eyebrow, player, and playlist
+stay aligned — tracked toward MWPW-206782.
+
 `renderStatus` adds `session-status--ipod-pending` for the pending case; it carries no
 styling of its own, so the state is targetable if design wants it differentiated. It is named
 for the state (not the label text), so it stays accurate when the `IPOD pending label` is
 re-authored.
 
-See [known-issues.md](known-issues.md) for the `liveStream` divergence from
-`video-player` and the `mobilerider`/`dvr` question.
+See [known-issues.md](known-issues.md) for the eyebrow ↔ `video-player` alignment
+and the `mobilerider`/`dvr` question.
 
 ### Watch now destination
 

@@ -1,7 +1,7 @@
 import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
 import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
-import { currentSessionHasEnded, EMBEDDABLE_PROVIDERS } from '../../utils/video-session.js';
+import { currentSessionHasEnded, findEmbeddableVideos } from '../../utils/video-session.js';
 import { renderSchedule } from './schedule.js';
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
@@ -64,9 +64,7 @@ export function hasPlayableVideo(doc = document) {
     return false;
   }
   if (!currentSessionHasEnded(entries, getNowMs())) return false;
-  return (entries || [])
-    .flatMap((t) => t?.videos || [])
-    .some((v) => EMBEDDABLE_PROVIDERS.includes(v?.provider) && v?.kind === 'onDemand');
+  return findEmbeddableVideos(entries).length > 0;
 }
 
 const normalizeAttr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');

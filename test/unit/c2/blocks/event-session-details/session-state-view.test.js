@@ -250,12 +250,16 @@ describe('session-state-view', () => {
       expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
-    it('IPOD with only a leftover liveStream entry -> Available soon', () => {
+    // Presence of an embeddable mpc/youtube source is what matters, not its `kind` — the
+    // recording shows up once the session has ended (per Sekhar: an MPC/YouTube id means
+    // there is an on-demand recording). Matches the player's own `findEmbeddableVideos`,
+    // which filters by provider only.
+    it('IPOD with a youtube entry of any kind -> On-demand', () => {
       setPage({
         videos: [{ provider: 'youtube', url: 'https://youtube.com/watch?v=x', kind: 'liveStream' }],
         format: IPOD,
       });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
     });
 
     it('IPOD with a non-embeddable provider only -> Available soon', () => {
@@ -263,12 +267,9 @@ describe('session-state-view', () => {
       expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
-    // Matches session-video-player's `pickEmbeddableVideo`, which requires kind === 'onDemand'
-    // exactly. An embeddable provider under any other kind gets no player, so claiming
-    // "On-demand" here would promise a video the page cannot play.
-    it('IPOD with an embeddable provider but a non-onDemand kind -> Available soon', () => {
+    it('IPOD with an embeddable provider of a non-onDemand kind -> On-demand', () => {
       setPage({ videos: [{ provider: 'mpc', url: 'x', kind: 'dvr' }], format: IPOD });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
     });
 
     it('matches the Format slug even with no display label', () => {
