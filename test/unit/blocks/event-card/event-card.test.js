@@ -93,6 +93,50 @@ describe('event-card', () => {
     expect(img.src).to.equal('https://example.com/media/session.jpg');
   });
 
+  it('sets no theme attribute — dark/light is pure CSS off the ancestor .section.dark or a dark-card class', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
+    const el = document.querySelector('.event-card');
+    await init(el);
+
+    expect(el.dataset.cardTheme).to.equal(undefined);
+  });
+
+  it('leaves an authored dark-card class in place for event-card.css to key off', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
+    const el = document.querySelector('.event-card');
+    el.classList.add('dark-card');
+    await init(el);
+
+    expect(el.classList.contains('dark-card')).to.equal(true);
+  });
+
+  it('leaves the card under its ancestor .section.dark for event-card.css to key off, with no card-level class added', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
+    const el = document.querySelector('.event-card');
+    const section = document.createElement('div');
+    section.className = 'section dark';
+    section.append(el);
+    document.body.append(section);
+    await init(el);
+
+    expect(el.closest('.section.dark')).to.equal(section);
+    expect(el.classList.contains('dark-card')).to.equal(false);
+  });
+
+  it('stays light inside a .section with no dark class', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
+    const el = document.querySelector('.event-card');
+    const section = document.createElement('div');
+    section.className = 'section';
+    section.append(el);
+    document.body.append(section);
+    await init(el);
+
+    expect(el.closest('.section.dark')).to.equal(null);
+    expect(el.classList.contains('dark-card')).to.equal(false);
+    expect(el.dataset.cardTheme).to.equal(undefined);
+  });
+
   it('keeps a cross-origin authored <img> at its real absolute URL, not a same-origin pathname', async () => {
     document.body.innerHTML = `
       <div class="event-card media-wide">

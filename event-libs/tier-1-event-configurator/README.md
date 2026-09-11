@@ -43,14 +43,16 @@ PLAN.md §6 — not built here.
 authors pick both explicitly for every track (`default-track-icons.js` re-exports
 `DEFAULT_ICON_COLOR`, the one universal fallback color, from the real
 `event-libs/v1/utils/tier-1-event-config.js` rather than carrying its own copy).
-`IconPicker.js` (a searchable combobox, since a native `<select>` can't render
-an icon + name per option) renders each option through the real, shared
-`event-libs/v1/features/icons/Icon.js`/`icon-resolver.js` — the same
-federal-CDN-first, then-Milo-as-backup chain session-guide's live badges use
-(no other fallback — an icon in neither source doesn't render) — so the
-picker and the live page never drift. Its option list itself comes from
-`useIconSlugOptions()` (`IconPicker.js`), sourced entirely from federal's live
-`icons.json` inventory, so newly-uploaded federal icons appear with no code change.
+Track icons get the same treatment as product icons: they live in their own
+federal namespace (`/federal/assets/icons/track-icons/`, curated per-event, no
+manifest), so `TrackIconEditor.js`/`OverrideTrackIconEditor.js` are a plain text
+slug field, not a searchable picker — an author types the slug and the preview
+resolves it via `fetchFederalTrackIcon()` (`event-libs/v1/features/icons/
+federal-icons.js`), the same function the live sessions-guide badges call, so
+the editor and the live page never drift. The old `IconPicker.js` searchable
+combobox (fed by federal's generic-icon `icons.json` manifest) was retired along
+with it — track icons never lived in that namespace, so the manifest never
+actually reflected what a typed slug there would resolve to.
 
 **Known interim gap:** the track list shown in the editor comes from a raw
 `getEventSessionCatalog()` call in `event-libs/v1/utils/esp-controller.js`,
@@ -85,7 +87,7 @@ unchanged).
 - `context/ConfigsContext.js` — config-library list state, CRUD actions, toasts.
 - `context/EventEnvContext.js` — reactive wrapper around
   `setEventServiceEnvOverride()`; backs `ManualEventLookup.js`'s environment
-  picker and the app-wide non-prod banner.
+  picker and each row's non-prod badge in the library list (`tec-library__item-env`).
 - `scripts/da-controller.js` — `readSheet`/`writeSheet`/`mutateSheet` (ETag optimistic
   locking, ported from Schedule Maker's pre-link-first-pivot implementation) plus
   `getConfigs`/`upsertConfig`/`deleteConfig` on top.
@@ -100,13 +102,12 @@ unchanged).
 - `components/ManualEventLookup.js` — manual Event ID entry + lookup, with
   its own environment picker; the automatic fallback above, and how you'd
   target a non-prod tier for testing.
-- `components/TrackIconEditor.js` — per-track icon/color pickers.
+- `components/TrackIconEditor.js` — per-track icon slug (typed, resolved against
+  federal's track-icon namespace) + color fields.
+- `components/OverrideTrackIconEditor.js` — same, per override text (see the Track icon
+  editor implementation note above).
 - `components/ProductIconEditor.js` — per-product icon picker (no color — products
   already have their own colored SVGs) plus a product page URL field.
-- `components/IconPicker.js` — the shared searchable icon combobox TrackIconEditor and
-  OverrideTrackIconEditor render per row (a native `<select>` can't show an icon + name
-  per option); also hosts `useIconSlugOptions()`, sourced entirely from federal's live
-  `icons.json` inventory.
 - `components/FeaturedSessionsEditor.js` — session picker: search + track filter
   over the already-fetched session catalog, add/remove, ↑/↓ reorder into a flat
   ordered array. Homepage config types only — see "Data model" below.

@@ -95,3 +95,12 @@ export const eventsDelayedActions = async () => {
     initMetaPixel();
   }
 };
+
+// Unlike eventsDelayedActions, this must run on any page (no event-id required) --
+// consumer sites should call it unconditionally, independent of event-specific
+// decoration.
+export const initMiloSiteRedesignOverride = async () => {
+  if (getMetadata('override-milo-ace1209') !== 'true') return;
+  const { default: init } = await import('./features/milo-site-redesign-override/index.js');
+  return init();
+};

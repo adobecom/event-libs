@@ -219,18 +219,22 @@ interface Session {
   technicalLevel: string;
   category: string;
   audience: string;
-  aiFocus: string[];             // `AI Focus` -- no catalog attribute yet, so [] today
+  aiFocus: string[];             // `AI Focus` -- in the catalog since ~2026-08-27
   speakers: Speaker[];
   products: string[];
-  resources: Resource[];
+  resources: Resource[];         // still absent from the catalog entirely (no backend field yet)
   // Four video sources, one field each, named for the player. Alternatives, not a fallback
   // chain — a session carries whichever it was produced for.
-  mrStreamId: string | null;     // Mobile Rider LIVE; non-null = MR session. Always null
-                                 // today: inbound as `Mobilerider Live Stream ID` (tentative).
-  mpcId: string;                 // `MPC ID` -> Adobe Video TV. Mapped, unread.
-  youTubeId: string;             // `YouTube ID` -> YouTube. Mapped, unread.
+  mrStreamId: string | null;     // Mobile Rider LIVE; non-null = MR session. Mapped 2026-09-03
+                                 // from `Mobilerider Video ID (Livestream)` (real name, not the
+                                 // earlier tentative `Mobilerider Live Stream ID` guess).
+  mpcId: string;                 // `MPC ID` -> Adobe Video TV. Mapped; read by session-broadcast's
+                                 // PlayerHost.js/MpcPlayerAdapter.js.
+  youTubeId: string;             // `YouTube ID` -> YouTube. Mapped; read by session-broadcast's
+                                 // PlayerHost.js/YouTubePlayerAdapter.js.
   mrDvrVideoId: string;          // `Mobilerider Video ID (DVR)` -> post-stream recording,
-                                 // gated by `DVR Timing (in hours)`. Mapped, unread.
+                                 // gated by `DVR Timing (in hours)`. Mapped, read for presence
+                                 // only (session-video-playlist.js) -- no DVR player built yet.
   mrSkinId: string;              // `Skin ID` -> Mobile Rider player skin (mr* sources only).
   inPerson: boolean;             // Format carries `In person`
   isOnline: boolean;             // Format carries `Online`
@@ -934,11 +938,13 @@ Key rules, not obvious from the table alone:
   (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons.byText`),
   authored explicitly per text. No event-wide default and no built-in default (both dropped
   2026-08-24): an unmapped text gets no icon and `DEFAULT_ICON_COLOR` at render time.
-- `stackedTracks` (for the detail/session-page stacked-badge display) is the *additional*
-  track(s) only when an override applies (the override text isn't a real track, so it isn't
-  itself "stacked", and the primary track — if any — is also dropped from the stack once
-  overridden), or `[primary, ...additional]` when there's no override. Confirmed with
-  Daniel (2026-08-11): this is the intended behavior.
+- `stackedTracks` (for the detail/session-page stacked-badge display) is
+  `[primary, ...additional]` when there's no override, or `[override, ...additional]` when
+  there is — either way, whichever badge wins placement (16.2's table) leads the stack, with
+  any additional track(s) after it. **Superseded 2026-09-03** (Daniel): originally confirmed
+  2026-08-11 as override-excluded (`additional` only, on the theory that override text isn't
+  a real track so isn't itself "stacked") — reversed once Phase 18 actually needed the
+  override+additional case to render the same two-full-rows treatment as primary+additional.
 
 ### 16.3 Swimlane placement + ordering — `groupByTrack(sessions, swimlaneOrder)` ✅
 
@@ -1112,6 +1118,34 @@ this block right now, but cheap, already-authored data worth keeping available.
 - `profileId` → `rfProfileId` on the same object, so it's unambiguous which system's profile
   id this is without having to chase the assignment back to `rainfocus.js`.
 
+## Phase 18 — Detail overlay summary-top badge redesign ✅ (2026-09-03)
+
+Figma reintroduced a stacked-badge treatment for the channel line (`.sg-detail__summary-top`)
+that 16.9 had explicitly removed as "not a thing in the design" — the design changed again,
+this doesn't reopen that decision retroactively.
+
+- `SessionDetailOverlay.js`: when `resolveTrackBadge()`'s `stackedTracks` has more than one
+  entry (primary or override track + a real additional track — see 16.2's table), the
+  channel line renders both as two full rows (icon + label each,
+  `.sg-detail__channels--stacked`) instead of the single-row badge. `stackedTracks[0]` is
+  always `trackBadge` itself; the rest resolve their own icon via `resolveNamedTrackBadge()`
+  (same helper `CategoryBadge.js`'s `track` prop already uses). Single-track sessions (no
+  additional track either way) are unaffected, keeping the pre-existing single-row badge.
+  **2026-09-03, later same day:** override + additional was initially left on the single-row
+  badge per 16.2's original (2026-08-11) call that override text isn't itself "stacked" —
+  reversed on request to match primary + additional's treatment exactly; see 16.2's updated
+  entry.
+- `sessions-guide-overlays.css`: new `.sg-detail__channels--stacked` (flex column,
+  `--s2a-spacing-2xs` gap on mobile; row + `--s2a-spacing-md` gap from 768px) and
+  `.sg-detail__channel-icon--sm` (16px, vs. the single-row badge's 24px, per the "Status tag"
+  Figma component). `.sg-detail__meta-divider` switched from a fixed 20px height to
+  `align-self: stretch` so it still spans the full column when paired with the taller
+  two-row stack.
+- Out of scope, left for a separate ticket: the same Figma frames also showed a "Recording
+  coming soon" status replacing the time range in this row — that's the pre-existing,
+  not-yet-scoped `dvrDelayHours` display treatment flagged at Phase 17's DVR Timing section,
+  not something this pass touches.
+
 ---
 
 ## Dependency Map
@@ -1143,7 +1177,7 @@ Phase 15 (PR Readiness) ⬜ — final gate
 | FEDS event name / attribute path differs from what's documented | `getFedsToken()` implemented with timeout; FEDS integration not yet activated — confirm before shipping Phase 0.7 |
 | `isRegistered` source wiring | Wired via `BlockMediator.get('rsvpData').registered` inside `session-store.js`'s `syncAuth()`; dev state via `sg:dev-auth` localStorage; production wiring blocked on real Rainfocus integration |
 | Real Rainfocus API calls not wired | All RF service methods are stubs; `null` credentials passed in `services/sessions/session-actions.js`; must replace before shipping |
-| Real Mobile Rider API not wired | `fetchLiveStatus` returns all-inactive mock; polling runs but no live sessions will appear |
+| Real Mobile Rider API not wired | **Stale as of 2026-09-03** — `fetchLiveStatus` already hits Mobile Rider's real `media-status` endpoint (`mobile-rider.js`), not a mock. The actual blocker was `mrStreamId` always being `null` (the `Mobilerider Video ID (Livestream)` attribute wasn't in the catalog yet); that attribute has now arrived and `sessions-api.js` maps it — see `docs/sessions-guide-implementation-notes.md`'s Video sources section. Not yet verified against a real live stream in the browser. |
 | Real sessions API | ✅ wired (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_ESL_PAYLOAD` used only when no `eventId` is present |
 | Dev scaffolding (`seedDevData()` in `session-store.js`) in production path | `TODO` comments present; must remove or gate before PR — now runs page-wide via `decorateEvent`, not just for this block, so removal affects any page with `rainfocus-api-url` metadata |
 | 30 s polling causes excessive re-renders | Preact diffing handles; `useMemo` guards in view components on filter-derived lists |

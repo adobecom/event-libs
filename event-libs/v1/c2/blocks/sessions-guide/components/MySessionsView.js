@@ -4,12 +4,15 @@ import {
   sessions as sessionsSignal, scheduled as scheduledSignal,
   liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
 } from '../../../../utils/session-store.js';
-import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
+import { checkViewAccess, isAuthResolved } from '../../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
+import { NoResultsFound } from './NoResultsFound.js';
+import { LoadingState } from './LoadingState.js';
 import {
   groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
+  hasActiveSearchOrFilters,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 import { useIsPostEvent } from '../utils/use-post-event.js';
@@ -26,25 +29,24 @@ export function MySessionsView() {
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const userTz = state.guideConfig?.userTz;
-  // Read purely to establish a re-render dependency on time-driven session-state
-  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // Read only to trigger a re-render on session-state transitions; value itself is unused.
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
   const isPost = useIsPostEvent();
 
-  // Logged-out/unregistered visitors never see this view's content — a toast fires and
-  // they're bounced to a fallback view instead. Re-checked on every auth change, not just
-  // mount, so it also catches URL-driven navigation and a session expiring mid-view.
+  // Logged-out/unregistered visitors get bounced to a fallback view with a toast, re-checked on every auth change.
   const { isLoggedIn, isRegistered } = auth.value;
+  const authResolved = isAuthResolved(auth.value);
   useEffect(() => {
+    if (!authResolved) return;
     const fallback = checkViewAccess('my-sessions', { eventConfig: state.guideConfig });
     if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
-  }, [isLoggedIn, isRegistered]);
-  if (!isLoggedIn || isRegistered !== true) return null;
+  }, [authResolved, isLoggedIn, isRegistered]);
 
-  // Memoized: this component re-renders on every context dispatch (e.g. opening the
-  // detail overlay), not just when the inputs below actually change.
+  // Computed unconditionally (even while loading/unauthorized) so every hook below runs on
+  // every render, not just once auth resolves — a conditional hook count corrupts Preact's
+  // hook state across renders.
   const { live, timeSlots, filteredOnDemand } = useMemo(() => {
     const scheduledSessions = sessions.filter((s) => scheduled.has(s.id));
     const dayScheduled = sessionsForDay(scheduledSessions, activeDay, userTz);
@@ -65,6 +67,15 @@ export function MySessionsView() {
       filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
     };
   }, [sessions, scheduled, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
+
+  // Avoids a blank view in the gap between the catalog resolving and registration resolving.
+  if (!authResolved) {
+    return html`
+      <div class="sg-sr-only" role="status" aria-live="polite">Loading your scheduled sessions…</div>
+      ${html`<${LoadingState} />`}
+    `;
+  }
+  if (!isLoggedIn || isRegistered !== true) return null;
 
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;
@@ -90,16 +101,20 @@ export function MySessionsView() {
           />
         </div>
       `}
-      ${bothEmpty ? html`
-        <div class="sg-my-sessions__empty" role="status" aria-live="polite">
-          <p>You currently have no scheduled sessions.</p>
-          <button
-            class="sg-my-sessions__see-live-btn"
-            type="button"
-            onclick=${() => dispatch({ type: 'SET_VIEW', view: isPost ? 'on-demand' : 'live-upcoming' })}
-          >${isPost ? 'See On demand' : 'See Live & upcoming'}</button>
-        </div>
-      ` : html`
+      ${bothEmpty ? (
+        hasActiveSearchOrFilters(activeFilters, searchQuery)
+          ? html`<${NoResultsFound} />`
+          : html`
+            <div class="sg-my-sessions__empty" role="status" aria-live="polite">
+              <p>You currently have no scheduled sessions.</p>
+              <button
+                class="sg-my-sessions__see-live-btn"
+                type="button"
+                onclick=${() => dispatch({ type: 'SET_VIEW', view: isPost ? 'on-demand' : 'live-upcoming' })}
+              >${isPost ? 'See On demand' : 'See Live & upcoming'}</button>
+            </div>
+          `
+      ) : html`
         <div class="sg-my-sessions-tab-bar">
           ${hasUpcoming && html`<button
             class=${'sg-my-sessions-tab' + (effectiveTab === 'upcoming' ? ' sg-my-sessions-tab--active' : '')}

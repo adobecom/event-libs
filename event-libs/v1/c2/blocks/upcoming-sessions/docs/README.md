@@ -159,7 +159,16 @@ the same section, but only if that block opts in via an `attach-upcoming` class
      touch/keyboard otherwise. This card keeps them always visible at every breakpoint.
 - The dark surface variant is authored as `dark-card` (not `dark`) deliberately —
   `dark` is a reserved global Milo class that paints a solid dark background site-wide,
-  which would collide with this block's own local "dark card surface" meaning.
+  which would collide with this block's own local "dark card surface" meaning. There's no
+  Theme pick in the Upcoming Sessions configurator (removed — dark/light was never
+  config-driven for Featured Sessions either, see its own README): `decorate()` itself
+  adds `dark-card` to `el` automatically when the *ancestor* `.section` carries a plain
+  `dark` class (DA's own Section Metadata `style: dark` authoring / decorate.js's
+  `applyAreaTheme()`) — the same section-driven signal `event-card.css`'s/
+  `event-carousel.css`'s own dark rules key off directly (`.section.dark .event-card ...`),
+  with no JS-set attribute involved. Only ever adds `dark-card` to `el` itself, never
+  touches `dark` on `el`, so there's no ambiguity with the reserved global class this
+  note is about.
 - Desktop (`@media (min-width: 1280px)`) uses a fixed `margin-top` on `.sg-card__footer`
   rather than `margin-top: auto` (which sessions-guide uses, since its card is
   min-height/grows to fit content) — this card is fixed-height, so `auto` would push the

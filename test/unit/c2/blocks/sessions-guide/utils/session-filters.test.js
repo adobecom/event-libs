@@ -324,6 +324,15 @@ describe('session-filters/filterSessions', () => {
     expect(filterSessions(sessions, {}).length).to.equal(3);
     expect(filterSessions(sessions, null).length).to.equal(3);
   });
+
+  it('matches searchQuery against sessionCode, case-insensitively', () => {
+    const withCodes = [
+      { id: 'a', sessionCode: 'S001', title: 'Foo' },
+      { id: 'b', sessionCode: 'S002', title: 'Bar' },
+    ];
+    expect(filterSessions(withCodes, null, 's001').map((s) => s.id)).to.deep.equal(['a']);
+    expect(filterSessions(withCodes, null, 'S002').map((s) => s.id)).to.deep.equal(['b']);
+  });
 });
 
 // Override, when present, always wins swimlane placement and the badge regardless of
@@ -385,6 +394,9 @@ describe('session-filters/resolveTrackBadge', () => {
     expect(badge.isOverride).to.be.true;
     expect(badge.swimlanes).to.deep.equal(['custom label', 'Video']);
     expect(badge.count).to.equal(1);
+    // Override + additional stack the same way primary + additional does (2026-09-03) --
+    // supersedes 16.2's original "override text is never itself stacked" call.
+    expect(badge.stackedTracks).to.deep.equal(['custom label', 'Video']);
   });
 
   it('Primary, additional, and override all present — override lane + additional lane, override badge icon', () => {
@@ -397,6 +409,7 @@ describe('session-filters/resolveTrackBadge', () => {
     // one present — the primary track still never appears in swimlanes.
     expect(badge.swimlanes).to.deep.equal(['custom label', 'Video']);
     expect(badge.count).to.equal(1);
+    expect(badge.stackedTracks).to.deep.equal(['custom label', 'Video']);
   });
 
   it('only ever applies one additional track even if more are somehow present', () => {

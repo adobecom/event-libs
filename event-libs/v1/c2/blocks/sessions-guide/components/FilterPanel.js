@@ -8,15 +8,12 @@ import { Icon } from '../../../../features/icons/Icon.js';
 import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
 import { IconCheckmark } from './icons.js';
 
-// Only the mobile/tablet takeover is modal; at desktop the panel is a click-away popover
-// anchored to the filter button, so claiming aria-modal there would wrongly tell assistive
-// tech the rest of the drawer is unavailable. Kept in sync with the 1280px CSS breakpoint.
+// Only the mobile/tablet takeover is modal; desktop is a click-away popover. Kept in sync
+// with the 1280px CSS breakpoint.
 const isTakeover = () => !window.matchMedia?.('(min-width: 1280px)').matches;
 
-// Mobile is a two-screen drill-down (Figma 11519-32674 / 11519-32675): a list of categories,
-// then the chosen category's options. Tablet and desktop show both columns at once, so a
-// category is always selected there. Tracked reactively rather than read once, so resizing
-// across the breakpoint lands on a coherent screen.
+// Mobile is a two-screen drill-down (Figma 11519-32674/32675); tablet/desktop show both
+// columns at once. Tracked reactively so resizing across the breakpoint stays coherent.
 const MOBILE_QUERY = '(max-width: 767px)';
 const matchesMobile = () => !!window.matchMedia?.(MOBILE_QUERY).matches;
 
@@ -56,14 +53,11 @@ export function FilterPanel({ onClose }) {
     () => (matchesMobile() ? null : firstCategoryId),
   );
 
-  // Crossing up out of mobile with nothing selected would strand the options column empty —
-  // the wider layouts always render both columns.
+  // Crossing up out of mobile with nothing selected would strand the options column empty.
   useEffect(() => {
     if (!isMobile && activeCategory === null) setActiveCategory(firstCategoryId);
   }, [isMobile]);
 
-  // Derive unique option values from sessions for each category — auto-tracks
-  // `sessions.value` and only recomputes when it actually changes.
   const categoryOptions = useComputed(() => {
     const opts = {};
     if (!filterCategories) return opts;
@@ -79,13 +73,11 @@ export function FilterPanel({ onClose }) {
     return opts;
   }).value;
 
-  // The product category's id is the Product attribute's own id, event-wide — so the first
-  // session carrying it answers for the whole catalog.
+  // The product category's id is the Product attribute's own id, event-wide.
   const productCategoryId = useComputed(
     () => sessions.value.find((s) => s.productAttributeId)?.productAttributeId || null,
   ).value;
 
-  // Count of active filters across all categories
   const totalActiveCount = Object.values(activeFilters).reduce(
     (sum, set) => sum + (set instanceof Set ? set.size : 0),
     0,
@@ -118,17 +110,15 @@ export function FilterPanel({ onClose }) {
   const currentSet = localFilters[activeCategory] instanceof Set ? localFilters[activeCategory] : new Set();
   const activeLabel = filterCategories.find(({ id }) => id === activeCategory)?.label || 'Filter options';
 
-  // On mobile the options are their own screen, reached by drilling into a category.
   const drilledIn = isMobile && activeCategory !== null;
 
-  // Product icons belong to the product category alone: `Illustrator` is both a product and an
-  // Audience job role, so matching against the products map isn't enough on its own.
+  // Product icons belong to the product category alone: some values (e.g. Illustrator)
+  // are also Audience job roles, so matching the products map alone isn't enough.
   const showProductIcons = activeCategory !== null && activeCategory === productCategoryId;
 
   const optionsList = html`
     <div class="sg-filter-panel__options" id="sg-filter-panel-options" role="group" aria-label=${activeLabel}>
       ${currentOptions.map((opt) => {
-    // An unmapped product stays text-only — same graceful fallback as getTrackIcon().
     const isSelected = currentSet.has(opt);
     const productIcon = showProductIcons ? getProduct(opt)?.icon : null;
     return html`
@@ -150,8 +140,6 @@ export function FilterPanel({ onClose }) {
     </div>
   `;
 
-  // data-lenis-prevent: the panel's option list scrolls itself, and on the full-page surface
-  // it sits outside the drawer that otherwise fends Lenis off (see DrawerShell.js).
   // ── Mobile screen 2: one category's options, with a back affordance and Save ──
   if (drilledIn) {
     return html`
@@ -195,7 +183,7 @@ export function FilterPanel({ onClose }) {
       aria-modal=${isTakeover() ? 'true' : undefined}
       aria-labelledby="sg-filter-panel-title"
     >
-      <button class="sg-filter-panel__close" onclick=${onClose} type="button" aria-label="Close filter panel">✕</button>
+      <button class="sg-filter-panel__close" onclick=${onClose} type="button" aria-label="Close filter panel"></button>
       <div class="sg-filter-panel__body">
         <div class="sg-filter-panel__sidebar">
           <h3 class="sg-filter-panel__title" id="sg-filter-panel-title">
@@ -204,9 +192,8 @@ export function FilterPanel({ onClose }) {
           <ul class="sg-filter-panel__cats" role="list">
             ${filterCategories.map(({ id, label }) => {
     const catCount = localFilters[id]?.size || 0;
-    // On mobile these navigate to the options screen, unmounting themselves, so they are
-    // neither toggles nor disclosures — aria-pressed/-controls would only ever announce a
-    // state the user cannot reach. Above mobile the options sit alongside, so both apply.
+    // On mobile these navigate to the options screen (unmounting themselves), so they
+    // aren't toggles/disclosures there — aria-pressed/-controls only apply above mobile.
     return html`
                 <li>
                   <button
