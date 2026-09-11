@@ -1,5 +1,6 @@
 // Pure functions — session/config in, entry objects out. No fetch, no module-level
 // state, so these are trivially unit-testable in isolation from the storage/display layer.
+import { getTrackIcon, getOverrideTrackIcon } from '../../utils/tier-1-event-config.js';
 
 // Guards against Number(undefined) === NaN silently turning into a null/dropped
 // trigger time when an author omits the field.
@@ -49,6 +50,9 @@ export const STAGE_COPY = {
 // unlike `title` this is never a fallback-only value.
 export function buildNotificationEntry(session, stage, swanConfig) {
   const category = `Adobe ${swanConfig.eventName || 'Event'} Session`;
+  // Same precedence sessions-guide's resolveTrackBadge() uses: an author's explicit
+  // trackOverride wins over the session's own primaryTrack.
+  const trackIcon = getOverrideTrackIcon(session.trackOverride) || getTrackIcon(session.primaryTrack);
   return {
     title: session.title || category,
     category,
@@ -59,5 +63,8 @@ export function buildNotificationEntry(session, stage, swanConfig) {
     // Prefer the session's own catalog thumbnail; swanConfig.defaultNotificationIconUrl is
     // only a per-event fallback for a session that doesn't have one.
     iconUrl: session.thumbnailUrl || swanConfig.defaultNotificationIconUrl || '',
+    // Icon *name* only — notification-widget.js resolves it to an SVG at render time, so a
+    // failed/slow fetch never blocks building this entry.
+    trackIconName: trackIcon?.icon || null,
   };
 }

@@ -3,6 +3,7 @@ import { mountNotificationWidget } from '../../../../event-libs/v1/features/swan
 import {
   getEntries, removeEntry, upsertEntry,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
 
 function clearStore() {
   getEntries().forEach((entry) => removeEntry(entry.rfCode));
@@ -286,6 +287,66 @@ describe('notification-widget', () => {
       addEntry('RF-1', { stage: 'live', title: 'First' });
       const timeLines = rows()[0].querySelectorAll('.swan-notif__time');
       expect(timeLines).to.have.lengthOf(1); // relative "updated" time only
+    });
+  });
+
+  describe('track icon fallback', () => {
+    before(() => {
+      setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+    });
+
+    function icon() { return rows()[0].querySelector('.swan-notif__icon'); }
+
+    it('shows SESSION_ICON_FALLBACK immediately for a row with no iconUrl and no trackIconName', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First' });
+      expect(icon().classList.contains('swan-notif__icon--placeholder')).to.equal(true);
+      expect(icon().querySelector('svg.icon-federal')).to.equal(null);
+    });
+
+    it('swaps in the resolved track icon once fetchFederalTrackIcon resolves', async () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First', trackIconName: 'branding' });
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      const svg = icon().querySelector('svg');
+      expect(svg.classList.contains('icon-federal-branding')).to.equal(true);
+    });
+
+    it('leaves SESSION_ICON_FALLBACK in place when the named track icon does not resolve', async () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First', trackIconName: 'does-not-exist-anywhere' });
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      expect(icon().querySelector('svg.icon-federal')).to.equal(null);
+    });
+
+    it('never renders a placeholder at all when the row has a real iconUrl', () => {
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', iconUrl: 'https://example.com/thumb.png', trackIconName: 'branding',
+      });
+      expect(icon().tagName).to.equal('IMG');
+    });
+  });
+
+  describe('broken thumbnail fallback', () => {
+    before(() => {
+      setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+    });
+
+    function icon() { return rows()[0].querySelector('.swan-notif__icon'); }
+
+    it('falls back to the track-icon placeholder when the <img> fails to load', () => {
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', iconUrl: 'https://example.com/broken.png', trackIconName: 'branding',
+      });
+      const img = icon();
+      expect(img.tagName).to.equal('IMG');
+      img.dispatchEvent(new Event('error'));
+      expect(icon().classList.contains('swan-notif__icon--placeholder')).to.equal(true);
+    });
+
+    it('does not touch a disconnected row\'s <img> if the error fires after the list was rebuilt', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First', iconUrl: 'https://example.com/broken.png' });
+      const staleImg = icon();
+      addEntry('RF-2', { stage: 'live', title: 'Second' }); // rebuilds the whole list
+      expect(() => staleImg.dispatchEvent(new Event('error'))).to.not.throw();
+      expect(staleImg.isConnected).to.equal(false);
     });
   });
 });

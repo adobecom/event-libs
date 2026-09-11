@@ -9,6 +9,7 @@ import {
 } from './notification-store.js';
 import { STAGE_COPY } from './swan-payload.js';
 import { waitForElement } from './gnav-wait.js';
+import { fetchFederalTrackIcon } from '../icons/federal-icons.js';
 
 // Page-level, framework-agnostic widget — same shape as features/toast/toast.js (a signal
 // for state, createTag/loadStyle for vanilla DOM, a mounted guard) rather than a full
@@ -25,10 +26,11 @@ const MOUNT_SELECTOR = '#universal-nav';
 // in notification-widget.css (light/dark/scrolled/popup-open) keep controlling its color.
 const BELL_ICON_FALLBACK = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.7862 12.6758C17.6177 12.3672 17.4454 12.0684 17.2749 11.7734C16.4483 10.3389 15.7339 9.10059 15.7339 7.15332C15.7339 4.03418 13.1963 1.49609 10.0767 1.49609C6.95706 1.49609 4.41946 4.03418 4.41946 7.15332C4.41946 8.91992 3.66067 10.2022 2.85745 11.5586C2.63724 11.9307 2.41604 12.3047 2.20804 12.6895C1.83206 13.3857 1.85111 14.21 2.25882 14.8936C2.67093 15.584 3.39554 15.9961 4.1973 15.9961H7.24955C7.24955 17.5127 8.48295 18.7461 9.99955 18.7461C11.5162 18.7461 12.7496 17.5127 12.7496 15.9961H15.8047C16.608 15.9961 17.3326 15.583 17.7437 14.8906C18.1514 14.2031 18.1675 13.375 17.7862 12.6758ZM9.99955 17.2461C9.3101 17.2461 8.74955 16.6855 8.74955 15.9961H11.2496C11.2496 16.6855 10.689 17.2461 9.99955 17.2461ZM16.4537 14.125C16.3872 14.2363 16.1914 14.4961 15.8047 14.4961H4.19731C3.92876 14.4961 3.68559 14.3574 3.54692 14.125C3.48247 14.0166 3.35161 13.7295 3.52837 13.4023C3.72661 13.0342 3.93804 12.6777 4.148 12.3232C5.01909 10.8525 5.91948 9.33105 5.91948 7.15332C5.91948 4.89941 7.82329 2.99609 10.0767 2.99609C12.3301 2.99609 14.2339 4.89941 14.2339 7.15332C14.2339 9.50195 15.1192 11.0371 15.9756 12.5225C16.1402 12.8076 16.3062 13.0957 16.4693 13.3945C16.65 13.7256 16.5186 14.0156 16.4537 14.125Z"/></svg>';
 
-// Generic calendar glyph shown on a row's colored icon tile when no iconUrl is configured —
-// the Figma reference uses Adobe MAX's own branded mark there, which can't be reused for a
-// generic library; this at least reads as "a session," not a blank colored square.
-const SESSION_ICON_FALLBACK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="15" rx="2" fill="none" stroke="#fff" stroke-width="1.5"/><path stroke="#fff" stroke-width="1.5" d="M3 9.5h18"/><path stroke="#fff" stroke-width="1.5" stroke-linecap="round" d="M7.5 3v3.5M16.5 3v3.5"/></svg>';
+// MAX's own badge mark, shown on a row's colored icon tile when no iconUrl is configured.
+// Source: MAX Badge Icon.svg, with its own baked-in red background/clipPath stripped out —
+// notification-widget.css's .swan-notif__icon tile already supplies that red background, so
+// only the white mark itself is kept here.
+const SESSION_ICON_FALLBACK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="28" height="28" aria-hidden="true" focusable="false"><path fill="#fff" d="M33.7558 14L32.1593 16.9232L30.5797 14H26.3195L29.6859 19.5165L27.0938 23.7592L23.3992 14H19.6011L15.8728 23.8086L14.4783 14H10.2022L9.02142 19.5823L7.83982 14H3.56368L2 25H5.30241L5.98915 19.0246L7.37778 25H10.4892L11.8778 18.9917L12.5797 25H15.42H16.0428H22.5054L21.7716 22.3903H19.9041L21.3886 18.2038L23.7661 25H26.3355H27.5642H30.2767L32.0003 21.914L33.7399 25H38L34.4897 19.2541L37.697 14H33.7558Z"/></svg>';
 
 // Same close glyph/markup as features/toast/toast.js's own dismiss button, for visual parity.
 const CLOSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
@@ -54,6 +56,37 @@ function resolveTimezone() {
   return getMetadata('event-type') === 'InPerson' ? getMetadata('timezone') : null;
 }
 
+// SESSION_ICON_FALLBACK is the placeholder's initial (and, absent a track icon, final)
+// content. When the session has a track icon, fetchFederalTrackIcon resolves it in the
+// background and swaps it in — but only if it actually resolves to something and the
+// placeholder is still on the page (renderList() rebuilds the whole <ul> on every store
+// change, so a slow fetch can easily outlive the row it was meant for).
+function renderTrackIconPlaceholder(entry) {
+  const placeholder = createTag('span', { class: 'swan-notif__icon swan-notif__icon--placeholder', 'aria-hidden': 'true' }, SESSION_ICON_FALLBACK);
+  if (entry.trackIconName) {
+    fetchFederalTrackIcon(entry.trackIconName).then((svg) => {
+      if (!svg || !placeholder.isConnected) return;
+      svg.setAttribute('width', '28');
+      svg.setAttribute('height', '28');
+      placeholder.replaceChildren(svg);
+    });
+  }
+  return placeholder;
+}
+
+// entry.iconUrl only says a thumbnail was authored, not that it will actually load — a 404
+// or CORS failure would otherwise leave a broken-image glyph in place forever. Falling back
+// to the same track-icon/SESSION_ICON_FALLBACK chain here, rather than a bare placeholder,
+// means a broken thumbnail degrades exactly like having no thumbnail at all.
+function renderThumbnail(entry) {
+  if (!entry.iconUrl) return renderTrackIconPlaceholder(entry);
+  const img = createTag('img', { class: 'swan-notif__icon', src: entry.iconUrl, alt: '' });
+  img.addEventListener('error', () => {
+    if (img.isConnected) img.replaceWith(renderTrackIconPlaceholder(entry));
+  }, { once: true });
+  return img;
+}
+
 // Three lines per the Figma spec (node 9690:20849): category kicker + stage pill, then the
 // session title (can wrap), then the relative timestamp alone — not the pill+timestamp
 // sharing a line under the title, which an earlier pass got wrong. A fourth, reminder-only
@@ -70,9 +103,7 @@ function renderRow(entry, locale, timezone, onDismiss) {
   });
 
   row.append(createTag('span', { class: 'swan-notif__dot', 'aria-hidden': 'true' }));
-  row.append(entry.iconUrl
-    ? createTag('img', { class: 'swan-notif__icon', src: entry.iconUrl, alt: '' })
-    : createTag('span', { class: 'swan-notif__icon swan-notif__icon--placeholder', 'aria-hidden': 'true' }, SESSION_ICON_FALLBACK));
+  row.append(renderThumbnail(entry));
 
   const body = createTag('div', { class: 'swan-notif__body' });
 

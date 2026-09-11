@@ -215,6 +215,13 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
   background: var(--s2a-color-red-900, #d31510);
 }
 
+/* A resolved track icon (fetchFederalTrackIcon recolors its literal black fill/stroke to
+   currentColor) needs this to read white against the tile's red background, matching
+   SESSION_ICON_FALLBACK's own hardcoded fill="#fff" — same tile, no per-track color variant. */
+.swan-notif__icon--placeholder {
+  color: #fff;
+}
+
 .swan-notif__body {
   min-width: 0;
   flex: 1;
