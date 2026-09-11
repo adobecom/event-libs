@@ -52,7 +52,17 @@ describe('swan-payload', () => {
       expect(entry.startTimeMs).to.equal(Date.parse(session.startTimeUtc));
       expect(entry.endTimeMs).to.equal(Date.parse(session.endTimeUtc));
       expect(entry.actionUrl).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
+      // Falls back to swanConfig's default when the session has no thumbnail of its own.
       expect(entry.iconUrl).to.equal(swanConfig.defaultNotificationIconUrl);
+    });
+
+    it('prefers the session catalog\'s own thumbnailUrl over swanConfig\'s per-event default', () => {
+      const entry = buildNotificationEntry(
+        { ...session, thumbnailUrl: 'https://example.com/session-thumb.png' },
+        'reminder',
+        swanConfig,
+      );
+      expect(entry.iconUrl).to.equal('https://example.com/session-thumb.png');
     });
 
     it('falls back to a generic event-branded title when the session has none', () => {

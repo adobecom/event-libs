@@ -122,7 +122,13 @@ function buildWidget(mount) {
   badge.hidden = true;
   button.append(badge);
 
-  const panel = createTag('div', { class: 'swan-notif__panel', role: 'dialog', 'aria-label': 'Notifications' });
+  // data-lenis-prevent: milo's Lenis smooth-scroll instance (loaded on foundation=c2 pages)
+  // hijacks wheel/touch events at the document level; this attribute is Lenis's own
+  // documented escape hatch for a nested scrollable region, already used the same way by
+  // sessions-guide's DrawerShell.js/FilterPanel.js.
+  const panel = createTag('div', {
+    class: 'swan-notif__panel', role: 'dialog', 'aria-label': 'Notifications', 'data-lenis-prevent': '',
+  });
   panel.hidden = true;
   panel.append(createTag('p', { class: 'swan-notif__panel-title' }, 'Notifications'));
   panel.append(createTag('div', { class: 'swan-notif__divider', 'aria-hidden': 'true' }));
@@ -151,6 +157,12 @@ function buildWidget(mount) {
     button.setAttribute('aria-expanded', 'false');
     document.removeEventListener('click', onOutsideClick);
     document.removeEventListener('keydown', onKeydown);
+    // Closing, not opening, is "having seen" the list — marking read on open would clear
+    // the unread dot/tint before the attendee ever actually saw it (both happen
+    // synchronously, in the same tick, before the browser paints). This still clears the
+    // badge for entries never individually clicked, just one interaction later; markAllRead()
+    // itself no-ops (no signal write) when nothing is unread.
+    markAllRead();
   }
 
   function onOutsideClick(e) {
@@ -166,10 +178,6 @@ function buildWidget(mount) {
     button.setAttribute('aria-expanded', 'true');
     document.addEventListener('click', onOutsideClick);
     document.addEventListener('keydown', onKeydown);
-    // Opening the panel is "seeing" the list — clears the badge count even for entries
-    // the attendee doesn't click into, matching common bell UX (Slack/Gmail); markAllRead()
-    // itself no-ops (no signal write) when nothing is unread.
-    markAllRead();
   }
 
   button.addEventListener('click', (e) => {

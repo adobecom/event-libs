@@ -49,6 +49,10 @@ describe('notification-widget', () => {
     expect(mountPoint.querySelectorAll('.swan-notif__panel')).to.have.lengthOf(1);
   });
 
+  it('excludes the panel from Lenis smooth-scroll hijacking', () => {
+    expect(panel().hasAttribute('data-lenis-prevent')).to.equal(true);
+  });
+
   it('re-inserts the bell if something else clears #universal-nav (e.g. UniversalNav.js re-rendering)', async () => {
     expect(mountPoint.querySelector('.swan-notif')).to.not.equal(null);
     mountPoint.replaceChildren();
@@ -142,11 +146,20 @@ describe('notification-widget', () => {
     expect(bell().getAttribute('aria-expanded')).to.equal('false');
   });
 
-  it('clears the badge on open, even for rows never individually clicked', () => {
+  it('keeps entries unread while the panel is open the first time, so the dot is actually visible', () => {
+    addEntry('RF-1', { stage: 'reminder', title: 'First' });
+    bell().click();
+    expect(rows()[0].classList.contains('swan-notif__row--unread')).to.equal(true);
+    expect(badge().hidden).to.equal(false);
+  });
+
+  it('clears the badge on close, even for rows never individually clicked', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     addEntry('RF-2', { stage: 'reminder', title: 'Second' });
     expect(badge().hidden).to.equal(false);
     bell().click();
+    expect(badge().hidden).to.equal(false); // still unread while open — see the test above
+    bell().click(); // closes
     expect(badge().hidden).to.equal(true);
     expect(getEntries().every((entry) => entry.read)).to.equal(true);
   });

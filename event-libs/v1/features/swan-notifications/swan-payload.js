@@ -18,6 +18,12 @@ export function calculateSessionTimes(session, upcomingOffsetMinutes) {
   };
 }
 
+// Both sessionPageUrl and thumbnailUrl come from the same real source: the session-catalog
+// endpoint (services/sessions/sessions-api.js's fetchSessions -> normalizeSessions), not raw
+// RainFocus and not constructed here — sessionPageUrl is the catalog's own authored `url`
+// field (env-adjusted), and thumbnailUrl is that session's `session-card-image` asset, the
+// same field sessions-guide's LiveCard.js already renders for its own thumbnail.
+//
 // sessionPageUrl is a relative path (e.g. "/sessions/my-session") — resolved against
 // the current page's own origin, since that's the only origin this feature ever runs in.
 function resolveSessionUrl(sessionPageUrl) {
@@ -50,6 +56,8 @@ export function buildNotificationEntry(session, stage, swanConfig) {
     startTimeMs: Date.parse(session.startTimeUtc),
     endTimeMs: Date.parse(session.endTimeUtc),
     actionUrl: resolveSessionUrl(session.sessionPageUrl),
-    iconUrl: swanConfig.defaultNotificationIconUrl || '',
+    // Prefer the session's own catalog thumbnail; swanConfig.defaultNotificationIconUrl is
+    // only a per-event fallback for a session that doesn't have one.
+    iconUrl: session.thumbnailUrl || swanConfig.defaultNotificationIconUrl || '',
   };
 }
