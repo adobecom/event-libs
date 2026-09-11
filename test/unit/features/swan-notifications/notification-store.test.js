@@ -73,6 +73,22 @@ describe('notification-store', () => {
       expect(entries.map((e) => e.rfCode)).to.deep.equal(['RF-2', 'RF-1']);
     });
 
+    it('sorts a live entry above an on-demand entry even when the on-demand one is more recent', () => {
+      upsertEntry('RF-old-live', { stage: 'live', title: 'Live' });
+      upsertEntry('RF-newer-on-demand', { stage: 'on-demand', title: 'On-Demand' });
+      expect(getEntries().map((e) => e.rfCode)).to.deep.equal(['RF-old-live', 'RF-newer-on-demand']);
+    });
+
+    it('sorts live above reminder above on-demand, then falls back to recency within a stage', () => {
+      upsertEntry('RF-on-demand', { stage: 'on-demand', title: 'On-Demand' });
+      upsertEntry('RF-reminder-older', { stage: 'reminder', title: 'Reminder older' });
+      upsertEntry('RF-reminder-newer', { stage: 'reminder', title: 'Reminder newer' });
+      upsertEntry('RF-live', { stage: 'live', title: 'Live' });
+      expect(getEntries().map((e) => e.rfCode)).to.deep.equal([
+        'RF-live', 'RF-reminder-newer', 'RF-reminder-older', 'RF-on-demand',
+      ]);
+    });
+
     it('includes rfCode on each returned entry', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
       expect(getEntries()[0].rfCode).to.equal('RF-1');
@@ -148,13 +164,32 @@ describe('notification-store', () => {
       expect(getEntry('RF-1')).to.not.equal(undefined);
     });
 
-    it('never prunes a reminder or live entry regardless of age', () => {
+    it('keeps a reminder or live entry under the (default 14-day) event-wide expiration safety net', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'Still upcoming' });
       upsertEntry('RF-2', { stage: 'live', title: 'Still live' });
       const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
       pruneStale(Date.now() + tenDaysMs, 3);
       expect(getEntry('RF-1')).to.not.equal(undefined);
       expect(getEntry('RF-2')).to.not.equal(undefined);
+    });
+
+    it('drops a reminder or live entry once it exceeds the event-wide expirationDays safety net', () => {
+      // Reproduces the scenario the safety net exists for: an entry that never gets
+      // reconciled further (e.g. its session silently drops out of the catalog) would
+      // otherwise persist forever, since only on-demand entries have their own TTL.
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Stuck reminder' });
+      upsertEntry('RF-2', { stage: 'live', title: 'Stuck live' });
+      const twentyDaysMs = 20 * 24 * 60 * 60 * 1000;
+      pruneStale(Date.now() + twentyDaysMs, 3, 14);
+      expect(getEntry('RF-1')).to.equal(undefined);
+      expect(getEntry('RF-2')).to.equal(undefined);
+    });
+
+    it('falls back to a 14-day expiration window for a non-numeric expirationDays', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Still upcoming' });
+      const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
+      pruneStale(Date.now() + tenDaysMs, 3, 'not-a-number');
+      expect(getEntry('RF-1')).to.not.equal(undefined);
     });
 
     it('falls back to a 3-day window for a non-numeric persistTillDays', () => {
@@ -176,6 +211,70 @@ describe('notification-store', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
       const stored = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY));
       expect(stored['RF-1'].title).to.equal('First');
+    });
+  });
+
+  describe('cross-tab sync (storage event)', () => {
+    // The real browser never fires `storage` in the same tab that made the write — this
+    // dispatches it manually to simulate another tab's write landing in this one.
+    function simulateOtherTabWrite(newState) {
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: LOCAL_STATE_KEY,
+        newValue: JSON.stringify(newState),
+      }));
+    }
+
+    it('adopts state written by another tab', () => {
+      simulateOtherTabWrite({ 'RF-1': {
+        stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 1,
+      } });
+      expect(getEntry('RF-1').title).to.equal('From another tab');
+    });
+
+    it('notifies subscribers when another tab writes', () => {
+      const seen = [];
+      const unsubscribe = notifications.subscribe((entries) => seen.push(entries.length));
+      simulateOtherTabWrite({ 'RF-1': {
+        stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 1,
+      } });
+      unsubscribe();
+      expect(seen[seen.length - 1]).to.equal(1);
+    });
+
+    it('ignores a storage event for an unrelated key', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
+      window.dispatchEvent(new StorageEvent('storage', { key: 'some-other-key', newValue: '{}' }));
+      expect(getEntry('RF-1').title).to.equal('Mine');
+    });
+
+    it('resets to empty state rather than throwing on a corrupt cross-tab write', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
+      expect(() => window.dispatchEvent(new StorageEvent('storage', {
+        key: LOCAL_STATE_KEY, newValue: '{not-json',
+      }))).to.not.throw();
+      expect(getEntries()).to.have.lengthOf(0);
+    });
+
+    it('resets to empty state rather than crashing when the written value is valid JSON but not an object', () => {
+      // JSON.parse('null')/('42')/('"x"') all succeed without throwing — only the try/catch
+      // shape check catches these; without it, `state` would become `null`/a number/a string,
+      // and the very next line (Object.values(state)) would throw instead.
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
+      ['null', '42', '"just a string"', '[]'].forEach((newValue) => {
+        expect(() => window.dispatchEvent(new StorageEvent('storage', {
+          key: LOCAL_STATE_KEY, newValue,
+        }))).to.not.throw();
+      });
+      expect(() => getEntry('anything')).to.not.throw();
+      expect(() => markRead('anything')).to.not.throw();
+    });
+
+    it('lets a subsequent local upsert generate a seq higher than anything adopted cross-tab', () => {
+      simulateOtherTabWrite({ 'RF-1': {
+        stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 100,
+      } });
+      upsertEntry('RF-2', { stage: 'live', title: 'Mine, written after' });
+      expect(getEntry('RF-2').seq).to.be.above(100);
     });
   });
 });

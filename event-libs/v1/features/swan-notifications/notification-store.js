@@ -25,13 +25,22 @@ function writeLocalState(state) {
   }
 }
 
+// Live always sorts above Upcoming/On-Demand regardless of recency, matching legacy SWAN
+// 1.0's resortSwanNotifications() — a live session shouldn't get buried under an on-demand
+// entry that merely happened to update more recently.
+const STAGE_DISPLAY_PRIORITY = { live: 0, reminder: 1, 'on-demand': 2 };
+
 function toList(state) {
   return Object.entries(state)
     .map(([rfCode, entry]) => ({ rfCode, ...entry }))
-    // `seq`, not `updatedAt`, breaks ties — several entries can share the same
-    // Date.now() millisecond (e.g. a reconcile pass touching multiple sessions back to
-    // back), which would otherwise make ordering effectively random across ties.
-    .sort((a, b) => b.seq - a.seq);
+    .sort((a, b) => {
+      const priorityDiff = (STAGE_DISPLAY_PRIORITY[a.stage] ?? 99) - (STAGE_DISPLAY_PRIORITY[b.stage] ?? 99);
+      if (priorityDiff !== 0) return priorityDiff;
+      // `seq`, not `updatedAt`, breaks ties — several entries can share the same
+      // Date.now() millisecond (e.g. a reconcile pass touching multiple sessions back to
+      // back), which would otherwise make ordering effectively random across ties.
+      return b.seq - a.seq;
+    });
 }
 
 let state = readLocalState();
@@ -47,6 +56,26 @@ function persistAndSync() {
   writeLocalState(state);
   notifications.value = toList(state);
 }
+
+// Cross-tab sync: a `storage` event fires in every OTHER tab of the same origin whenever one
+// tab writes this key (never in the tab that made the write), so read/dismiss actions taken
+// in one tab reflect live in any other open tab, without a page reload. Free with the
+// existing localStorage writes — no BroadcastChannel needed.
+window.addEventListener('storage', (e) => {
+  if (e.key !== LOCAL_STATE_KEY) return;
+  try {
+    const parsed = JSON.parse(e.newValue || '{}');
+    // JSON.parse('null')/('42')/('"x"') all succeed without throwing — only a genuine
+    // object is a valid state shape; anything else would otherwise crash every later
+    // Object.values(state)/state[rfCode] access for the rest of the page session.
+    state = (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch (err) {
+    window.lana?.log(`[notification-store] cross-tab storage event carried corrupt state, resetting: ${err.message}`);
+    state = {};
+  }
+  sequence = Math.max(0, ...Object.values(state).map((entry) => entry.seq || 0));
+  notifications.value = toList(state);
+});
 
 export function getEntry(rfCode) {
   return state[rfCode];
@@ -98,17 +127,27 @@ export function markAllRead() {
   persistAndSync();
 }
 
-// Drops on-demand entries older than persistTillDays so the panel doesn't accumulate
-// forever — reminder/live entries are never pruned this way since they're still "current."
-export function pruneStale(now, persistTillDays) {
-  // `|| 3` would treat an explicit 0 (prune on-demand entries immediately) as falsy and
-  // silently substitute the 3-day default instead — only a genuinely invalid value should
-  // fall back.
-  const days = Number(persistTillDays);
-  const effectiveDays = Number.isFinite(days) && days >= 0 ? days : 3;
-  const maxAgeMs = effectiveDays * 24 * 60 * 60 * 1000;
+function daysToMs(days, fallbackDays) {
+  // `|| fallbackDays` would treat an explicit 0 (prune immediately) as falsy and silently
+  // substitute the fallback instead — only a genuinely invalid value should fall back.
+  const n = Number(days);
+  const effectiveDays = Number.isFinite(n) && n >= 0 ? n : fallbackDays;
+  return effectiveDays * 24 * 60 * 60 * 1000;
+}
+
+// Drops on-demand entries older than persistTillDays so the panel doesn't accumulate forever,
+// plus a stage-independent safety-net wipe at expirationDays (mirroring legacy SWAN 1.0's
+// event-wide notifExpirationDate) for any entry — reminder or live included — that never gets
+// reconciled further, e.g. a session whose catalog record silently stops updating.
+export function pruneStale(now, persistTillDays, expirationDays) {
+  const onDemandMaxAgeMs = daysToMs(persistTillDays, 3);
+  const allStageMaxAgeMs = daysToMs(expirationDays, 14);
   const staleRfCodes = Object.entries(state)
-    .filter(([, entry]) => entry.stage === 'on-demand' && now - entry.updatedAt > maxAgeMs)
+    .filter(([, entry]) => {
+      const age = now - entry.updatedAt;
+      if (entry.stage === 'on-demand' && age > onDemandMaxAgeMs) return true;
+      return age > allStageMaxAgeMs;
+    })
     .map(([rfCode]) => rfCode);
   if (!staleRfCodes.length) return;
   const next = { ...state };

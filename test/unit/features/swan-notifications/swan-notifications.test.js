@@ -45,11 +45,10 @@ describe('swan-notifications', () => {
   });
 
   describe('notifySessionScheduled / notifySessionUnscheduled', () => {
-    it('creates a reminder entry when the trigger time is still in the future', () => {
+    it('does not create an entry yet when the trigger time (start - offset) is still in the future', () => {
       const session = makeSession('RF-100', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
       notifySessionScheduled(session);
-      expect(getEntry('RF-100').stage).to.equal('reminder');
-      expect(getEntry('RF-100').title).to.equal('Session RF-100');
+      expect(getEntry('RF-100')).to.equal(undefined);
     });
 
     it('creates a reminder entry even once its trigger time has already passed but the session has not started', () => {
@@ -82,6 +81,18 @@ describe('swan-notifications', () => {
       expect(getEntries()).to.have.lengthOf(0);
     });
 
+    it('creates the reminder entry once reconcile catches the trigger-time boundary passing', () => {
+      const farSession = makeSession('RF-later', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
+      notifySessionScheduled(farSession);
+      expect(getEntry('RF-later')).to.equal(undefined);
+
+      // Simulates time passing: the session is now within the (default 5-minute) reminder
+      // window, without changing anything else about it.
+      const dueSession = makeSession('RF-later', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN });
+      reconcileSwanNotifications(() => [dueSession], () => new Set([dueSession.id]));
+      expect(getEntry('RF-later').stage).to.equal('reminder');
+    });
+
     it('skips a session with malformed start/end timestamps rather than misclassifying its stage', () => {
       const badSession = {
         id: 'session-bad', rfCode: 'RF-bad', startTimeUtc: 'not-a-date', endTimeUtc: 'also-not-a-date',
@@ -100,7 +111,7 @@ describe('swan-notifications', () => {
 
   describe('reconcileSwanNotifications', () => {
     it('advances a session from reminder to live in place, as a single entry (not a new one)', () => {
-      const reminderSession = makeSession('RF-progress', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
+      const reminderSession = makeSession('RF-progress', { startOffsetMs: 2 * MIN, endOffsetMs: 120 * MIN });
       notifySessionScheduled(reminderSession);
       expect(getEntry('RF-progress').stage).to.equal('reminder');
 
@@ -112,7 +123,7 @@ describe('swan-notifications', () => {
     });
 
     it('re-flags the entry unread on a stage advance', () => {
-      const reminderSession = makeSession('RF-unread', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
+      const reminderSession = makeSession('RF-unread', { startOffsetMs: 2 * MIN, endOffsetMs: 120 * MIN });
       notifySessionScheduled(reminderSession);
       // Simulate the user having already opened the panel and read the reminder.
       markRead('RF-unread');
@@ -167,7 +178,7 @@ describe('swan-notifications', () => {
 
     it('advances a session all the way through reminder -> live -> on-demand, one entry at a time', () => {
       const rfCode = 'RF-full-lifecycle';
-      const reminderSession = makeSession(rfCode, { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
+      const reminderSession = makeSession(rfCode, { startOffsetMs: 2 * MIN, endOffsetMs: 120 * MIN });
       notifySessionScheduled(reminderSession);
       expect(getEntry(rfCode).stage).to.equal('reminder');
 

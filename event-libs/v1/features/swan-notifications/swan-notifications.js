@@ -12,14 +12,17 @@ import { getEntry, getEntries, pruneStale } from './notification-store.js';
 
 const STAGE_RANK = { reminder: 1, live: 2, 'on-demand': 3 };
 
-// Always returns a stage rather than null before the reminder trigger time — a session's
-// entry is created (as "reminder"/Upcoming) as soon as it's scheduled, and this reconcile
-// pass, driven by session-state-ticker.js, is what advances it to Live/On-Demand as time
-// passes, now that there's no external engine of its own to fire a future notification.
+// Returns null before the reminder trigger time (start - upcomingOffsetMinutes) has actually
+// arrived — a session's entry isn't created until it's genuinely due, rather than the instant
+// it's scheduled, so "Upcoming" keeps meaning "starting soon." This reconcile pass, driven by
+// session-state-ticker.js, is what both creates the reminder once due and advances it to
+// Live/On-Demand as time passes, now that there's no external engine of its own to fire a
+// future notification.
 function desiredStage(timingProperties, now) {
   if (now >= timingProperties.triggerOnDemandBadgeTime) return 'on-demand';
   if (now >= timingProperties.triggerLiveBadgeTime) return 'live';
-  return 'reminder';
+  if (now >= timingProperties.triggerNotificationTime) return 'reminder';
+  return null;
 }
 
 // No-ops if already at (or, defensively, past) the desired stage: forward-only is the only
@@ -34,6 +37,7 @@ function applyStage(session, swanConfig, now) {
     return;
   }
   const stage = desiredStage(timingProperties, now);
+  if (!stage) return;
   const existing = getEntry(session.rfCode);
   if (existing && STAGE_RANK[existing.stage] >= STAGE_RANK[stage]) return;
 
@@ -94,7 +98,7 @@ export function reconcileSwanNotifications(getSessions, getScheduled, isSchedule
         .forEach((entry) => removeNotification(entry.rfCode));
     }
 
-    pruneStale(now, swanConfig.localNotificationPersistTillDays);
+    pruneStale(now, swanConfig.localNotificationPersistTillDays, swanConfig.notificationExpirationDays);
   } catch (err) {
     window.lana?.log(`[swan-notifications] reconcile failed: ${err.message}`);
   }

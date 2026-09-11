@@ -6,6 +6,9 @@ import { getMetadata } from '../../utils/utils.js';
 const DEFAULT_UPCOMING_OFFSET_MINUTES = 5;
 const DEFAULT_NOTIFICATION_ICON_URL = '';
 const DEFAULT_LOCAL_NOTIFICATION_PERSIST_TILL_DAYS = 3;
+// Event-wide safety-net TTL for every stage (not just on-demand) — a backstop against an
+// entry that never reconciles further, mirroring legacy SWAN 1.0's notifExpirationDate wipe.
+const DEFAULT_NOTIFICATION_EXPIRATION_DAYS = 14;
 
 // Parses the Tier 1 Event Configurator's payload (MWPW-200311); null if absent/invalid.
 // Duplicated from session-store.js's own parseTierOneEventConfig() rather than shared,
@@ -34,5 +37,6 @@ export function getSwanConfig() {
     upcomingOffsetMinutes: DEFAULT_UPCOMING_OFFSET_MINUTES,
     defaultNotificationIconUrl: DEFAULT_NOTIFICATION_ICON_URL,
     localNotificationPersistTillDays: DEFAULT_LOCAL_NOTIFICATION_PERSIST_TILL_DAYS,
+    notificationExpirationDays: DEFAULT_NOTIFICATION_EXPIRATION_DAYS,
   };
 }

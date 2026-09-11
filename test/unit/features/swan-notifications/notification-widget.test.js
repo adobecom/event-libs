@@ -16,6 +16,7 @@ describe('notification-widget', () => {
   function badge() { return mountPoint.querySelector('.swan-notif__badge'); }
   function sectionTitle() { return mountPoint.querySelector('.swan-notif__section-title'); }
   function rows() { return [...mountPoint.querySelectorAll('.swan-notif__row')]; }
+  function announcer() { return mountPoint.querySelector('.swan-notif__sr-only'); }
 
   function addEntry(rfCode, overrides) {
     upsertEntry(rfCode, { category: 'Adobe Test Event Session', ...overrides });
@@ -181,5 +182,104 @@ describe('notification-widget', () => {
   it('does not mount a second widget on a repeated call', () => {
     mountNotificationWidget();
     expect(mountPoint.querySelectorAll('.swan-notif__bell')).to.have.lengthOf(1);
+  });
+
+  describe('analytics attributes', () => {
+    it('tags the bell button for click tracking', () => {
+      expect(bell().getAttribute('daa-ll')).to.equal('Notification-Bell-Open');
+    });
+
+    it('tags each row with the session title for click tracking', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First' });
+      expect(rows()[0].getAttribute('daa-ll')).to.equal('Notification-Row-Click|First');
+    });
+  });
+
+  describe('dismiss button', () => {
+    it('renders one dismiss button per row', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First' });
+      expect(rows()[0].querySelectorAll('.swan-notif__dismiss')).to.have.lengthOf(1);
+    });
+
+    it('removes only the dismissed entry from the store', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First' });
+      addEntry('RF-2', { stage: 'reminder', title: 'Second' });
+      // Same stage, so rows()[0] is the more recently added one (RF-2) — see the sort-order
+      // tests in notification-store.test.js.
+      rows()[0].querySelector('.swan-notif__dismiss').click();
+      expect(getEntries().map((e) => e.rfCode)).to.deep.equal(['RF-1']);
+    });
+
+    it('does not mark the entry read or navigate — only the row itself does that', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First', actionUrl: '' });
+      rows()[0].querySelector('.swan-notif__dismiss').click();
+      // The entry is gone entirely (removed, not read-then-kept), proving the row's own
+      // click-through handler never ran as a side effect of the dismiss click.
+      expect(getEntries()).to.have.lengthOf(0);
+    });
+
+    // .focus() (unlike .click()) is a no-op on an element inside a hidden ancestor, so these
+    // two need the panel actually open — matching how a keyboard user would really reach a
+    // dismiss button in the first place.
+    it('moves focus to the next remaining row\'s dismiss button, so keyboard focus never falls back to <body>', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First' });
+      addEntry('RF-2', { stage: 'reminder', title: 'Second' });
+      bell().click(); // open the panel
+      const firstDismiss = rows()[0].querySelector('.swan-notif__dismiss');
+      firstDismiss.focus();
+      firstDismiss.click();
+      expect(document.activeElement.classList.contains('swan-notif__dismiss')).to.equal(true);
+      expect(document.activeElement).to.not.equal(firstDismiss); // the old node was destroyed
+    });
+
+    it('falls back to the bell button once the last entry is dismissed', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'Only one' });
+      bell().click(); // open the panel
+      const dismiss = rows()[0].querySelector('.swan-notif__dismiss');
+      dismiss.focus();
+      dismiss.click();
+      expect(document.activeElement).to.equal(bell());
+    });
+  });
+
+  describe('aria-live announcer', () => {
+    it('renders a visually-hidden role="status" live region', () => {
+      expect(announcer()).to.not.equal(null);
+      expect(announcer().getAttribute('role')).to.equal('status');
+      expect(announcer().getAttribute('aria-live')).to.equal('polite');
+    });
+
+    it('announces when the unread count increases', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First' });
+      expect(announcer().textContent).to.equal('1 new notification');
+      addEntry('RF-2', { stage: 'reminder', title: 'Second' });
+      expect(announcer().textContent).to.equal('2 new notifications');
+    });
+
+    it('does not re-announce when the count only decreases (e.g. a read/dismiss)', () => {
+      addEntry('RF-1', { stage: 'reminder', title: 'First' });
+      expect(announcer().textContent).to.equal('1 new notification');
+      rows()[0].click(); // marks read, unread count drops to 0
+      expect(announcer().textContent).to.equal('1 new notification');
+    });
+  });
+
+  describe('reminder start-time line', () => {
+    it('shows a formatted start time for a reminder-stage row', () => {
+      const startTimeMs = Date.parse('2026-10-28T16:00:00.000Z');
+      const endTimeMs = Date.parse('2026-10-28T17:00:00.000Z');
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', startTimeMs, endTimeMs,
+      });
+      const timeLines = rows()[0].querySelectorAll('.swan-notif__time');
+      expect(timeLines).to.have.lengthOf(2); // start time + relative "updated" time
+      expect(timeLines[0].textContent).to.include('Oct');
+    });
+
+    it('does not show a start-time line for a live or on-demand row', () => {
+      addEntry('RF-1', { stage: 'live', title: 'First' });
+      const timeLines = rows()[0].querySelectorAll('.swan-notif__time');
+      expect(timeLines).to.have.lengthOf(1); // relative "updated" time only
+    });
   });
 });

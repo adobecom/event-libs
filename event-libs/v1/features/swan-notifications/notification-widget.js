@@ -1,6 +1,11 @@
-import { createTag, loadStyle } from '../../utils/utils.js';
 import {
-  notifications, markRead, markAllRead,
+  createTag, loadStyle, getEventConfig, getFallbackLocale, getMetadata,
+} from '../../utils/utils.js';
+import { FALLBACK_LOCALES } from '../../utils/constances.js';
+import { dictionaryManager } from '../../utils/dictionary-manager.js';
+import { getRelativeTime, createTemplatedDateRange } from '../../utils/date-time-helper.js';
+import {
+  notifications, markRead, markAllRead, removeEntry, getEntries,
 } from './notification-store.js';
 import { STAGE_COPY } from './swan-payload.js';
 import { waitForElement } from './gnav-wait.js';
@@ -25,33 +30,43 @@ const BELL_ICON_FALLBACK = '<svg xmlns="http://www.w3.org/2000/svg" width="20" h
 // generic library; this at least reads as "a session," not a blank colored square.
 const SESSION_ICON_FALLBACK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="15" rx="2" fill="none" stroke="#fff" stroke-width="1.5"/><path stroke="#fff" stroke-width="1.5" d="M3 9.5h18"/><path stroke="#fff" stroke-width="1.5" stroke-linecap="round" d="M7.5 3v3.5M16.5 3v3.5"/></svg>';
 
+// Same close glyph/markup as features/toast/toast.js's own dismiss button, for visual parity.
+const CLOSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+
 // "reminder" -> "Upcoming" matches the Figma reference's pill label and the app's broader
 // upcoming/live/on-demand vocabulary (see utils/session-state.js) — SWAN's internal stage
 // name stays "reminder" (it means something more specific: before the lead-time window).
+// Values double as dictionary keys/English fallbacks (dictionaryManager.getValue(key) returns
+// the key itself when unloaded/missing), same convention as sessions-hub.js's own copy.
 const STAGE_PILL_LABEL = { reminder: 'Upcoming', live: 'Live', 'on-demand': 'On-Demand' };
 
 let mounted = false;
 
-function formatRelativeTime(updatedAt) {
-  const minutes = Math.round((Date.now() - updatedAt) / 60_000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
+// Resolved once per widget build — locale doesn't change during a page's lifetime.
+function resolveLocale() {
+  return getEventConfig()?.miloConfig?.locale?.ietf || getFallbackLocale(FALLBACK_LOCALES)?.ietf;
+}
+
+// In-person events carry an authored venue timezone; everything else (virtual/on-demand,
+// global audiences) shows the viewer's own local time instead — same eventType-gated rule
+// date-time-helper.js's own metadata hydration rules and decorate.js already apply.
+function resolveTimezone() {
+  return getMetadata('event-type') === 'InPerson' ? getMetadata('timezone') : null;
 }
 
 // Three lines per the Figma spec (node 9690:20849): category kicker + stage pill, then the
 // session title (can wrap), then the relative timestamp alone — not the pill+timestamp
-// sharing a line under the title, which an earlier pass got wrong.
-function renderRow(entry) {
-  const stageLabel = STAGE_PILL_LABEL[entry.stage] || entry.stage;
+// sharing a line under the title, which an earlier pass got wrong. A fourth, reminder-only
+// line shows the session's actual start time/date, since "Upcoming" alone doesn't say when.
+function renderRow(entry, locale, timezone, onDismiss) {
+  const stageLabel = dictionaryManager.getValue(STAGE_PILL_LABEL[entry.stage] || entry.stage);
   const row = createTag('li', {
     class: `swan-notif__row${entry.read ? '' : ' swan-notif__row--unread'}`,
     tabindex: '0',
     role: 'button',
-    'aria-label': `${entry.title} ${STAGE_COPY[entry.stage] || ''}`,
+    'aria-label': `${entry.title} ${dictionaryManager.getValue(STAGE_COPY[entry.stage] || '')}`,
+    'daa-ll': `Notification-Row-Click|${entry.title}`,
+    'data-rfcode': entry.rfCode,
   });
 
   row.append(createTag('span', { class: 'swan-notif__dot', 'aria-hidden': 'true' }));
@@ -74,7 +89,18 @@ function renderRow(entry) {
   title.textContent = entry.title;
   body.append(title);
 
-  body.append(createTag('p', { class: 'swan-notif__time' }, formatRelativeTime(entry.updatedAt)));
+  if (entry.stage === 'reminder') {
+    const startTime = createTemplatedDateRange(
+      entry.startTimeMs,
+      entry.endTimeMs,
+      locale,
+      '{ddd}, {LLL} {dd} · {timeRange} {timeZone}',
+      timezone,
+    );
+    if (startTime) body.append(createTag('p', { class: 'swan-notif__time' }, startTime));
+  }
+
+  body.append(createTag('p', { class: 'swan-notif__time' }, getRelativeTime(entry.updatedAt, locale)));
   row.append(body);
 
   function activate() {
@@ -89,33 +115,54 @@ function renderRow(entry) {
     }
   });
 
+  const dismissLabel = dictionaryManager.getValue('Dismiss {title}').replace('{title}', entry.title);
+  const dismissBtn = createTag('button', {
+    class: 'swan-notif__dismiss', type: 'button', 'aria-label': dismissLabel,
+  }, CLOSE_ICON);
+  dismissBtn.addEventListener('click', (e) => {
+    // Stops the row's own click-through/mark-read handler from also firing.
+    e.stopPropagation();
+    onDismiss(entry.rfCode);
+  });
+  // A native <button> translates an Enter/Space keydown into its own click automatically —
+  // this only needs to stop that keydown from also reaching the row's own keydown listener
+  // (a separate event from the click it triggers, so the click-handler's stopPropagation
+  // above doesn't cover it).
+  dismissBtn.addEventListener('keydown', (e) => e.stopPropagation());
+  row.append(dismissBtn);
+
   return row;
 }
 
 // sectionTitle ("Important") only ever shows when there's something under it — SWAN only ever
 // has one section today, but this keeps the render function structured so a second section
-// could be added later without a rewrite.
-function renderList(sectionTitle, list, badge, entries) {
+// could be added later without a rewrite. Returns the unread count so the caller can decide
+// whether to make an aria-live announcement, without a second pass over entries.
+function renderList(sectionTitle, list, badge, entries, locale, timezone, onDismiss) {
   sectionTitle.hidden = entries.length === 0;
   list.textContent = '';
   if (!entries.length) {
-    list.append(createTag('li', { class: 'swan-notif__empty' }, 'No notifications yet'));
+    list.append(createTag('li', { class: 'swan-notif__empty' }, dictionaryManager.getValue('No notifications yet')));
   } else {
-    entries.forEach((entry) => list.append(renderRow(entry)));
+    entries.forEach((entry) => list.append(renderRow(entry, locale, timezone, onDismiss)));
   }
   const unreadCount = entries.filter((entry) => !entry.read).length;
   badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
   badge.hidden = unreadCount === 0;
+  return unreadCount;
 }
 
 function buildWidget(mount) {
+  const locale = resolveLocale();
+  const timezone = resolveTimezone();
   const wrapper = createTag('div', { class: 'swan-notif' });
   const button = createTag('button', {
     class: 'swan-notif__bell',
     type: 'button',
     'aria-haspopup': 'true',
     'aria-expanded': 'false',
-    'aria-label': 'Notifications',
+    'aria-label': dictionaryManager.getValue('Notifications'),
+    'daa-ll': 'Notification-Bell-Open',
   });
   button.append(createTag('span', { class: 'swan-notif__bell-icon' }, BELL_ICON_FALLBACK));
   const badge = createTag('span', { class: 'swan-notif__badge', 'aria-hidden': 'true' });
@@ -127,17 +174,24 @@ function buildWidget(mount) {
   // documented escape hatch for a nested scrollable region, already used the same way by
   // sessions-guide's DrawerShell.js/FilterPanel.js.
   const panel = createTag('div', {
-    class: 'swan-notif__panel', role: 'dialog', 'aria-label': 'Notifications', 'data-lenis-prevent': '',
+    class: 'swan-notif__panel', role: 'dialog', 'aria-label': dictionaryManager.getValue('Notifications'), 'data-lenis-prevent': '',
   });
   panel.hidden = true;
-  panel.append(createTag('p', { class: 'swan-notif__panel-title' }, 'Notifications'));
+  panel.append(createTag('p', { class: 'swan-notif__panel-title' }, dictionaryManager.getValue('Notifications')));
   panel.append(createTag('div', { class: 'swan-notif__divider', 'aria-hidden': 'true' }));
-  const sectionTitle = createTag('p', { class: 'swan-notif__section-title' }, 'Important');
+  const sectionTitle = createTag('p', { class: 'swan-notif__section-title' }, dictionaryManager.getValue('Important'));
   panel.append(sectionTitle);
   const list = createTag('ul', { class: 'swan-notif__list' });
   panel.append(list);
 
-  wrapper.append(button, panel);
+  // Visually hidden, always in the DOM (unlike the badge, which is aria-hidden and purely
+  // visual) — role="status"/aria-live="polite" is DrawerShell.js's own established pattern
+  // for this exact "announce a background state change" need.
+  const announcer = createTag('div', {
+    class: 'swan-notif__sr-only', role: 'status', 'aria-live': 'polite',
+  });
+
+  wrapper.append(button, panel, announcer);
   // Prepend directly into UniversalNav's own rendered container, not just append to its
   // outer .feds-utilities shell — waiting for this more specific element to exist means
   // UniversalNav.js has already finished rendering into it, avoiding the earlier issue where
@@ -186,7 +240,35 @@ function buildWidget(mount) {
     else closePanel();
   });
 
-  notifications.subscribe((entries) => renderList(sectionTitle, list, badge, entries));
+  // Dismissing a row destroys the very DOM node that currently has keyboard focus (renderList
+  // rebuilds the whole <ul> from scratch on every store change) — without this, focus would
+  // silently drop to <body>. Moves it to the next remaining row's own dismiss button (keeping
+  // a keyboard user "in the flow" of dismissing several in a row), falling back to the
+  // previous row, then to the bell button once the list is empty.
+  function dismissAndRefocus(rfCode) {
+    const current = getEntries();
+    const idx = current.findIndex((e) => e.rfCode === rfCode);
+    const neighborRfCode = current[idx + 1]?.rfCode ?? current[idx - 1]?.rfCode ?? null;
+    removeEntry(rfCode);
+    const neighborRow = neighborRfCode
+      && [...list.querySelectorAll('.swan-notif__row')].find((row) => row.dataset.rfcode === neighborRfCode);
+    (neighborRow?.querySelector('.swan-notif__dismiss') || button).focus();
+  }
+
+  // Announces only on an *increase* (a genuinely new thing to notice), not every render —
+  // e.g. not when entries are marked read/dismissed, which also lowers/holds the count. Starts
+  // at `null`, not `0`: notifications.subscribe() invokes its callback synchronously with
+  // whatever's already in the store (e.g. unread entries persisted from an earlier visit),
+  // which must never be announced as "new" on this first call.
+  let previousUnreadCount = null;
+  notifications.subscribe((entries) => {
+    const unreadCount = renderList(sectionTitle, list, badge, entries, locale, timezone, dismissAndRefocus);
+    if (previousUnreadCount !== null && unreadCount > previousUnreadCount) {
+      const key = unreadCount === 1 ? '{count} new notification' : '{count} new notifications';
+      announcer.textContent = dictionaryManager.getValue(key).replace('{count}', unreadCount);
+    }
+    previousUnreadCount = unreadCount;
+  });
 }
 
 export function mountNotificationWidget() {
@@ -194,6 +276,14 @@ export function mountNotificationWidget() {
   mounted = true;
 
   loadStyle(new URL('./notification-widget.css', import.meta.url).href);
+
+  // Fire-and-forget, in parallel with waitForElement below rather than awaited before it —
+  // this must never delay (or, under fake timers in tests, deadlock) the gnav mount wait.
+  // buildWidget() calls dictionaryManager.getValue() synchronously regardless of whether this
+  // has resolved yet; it just falls back to the English key text until it has.
+  dictionaryManager.initialize().catch((err) => {
+    window.lana?.log(`[notification-widget] dictionary failed to load, using fallback copy: ${err.message}`);
+  });
 
   waitForElement(MOUNT_SELECTOR).then((mount) => {
     if (!mount) {
