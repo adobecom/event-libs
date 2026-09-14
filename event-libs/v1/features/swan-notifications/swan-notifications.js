@@ -9,6 +9,7 @@ import { isSwanEnabled, getSwanConfig } from './swan-config.js';
 import { calculateSessionTimes, buildNotificationEntry } from './swan-payload.js';
 import { upsertNotification, removeNotification } from './notification-display.js';
 import { getEntry, getEntries, pruneStale } from './notification-store.js';
+import { getNowMs } from '../../utils/session-state.js';
 
 const STAGE_RANK = { reminder: 1, live: 2, 'on-demand': 3 };
 
@@ -47,7 +48,7 @@ function applyStage(session, swanConfig, now) {
 export function notifySessionScheduled(session) {
   if (!isSwanEnabled() || !session?.rfCode) return;
   try {
-    applyStage(session, getSwanConfig(), Date.now());
+    applyStage(session, getSwanConfig(), getNowMs());
   } catch (err) {
     window.lana?.log(`[swan-notifications] notifySessionScheduled failed for ${session.rfCode}: ${err.message}`);
   }
@@ -81,7 +82,7 @@ export function reconcileSwanNotifications(getSessions, getScheduled, isSchedule
   if (!isSwanEnabled()) return;
   try {
     const swanConfig = getSwanConfig();
-    const now = Date.now();
+    const now = getNowMs();
     const sessionsById = new Map(getSessions().map((s) => [s.id, s]));
     const scheduledSessions = [...getScheduled()]
       .map((id) => sessionsById.get(id))

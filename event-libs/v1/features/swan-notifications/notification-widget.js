@@ -4,6 +4,7 @@ import {
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getRelativeTime, createTemplatedDateRange } from '../../utils/date-time-helper.js';
+import { getNowMs } from '../../utils/session-state.js';
 import {
   notifications, markRead, markAllRead, dismissEntry, getEntries,
 } from './notification-store.js';
@@ -131,7 +132,7 @@ function renderRow(entry, locale, timezone, onDismiss) {
     if (startTime) body.append(createTag('p', { class: 'swan-notif__time' }, startTime));
   }
 
-  body.append(createTag('p', { class: 'swan-notif__time' }, getRelativeTime(entry.updatedAt, locale)));
+  body.append(createTag('p', { class: 'swan-notif__time' }, getRelativeTime(entry.updatedAt, locale, getNowMs())));
   row.append(body);
 
   function activate() {

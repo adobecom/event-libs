@@ -1,4 +1,5 @@
 import { signal } from '../../deps/htm-preact.js';
+import { getNowMs } from '../../utils/session-state.js';
 
 // Single local store: doubles as "what stage is currently registered" (SWAN's own
 // forward-only stage guard, see swan-notifications.js) and the notification widget's
@@ -100,7 +101,7 @@ export function upsertEntry(rfCode, entry) {
       ...entry,
       read: stageChanged ? false : (prev?.read ?? false),
       dismissed: stageChanged ? false : (prev?.dismissed ?? false),
-      updatedAt: Date.now(),
+      updatedAt: getNowMs(),
       seq: sequence,
     },
   };
