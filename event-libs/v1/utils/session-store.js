@@ -136,8 +136,10 @@ async function loadMyData() {
     reconcileSwanNotifications(() => sessions.value, () => scheduled.value, () => scheduleKnown);
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
-    // A failed fetch is still a final, non-retried answer — isRegistered must not stay undefined.
+    // A failed fetch is still a final, non-retried answer — isRegistered must not stay undefined,
+    // and SWAN's orphan cleanup must not be gated forever on a fetch that will never resolve.
     auth.value = { ...auth.value, isRegistered: null };
+    scheduleKnown = true;
   }
 }
 
