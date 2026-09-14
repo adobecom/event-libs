@@ -728,10 +728,11 @@ describe('services/sessions/sessions-api', () => {
       sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT, GATED] }],
     };
 
-    // Everything except the generic attributeId-keyed map, which is where it is allowed.
+    // Everything except the generic attributeId-keyed maps, which is where it is allowed.
     const withoutGenericMap = (session) => {
       const copy = { ...session };
       delete copy.customAttributeValues;
+      delete copy.customAttributeLabels;
       return copy;
     };
 
@@ -754,7 +755,8 @@ describe('services/sessions/sessions-api', () => {
     // The other half of the intent: it stays visible to authors rather than being hidden.
     it('still reaches customAttributeValues and the facet list, so an author can unmark it', () => {
       const [mapped] = mapEslPayloadToRawSessions(payload);
-      expect(mapped.customAttributeValues['gated-attr-id']).to.deep.equal(['Yes']);
+      expect(mapped.customAttributeValues['gated-attr-id']).to.deep.equal(['yes']);
+      expect(mapped.customAttributeLabels['gated-attr-id']).to.deep.equal(['Yes']);
       expect(deriveFacetableAttributes(payload.sessions).map((f) => f.attributeId))
         .to.include('gated-attr-id');
     });
@@ -1009,17 +1011,25 @@ describe('services/sessions/sessions-api', () => {
     const [session] = mapEslPayloadToRawSessions(payload);
 
     it('builds a generic attributeId-keyed map from any single/multi-select customAttribute', () => {
-      expect(session.customAttributeValues['attr-technical-level']).to.deep.equal(['Intermediate']);
-      expect(session.customAttributeValues['attr-audience']).to.deep.equal(['Designer', 'Developer']);
+      expect(session.customAttributeValues['attr-technical-level']).to.deep.equal(['intermediate']);
+      expect(session.customAttributeValues['attr-audience']).to.deep.equal(['designer', 'developer']);
     });
 
     it('covers attributes with no hand-built flat field (e.g. Region) automatically', () => {
-      expect(session.customAttributeValues['attr-region']).to.deep.equal(['AMER']);
+      expect(session.customAttributeValues['attr-region']).to.deep.equal(['amer']);
     });
 
     it('excludes disabled attributes and non-select input types', () => {
       expect(session.customAttributeValues).to.not.have.property('attr-disabled');
       expect(session.customAttributeValues).to.not.have.property('attr-free-text');
+    });
+
+    it('builds the label-keyed counterpart alongside it, for display', () => {
+      expect(session.customAttributeLabels['attr-technical-level']).to.deep.equal(['Intermediate']);
+      expect(session.customAttributeLabels['attr-audience']).to.deep.equal(['Designer', 'Developer']);
+      expect(session.customAttributeLabels['attr-region']).to.deep.equal(['AMER']);
+      expect(session.customAttributeLabels).to.not.have.property('attr-disabled');
+      expect(session.customAttributeLabels).to.not.have.property('attr-free-text');
     });
   });
 
@@ -1101,6 +1111,13 @@ describe('services/sessions/sessions-api', () => {
       expect(withMap.customAttributeValues).to.deep.equal({ 'attr-1': ['A'] });
       const [withoutMap] = normalizeSessions([{ id: 's-2' }]);
       expect(withoutMap.customAttributeValues).to.deep.equal({});
+    });
+
+    it('passes customAttributeLabels through, defaulting to {} when absent', () => {
+      const [withMap] = normalizeSessions([{ id: 's-1', customAttributeLabels: { 'attr-1': ['Label A'] } }]);
+      expect(withMap.customAttributeLabels).to.deep.equal({ 'attr-1': ['Label A'] });
+      const [withoutMap] = normalizeSessions([{ id: 's-2' }]);
+      expect(withoutMap.customAttributeLabels).to.deep.equal({});
     });
 
     // The test harness runs with Milo env "local", so the non-prod branch is what applies here.

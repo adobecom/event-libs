@@ -1,11 +1,28 @@
 import { detectUserTimezone } from './time.js';
 
-// Authored { attributeId, displayName, enabled } -> FilterPanel's { id, label }. `id` is the
-// attributeId getFilterValue() resolves against customAttributeValues. Order is display order.
+// RainFocus gives categories a UUID and a label, no slug — this is ours, for the ?filter=
+// URL param (an attributeId there would be unreadable and isn't stable across schema
+// regenerations anyway, see gotcha 22 in not-tracked/session-catalog-response.md).
+function slugifyCategoryLabel(label) {
+  return label ? label.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
+}
+
+// Authored { attributeId, displayName, enabled } -> FilterPanel's { id, label, slug }. `id` is
+// the attributeId getFilterValue() resolves against customAttributeValues; `slug` is the
+// ?filter= URL key. Two categories authored down to the same slug get -2/-3/... suffixes, in
+// authoring order, so the URL key stays unique and deterministic without erroring.
 function mapAuthoredFilterCategories(authoredCategories) {
-  return authoredCategories
+  const categories = authoredCategories
     .filter((c) => c.enabled !== false)
     .map((c) => ({ id: c.attributeId, label: c.displayName || c.label }));
+
+  const seen = new Map();
+  return categories.map((c) => {
+    const base = slugifyCategoryLabel(c.label) || c.id;
+    const count = (seen.get(base) || 0) + 1;
+    seen.set(base, count);
+    return { ...c, slug: count === 1 ? base : `${base}-${count}` };
+  });
 }
 
 // Config comes solely from the data-session-guide-config attribute decorate.js sets.

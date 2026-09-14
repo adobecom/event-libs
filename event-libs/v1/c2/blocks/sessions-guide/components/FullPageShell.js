@@ -6,9 +6,21 @@ import { ViewRouter } from './ViewRouter.js';
 import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
 import { BackToTop } from './BackToTop.js';
 
+// filterCategories: [{ id, label, slug }] (see parse-config.js). `id` (attributeId) is what
+// activeFilters/session data key on; `slug` is the readable ?filter= key. A slug/id with no
+// match (a stale or renamed category) is dropped rather than erroring or leaking a raw
+// attributeId into the URL.
+export function categoryIdForSlug(filterCategories, slug) {
+  return filterCategories?.find((c) => c.slug === slug)?.id || null;
+}
+
+export function categorySlugForId(filterCategories, id) {
+  return filterCategories?.find((c) => c.id === id)?.slug || null;
+}
+
 export function FullPageShell() {
   const { state, dispatch } = useSessionGuide();
-  const { activeView, activeFilters, searchQuery } = state;
+  const { activeView, activeFilters, searchQuery, guideConfig } = state;
   const [filterOpen, setFilterOpen] = useState(false);
   // Where focus lands after a Back to top jump; tabindex="-1" below keeps it out of the tab
   // order while still accepting programmatic focus — see the comment in BackToTop.js.
@@ -28,8 +40,9 @@ export function FullPageShell() {
       filterParam.split(',').forEach((pair) => {
         const colonIdx = pair.indexOf(':');
         if (colonIdx < 0) return;
-        const cat = pair.slice(0, colonIdx);
+        const slug = pair.slice(0, colonIdx);
         const val = pair.slice(colonIdx + 1);
+        const cat = categoryIdForSlug(guideConfig.filterCategories, slug);
         if (cat && val) {
           if (!filters[cat]) filters[cat] = new Set();
           filters[cat].add(val);
@@ -59,7 +72,10 @@ export function FullPageShell() {
 
     const filterPairs = [];
     Object.entries(activeFilters).forEach(([cat, valSet]) => {
-      if (valSet instanceof Set) valSet.forEach((v) => filterPairs.push(`${cat}:${v}`));
+      if (!(valSet instanceof Set)) return;
+      const slug = categorySlugForId(guideConfig.filterCategories, cat);
+      if (!slug) return;
+      valSet.forEach((v) => filterPairs.push(`${slug}:${v}`));
     });
     if (filterPairs.length > 0) {
       params.set('filter', filterPairs.join(','));

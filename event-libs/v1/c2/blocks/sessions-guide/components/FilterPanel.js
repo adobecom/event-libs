@@ -2,7 +2,7 @@ import { html, useState, useComputed, useEffect, useRef } from '../../../../deps
 import { useSessionGuide } from '../store/index.js';
 import { sessions } from '../../../../utils/session-store.js';
 import { trapFocus } from '../utils/focus-trap.js';
-import { getFilterValue } from '../utils/session-filters.js';
+import { getFilterOptions } from '../utils/session-filters.js';
 import { getProduct } from '../../../../utils/tier-1-event-config.js';
 import { Icon } from '../../../../features/icons/Icon.js';
 import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
@@ -58,17 +58,21 @@ export function FilterPanel({ onClose }) {
     if (!isMobile && activeCategory === null) setActiveCategory(firstCategoryId);
   }, [isMobile]);
 
+  // { value, label } pairs — value (RF's own slug) is the Set/URL identity, label is what
+  // the pill shows. Deduped by value: a value's label is the same everywhere it appears.
   const categoryOptions = useComputed(() => {
     const opts = {};
     if (!filterCategories) return opts;
     filterCategories.forEach(({ id }) => {
-      const values = new Set();
+      const byValue = new Map();
       sessions.value.forEach((s) => {
-        const v = getFilterValue(s, id);
-        if (Array.isArray(v)) v.forEach((x) => x && values.add(x));
-        else if (v) values.add(v);
+        getFilterOptions(s, id).forEach(({ value, label }) => {
+          if (value) byValue.set(value, label);
+        });
       });
-      opts[id] = [...values].sort();
+      opts[id] = [...byValue.entries()]
+        .map(([value, label]) => ({ value, label }))
+        .sort((a, b) => a.label.localeCompare(b.label));
     });
     return opts;
   }).value;
@@ -119,18 +123,19 @@ export function FilterPanel({ onClose }) {
   const optionsList = html`
     <div class="sg-filter-panel__options" id="sg-filter-panel-options" role="group" aria-label=${activeLabel}>
       ${currentOptions.map((opt) => {
-    const isSelected = currentSet.has(opt);
-    const productIcon = showProductIcons ? getProduct(opt)?.icon : null;
+    const isSelected = currentSet.has(opt.value);
+    // getProduct() is keyed by the authored display name, not the slug.
+    const productIcon = showProductIcons ? getProduct(opt.label)?.icon : null;
     return html`
           <button
             type="button"
             class=${'sg-filter-pill' + (isSelected ? ' sg-filter-pill--selected' : '')}
-            onclick=${() => toggleOption(activeCategory, opt)}
+            onclick=${() => toggleOption(activeCategory, opt.value)}
             aria-pressed=${String(isSelected)}
           >
             <span class="sg-filter-pill__content">
               ${productIcon && html`<${Icon} name=${productIcon} size=${24} resolve=${fetchFederalProductIcon} className="sg-filter-pill__icon" />`}
-              <span class="sg-filter-pill__label">${opt}</span>
+              <span class="sg-filter-pill__label">${opt.label}</span>
             </span>
             ${isSelected && html`<${IconCheckmark} />`}
           </button>

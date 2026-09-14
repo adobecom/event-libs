@@ -80,6 +80,7 @@ export function normalizeSessions(rawSessions) {
     isKeynote: Boolean(s.isKeynote),
     thumbnailUrl: s.thumbnailUrl ?? null,
     customAttributeValues: s.customAttributeValues || {},
+    customAttributeLabels: s.customAttributeLabels || {},
     ...(s.legalDisclaimer ? { legalDisclaimer: s.legalDisclaimer } : {}),
   }));
 }
@@ -242,14 +243,19 @@ export function extractCustomAttributeSlugs(session, name) {
 }
 
 // attributeId-keyed, so newly authored filter categories resolve with no per-field mapping.
-function buildCustomAttributeValueMap(session) {
-  const map = {};
+// `values` is RF's own slug (`v.value`) — the filter identity activeFilters/the URL key on.
+// `labels` is the human string — what the filter panel displays. See getFilterOptions() in
+// session-filters.js, which pairs the two back up.
+function buildCustomAttributeMaps(session) {
+  const values = {};
+  const labels = {};
   (session.customAttributes || []).forEach((attr) => {
     if (attr.enabled === false) return;
     if (!['single-select', 'multi-select'].includes(attr.inputType)) return;
-    map[attr.attributeId] = (attr.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
+    values[attr.attributeId] = (attr.values || []).map((v) => v?.value ?? v?.label).filter(Boolean);
+    labels[attr.attributeId] = (attr.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
   });
-  return map;
+  return { values, labels };
 }
 
 // Missing field is treated as visible (fail open).
@@ -358,6 +364,7 @@ export function mapEslPayloadToRawSessions(payload) {
     const isLivestreamed = getSessionIsLivestreamed(session);
     const type = extractCustomAttributeValue(session, ['Type', 'Session Type']);
     const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
+    const { values: customAttributeValues, labels: customAttributeLabels } = buildCustomAttributeMaps(session);
 
     return {
       id: session.sessionId,
@@ -401,7 +408,8 @@ export function mapEslPayloadToRawSessions(payload) {
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       legalDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
-      customAttributeValues: buildCustomAttributeValueMap(session),
+      customAttributeValues,
+      customAttributeLabels,
     };
   });
 

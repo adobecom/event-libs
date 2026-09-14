@@ -2,11 +2,11 @@
 
 **Ticket:** MWPW-206102 · **Epic:** MWPW-192677
 
-> **Status: still under review.** This document tracks design decisions made so
-> far for the full-page surface, ahead of implementation. Nothing here has been
-> coded yet unless explicitly marked done. Treat this as the source of truth for
-> "why" a decision was made — the ticket's ACs (kept in sync as decisions land)
-> are the source of truth for "what" is required.
+> **Status: filter/URL work implemented (§2, §3); one open question remains**
+> (where the new URL helpers should live, see "Still reviewing" below). Items
+> are marked ✅ Implemented individually — treat this as the source of truth
+> for "why" a decision was made, and the ticket's ACs (kept in sync as
+> decisions land) as the source of truth for "what" is required.
 
 ---
 
@@ -47,24 +47,33 @@ state (default view, no filters, empty search) — the base `sessions.html` URL
 is the "nothing active" state. This matches the ticket's ACs (see MWPW-206102,
 "URL Parameters" sections) and was not changed by anything below.
 
-### 2. Filter category key: our own slug, not the raw `attributeId`
+### 2. Filter category key: our own slug, not the raw `attributeId` ✅ Implemented
 `filterCategories[].attributeId` is a RainFocus UUID — correct to key internal
 logic on, but unusable in a shareable URL. RainFocus doesn't give categories a
-slug (only `attributeId` + `label`/`displayName`), so we generate one:
-`slugify(category.label)`.
+slug (only `attributeId` + `label`/`displayName`), so we generate one.
 
-Since this is authored, event-specific, human-edited text, two things need
-handling wherever this slug gets generated (once per `guideConfig` load, not
-per interaction):
-- **Collision** — two enabled categories reducing to the same slug. Rare with
-  today's ~7 categories, but cheap to guard: detect it and deterministically
-  disambiguate (exact mechanism TBD — still reviewing).
+What shipped:
+- **`parse-config.js`**: `mapAuthoredFilterCategories()` now returns
+  `{ id, label, slug }` per category (was `{ id, label }`). `slug` is
+  `slugifyCategoryLabel(label)` — lowercase, spaces/underscores to hyphens,
+  everything else stripped. Computed once per `guideConfig` parse, not per
+  interaction.
+- **Collision** — two enabled categories reducing to the same slug: resolved
+  with a `-2`/`-3`/... suffix in authoring order (a `Map` tracking counts as
+  categories are walked in their authored array order, which is already
+  stable/deterministic). Falls back to the raw `attributeId` in the
+  (currently unseen) case a label slugifies to an empty string.
 - **Staleness** — a URL's category slug not matching any category in the
-  *current* config (a renamed category, an old shared link). Resolution: the
-  unrecognized `filter=` pair is silently ignored, not an error. Same
-  graceful-degradation posture as everything else in this payload.
+  *current* config (a renamed category, an old shared link): `FullPageShell.js`'s
+  new `categoryIdForSlug()`/`categorySlugForId()` return `null` on a miss, and
+  both the parse and serialize effects drop that pair rather than erroring or
+  leaking a raw `attributeId` into the URL. Same graceful-degradation posture
+  as everything else in this payload.
+- `FilterPanel.js` needed **no changes** — it only ever dealt in `id`
+  (attributeId), never the URL string. The slug is purely a translation layer
+  at the `FullPageShell.js` URL boundary, exactly as scoped.
 
-### 3. Filter value: RainFocus's own `value`, not `label`
+### 3. Filter value: RainFocus's own `value`, not `label` ✅ Implemented
 Verified against a real `session-catalog` capture
 (`not-tracked/session-catalog-response.md` §3.2/§3.4): every `single-select`/
 `multi-select` custom attribute value carries both a kebab-case `value` slug
@@ -73,20 +82,32 @@ the full payload. `AI Focus` was the one exception (`value === label`,
 un-slugified) until a backend fix — confirmed slugified as of the 2026-09-10
 capture. There is no longer any attribute where `value` is unsafe to use.
 
-This means:
-- **No home-grown slugify for values.** Use `value` as-is.
-- **This is where the real implementation cost lives, and it's shared code:**
-  `sessions-api.js`'s `buildCustomAttributeValueMap()` currently builds
-  `session.customAttributeValues` from `v.label ?? v.value` (label-first) — that
-  map is what `FilterPanel.js`'s `categoryOptions` and `filterSessions()`
-  compare against today. Making `value` the filter identity means adding a
-  slug-keyed variant used specifically for filter Set-membership/comparison,
-  while every other consumer of `customAttributeValues` (session cards,
-  `CategoryBadge`, detail modal) keeps using the label-keyed map, unchanged.
-  `FilterPanel.js` needs to carry `{value, label}` pairs instead of one bare
-  string, selecting on `value`, rendering `label`.
-- See the scope-boundary note above — this specific change is shared with the
-  widget and needs a widget regression check.
+**Turned out to be simpler than expected:** `customAttributeValues` had exactly
+one consumer — `session-filters.js` (`getFilterValue()`/`filterSessions()`) via
+`FilterPanel.js`. Session cards, `CategoryBadge`, and the detail modal all read
+their own separate flat fields (`primaryTrack`, `tracks`, `products`, etc.),
+never `customAttributeValues` — so there was no second consumer requiring the
+old label-first content to stick around under that name.
+
+What shipped, in `sessions-api.js`:
+- `buildCustomAttributeValueMap()` → `buildCustomAttributeMaps()`, building both
+  maps in one pass over `session.customAttributes`: `values` (slug-first,
+  `v.value ?? v.label`) and `labels` (label-first, the old behavior). Both are
+  passed through `normalizeSessions()` as `customAttributeValues` and the new
+  `customAttributeLabels`.
+- `session-filters.js`: `getFilterValue()` is untouched (it just returns
+  whatever's in the map, so flipping the map's content was enough) —
+  `filterSessions()` needed no changes either. Added `getFilterLabel()` (same
+  shape, reads `customAttributeLabels`) and `getFilterOptions()`, which zips
+  the two into `[{ value, label }]` per session/category.
+- `FilterPanel.js`: `categoryOptions` now holds `{value, label}` pairs
+  (deduped by `value`, sorted by `label`) instead of bare strings.
+  `toggleOption`/`currentSet` key on `value`; the pill renders `label`.
+  `getProduct(opt.label)` — that lookup is keyed by the authored display name,
+  not the slug, so it has to stay on `label` specifically.
+- Scope-boundary check: this is shared code (`FilterPanel.js`/`sessions-api.js`
+  are used by the widget too). Full suite run after the change: 2589 passed, 0
+  failed — no widget regression.
 
 ### 4. `?filter=` format: the ticket's own shape, once fed safe values
 Format: `?filter=category:value,category:value`, one pair per selected value —
@@ -120,17 +141,17 @@ conversation history for the byte-count comparison. No open action here.
 
 ## Still reviewing / not yet decided
 
-- Exact category-slug collision tie-break algorithm (§2).
-- Test coverage plan for the `value`-based filter identity change and its
-  widget regression check (§3).
 - Whether `utils/url.js` (currently widget-only: `setSessionsParam` /
   `clearSessionParams`) is the right home for the new full-page-only
-  `?view=`/`?filter=`/`?search=` helpers, or whether they stay inline in
-  `FullPageShell.js` as they are today.
+  `?view=`/`?filter=`/`?search=` helpers (including the new
+  `categoryIdForSlug`/`categorySlugForId` pair), or whether they stay inline in
+  `FullPageShell.js` as they are today. Both §2 and §3 are now implemented
+  inline; this is purely a "where should this code live" question, not a
+  behavior one.
 
 ## Ticket sync
 
 MWPW-206102's "URL Parameters — Filters" AC and the "URL Parameter
 Combinations" example have been updated to match §4 (real `category:value`
-pairs, slug values, note about slugs vs. display text). Re-sync this section
-if any decision above changes before implementation.
+pairs, slug values, note about slugs vs. display text) — still accurate now
+that §2/§3 are implemented, no further ticket changes needed.
