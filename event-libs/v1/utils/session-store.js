@@ -194,6 +194,10 @@ export function initSessionState() {
   if (!tierOneConfig) {
     // eslint-disable-next-line no-console
     console.warn('[session-store] initialization skipped: tier-1-event-config metadata is missing or invalid');
+    // Skips loadSessions()/syncAuth() below, so this one line silently suppresses every
+    // session-catalog and RainFocus call for the page — needs to be visible in lana, not
+    // just devtools.
+    window.lana?.log('[session-store] initialization skipped: tier-1-event-config metadata is missing or invalid');
     return;
   }
   initialized = true;
