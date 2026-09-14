@@ -14,12 +14,12 @@ import { fetchFederalTrackIcon } from '../icons/federal-icons.js';
 
 // Page-level, framework-agnostic widget — same shape as features/toast/toast.js (a signal
 // for state, createTag/loadStyle for vanilla DOM, a mounted guard) rather than a full
-// Preact render tree. Injected directly into `#universal-nav`, inside UniversalNav's own
-// rendered `.universal-nav-container` (not just `.feds-utilities`, its outer shell), so it
-// sits alongside profile/appswitcher, in place of UNC's own notifications icon. Federal is
-// expected to give this widget a real placeholder later — this selector/prepend approach is
-// a for-now stopgap.
-const MOUNT_SELECTOR = '#universal-nav';
+// Preact render tree. Injected into `.feds-notifications-wrapper`, the dedicated placeholder
+// federal added for this widget (federal#203 / MWPW-207209) — rendered unconditionally right
+// before `.feds-utilities` in gnav's own template, the same pattern used for Brand
+// Concierge's `.feds-bc-wrapper`. Replaces an earlier stopgap that injected straight into
+// `#universal-nav`, UniversalNav's own rendered container, before federal owned a real slot.
+const MOUNT_SELECTOR = '.feds-notifications-wrapper';
 
 // Real gnav bell glyph, supplied directly (not resolved via features/icons/icon-resolver.js)
 // for a closer look/feel match. Both light/dark source files share the same path (only their
@@ -224,18 +224,16 @@ function buildWidget(mount) {
   });
 
   wrapper.append(button, panel, announcer);
-  // Prepend directly into UniversalNav's own rendered container, not just append to its
-  // outer .feds-utilities shell — waiting for this more specific element to exist means
-  // UniversalNav.js has already finished rendering into it, avoiding the earlier issue where
-  // the bell was inserted into the (still-empty) outer shell and then wiped out moments
-  // later once UniversalNav.js's own async render/rebuild pass caught up to it.
-  mount.prepend(wrapper);
+  // .feds-notifications-wrapper is a dedicated, empty container just for this widget, so
+  // plain append is all placement needs — no other icons share it to land ahead of.
+  mount.append(wrapper);
 
-  // Kept as a safety net even with the more specific mount point above — there's no
-  // guarantee UniversalNav.js won't re-render this container again later (e.g. on a
-  // sign-in state change), and this is cheap insurance against that for the life of the page.
+  // Cheap insurance for the life of the page: nothing today re-renders gnav's own template
+  // wholesale (a locale switch or sign-in state change could), but if one ever does, this
+  // silently reinserts the widget into the fresh `.feds-notifications-wrapper` instead of
+  // leaving the bell missing until the next mountNotificationWidget() call.
   new MutationObserver(() => {
-    if (!wrapper.isConnected) mount.prepend(wrapper);
+    if (!wrapper.isConnected) mount.append(wrapper);
   }).observe(mount, { childList: true });
 
   function closePanel() {
@@ -326,11 +324,11 @@ export function mountNotificationWidget() {
     if (!mount) {
       // Reset the guard on a timed-out mount, not just log it — gnav's mount timing is
       // "unpredictable," not merely slow, so a permanent no-op here would silently drop
-      // the bell for the rest of the page session even once .feds-utilities does appear.
-      // session-store.js's syncAuth() re-invokes this on every imsProfile change, giving
-      // this a real retry path rather than needing its own polling loop.
+      // the bell for the rest of the page session even once .feds-notifications-wrapper does
+      // appear. session-store.js's syncAuth() re-invokes this on every imsProfile change,
+      // giving this a real retry path rather than needing its own polling loop.
       mounted = false;
-      window.lana?.log('[notification-widget] gnav utility bar never appeared — bell not mounted, will retry on next call');
+      window.lana?.log('[notification-widget] gnav notifications placeholder never appeared — bell not mounted, will retry on next call');
       return;
     }
     buildWidget(mount);

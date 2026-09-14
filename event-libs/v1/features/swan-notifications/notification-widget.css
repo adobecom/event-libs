@@ -1,9 +1,10 @@
 /* ── SWAN notification widget ─────────────────────────────────────
-   Injected directly into UniversalNav's own rendered container, in place of UNC's own
-   notifications icon. Colors reuse the shared --s2a-* design tokens (see
-   c2/styles/tokens.css) already used elsewhere in event-libs, with hardcoded
-   fallbacks matching the exact hex values pulled from the Figma spec (node
-   9690:20849) in case this widget ever mounts on a page those tokens aren't loaded on. */
+   Injected into `.feds-notifications-wrapper`, federal's dedicated placeholder for this
+   widget (federal#203/MWPW-207209), in place of UNC's own notifications icon. Colors reuse
+   the shared --s2a-* design tokens (see c2/styles/tokens.css) already used elsewhere in
+   event-libs, with hardcoded fallbacks matching the exact hex values pulled from the Figma
+   spec (node 9690:20849) in case this widget ever mounts on a page those tokens aren't
+   loaded on. */
 
 .swan-notif {
   position: relative;
@@ -324,11 +325,13 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
 
 /* Mobile / collapsed gnav: full-width sheet anchored under the fixed top bar, at milo's
    own gnav breakpoint (global-navigation.css:569,627) rather than inventing a new one.
-   `.feds-utilities` (the outer container `#universal-nav`/`.universal-nav-container` live
-   in) is the same DOM node in both desktop and mobile/hamburger gnav — this widget needs
-   only this one CSS-driven layout switch, not a second injection point, as long as that
-   holds for the more specific mount point too. --swan-notif-mobile-top lets a consumer page
-   override the assumed gnav height if it differs from the default. */
+   `.feds-notifications-wrapper` is rendered once, right alongside `.feds-utilities` in
+   gnav's own template — assumed to be the same DOM node in both desktop and mobile/
+   hamburger gnav the same way `.feds-utilities` is, so this widget needs only this one
+   CSS-driven layout switch, not a second injection point. Flagged for manual QA against
+   federal's actual mobile/hamburger markup once federal#203 ships, since that assumption
+   hasn't been verified against a real rendered page yet. --swan-notif-mobile-top lets a
+   consumer page override the assumed gnav height if it differs from the default. */
 @media (max-width: 900px) {
   .swan-notif__panel {
     position: fixed;

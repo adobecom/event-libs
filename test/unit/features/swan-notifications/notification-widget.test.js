@@ -25,15 +25,15 @@ describe('notification-widget', () => {
 
   before(async () => {
     mountPoint = document.createElement('div');
-    mountPoint.id = 'universal-nav';
+    mountPoint.className = 'feds-notifications-wrapper';
     document.body.append(mountPoint);
 
     // mountNotificationWidget() is a module-level singleton (guarded by its own `mounted`
     // flag), so it's called exactly once for this whole file; every test below interacts
     // with this one mounted instance via the real, shared notification-store.js.
     mountNotificationWidget();
-    // `#universal-nav` already exists, so waitForElement() resolves on a microtask —
-    // this macrotask tick guarantees buildWidget() has already run.
+    // `.feds-notifications-wrapper` already exists, so waitForElement() resolves on a
+    // microtask — this macrotask tick guarantees buildWidget() has already run.
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
@@ -46,7 +46,7 @@ describe('notification-widget', () => {
     panel().hidden = true;
   });
 
-  it('mounts exactly one bell button and panel into #universal-nav', () => {
+  it('mounts exactly one bell button and panel into .feds-notifications-wrapper', () => {
     expect(mountPoint.querySelectorAll('.swan-notif__bell')).to.have.lengthOf(1);
     expect(mountPoint.querySelectorAll('.swan-notif__panel')).to.have.lengthOf(1);
   });
@@ -55,7 +55,7 @@ describe('notification-widget', () => {
     expect(panel().hasAttribute('data-lenis-prevent')).to.equal(true);
   });
 
-  it('re-inserts the bell if something else clears #universal-nav (e.g. UniversalNav.js re-rendering)', async () => {
+  it('re-inserts the bell if something else clears .feds-notifications-wrapper (e.g. a gnav re-render)', async () => {
     expect(mountPoint.querySelector('.swan-notif')).to.not.equal(null);
     mountPoint.replaceChildren();
     expect(mountPoint.querySelector('.swan-notif')).to.equal(null);

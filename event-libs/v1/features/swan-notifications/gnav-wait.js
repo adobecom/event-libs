@@ -1,11 +1,12 @@
 // Milo's gnav (global-navigation) mounts asynchronously and unpredictably, and dispatches
 // no ready event for it today — confirmed by an exhaustive grep of
 // milo/libs/blocks/global-navigation/ for CustomEvent/dispatchEvent usage. The only
-// reliable signal available right now is the `.feds-utilities` utility-bar element itself
-// appearing in the DOM (it's the single mount point for utility icons in both desktop and
-// mobile/hamburger gnav — milo re-stacks it via CSS z-index rather than using a separate
-// mobile container). This checks once for GNAV_READY_EVENT before falling back to polling,
-// so adopting a real milo hook later (recommended as a follow-up) needs no change here.
+// reliable signal available right now is the target mount point itself appearing in the DOM
+// (notification-widget.js waits on `.feds-notifications-wrapper`, federal's dedicated
+// placeholder for this widget — federal#203/MWPW-207209 — rendered unconditionally as part
+// of gnav's own template, so it appears the same way in both desktop and mobile/hamburger
+// gnav). This checks once for GNAV_READY_EVENT before falling back to polling, so adopting a
+// real milo hook later (recommended as a follow-up) needs no change here.
 const GNAV_READY_EVENT = 'gnav:ready';
 
 export function waitForElement(selector, { timeout = 8000, interval = 250 } = {}) {
