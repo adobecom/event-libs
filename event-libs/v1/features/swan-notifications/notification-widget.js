@@ -232,16 +232,17 @@ function buildWidget(mount) {
   });
 
   wrapper.append(button, panel, announcer);
-  // .feds-notifications-wrapper is a dedicated, empty container just for this widget, so
-  // plain append is all placement needs — no other icons share it to land ahead of.
-  mount.append(wrapper);
+  // Prepend rather than append: `.feds-notifications-wrapper` is empty so order doesn't
+  // matter there, but the `?swanMountFallback=true` fallback mounts into `#universal-nav`
+  // alongside UNC's other icons, where this needs to land first to match the Figma order.
+  mount.prepend(wrapper);
 
   // Cheap insurance for the life of the page: nothing today re-renders gnav's own template
   // wholesale (a locale switch or sign-in state change could), but if one ever does, this
-  // silently reinserts the widget into the fresh `.feds-notifications-wrapper` instead of
-  // leaving the bell missing until the next mountNotificationWidget() call.
+  // silently reinserts the widget into the fresh mount point instead of leaving the bell
+  // missing until the next mountNotificationWidget() call.
   new MutationObserver(() => {
-    if (!wrapper.isConnected) mount.append(wrapper);
+    if (!wrapper.isConnected) mount.prepend(wrapper);
   }).observe(mount, { childList: true });
 
   function closePanel() {
