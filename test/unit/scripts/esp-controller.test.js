@@ -150,6 +150,16 @@ describe('Adobe Event Service API', () => {
       expect(event).to.be.an('object');
       expect(event.data).to.have.property('eventId', '123');
     });
+
+    it('should report a network error to lana with the full error detail interpolated', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('offline'));
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+      const result = await api.getEvent('123');
+      expect(result.status).to.equal('Network Error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      const [message] = lanaLogStub.firstCall.args;
+      expect(message).to.equal('Error: Failed to get details for event 123:{}');
+    });
   });
 
   describe('getAttendee', () => {

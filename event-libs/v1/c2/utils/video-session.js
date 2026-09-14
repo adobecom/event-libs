@@ -9,7 +9,7 @@ export const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
 export const VIDEO_CONTAINER_CLASS = 'session-video-container';
 export const VIDEO_PLAYLIST_CONTAINER_CLASS = 'session-video-playlist-container';
 
-function logError(scope, message) {
+export function logError(scope, message) {
   window.lana?.log(`[${scope}] ${message}`);
 }
 

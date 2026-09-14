@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import {
   fetchAuthToken, fetchMyData, fetchScheduled, fetchFavorited,
   addSession, removeSession, dropAndSwapSession, toggleSessionInterest, fetchAttendeeAccess,
@@ -188,6 +189,46 @@ describe('services/sessions/rainfocus', () => {
         error = err;
       }
       expect(error).to.be.an('error');
+    });
+  });
+
+  describe('rawFetch failures are reported to lana', () => {
+    let lanaLogStub;
+
+    beforeEach(() => {
+      lanaLogStub = sinon.stub(window.lana, 'log');
+    });
+
+    afterEach(() => {
+      lanaLogStub.restore();
+    });
+
+    it('logs a non-ok response before throwing', async () => {
+      stubFetch({}, { ok: false, status: 503 });
+      let error;
+      try {
+        await fetchMyData('auth-token', 'profile-1', 'https://example.com/rf/');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      expect(lanaLogStub.firstCall.args[0]).to.include('[rainfocus]');
+      expect(lanaLogStub.firstCall.args[0]).to.include('myData');
+      expect(lanaLogStub.firstCall.args[0]).to.include('503');
+    });
+
+    it('logs a network error before rethrowing', async () => {
+      window.fetch = async () => { throw new Error('offline'); };
+      let error;
+      try {
+        await fetchMyData('auth-token', 'profile-1', 'https://example.com/rf/');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      expect(lanaLogStub.firstCall.args[0]).to.include('[rainfocus] network error calling myData: offline');
     });
   });
 });
