@@ -2888,30 +2888,21 @@
   outline: none;
 }
 
-/* Mobile: static, scrolls away with the page like any other in-flow content — no sticky/
-   overlap trick, so there's no GNAV interaction to reason about at all below tablet. Still
-   needs its own top clearance, though — nothing else pushes this below GNAV on load. */
+/* Same behavior at every breakpoint: extends the box up behind GNAV instead of stacking
+   below it, so the two read as one continuous header. The negative margin/padding-top pair
+   cancels out for where the *content* sits (still right below GNAV, scrolled or not), but
+   the box itself reaches the viewport top, tucked behind GNAV. */
 .sg-full-page__header-wrap {
   border-bottom: 1px solid var(--s2a-color-border-subtle);
   background: var(--s2a-color-background-default);
+  position: sticky;
+  top: 0;
+  margin-top: calc(-1 * var(--feds-nav-total-height, 80px));
   padding-top: var(--feds-nav-total-height, 80px);
-}
 
-@media (min-width: 768px) {
-  .sg-full-page__header-wrap {
-    position: sticky;
-    top: 0;
-
-    /* Extends the box up behind GNAV instead of stacking below it, so the two read as one
-       continuous header — the negative margin here cancels the padding-top above for where
-       the *content* sits (still right below GNAV, scrolled or not), but the box itself now
-       reaches the viewport top, tucked behind GNAV. */
-    margin-top: calc(-1 * var(--feds-nav-total-height, 80px));
-
-    /* Below GNAV's own z-index (verified 10 on the live page) so GNAV paints over the
-       extended/overlapping region instead of covering it. */
-    z-index: 5;
-  }
+  /* Below GNAV's own z-index (verified 10 on the live page) so GNAV paints over the
+     extended/overlapping region instead of covering it. */
+  z-index: 5;
 }
 
 .sg-full-page__header-wrap .sg-header {
