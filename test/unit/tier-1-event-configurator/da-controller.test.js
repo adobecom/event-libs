@@ -101,6 +101,22 @@ describe('tier-1-event-configurator da-controller', () => {
       const result = await getConfigs('org', 'repo');
       expect(result.data[0].configId).to.equal('keep-me');
     });
+
+    it('does not double-count a legacy single-sheet file (Global rows once, not once per probed sheet)', async () => {
+      const singleSheet = {
+        ':type': 'sheet',
+        ':sheetname': 'data',
+        total: 1,
+        limit: 1,
+        offset: 0,
+        data: [{ eventId: 'E1', configType: 'global', config: JSON.stringify({ marker: 'A' }) }],
+      };
+      setDaFetch(async () => makeResponse({ json: singleSheet, headers: { ETag: '"r"' } }));
+      const result = await getConfigs('org', 'repo');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.lengthOf(1);
+      expect(result.data[0].configId).to.equal('legacy:global:E1');
+    });
   });
 
   describe('upsertConfig — multiple Global configs per event', () => {
