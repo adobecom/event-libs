@@ -391,7 +391,8 @@ export function mapEslPayloadToRawSessions(payload) {
       youTubeId: extractCustomAttributeValue(session, 'YouTube ID'),
       mrStreamId: extractCustomAttributeValue(session, 'Mobilerider Video ID (Livestream)'),
       mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
-      mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
+      // Authored as 'SkinID' (no space) in real payloads; 'Skin ID' in older/other sources.
+      mrSkinId: extractCustomAttributeValue(session, ['SkinID', 'Skin ID']),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
       playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
       playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),

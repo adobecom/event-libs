@@ -279,7 +279,10 @@ export function buildSessionFromMetadata(sessionTimes) {
     mpcId: getAttrText('MPC ID'),
     youTubeId: getAttrText('YouTube ID'),
     mrDvrVideoId: getAttrText('Mobilerider Video ID (DVR)'),
-    mrSkinId: getAttrText('Skin ID'),
+    // Real payloads author this as 'SkinID' (no space); older/other sources use 'Skin ID' —
+    // try both rather than silently drop the skin id (an empty skin id means mobilerider.embed()
+    // mounts but never starts playback).
+    mrSkinId: getAttrText('SkinID') || getAttrText('Skin ID'),
     // 'Video Duration' is the name sessions-api.js looks for; some real payloads carry it as
     // 'Video Duration (hr:min:sec)' instead — try both rather than repeat that mismatch here.
     videoDuration: getAttrText('Video Duration') || getAttrText('Video Duration (hr:min:sec)'),
