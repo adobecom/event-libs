@@ -2888,21 +2888,14 @@
   outline: none;
 }
 
-/* Same behavior at every breakpoint: extends the box up behind GNAV instead of stacking
-   below it, so the two read as one continuous header. The negative margin/padding-top pair
-   cancels out for where the *content* sits (still right below GNAV, scrolled or not), but
-   the box itself reaches the viewport top, tucked behind GNAV. */
+/* Static, at every breakpoint — only GNAV stays pinned while scrolling. Sticky here made a
+   ~300px control cluster (date tabs + view dropdown + filter/search) permanently glue itself
+   to the top of the screen for the entire page, not just while near the top. Still needs its
+   own top clearance, though — nothing else pushes this below GNAV on load. */
 .sg-full-page__header-wrap {
   border-bottom: 1px solid var(--s2a-color-border-subtle);
   background: var(--s2a-color-background-default);
-  position: sticky;
-  top: 0;
-  margin-top: calc(-1 * var(--feds-nav-total-height, 80px));
   padding-top: var(--feds-nav-total-height, 80px);
-
-  /* Below GNAV's own z-index (verified 10 on the live page) so GNAV paints over the
-     extended/overlapping region instead of covering it. */
-  z-index: 5;
 }
 
 .sg-full-page__header-wrap .sg-header {
