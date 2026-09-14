@@ -4,6 +4,17 @@ export function isOdd(number) {
   return number % 2 !== 0;
 }
 
+function sortByOrdinal(data) {
+  return [...data].sort((a, b) => {
+    const aHas = a.ordinal != null;
+    const bHas = b.ordinal != null;
+    if (aHas && bHas) return a.ordinal - b.ordinal;
+    if (aHas) return -1;
+    if (bHas) return 1;
+    return 0;
+  });
+}
+
 export default function init(el) {
   if (getMetadata('show-sponsors') !== 'true') {
     el.remove();
@@ -25,6 +36,8 @@ export default function init(el) {
     el.remove();
     return;
   }
+
+  partnersData = sortByOrdinal(partnersData);
 
   const eventPartners = createTag('div', { class: 'event-partners-container' });
 
