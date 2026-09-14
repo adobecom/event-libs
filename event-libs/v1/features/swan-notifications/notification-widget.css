@@ -213,14 +213,14 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
   height: 48px;
   border-radius: 4px;
   object-fit: cover;
-  background: var(--s2a-color-red-900, #d31510);
+  background: var(--s2a-color-gray-75, #f5f5f5);
 }
 
 /* A resolved track icon (fetchFederalTrackIcon recolors its literal black fill/stroke to
-   currentColor) needs this to read white against the tile's red background, matching
-   SESSION_ICON_FALLBACK's own hardcoded fill="#fff" — same tile, no per-track color variant. */
+   currentColor) and SESSION_ICON_FALLBACK (its own fill="currentColor" mark) both read this
+   to sit dark against the tile's light background — same tile, no per-track color variant. */
 .swan-notif__icon--placeholder {
-  color: #fff;
+  color: var(--s2a-color-gray-1000, #000);
 }
 
 .swan-notif__body {

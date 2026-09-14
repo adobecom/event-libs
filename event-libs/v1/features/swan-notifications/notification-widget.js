@@ -37,9 +37,10 @@ const BELL_ICON_FALLBACK = '<svg xmlns="http://www.w3.org/2000/svg" width="20" h
 
 // MAX's own badge mark, shown on a row's colored icon tile when no iconUrl is configured.
 // Source: MAX Badge Icon.svg, with its own baked-in red background/clipPath stripped out —
-// notification-widget.css's .swan-notif__icon tile already supplies that red background, so
-// only the white mark itself is kept here.
-const SESSION_ICON_FALLBACK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="28" height="28" aria-hidden="true" focusable="false"><path fill="#fff" d="M33.7558 14L32.1593 16.9232L30.5797 14H26.3195L29.6859 19.5165L27.0938 23.7592L23.3992 14H19.6011L15.8728 23.8086L14.4783 14H10.2022L9.02142 19.5823L7.83982 14H3.56368L2 25H5.30241L5.98915 19.0246L7.37778 25H10.4892L11.8778 18.9917L12.5797 25H15.42H16.0428H22.5054L21.7716 22.3903H19.9041L21.3886 18.2038L23.7661 25H26.3355H27.5642H30.2767L32.0003 21.914L33.7399 25H38L34.4897 19.2541L37.697 14H33.7558Z"/></svg>';
+// notification-widget.css's .swan-notif__icon tile supplies the tile's own background, and
+// fill="currentColor" (rather than a hardcoded color) lets .swan-notif__icon--placeholder's
+// `color` control the mark the same way it already does for a resolved track icon.
+const SESSION_ICON_FALLBACK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="28" height="28" aria-hidden="true" focusable="false"><path fill="currentColor" d="M33.7558 14L32.1593 16.9232L30.5797 14H26.3195L29.6859 19.5165L27.0938 23.7592L23.3992 14H19.6011L15.8728 23.8086L14.4783 14H10.2022L9.02142 19.5823L7.83982 14H3.56368L2 25H5.30241L5.98915 19.0246L7.37778 25H10.4892L11.8778 18.9917L12.5797 25H15.42H16.0428H22.5054L21.7716 22.3903H19.9041L21.3886 18.2038L23.7661 25H26.3355H27.5642H30.2767L32.0003 21.914L33.7399 25H38L34.4897 19.2541L37.697 14H33.7558Z"/></svg>';
 
 // Same close glyph/markup as features/toast/toast.js's own dismiss button, for visual parity.
 const CLOSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
