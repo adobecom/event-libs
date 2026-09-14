@@ -40,6 +40,10 @@ const VIDEO_PROVIDER_ORIGINS = {
   mpc: ['https://video.tv.adobe.com'],
 
   youtube: ['https://www.youtube.com', 'https://i.ytimg.com', 'https://www.google.com'],
+
+  // The DVR/replay player fetches its skin CSS + player.min.js from this separate origin, so
+  // warm the DNS/TLS handshake before loadMobileRiderPlayer() mounts the embed.
+  mobilerider: ['https://assets.mobilerider.com'],
 };
 
 function preconnectVideoProvider(provider) {
