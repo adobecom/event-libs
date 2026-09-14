@@ -19,7 +19,15 @@ import { fetchFederalTrackIcon } from '../icons/federal-icons.js';
 // before `.feds-utilities` in gnav's own template, the same pattern used for Brand
 // Concierge's `.feds-bc-wrapper`. Replaces an earlier stopgap that injected straight into
 // `#universal-nav`, UniversalNav's own rendered container, before federal owned a real slot.
-const MOUNT_SELECTOR = '.feds-notifications-wrapper';
+//
+// TEMPORARY — remove once federal#203/MWPW-207209 has shipped to every environment this
+// widget is tested against: `.feds-notifications-wrapper` doesn't exist in deployed gnav
+// markup until then, so `?swanMountFallback=true` in the URL opts back into the old
+// `#universal-nav` stopgap purely so the widget itself can still be exercised locally in
+// the meantime.
+const MOUNT_SELECTOR = new URLSearchParams(window.location.search).get('swanMountFallback') === 'true'
+  ? '#universal-nav'
+  : '.feds-notifications-wrapper';
 
 // Real gnav bell glyph, supplied directly (not resolved via features/icons/icon-resolver.js)
 // for a closer look/feel match. Both light/dark source files share the same path (only their
