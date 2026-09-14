@@ -46,9 +46,10 @@ export function formatCountdown(targetMs, nowMs) {
  * @param {string|number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string (e.g., 'en-US')
  * @param {string|null} timezone - Optional IANA timezone (e.g., 'America/Los_Angeles'); if null, uses viewer's local timezone
+ * @param {boolean} hideTimezoneLabel - When true, omits the timezone abbreviation
  * @returns {string} Formatted local date time string
  */
-export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US', timezone = null) {
+export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US', timezone = null, hideTimezoneLabel = false) {
   if (!timestamp) return '';
 
   const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
@@ -76,8 +77,8 @@ export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US', 
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-      timeZoneName: 'short',
     };
+    if (!hideTimezoneLabel) options.timeZoneName = 'short';
     if (timezone) options.timeZone = timezone;
 
     return date.toLocaleString(locale, options);
@@ -255,9 +256,10 @@ function getShortYear(timestamp, locale, timezone = null) {
  *   {timeRange} - Time interval (e.g., '13:00 - 14:45')
  *   {timeZone} - Timezone abbreviation (e.g., 'PST')
  * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
+ * @param {boolean} hideTimezoneLabel - When true, the {timeZone} token resolves to an empty string
  * @returns {string} Formatted date string
  */
-export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, template, timezone = null) {
+export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, template, timezone = null, hideTimezoneLabel = false) {
   if (!startTimestamp || !endTimestamp || !template) return '';
 
   const startNum = typeof startTimestamp === 'string' ? parseInt(startTimestamp, 10) : startTimestamp;
@@ -275,7 +277,7 @@ export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, t
       .replace('{ddd}', getDayOfTheWeek(startNum, locale, timezone))
       .replace('{dd}', getDay(startNum, locale, timezone))
       .replace('{timeRange}', getTimeInterval(startNum, endNum, locale, timezone))
-      .replace('{timeZone}', getLocalTimeZone(startNum, locale, timezone));
+      .replace('{timeZone}', hideTimezoneLabel ? '' : getLocalTimeZone(startNum, locale, timezone));
   } catch (error) {
     window.lana?.log(`Error creating templated date range: ${JSON.stringify(error)}`);
     return '';
@@ -318,11 +320,14 @@ function getDateOnly(timestamp, locale, timezone = null) {
  * @param {Object} [opts={}] - Options
  * @param {boolean} [opts.includeTimeZone=false] - Whether to include timezone abbreviation
  * @param {string|null} [opts.timezone=null] - Optional IANA timezone; if null, uses viewer's local timezone
+ * @param {boolean} [opts.hideTimezoneLabel=false] - When true, forces the timezone abbreviation off
  * @returns {string} Formatted time string
  */
-function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = null } = {}) {
+function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = null, hideTimezoneLabel = false } = {}) {
   const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
   if (Number.isNaN(timestampNum)) return '';
+
+  const showTimeZone = includeTimeZone && !hideTimezoneLabel;
 
   try {
     const date = new Date(timestampNum);
@@ -334,13 +339,13 @@ function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = nu
       const h = Number(parts.find((p) => p.type === 'hour').value);
       const m = Number(parts.find((p) => p.type === 'minute').value);
       const timeStr = applyLocaleFormat(h, m, locale);
-      if (!includeTimeZone) return timeStr;
+      if (!showTimeZone) return timeStr;
       const tzAbbr = date.toLocaleTimeString('en-US', { timeZoneName: 'short', ...tzOpts }).split(' ').pop();
       return `${timeStr} ${tzAbbr}`;
     }
 
     const options = { hour: 'numeric', minute: '2-digit', hour12: true };
-    if (includeTimeZone) options.timeZoneName = 'short';
+    if (showTimeZone) options.timeZoneName = 'short';
     if (timezone) options.timeZone = timezone;
     return date.toLocaleTimeString(locale, options);
   } catch (error) {
@@ -355,13 +360,14 @@ function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = nu
  * @param {string} endTimestamp - End timestamp
  * @param {string} locale - Locale string
  * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
+ * @param {boolean} hideTimezoneLabel - When true, omits the timezone abbreviation
  * @returns {string} Smart date range string
  */
-export function createSmartDateRange(startTimestamp, endTimestamp, locale, timezone = null) {
+export function createSmartDateRange(startTimestamp, endTimestamp, locale, timezone = null, hideTimezoneLabel = false) {
   if (!startTimestamp || !endTimestamp) return '';
 
-  const startDateTime = convertUtcTimestampToLocalDateTime(startTimestamp, locale, timezone);
-  const endDateTime = convertUtcTimestampToLocalDateTime(endTimestamp, locale, timezone);
+  const startDateTime = convertUtcTimestampToLocalDateTime(startTimestamp, locale, timezone, hideTimezoneLabel);
+  const endDateTime = convertUtcTimestampToLocalDateTime(endTimestamp, locale, timezone, hideTimezoneLabel);
 
   if (!startDateTime || !endDateTime) return '';
 
@@ -369,7 +375,7 @@ export function createSmartDateRange(startTimestamp, endTimestamp, locale, timez
   if (areTimestampsOnSameDay(startTimestamp, endTimestamp, timezone)) {
     const date = getDateOnly(startTimestamp, locale, timezone);
     const startTime = getTimeOnly(startTimestamp, locale, { timezone });
-    const endTime = getTimeOnly(endTimestamp, locale, { includeTimeZone: true, timezone });
+    const endTime = getTimeOnly(endTimestamp, locale, { includeTimeZone: true, timezone, hideTimezoneLabel });
 
     if (!date || !startTime || !endTime) return startDateTime;
 
@@ -378,6 +384,22 @@ export function createSmartDateRange(startTimestamp, endTimestamp, locale, timez
 
   // If different days, return full range format
   return `${startDateTime} - ${endDateTime}`;
+}
+
+/**
+ * Whether the author has opted this event out of showing the timezone abbreviation.
+ * @returns {boolean}
+ */
+export function shouldHideTimezoneLabel() {
+  try {
+    const customAttributes = JSON.parse(getMetadata('custom-attributes'));
+    const attr = customAttributes.find(
+      (a) => a.enabled !== false && (a.name ?? a.attribute)?.toLowerCase().trim() === 'hide-timezone-label',
+    );
+    return String(attr?.values?.[0]?.value ?? '').toLowerCase().trim() === 'true';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -390,7 +412,7 @@ const METADATA_MASSAGE_RULES = {
     transform: (originalValue, locale) => {
       const eventType = getMetadata('event-type');
       const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
-      return convertUtcTimestampToLocalDateTime(originalValue, locale, timezone);
+      return convertUtcTimestampToLocalDateTime(originalValue, locale, timezone, shouldHideTimezoneLabel());
     },
   },
   'local-end-time-millis': {
@@ -398,7 +420,7 @@ const METADATA_MASSAGE_RULES = {
     transform: (originalValue, locale) => {
       const eventType = getMetadata('event-type');
       const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
-      return convertUtcTimestampToLocalDateTime(originalValue, locale, timezone);
+      return convertUtcTimestampToLocalDateTime(originalValue, locale, timezone, shouldHideTimezoneLabel());
     },
   },
   // Smart date range that shows single date for same-day events, range for multi-day events
@@ -412,14 +434,15 @@ const METADATA_MASSAGE_RULES = {
       const customTemplate = getMetadata('custom-date-time-format');
       const eventType = getMetadata('event-type');
       const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
+      const hideTimezoneLabel = shouldHideTimezoneLabel();
 
       // If custom template is provided, use templated formatting
       if (customTemplate) {
-        return createTemplatedDateRange(startTimestamp, endTimestamp, locale, customTemplate, timezone);
+        return createTemplatedDateRange(startTimestamp, endTimestamp, locale, customTemplate, timezone, hideTimezoneLabel);
       }
 
       // Otherwise, use smart date range (fallback)
-      return createSmartDateRange(startTimestamp, endTimestamp, locale, timezone);
+      return createSmartDateRange(startTimestamp, endTimestamp, locale, timezone, hideTimezoneLabel);
     },
   },
   // Future hydration rules can be added here

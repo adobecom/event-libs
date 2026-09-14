@@ -11,7 +11,7 @@ import {
 import { dictionaryManager, getInviteOnlyNoCampaignMessage, getEventWaitlistBannerMessage } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
 import { buildModalContent, getProfileName } from '../profile-cards/profile-cards.js';
-import { createSmartDateRange } from '../../utils/date-time-helper.js';
+import { createSmartDateRange, shouldHideTimezoneLabel } from '../../utils/date-time-helper.js';
 import {
   getCaasTags,
   getEvent,
@@ -576,7 +576,7 @@ function renderSpeakerAvatars(speakers) {
 function renderSessionCard(session, opts = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
-    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, getLocaleString(), primaryTime.timezone)
+    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, getLocaleString(), primaryTime.timezone, shouldHideTimezoneLabel())
     : '';
   const locationName = primaryTime?.locationName || '';
 
@@ -906,7 +906,7 @@ function buildBannerDateString() {
   const eventType = getMetadata('event-type');
   const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
 
-  return createSmartDateRange(startMillis, endMillis, getLocaleString(), timezone);
+  return createSmartDateRange(startMillis, endMillis, getLocaleString(), timezone, shouldHideTimezoneLabel());
 }
 
 function renderEventBanner(rsvpConfig, { inviteOnlyBlocked = false, inviteOnlyMessage = '', isEventWaitlisted = false, waitlistBannerMessage = '' } = {}) {
@@ -974,7 +974,7 @@ function syncBannerVisibility(bannerEl, isEventRegistered) {
 function buildConflictOption(session, { registered = false } = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
-    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, getLocaleString(), primaryTime.timezone)
+    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, getLocaleString(), primaryTime.timezone, shouldHideTimezoneLabel())
     : '';
   const locationName = primaryTime?.locationName || '';
 
