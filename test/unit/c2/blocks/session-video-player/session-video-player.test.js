@@ -436,6 +436,9 @@ describe('session-video-player', () => {
       // Same stub loadScript() short-circuits on in mobile-rider.js's own test file — avoids
       // the real script/SDK load, which the test harness disallows.
       globalThis.mobilerider = { embed: sinon.stub() };
+      // DVR window is measured from eventStart (not session end): eventStart + 5h is 3h in the
+      // future, so now is still inside the buffer window → DVR_BUFFER.
+      setMeta('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - 2 * HOUR_MS }));
       sessions.value = [catalogSession({
         isLivestreamed: true,
         mpcId: '',
@@ -462,6 +465,8 @@ describe('session-video-player', () => {
     });
 
     it('does not render a live session\'s dvr-buffer window when no mrDvrVideoId is present', async () => {
+      // eventStart + 5h is 3h ahead → still in the DVR buffer window, but no DVR asset to play.
+      setMeta('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - 2 * HOUR_MS }));
       sessions.value = [catalogSession({
         isLivestreamed: true,
         mpcId: '',
@@ -479,6 +484,8 @@ describe('session-video-player', () => {
     });
 
     it('renders on-demand once a live session\'s dvr-buffer window elapses, falling back to mpcId', async () => {
+      // eventStart + 1h is 2h in the past → DVR window elapsed → on-demand (mpc VOD).
+      setMeta('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - 3 * HOUR_MS }));
       sessions.value = [catalogSession({
         isLivestreamed: true,
         mpcId: '8880000',

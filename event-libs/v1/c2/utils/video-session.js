@@ -141,12 +141,18 @@ export const PLAYBACK_PHASE = {
 const MINUTE_MS = 60_000;
 const HOUR_MS = 3_600_000;
 
-// Live-stream identity always wins: HP livestreamed sessions carry an mpcId (the eventual
-// VOD asset) alongside mrStreamId/isLivestreamed, but that mpcId is not a simulive video.
+// Classification is driven by the session's own identity + DVR gate, NOT the authored Format
+// attribute. Live identity wins first: a session with a livestream/DVR identity runs the full
+// Live→DVR→On-Demand lifecycle (livePhase ends in ON_DEMAND once dvrDelayHours is removed or the
+// window elapses) even if it also happens to carry an on-demand-post-event Format — Format must
+// not flatten that lifecycle. IPOD is a non-live post-event recording, identified by its
+// DVR-availability gate (dvrDelayHours present, e.g. 772): ipodPhase holds it PRE_EVENT until
+// now > eventStart + dvrDelayHours, then plays the VOD. Everything else with an embeddable asset
+// is a scheduled SIMULIVE premiere that ends in On-Demand.
 export function classifySessionPlayback(session) {
   if (!session) return null;
-  if (session.hasOnDemandFormat) return PLAYBACK_CASE.IPOD;
   if (session.mrStreamId || session.isLivestreamed) return PLAYBACK_CASE.LIVE;
+  if (session.dvrDelayHours != null) return PLAYBACK_CASE.IPOD;
   if (session.mpcId || session.youTubeId) return PLAYBACK_CASE.SIMULIVE;
   return null;
 }
@@ -208,23 +214,32 @@ function simulivePhase(session, nowMs) {
   return PLAYBACK_PHASE.ON_DEMAND;
 }
 
-function livePhase(session, nowMs, liveStreamActiveIds) {
+function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds) {
   const start = Date.parse(session.startTimeUtc) || null;
   if (start && nowMs < start) return PLAYBACK_PHASE.PRE_EVENT;
 
+  // "Is it live right now" is the MobileRider poll alone — it goes inactive promptly when the
+  // stream really ends, whereas the authored endTime is unreliable (a session can end early or
+  // run long). So we do NOT gate live on the clock; an over-running broadcast stays WATCH_LIVE
+  // until the poll drops. (A livestreamed session without an mrStreamId has no poll to consult,
+  // so it falls back to the scheduled window.)
   const end = Date.parse(session.endTimeUtc) || null;
   const isLiveNow = session.mrStreamId
-    ? Boolean(liveStreamActiveIds?.has(session.mrStreamId)) && (!end || nowMs < end)
+    ? Boolean(liveStreamActiveIds?.has(session.mrStreamId))
     : (end == null || nowMs < end);
   if (isLiveNow) return PLAYBACK_PHASE.WATCH_LIVE;
 
-  // Removal of dvrDelayHours is itself the "the MPC video is available" signal — skip
-  // straight to on-demand rather than falling back to the default DVR-buffer window.
-  if (session.dvrDelayHours == null) return PLAYBACK_PHASE.ON_DEMAND;
+  // Stream is off air. DVR window, when authored, is event-wide and measured from eventStart —
+  // the same convention ipodPhase/dvrAvailableAtMs use (NOT the unreliable session endTime):
+  // before eventStart + dvrDelayHours → still buffering (play the DVR asset), after → the MPC VOD.
+  if (session.dvrDelayHours != null) {
+    const availableAt = dvrAvailableAtMs(session, eventStartMs);
+    if (availableAt != null && nowMs < availableAt) return PLAYBACK_PHASE.DVR_BUFFER;
+    return PLAYBACK_PHASE.ON_DEMAND;
+  }
 
-  const delayMs = session.dvrDelayHours * HOUR_MS;
-  const bufferStart = end ?? nowMs;
-  if (nowMs < bufferStart + delayMs) return PLAYBACK_PHASE.DVR_BUFFER;
+  // No DVR delay authored: the VOD is ready as soon as the stream is off air (isLiveNow already
+  // false at this point), so go straight to on-demand — the MPC video's presence is the signal.
   return PLAYBACK_PHASE.ON_DEMAND;
 }
 
@@ -238,7 +253,7 @@ export function getPlaybackPhase(session, {
   const playbackCase = classifySessionPlayback(session);
   if (playbackCase === PLAYBACK_CASE.IPOD) return ipodPhase(session, nowMs, eventStartMs);
   if (playbackCase === PLAYBACK_CASE.SIMULIVE) return simulivePhase(session, nowMs);
-  if (playbackCase === PLAYBACK_CASE.LIVE) return livePhase(session, nowMs, liveStreamActiveIds);
+  if (playbackCase === PLAYBACK_CASE.LIVE) return livePhase(session, nowMs, eventStartMs, liveStreamActiveIds);
   return null;
 }
 
