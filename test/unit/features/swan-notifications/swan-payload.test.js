@@ -2,9 +2,11 @@ import { expect } from '@esm-bundle/chai';
 import {
   calculateSessionTimes, buildNotificationEntry, STAGE_COPY,
 } from '../../../../event-libs/v1/features/swan-notifications/swan-payload.js';
+import { MAX_EVENT_PAGES } from '../../../../event-libs/v1/utils/constances.js';
 
 describe('swan-payload', () => {
   const session = {
+    id: 'RF-1',
     rfCode: 'RF-1',
     title: 'My Session',
     sessionPageUrl: '/sessions/my-session',
@@ -96,6 +98,42 @@ describe('swan-payload', () => {
         (stage) => buildNotificationEntry(session, stage, swanConfig).stage,
       );
       expect(stages).to.deep.equal(['reminder', 'live', 'on-demand']);
+    });
+
+    it('still links a reminder to the session\'s own page', () => {
+      const entry = buildNotificationEntry(session, 'reminder', swanConfig);
+      expect(entry.actionUrl).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
+    });
+
+    it('still links an on-demand session to its own page', () => {
+      const entry = buildNotificationEntry(session, 'on-demand', swanConfig);
+      expect(entry.actionUrl).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
+    });
+
+    it('sends a live livestreamed session to the homepage instead of its own page', () => {
+      const entry = buildNotificationEntry({ ...session, isLivestreamed: true }, 'live', swanConfig);
+      expect(entry.actionUrl).to.equal(new URL(MAX_EVENT_PAGES.homepage, window.location.origin).toString());
+    });
+
+    it('sends a live online-only session to the broadcast page, carrying ?watch=<id>', () => {
+      const entry = buildNotificationEntry({ ...session, isOnline: true }, 'live', swanConfig);
+      const expected = new URL(`${MAX_EVENT_PAGES.broadcast}?watch=${session.id}`, window.location.origin).toString();
+      expect(entry.actionUrl).to.equal(expected);
+    });
+
+    it('prefers the homepage over the broadcast page when a session is both livestreamed and online', () => {
+      const entry = buildNotificationEntry({ ...session, isLivestreamed: true, isOnline: true }, 'live', swanConfig);
+      expect(entry.actionUrl).to.equal(new URL(MAX_EVENT_PAGES.homepage, window.location.origin).toString());
+    });
+
+    it('sends a live online-only session with no id to the bare broadcast page, no ?watch=', () => {
+      const entry = buildNotificationEntry({ ...session, id: '', isOnline: true }, 'live', swanConfig);
+      expect(entry.actionUrl).to.equal(new URL(MAX_EVENT_PAGES.broadcast, window.location.origin).toString());
+    });
+
+    it('falls back to the session\'s own page for a live session that is neither livestreamed nor online', () => {
+      const entry = buildNotificationEntry(session, 'live', swanConfig);
+      expect(entry.actionUrl).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
     });
   });
 

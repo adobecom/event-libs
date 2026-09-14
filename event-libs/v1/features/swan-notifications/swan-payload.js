@@ -1,6 +1,8 @@
 // Pure functions — session/config in, entry objects out. No fetch, no module-level
 // state, so these are trivially unit-testable in isolation from the storage/display layer.
 import { getTrackIcon, getOverrideTrackIcon } from '../../utils/tier-1-event-config.js';
+import { getWatchDestination } from '../../utils/session-state.js';
+import { safeUrl } from '../../utils/utils.js';
 
 // Guards against Number(undefined) === NaN silently turning into a null/dropped
 // trigger time when an author omits the field.
@@ -19,21 +21,36 @@ export function calculateSessionTimes(session, upcomingOffsetMinutes) {
   };
 }
 
-// Both sessionPageUrl and thumbnailUrl come from the same real source: the session-catalog
-// endpoint (services/sessions/sessions-api.js's fetchSessions -> normalizeSessions), not raw
-// RainFocus and not constructed here — sessionPageUrl is the catalog's own authored `url`
-// field (env-adjusted), and thumbnailUrl is that session's `session-card-image` asset, the
-// same field sessions-guide's LiveCard.js already renders for its own thumbnail.
+// thumbnailUrl comes from the session-catalog endpoint (services/sessions/sessions-api.js's
+// fetchSessions -> normalizeSessions) — that session's `session-card-image` asset, the same
+// field sessions-guide's LiveCard.js already renders for its own thumbnail.
 //
-// sessionPageUrl is a relative path (e.g. "/sessions/my-session") — resolved against
-// the current page's own origin, since that's the only origin this feature ever runs in.
-function resolveSessionUrl(sessionPageUrl) {
-  if (!sessionPageUrl) return window.location.origin;
+// The action path (session page, homepage, or broadcast path — see resolveActionPath below)
+// is always root-relative — resolved against the current page's own origin, since that's the
+// only origin this feature ever runs in. Gated through safeUrl() first, same as
+// session-routing.js's resolveCardAction does for this same getWatchDestination output —
+// blocks a javascript:/data:/cross-origin value from ever reaching window.location.href.
+function resolveSessionUrl(path) {
+  const safe = safeUrl(path);
+  if (!safe) return window.location.origin;
   try {
-    return new URL(sessionPageUrl, window.location.origin).toString();
+    return new URL(safe, window.location.origin).toString();
   } catch {
     return window.location.origin;
   }
+}
+
+// Reuses session-state.js's getWatchDestination — the same routing sessions-guide's
+// LiveCard/SessionDetailOverlay and session-routing.js's resolveCardAction use — so a live
+// session goes to the homepage (isLivestreamed) or Broadcast (isOnline) instead of its own
+// session page, matching every other entry point into a live session. getWatchDestination
+// doesn't model 'reminder' (it only knows 'live'/'on-demand'), so that stage keeps linking to
+// the session's own page, same as before. It also returns '' for a live session that's neither
+// isLivestreamed nor isOnline (e.g. in-person-only) — falling back to sessionPageUrl there,
+// rather than leaving the row pointing at the bare origin, since that's still a real page.
+function resolveActionPath(session, stage) {
+  if (stage === 'reminder') return session.sessionPageUrl;
+  return getWatchDestination(session, stage) || session.sessionPageUrl;
 }
 
 // Short status copy for a panel row's accessible label, per stage.
@@ -59,7 +76,7 @@ export function buildNotificationEntry(session, stage, swanConfig) {
     stage,
     startTimeMs: Date.parse(session.startTimeUtc),
     endTimeMs: Date.parse(session.endTimeUtc),
-    actionUrl: resolveSessionUrl(session.sessionPageUrl),
+    actionUrl: resolveSessionUrl(resolveActionPath(session, stage)),
     // Prefer the session's own catalog thumbnail; swanConfig.defaultNotificationIconUrl is
     // only a per-event fallback for a session that doesn't have one.
     iconUrl: session.thumbnailUrl || swanConfig.defaultNotificationIconUrl || '',
