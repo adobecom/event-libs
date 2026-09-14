@@ -44,8 +44,17 @@ function buildUrl(rfApiUrl, endpoint, params) {
 
 async function rawFetch(rfApiUrl, endpoint, params) {
   const url = buildUrl(rfApiUrl, endpoint, params);
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`RainFocus API request failed with status ${resp.status}`);
+  let resp;
+  try {
+    resp = await fetch(url);
+  } catch (err) {
+    window.lana?.log(`[rainfocus] network error calling ${endpoint}: ${err.message}`);
+    throw err;
+  }
+  if (!resp.ok) {
+    window.lana?.log(`[rainfocus] ${endpoint} request failed with status ${resp.status}`);
+    throw new Error(`RainFocus API request failed with status ${resp.status}`);
+  }
   return resp.json();
 }
 

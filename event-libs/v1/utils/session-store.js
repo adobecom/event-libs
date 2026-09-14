@@ -150,13 +150,7 @@ async function loadSessions() {
     );
     maybeLoadMyData();
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('[session-store] session catalog failed to load', {
-      eventId: eventApiConfig.eventId,
-      eventServiceEnv: getEventServiceEnv()?.name,
-      error: err,
-    });
-    window.lana?.log(`[session-store] sessions fetch failed: ${err.message}`);
+    window.lana?.log(`[session-store] sessions fetch failed for event ${eventApiConfig.eventId} on ${getEventServiceEnv()?.name}: ${err.message}`);
     sessionsStatus.value = 'error';
   }
 }

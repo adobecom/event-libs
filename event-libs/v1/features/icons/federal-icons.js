@@ -49,7 +49,10 @@ function namespaceSvgIds(svg) {
 async function fetchSvgFrom(url) {
   try {
     const resp = await fetch(url);
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      window.lana?.log(`[federal-icons] non-ok response fetching ${url}: ${resp.status}`);
+      return null;
+    }
     const svgText = await resp.text();
     const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
     return doc.querySelector('svg');
@@ -117,7 +120,10 @@ export function fetchFederalIconList() {
     federalIconListPromise = (async () => {
       try {
         const resp = await fetch(`${resolveFederalRoot()}/federal/assets/icons/icons.json`);
-        if (!resp.ok) return [];
+        if (!resp.ok) {
+          window.lana?.log(`[federal-icons] non-ok response fetching icons.json: ${resp.status}`);
+          return [];
+        }
         const { data = [] } = await resp.json();
         return data.map((entry) => entry.key).filter(Boolean);
       } catch (err) {

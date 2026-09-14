@@ -412,8 +412,15 @@ export function mapEslPayloadToRawSessions(payload) {
 // Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost.
 async function fetchEslSessions(eventId) {
   const options = await constructRequestOptions('GET', null, false, true);
-  const res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, options);
+  let res;
+  try {
+    res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, options);
+  } catch (err) {
+    window.lana?.log(`[sessions-api] network error fetching session catalog for event ${eventId}: ${err.message}`);
+    throw err;
+  }
   if (!res.ok) {
+    window.lana?.log(`[sessions-api] session catalog fetch failed for event ${eventId}: ${res.status}`);
     throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
   }
   const payload = await res.json();

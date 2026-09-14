@@ -107,7 +107,7 @@ export async function getEvent(eventId) {
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get details for event ${eventId}:`, error);
+    window.lana?.log(`Error: Failed to get details for event ${eventId}:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }

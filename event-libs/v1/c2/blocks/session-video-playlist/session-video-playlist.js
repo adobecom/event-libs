@@ -20,13 +20,12 @@ import {
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
+  logError as sharedLogError,
 } from '../../utils/video-session.js';
 
 const LOG_SCOPE = 'session-video-playlist';
 
-function logError(message) {
-  window.lana?.log(`[${LOG_SCOPE}] ${message}`);
-}
+const logError = (message) => sharedLogError(LOG_SCOPE, message);
 
 const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
