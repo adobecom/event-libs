@@ -68,7 +68,6 @@ function stubSheet(initialGlobalRows, initialHomepageRows = []) {
         ...r, config: typeof r.config === 'string' ? JSON.parse(r.config) : r.config,
       }));
       writes.push({ global: parseSheet(body.data), homepage: parseSheet(body.homepage) });
-      // Re-serialize config back to strings for the next GET.
       state.global = (body.data?.data || []);
       state.homepage = (body.homepage?.data || []);
       return makeResponse({ ok: true, headers: { ETag: '"w"' } });
@@ -86,23 +85,46 @@ describe('tier-1-event-configurator da-controller', () => {
     setDaToken(null);
   });
 
-  describe('getConfigs', () => {
-    it('backfills a stable configId onto a legacy Global row that has none', async () => {
-      setDaFetch(stubSheet([rawRow({ marker: 'A' })])); // no configId
+  describe('getConfigs — unique configId repair', () => {
+    it('assigns a configId to a row that has none', async () => {
+      setDaFetch(stubSheet([rawRow({ marker: 'A' })]));
       const result = await getConfigs('org', 'repo');
       expect(result.ok).to.be.true;
       expect(result.data).to.have.lengthOf(1);
-      // Deterministic key derived from (configType, eventId).
-      expect(result.data[0].configId).to.equal('legacy:global:E1');
+      expect(result.data[0].configId).to.be.a('string').and.not.equal('');
     });
 
-    it('leaves an existing configId untouched', async () => {
-      setDaFetch(stubSheet([rawRow({ configId: 'keep-me', marker: 'A' })]));
+    it('gives two configId-less rows for the same event DISTINCT ids', async () => {
+      setDaFetch(stubSheet([rawRow({ marker: 'A' }), rawRow({ marker: 'B' })]));
+      const result = await getConfigs('org', 'repo');
+      expect(result.data).to.have.lengthOf(2);
+      const ids = result.data.map((r) => r.configId);
+      expect(new Set(ids).size).to.equal(2);
+    });
+
+    it('repairs rows that already share a legacy:* id (from the earlier broken build) into distinct real ids', async () => {
+      const fetch = stubSheet([
+        rawRow({ configId: 'legacy:global:E1', marker: 'A' }),
+        rawRow({ configId: 'legacy:global:E1', marker: 'B' }),
+      ]);
+      setDaFetch(fetch);
+      const result = await getConfigs('org', 'repo');
+      const ids = result.data.map((r) => r.configId);
+      expect(new Set(ids).size).to.equal(2);
+      expect(ids.every((id) => !id.startsWith('legacy:'))).to.be.true;
+      // Repair is persisted, not just in memory.
+      expect(fetch.writes.length).to.be.greaterThan(0);
+    });
+
+    it('leaves an existing unique configId untouched (and does not rewrite the sheet)', async () => {
+      const fetch = stubSheet([rawRow({ configId: 'keep-me', marker: 'A' })]);
+      setDaFetch(fetch);
       const result = await getConfigs('org', 'repo');
       expect(result.data[0].configId).to.equal('keep-me');
+      expect(fetch.writes.length).to.equal(0);
     });
 
-    it('does not double-count a legacy single-sheet file (Global rows once, not once per probed sheet)', async () => {
+    it('does not double-count a legacy single-sheet file', async () => {
       const singleSheet = {
         ':type': 'sheet',
         ':sheetname': 'data',
@@ -111,57 +133,35 @@ describe('tier-1-event-configurator da-controller', () => {
         offset: 0,
         data: [{ eventId: 'E1', configType: 'global', config: JSON.stringify({ marker: 'A' }) }],
       };
-      setDaFetch(async () => makeResponse({ json: singleSheet, headers: { ETag: '"r"' } }));
+      const state = { body: singleSheet };
+      setDaFetch(async (url, options) => {
+        if (!url.includes(SHEET_URL)) return makeResponse({ ok: false, status: 404 });
+        if (options?.method === 'POST') { return makeResponse({ ok: true, headers: { ETag: '"w"' } }); }
+        return makeResponse({ json: state.body, headers: { ETag: '"r"' } });
+      });
       const result = await getConfigs('org', 'repo');
-      expect(result.ok).to.be.true;
       expect(result.data).to.have.lengthOf(1);
-      expect(result.data[0].configId).to.equal('legacy:global:E1');
+      expect(result.data[0].configId).to.be.a('string').and.not.equal('');
     });
   });
 
   describe('upsertConfig — multiple Global configs per event', () => {
-    it('editing a legacy (configId-less) Global config does not clobber a newer sibling for the same event', async () => {
-      // Sheet as getConfigs would have surfaced it: a newer row (configId) and a
-      // legacy row (backfilled to legacy:global:E1). New rows sit first.
+    it('editing one config does not clobber a sibling for the same event', async () => {
       const fetch = stubSheet([
-        rawRow({ configId: 'new-1', marker: 'B' }),
-        rawRow({ marker: 'A' }), // legacy, no configId
+        rawRow({ configId: 'id-b', marker: 'B' }),
+        rawRow({ configId: 'id-a', marker: 'A' }),
       ]);
       setDaFetch(fetch);
 
       const result = await upsertConfig('org', 'repo', {
-        eventId: 'E1',
-        backendEventTitle: 'E1',
-        eventServiceEnv: 'prod',
-        configType: 'global',
-        configId: 'legacy:global:E1', // what getConfigs stamped onto the legacy row
-        config: { marker: 'A-edited' },
+        eventId: 'E1', backendEventTitle: 'E1', eventServiceEnv: 'prod', configType: 'global', configId: 'id-a', config: { marker: 'A-edited' },
       });
       expect(result.ok).to.be.true;
 
       const written = fetch.writes.at(-1).global;
-      // Both configs survive — the edit replaced only the legacy row.
       expect(written).to.have.lengthOf(2);
-      const sibling = written.find((r) => r.configId === 'new-1');
-      const edited = written.find((r) => r.configId === 'legacy:global:E1');
-      expect(sibling.config.marker).to.equal('B'); // untouched
-      expect(edited.config.marker).to.equal('A-edited'); // updated in place
-    });
-
-    it('persists the backfilled configId onto every legacy sibling on write', async () => {
-      const fetch = stubSheet([
-        rawRow({ configId: 'new-1', marker: 'B' }),
-        rawRow({ marker: 'A' }), // legacy — should gain a configId after this save
-      ]);
-      setDaFetch(fetch);
-
-      await upsertConfig('org', 'repo', {
-        eventId: 'E1', backendEventTitle: 'E1', eventServiceEnv: 'prod', configType: 'global', configId: 'new-1', config: { marker: 'B-edited' },
-      });
-
-      const written = fetch.writes.at(-1).global;
-      expect(written.every((r) => r.configId)).to.be.true;
-      expect(written.find((r) => r.config.marker === 'A').configId).to.equal('legacy:global:E1');
+      expect(written.find((r) => r.configId === 'id-b').config.marker).to.equal('B');
+      expect(written.find((r) => r.configId === 'id-a').config.marker).to.equal('A-edited');
     });
 
     it('appends a new config rather than overwriting an existing one for the same event', async () => {
@@ -179,22 +179,37 @@ describe('tier-1-event-configurator da-controller', () => {
   });
 
   describe('deleteConfig', () => {
-    it('deletes only the targeted legacy row, leaving its same-event sibling intact', async () => {
+    it('removes only the targeted row when the event has multiple configs', async () => {
       const fetch = stubSheet([
-        rawRow({ configId: 'new-1', marker: 'B' }),
-        rawRow({ marker: 'A' }), // legacy
+        rawRow({ configId: 'id-b', marker: 'B' }),
+        rawRow({ configId: 'id-a', marker: 'A' }),
       ]);
       setDaFetch(fetch);
 
-      const result = await deleteConfig('org', 'repo', {
-        eventId: 'E1', configType: 'global', configId: 'legacy:global:E1',
-      });
+      const result = await deleteConfig('org', 'repo', { eventId: 'E1', configType: 'global', configId: 'id-a' });
       expect(result.ok).to.be.true;
 
       const written = fetch.writes.at(-1).global;
       expect(written).to.have.lengthOf(1);
-      expect(written[0].configId).to.equal('new-1');
-      expect(written[0].config.marker).to.equal('B');
+      expect(written[0].configId).to.equal('id-b');
+    });
+
+    it('end to end: after id repair, deleting one of two same-event configs leaves the other (the reported bug)', async () => {
+      const fetch = stubSheet([
+        rawRow({ configId: 'legacy:global:E1', marker: 'A' }),
+        rawRow({ configId: 'legacy:global:E1', marker: 'B' }),
+      ]);
+      setDaFetch(fetch);
+
+      const loaded = await getConfigs('org', 'repo');
+      const rowA = loaded.data.find((r) => r.config.marker === 'A');
+      await deleteConfig('org', 'repo', {
+        eventId: rowA.eventId, configType: rowA.configType, configId: rowA.configId,
+      });
+
+      const remaining = fetch.writes.at(-1).global;
+      expect(remaining).to.have.lengthOf(1);
+      expect(remaining[0].config.marker).to.equal('B');
     });
   });
 });

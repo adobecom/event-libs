@@ -1,5 +1,5 @@
 import {
-  setDaToken, setDaFetch, readSheet, mutateSheet, parseRowConfig, listFolder, uploadMedia, getContentUrl,
+  setDaToken, setDaFetch, mutateSheet, parseRowConfig, listFolder, uploadMedia, getContentUrl,
   getAemLiveUrl, uploadAndPublishMedia,
 } from '../../v1/utils/da-sheet-controller.js';
 import { CONFIGS_SHEET_PATH, CONFIG_TYPES } from '../constants.js';
@@ -28,17 +28,31 @@ function rowConfigType(row) {
   return row.configType || CONFIG_TYPES.GLOBAL;
 }
 
-// Legacy Global rows (pre-Aug-2026) lack a configId and would match by the
-// non-unique eventId+configType, clobbering a same-event sibling. Backfill a
-// deterministic id (unique: the old upsert kept one such row per event+type)
-// so reads and writes agree without a migration write; next save persists it.
-function withConfigId(row) {
-  if (row.configId) return row;
-  return { ...row, configId: `legacy:${rowConfigType(row)}:${row.eventId}` };
+// Every config row is identified by a unique configId. New rows get one from
+// ConfigsContext; this repairs any sheet that doesn't yet satisfy that by
+// assigning a fresh id to each row that is missing one, carries a `legacy:*`
+// sentinel from an earlier build, or duplicates another row's id within the
+// sheet. Unique ids are what keep same-event configs independent — a shared id
+// makes a single save or delete hit every sibling at once.
+function assignUniqueConfigIds(rows) {
+  const seen = new Set();
+  let changed = false;
+  const next = rows.map((row) => {
+    const id = row.configId;
+    if (id && !String(id).startsWith('legacy:') && !seen.has(id)) {
+      seen.add(id);
+      return row;
+    }
+    const fresh = crypto.randomUUID();
+    seen.add(fresh);
+    changed = true;
+    return { ...row, configId: fresh };
+  });
+  return { rows: next, changed };
 }
 
-// configId is authoritative on either side; eventId+configType is the fallback
-// only when neither row carries one.
+// configId is authoritative on either side; eventId+configType is only a
+// last-resort fallback for a row that somehow still lacks one.
 function rowMatches(row, target) {
   if (row.configId || target.configId) return row.configId === target.configId;
   return row.eventId === target.eventId && rowConfigType(row) === rowConfigType(target);
@@ -71,18 +85,31 @@ function migrateLegacyTitle(row) {
 function parseAndMigrateRows(rawRows) {
   return (rawRows || [])
     .filter((row) => row && row.eventId)
-    .map((row) => withConfigId(migrateLegacyTitle({
+    .map((row) => migrateLegacyTitle({
       ...row,
       config: parseRowConfig(row, 'tier-1-event-configurator'),
-    })));
+    }));
+}
+
+// Reads a sheet and, when a row needs a unique configId (see
+// assignUniqueConfigIds), persists the repaired rows before returning them — a
+// one-time migration that makes every row independently addressable so later
+// saves/deletes touch exactly one row. Idempotent: a sheet whose ids are
+// already unique is read without a write.
+async function readAndRepairSheet(org, repo, sheetName) {
+  return mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {
+    const { rows: next, changed } = assignUniqueConfigIds(rows);
+    if (!changed) return { rows, result: rows, skip: true };
+    return { rows: next, result: next };
+  }, sheetName, ALL_SHEET_NAMES);
 }
 
 export async function getConfigs(org, repo) {
-  const [globalResult, homepageResult] = await Promise.all([
-    readSheet(org, repo, CONFIGS_SHEET_PATH, GLOBAL_SHEET_NAME),
-    readSheet(org, repo, CONFIGS_SHEET_PATH, HOMEPAGE_SHEET_NAME),
-  ]);
+  // Sequential, not parallel: both sheets live in one file, so two concurrent
+  // read-modify-writes would race on its ETag.
+  const globalResult = await readAndRepairSheet(org, repo, GLOBAL_SHEET_NAME);
   if (!globalResult.ok && globalResult.status !== 404) return globalResult;
+  const homepageResult = await readAndRepairSheet(org, repo, HOMEPAGE_SHEET_NAME);
   if (!homepageResult.ok && homepageResult.status !== 404) return homepageResult;
 
   const globalRows = globalResult.ok ? parseAndMigrateRows(globalResult.data) : [];
@@ -90,9 +117,9 @@ export async function getConfigs(org, repo) {
   return { ok: true, data: [...globalRows, ...homepageRows] };
 }
 
-// Upsert by configId: replace the row with that id, else prepend. Multiple
-// configs per event coexist without clobbering. Existing rows pass through
-// withConfigId so a legacy row's backfilled id persists on write. Global and
+// Upsert by configId: replace the row with that id, else prepend. Every row
+// carries a unique configId (getConfigs repairs any that don't), so multiple
+// configs per event coexist and a save touches exactly one row. Global and
 // Homepage live in separate sheets of the same file, round-tripped untouched
 // by da-sheet-controller.js's otherSheets handling.
 export async function upsertConfig(org, repo, {
@@ -107,16 +134,15 @@ export async function upsertConfig(org, repo, {
   };
   // Row-level fields (env/configType/configId) aren't stamped into config —
   // they're authoring detail, irrelevant to the consuming page.
-  const newRow = withConfigId({
+  const newRow = {
     eventId, backendEventTitle, eventServiceEnv, configType, configId, config: stampedConfig, updated,
-  });
+  };
   const targetSheet = sheetNameForConfigType(configType);
 
   const result = await mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {
-    const stamped = rows.map(withConfigId);
-    const idx = stamped.findIndex((r) => rowMatches(r, newRow));
-    if (idx === -1) return { rows: [newRow, ...stamped], result: newRow };
-    const next = [...stamped];
+    const idx = rows.findIndex((r) => rowMatches(r, newRow));
+    if (idx === -1) return { rows: [newRow, ...rows], result: newRow };
+    const next = [...rows];
     next[idx] = newRow;
     return { rows: next, result: newRow };
   }, targetSheet, ALL_SHEET_NAMES);
@@ -128,11 +154,10 @@ export async function deleteConfig(org, repo, { eventId, configType, configId })
   let found = false;
   const targetType = configType || CONFIG_TYPES.GLOBAL;
   const targetSheet = sheetNameForConfigType(targetType);
-  const target = withConfigId({ eventId, configType: targetType, configId });
+  const target = { eventId, configType: targetType, configId };
   const result = await mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {
-    const stamped = rows.map(withConfigId);
-    const next = stamped.filter((r) => !rowMatches(r, target));
-    if (next.length === stamped.length) return { rows, result: null, skip: true };
+    const next = rows.filter((r) => !rowMatches(r, target));
+    if (next.length === rows.length) return { rows, result: null, skip: true };
     found = true;
     return { rows: next, result: null };
   }, targetSheet, ALL_SHEET_NAMES);
