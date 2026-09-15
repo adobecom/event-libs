@@ -45,9 +45,7 @@ let rfAuthToken = null;
 let rfAuthTokenStarted = false;
 let rfAuthTokenSettled = false;
 
-// The media-relay backend only has dev/stage/prod, so the finer-grained envs collapse.
-// Exported so a consumer can poll MobileRider without going through initSessionState()'s
-// catalog fetch (e.g. session-video-player.js's metadata-only mrStreamId poll).
+
 export function deriveMrEnv() {
   const env = getEventServiceEnv()?.name || 'dev';
   if (env.startsWith('stage')) return 'stage';
