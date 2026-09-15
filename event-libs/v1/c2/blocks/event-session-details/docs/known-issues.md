@@ -54,9 +54,9 @@ Only renderable types are affected — `pdf`, `mp4`, `mov` and images preview; `
 one change — or, as a standalone ask to Sekhar / RainFocus, add
 `Content-Disposition: attachment` to those CDN responses, which needs no client change at all.
 
-## 2. `video-player` reads an unsorted `sessionTimes[0]`
+## 2. `session-video-player` reads an unsorted `sessionTimes[0]`
 
-**Files:** `c2/blocks/video-player/video-player.js` (`currentSessionHasEnded`) —
+**Files:** `c2/blocks/session-video-player/session-video-player.js` (`currentSessionHasEnded`) —
 on the unmerged **`latest-playlist`** branch, not on `dev`
 
 **Resolved since first written:** `pickEmbeddableVideo()` used to accept any `kind` and

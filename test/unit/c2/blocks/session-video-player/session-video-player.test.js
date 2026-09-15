@@ -7,36 +7,12 @@ import init, {
   convertIsoDurationToSeconds,
 } from '../../../../../event-libs/v1/c2/blocks/session-video-player/session-video-player.js';
 import BlockMediator from '../../../../../event-libs/v1/deps/block-mediator.min.js';
-import { sessions } from '../../../../../event-libs/v1/utils/session-store.js';
 
 const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
 const DECISION_KEY = 'videoLayoutDecision';
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
 
 const HOUR_MS = 3_600_000;
-
-/**
- * The catalog session backing the render-context phase gate. Defaults to an already-ended,
- * on-demand-eligible session (mpcId present) — the shape most tests exercise; individual
- * tests override fields (or replace sessions.value entirely) for other phases.
- */
-function catalogSession(overrides = {}) {
-  return {
-    id: 's-1',
-    title: 'Test Session',
-    startTimeUtc: new Date(Date.now() - 2 * HOUR_MS).toISOString(),
-    endTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
-    mpcId: '3458940',
-    youTubeId: '',
-    mrDvrVideoId: '',
-    mrSkinId: '',
-    mrStreamId: null,
-    isLivestreamed: false,
-    hasOnDemandFormat: false,
-    dvrDelayHours: null,
-    ...overrides,
-  };
-}
 
 function setMeta(name, content) {
   const attr = name.includes('og:') ? 'property' : 'name';
@@ -101,20 +77,6 @@ function addConfigRow(el, key, value) {
 /** Lets the not-awaited async decision flow inside init() settle. */
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
-/**
- * Polls until `check()` is truthy or `timeoutMs` elapses. Needed for the dvr-buffer path,
- * which dynamically imports mobile-rider.js — a real module fetch whose settling time isn't
- * bounded by a fixed number of `flush()` ticks.
- */
-async function waitFor(check, timeoutMs = 500) {
-  const start = Date.now();
-  for (;;) {
-    if (check()) return;
-    if (Date.now() - start > timeoutMs) throw new Error('waitFor: condition never became true');
-    await flush();
-  }
-}
-
 describe('session-video-player', () => {
   let clock;
 
@@ -123,11 +85,9 @@ describe('session-video-player', () => {
     document.head.innerHTML = '';
     localStorage.clear();
     window.lana = { log: sinon.stub() };
-    sessions.value = [catalogSession()];
   });
 
   afterEach(() => {
-    sessions.value = [];
     clock?.restore();
     clock = null;
     sinon.restore();
@@ -164,9 +124,18 @@ describe('session-video-player', () => {
       expect(playlistPlayer.querySelector('iframe')).to.not.exist;
     });
 
-    // NOTE: there is no longer a timed fallback. The player waits indefinitely for the playlist
-    // to announce videoLayoutDecision (the playlist is always present on a session page and always
-    // resolves to a terminal decision), so a "falls back after 4s" test no longer applies.
+    it('falls back to the full-width instance after the 4s timeout', async () => {
+      clock = sinon.useFakeTimers({ now: Date.now(), shouldAdvanceTime: true });
+      const { fullWidthPlayer, playlistPlayer } = buildPage();
+      await init(fullWidthPlayer);
+      await init(playlistPlayer);
+
+      clock.tick(4000);
+      await flush();
+
+      expect(fullWidthPlayer.querySelector('iframe.adobetv')).to.exist;
+      expect(playlistPlayer.querySelector('iframe')).to.not.exist;
+    });
   });
 
   describe('progress persistence', () => {
@@ -262,7 +231,6 @@ describe('session-video-player', () => {
     });
 
     it('falls back to an authored session-id row when page metadata is missing', async () => {
-      sessions.value = [catalogSession({ id: 's-authored' })];
       const { fullWidthPlayer } = buildPage();
       addConfigRow(fullWidthPlayer, 'session-id', 's-authored');
       setMeta('session-times', sessionTimes());
@@ -273,8 +241,7 @@ describe('session-video-player', () => {
       expect(fullWidthPlayer.isConnected).to.be.true;
     });
 
-    it('removes the block when neither session-times nor the catalog session has an embeddable video', async () => {
-      sessions.value = [catalogSession({ mpcId: '', youTubeId: '' })];
+    it('removes the block when session-times has no embeddable video', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
       setMeta('session-times', sessionTimes({ videos: [] }));
@@ -284,10 +251,7 @@ describe('session-video-player', () => {
       expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
-    it('does NOT pick a liveStream session-times entry as the on-demand video (kind must be onDemand)', async () => {
-      // session-times has ONLY a liveStream mpc entry — pickEmbeddableVideo must skip it (it's the
-      // live broadcast video, not the VOD). The player falls back to the catalog session's mpcId.
-      sessions.value = [catalogSession({ mpcId: '9990000', youTubeId: '' })];
+    it('keeps a liveStream video once the session has ended (kind is not gated)', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
       setMeta('session-times', sessionTimes({
@@ -295,16 +259,11 @@ describe('session-video-player', () => {
       }));
 
       await init(fullWidthPlayer);
-      await flush();
 
-      const iframe = fullWidthPlayer.querySelector('iframe.adobetv');
-      expect(iframe).to.exist;
-      // Built from the catalog mpcId (9990000), NOT the liveStream session-times entry (/v/1).
-      expect(iframe.getAttribute('src')).to.equal(`${ADOBE_TV_ORIGIN}/v/9990000?autoplay=true`);
+      expect(fullWidthPlayer.isConnected).to.be.true;
     });
 
-    it('removes the block when no video has an embeddable provider anywhere', async () => {
-      sessions.value = [catalogSession({ mpcId: '', youTubeId: '' })];
+    it('removes the block when no video has an embeddable provider', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
       setMeta('session-times', sessionTimes({
@@ -316,49 +275,29 @@ describe('session-video-player', () => {
       expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
-    it('removes the block while a genuinely live session is still broadcasting (watch-live is not this block\'s job)', async () => {
-      sessions.value = [catalogSession({
-        isLivestreamed: true,
-        startTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
-        endTimeUtc: new Date(Date.now() + HOUR_MS).toISOString(),
-      })];
+    it('removes the block when the session has not ended yet', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes());
+      setMeta('session-times', sessionTimes({ endTimeMillis: Date.now() + HOUR_MS }));
 
       await init(fullWidthPlayer);
 
       expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
-    it('removes the block while the catalog session is still pre-event', async () => {
-      sessions.value = [catalogSession({
-        startTimeUtc: new Date(Date.now() + HOUR_MS).toISOString(),
-        endTimeUtc: new Date(Date.now() + 2 * HOUR_MS).toISOString(),
-      })];
+    it('removes the block when endTimeMillis is missing (cannot confirm the session ended)', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes());
+      setMeta('session-times', JSON.stringify([{
+        videos: [{ provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/1`, kind: 'onDemand' }],
+      }]));
 
       await init(fullWidthPlayer);
 
       expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
-    it('survives invalid session-times JSON without throwing, falling back to the catalog video', async () => {
-      const { fullWidthPlayer } = buildPage();
-      setMeta('session-id', 's-1');
-      setMeta('session-times', '{not json');
-
-      await init(fullWidthPlayer);
-      await flush();
-
-      expect(fullWidthPlayer.isConnected).to.be.true;
-      expect(window.lana.log.called).to.be.true;
-    });
-
-    it('removes the block when session-times is invalid AND the catalog has no video either', async () => {
-      sessions.value = [catalogSession({ mpcId: '', youTubeId: '' })];
+    it('survives invalid session-times JSON without throwing', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
       setMeta('session-times', '{not json');
@@ -367,148 +306,6 @@ describe('session-video-player', () => {
 
       expect(fullWidthPlayer.isConnected).to.be.false;
       expect(window.lana.log.called).to.be.true;
-    });
-  });
-
-  describe('playback-phase branching (IPOD/Simulive/Live)', () => {
-    beforeEach(() => {
-      setMeta('session-id', 's-1');
-      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
-    });
-
-    it('renders a simulive session by building the video from mpcId directly (no session-times entry exists for it)', async () => {
-      sessions.value = [catalogSession({
-        mpcId: '5551234',
-        startTimeUtc: new Date(Date.now() - 10 * 60_000).toISOString(),
-        endTimeUtc: new Date(Date.now() + 10 * 60_000).toISOString(),
-      })];
-      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
-
-      await init(fullWidthPlayer);
-      await flush();
-
-      const iframe = fullWidthPlayer.querySelector('iframe.adobetv');
-      expect(iframe).to.exist;
-      expect(iframe.getAttribute('src')).to.equal(`${ADOBE_TV_ORIGIN}/v/5551234?autoplay=true`);
-    });
-
-    it('does not render a simulive session before its 5-minute pre-roll window', async () => {
-      sessions.value = [catalogSession({
-        mpcId: '5551234',
-        startTimeUtc: new Date(Date.now() + 10 * 60_000).toISOString(),
-        endTimeUtc: new Date(Date.now() + 30 * 60_000).toISOString(),
-      })];
-      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
-
-      await init(fullWidthPlayer);
-
-      expect(fullWidthPlayer.isConnected).to.be.false;
-    });
-
-    it('renders an IPOD session on-demand once its own DVR delay has elapsed, built from mpcId', async () => {
-      setMeta('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - 10 * HOUR_MS }));
-      sessions.value = [catalogSession({
-        hasOnDemandFormat: true,
-        mpcId: '9990000',
-        startTimeUtc: new Date(Date.now() - 5 * HOUR_MS).toISOString(),
-        endTimeUtc: new Date(Date.now() - 4 * HOUR_MS).toISOString(),
-        dvrDelayHours: 1,
-      })];
-      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
-
-      await init(fullWidthPlayer);
-      await flush();
-
-      const iframe = fullWidthPlayer.querySelector('iframe.adobetv');
-      expect(iframe).to.exist;
-      expect(iframe.getAttribute('src')).to.equal(`${ADOBE_TV_ORIGIN}/v/9990000?autoplay=true`);
-    });
-
-    it('does not render an IPOD session whose own DVR delay has not elapsed yet', async () => {
-      sessions.value = [catalogSession({
-        hasOnDemandFormat: true,
-        mpcId: '9990000',
-        startTimeUtc: new Date(Date.now() - 5 * HOUR_MS).toISOString(),
-        endTimeUtc: new Date(Date.now() - 4 * HOUR_MS).toISOString(),
-        dvrDelayHours: 100,
-      })];
-      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
-
-      await init(fullWidthPlayer);
-
-      expect(fullWidthPlayer.isConnected).to.be.false;
-    });
-
-    it('embeds the MobileRider DVR/replay asset during a live session\'s dvr-buffer window', async () => {
-      // Same stub loadScript() short-circuits on in mobile-rider.js's own test file — avoids
-      // the real script/SDK load, which the test harness disallows.
-      globalThis.mobilerider = { embed: sinon.stub() };
-      // DVR window is measured from eventStart (not session end): eventStart + 5h is 3h in the
-      // future, so now is still inside the buffer window → DVR_BUFFER.
-      setMeta('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - 2 * HOUR_MS }));
-      sessions.value = [catalogSession({
-        isLivestreamed: true,
-        mpcId: '',
-        mrDvrVideoId: 'dvr-asset-1',
-        mrSkinId: 'adobe',
-        startTimeUtc: new Date(Date.now() - 2 * HOUR_MS).toISOString(),
-        endTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
-        dvrDelayHours: 5,
-      })];
-      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
-
-      await init(fullWidthPlayer);
-      // loadMobileRiderPlayer() dynamically imports mobile-rider.js — a real module fetch,
-      // whose settling time isn't bounded by a fixed number of flush() ticks.
-      await waitFor(() => fullWidthPlayer.querySelector('.mobile-rider'));
-
-      const rider = fullWidthPlayer.querySelector('.mobile-rider');
-      expect(rider).to.exist;
-      // Without a skin id, mobilerider.embed() mounts the player but playback never starts.
-      expect(rider.dataset.extractedVideoId).to.equal('dvr-asset-1');
-      expect(rider.dataset.extractedSkinId).to.equal('adobe');
-      expect(rider.dataset.extractedAutoplay).to.equal('true');
-      delete globalThis.mobilerider;
-    });
-
-    it('does not render a live session\'s dvr-buffer window when no mrDvrVideoId is present', async () => {
-      // eventStart + 5h is 3h ahead → still in the DVR buffer window, but no DVR asset to play.
-      setMeta('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - 2 * HOUR_MS }));
-      sessions.value = [catalogSession({
-        isLivestreamed: true,
-        mpcId: '',
-        mrDvrVideoId: '',
-        startTimeUtc: new Date(Date.now() - 2 * HOUR_MS).toISOString(),
-        endTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
-        dvrDelayHours: 5,
-      })];
-      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
-
-      await init(fullWidthPlayer);
-
-      expect(fullWidthPlayer.isConnected).to.be.false;
-      expect(window.lana.log.called).to.be.true;
-    });
-
-    it('renders on-demand once a live session\'s dvr-buffer window elapses, falling back to mpcId', async () => {
-      // eventStart + 1h is 2h in the past → DVR window elapsed → on-demand (mpc VOD).
-      setMeta('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - 3 * HOUR_MS }));
-      sessions.value = [catalogSession({
-        isLivestreamed: true,
-        mpcId: '8880000',
-        startTimeUtc: new Date(Date.now() - 3 * HOUR_MS).toISOString(),
-        endTimeUtc: new Date(Date.now() - 2 * HOUR_MS).toISOString(),
-        dvrDelayHours: 1,
-      })];
-      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
-      setMeta('session-times', sessionTimes({ videos: [] }));
-
-      await init(fullWidthPlayer);
-      await flush();
-
-      const iframe = fullWidthPlayer.querySelector('iframe.adobetv');
-      expect(iframe).to.exist;
-      expect(iframe.getAttribute('src')).to.equal(`${ADOBE_TV_ORIGIN}/v/8880000?autoplay=true`);
     });
   });
 

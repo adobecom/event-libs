@@ -146,7 +146,7 @@ soonest of every remaining start and end — so the page wakes for the premiere 
 stopping at the first slot's end. It returns `null` only once all slots have ended, which
 is what finally cancels the timer.
 
-**The video player is not involved.** `video-player` decides once at init and never
+**The video player is not involved.** `session-video-player` decides once at init and never
 re-evaluates, gating on `now >= sessionTimes[0].endTimeMillis` — i.e. past the **earliest**
 slot's end, not the final one. That is intentional: the first on-demand window already
 carries the recording, and the player stays put through the premiere. The only thing that
@@ -176,7 +176,7 @@ carries `DVR Timing (in hours)` of **772** (~32 days).
 **Has a recording** — `hasPlayableVideo()` looks for an entry in `session-times[].videos[]`
 whose `provider` is `mpc` or `youtube` **and** whose `kind` is exactly **`onDemand`**.
 
-This deliberately mirrors `video-player`'s `pickEmbeddableVideo()`, which resolves
+This deliberately mirrors `session-video-player`'s `pickEmbeddableVideo()`, which resolves
 `.find((v) => v.kind === 'onDemand')` against the same providers. The eyebrow must not
 promise a recording the player would refuse to embed, so the two predicates are kept
 identical rather than merely similar — an earlier `kind !== 'liveStream'` form was looser
@@ -205,7 +205,7 @@ for the state (not the label text), so it stays accurate when the `IPOD pending 
 re-authored.
 
 See [known-issues.md](known-issues.md) for the `liveStream` divergence from
-`video-player` and the `mobilerider`/`dvr` question.
+`session-video-player` and the `mobilerider`/`dvr` question.
 
 ### Watch now destination
 
