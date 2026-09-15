@@ -64,8 +64,11 @@
   }
 }
 
+/* Hidden until the player signals it is playable and render() builds the rows (adds
+   .is-rendered). The block stays mounted-but-idle while the session is pre-event / live / DVR so
+   it can render on a later transition — but it must not occupy layout as an empty box until then. */
 .session-video-playlist {
-  display: flex;
+  display: none;
   flex-direction: column;
   box-sizing: border-box;
   background: var(--vp-bg, var(--s2a-color-gray-25, #fff));
@@ -73,6 +76,10 @@
   border-radius: var(--s2a-border-radius-md, 16px);
   margin-bottom: var(--s2a-spacing-8, 8px);
   overflow: hidden;
+}
+
+.session-video-playlist.is-rendered {
+  display: flex;
 }
 
 .session-video-playlist-handle,

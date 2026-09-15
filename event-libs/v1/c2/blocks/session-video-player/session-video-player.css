@@ -1,6 +1,14 @@
 @import '../../styles/tokens.css';
 
+/* Hidden until it actually embeds a video (init sets data-embedded="true"). The block stays
+   mounted-but-empty during pre-event / watch-live so it can embed on a later transition, but it
+   must not occupy layout as an empty box until then. */
 .session-video-player {
+  display: none;
+}
+
+.session-video-player[data-embedded="true"] {
+  display: block;
   padding-bottom: var(--s2a-spacing-8, 8px);
 }
 

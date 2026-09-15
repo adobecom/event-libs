@@ -867,6 +867,10 @@ export default async function init(el) {
     el.querySelector('.session-video-playlist-list')?.setAttribute('id', LIST_ID);
     setUpDrawer({ header, toggle, handle });
 
+    // Reveal the block only now that it has real content — until this point it stays display:none
+    // (see CSS) so it never sits as an empty box during pre-event / live / DVR-buffer.
+    el.classList.add('is-rendered');
+
     el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
   };
 

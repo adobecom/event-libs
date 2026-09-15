@@ -554,11 +554,14 @@ describe('session-video-playlist', () => {
       // DVR-buffer with no asset now → on-demand with an mpc id later), so we must NOT tear down.
       expect(playlist.isConnected).to.be.true;
       expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
+      // ...and while idle it stays hidden (no .is-rendered) so it never sits as an empty box.
+      expect(playlist.classList.contains('is-rendered')).to.be.false;
 
-      // A later playable signal still renders it.
+      // A later playable signal still renders it — and reveals it.
       firePlayable();
       await flush();
       expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
+      expect(playlist.classList.contains('is-rendered')).to.be.true;
     });
 
     it('does not render on its own without a player signal', async () => {
