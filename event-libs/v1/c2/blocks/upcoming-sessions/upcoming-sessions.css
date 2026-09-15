@@ -320,15 +320,16 @@
 @media (min-width: 1280px) {
   .upcoming-sessions .sg-card {
     flex-direction: row;
-    align-items: stretch;
-    width: 375px;
-    height: 108px;
+    align-items: flex-start;
+    width: 431px;
+    height: 128px;
     padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-md, 16px);
+    gap: var(--s2a-spacing-lg, 24px);
   }
 
   .upcoming-sessions .sg-card__body {
     width: auto;
+    gap: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions .sg-card__badge-row {
@@ -383,18 +384,9 @@
   .upcoming-sessions.dark-card .sg-card,
   .upcoming-sessions.dark-card .sg-card.is-scheduled,
   .upcoming-sessions.dark-card .sg-card.is-favorited {
-    width: 431px;
-    height: 128px;
-    align-items: flex-start;
-    padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-lg, 24px);
     background: rgb(10 10 10 / 35%);
     border: 1px solid #505050;
     backdrop-filter: none;
-  }
-
-  .upcoming-sessions.dark-card .sg-card__body {
-    gap: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions.dark-card .sg-card:hover {
