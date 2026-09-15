@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   classifySessionPlayback,
   getPlaybackPhase,
+  nextPhaseBoundaryMs,
   PLAYBACK_CASE,
   PLAYBACK_PHASE,
 } from '../../../../event-libs/v1/c2/utils/video-session.js';
@@ -84,5 +85,56 @@ describe('livePhase — poll-driven live, eventStart-anchored DVR', () => {
 
   it('is ON_DEMAND straight away when no dvrDelayHours is authored and the poll is inactive', () => {
     expect(phase(live({ dvrDelayHours: null }))).to.equal(PLAYBACK_PHASE.ON_DEMAND);
+  });
+});
+
+describe('nextPhaseBoundaryMs — the clock boundaries the shared watcher schedules against', () => {
+  it('returns the scheduled start when the session is still upcoming', () => {
+    const s = session({
+      startTimeUtc: new Date(NOW + HOUR).toISOString(),
+      endTimeUtc: new Date(NOW + 2 * HOUR).toISOString(),
+    });
+    // start (+1h) and the simulive pre-roll (start − 5min) are both future; pre-roll is nearest.
+    const preRoll = (NOW + HOUR) - (5 * 60 * 1000);
+    expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(preRoll);
+  });
+
+  it('returns the scheduled end when the session is currently within its window', () => {
+    const end = NOW + HOUR;
+    const s = session({
+      startTimeUtc: new Date(NOW - HOUR).toISOString(),
+      endTimeUtc: new Date(end).toISOString(),
+    });
+    expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(end);
+  });
+
+  it('includes the DVR-availability gate (eventStart + dvrDelayHours) as a boundary', () => {
+    const eventStartMs = NOW - HOUR;
+    const s = session({
+      startTimeUtc: new Date(NOW - 3 * HOUR).toISOString(),
+      endTimeUtc: new Date(NOW - 2 * HOUR).toISOString(),
+      dvrDelayHours: 5,
+    });
+    // Only future boundary is eventStart + 5h (= NOW + 4h); start/end are in the past.
+    expect(nextPhaseBoundaryMs(s, { nowMs: NOW, eventStartMs })).to.equal(eventStartMs + 5 * HOUR);
+  });
+
+  it('returns null once every boundary is in the past (fully settled)', () => {
+    const s = session({
+      startTimeUtc: new Date(NOW - 3 * HOUR).toISOString(),
+      endTimeUtc: new Date(NOW - 2 * HOUR).toISOString(),
+      dvrDelayHours: null,
+    });
+    expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(null);
+  });
+
+  it('ignores the DVR gate when eventStartMs is unknown', () => {
+    const s = session({
+      startTimeUtc: new Date(NOW - 3 * HOUR).toISOString(),
+      endTimeUtc: new Date(NOW - 2 * HOUR).toISOString(),
+      dvrDelayHours: 5,
+    });
+    // No eventStartMs → DVR gate can't be computed → no future boundary.
+    expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(null);
   });
 });

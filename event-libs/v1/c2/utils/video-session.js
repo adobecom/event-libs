@@ -1,7 +1,12 @@
 import { getMetadata } from '../../utils/utils.js';
-import { dvrAvailableAtMs } from '../../utils/session-state.js';
+import { dvrAvailableAtMs, getNowMs } from '../../utils/session-state.js';
 import { getAttrText, getAttrValues } from './custom-attributes.js';
 import { hasOnDemandFormat, parseDvrDelayHours } from '../../services/sessions/sessions-api.js';
+import { getEventStartMs } from '../../utils/tier-1-event-config.js';
+import { deriveMrEnv } from '../../utils/session-store.js';
+import {
+  registerStreamIds, unregisterStreamIds, subscribe as subscribeToPoller,
+} from '../../services/sessions/poller.js';
 
 export const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
 
@@ -327,5 +332,112 @@ export function buildSessionFromMetadata(sessionTimes) {
     mrSkinId: getAttrText('SkinID') || getAttrText('Skin ID'),
     videoDuration: getAttrText('Video Duration') || getAttrText('Video Duration (hr:min:sec)'),
     dvrDelayHours: parseDvrDelayHours(getAttrText('DVR Timing (in hours)')),
+  };
+}
+
+// --- Shared phase watcher ---------------------------------------------------------------
+//
+// getPlaybackPhase() is a pure "what phase is it right now" function — it must be invoked, and
+// tells you nothing about WHEN the phase next changes. watchPlaybackPhase() wraps it into a single
+// push API that every surface (eyebrow, player, playlist) can consume so they never diverge:
+//
+//   const stop = watchPlaybackPhase(session, (phase) => { ... });  // fires now + on every change
+//   // ...later: stop();
+//
+// It owns both triggers, branching on whether the session is live:
+//   - CLOCK-driven (all sessions): the pre-event→simulive/dvr→on-demand boundaries are known
+//     timestamps (start, end, eventStart + dvrDelayHours), so it self-schedules a setTimeout to the
+//     next one — the phase-aware version of event-session-details' nextBoundary().
+//   - POLL-driven (mrStreamId only): a live session's live→DVR flip happens when the MobileRider
+//     stream goes inactive, an UNPREDICTABLE moment no timer can hit — so for those we also
+//     subscribe to the poll and re-evaluate on each result. deriveMrEnv() is resolved internally so
+//     callers don't need to know about MR env.
+
+const HOUR_MS = 60 * 60 * 1000;
+
+// The next future instant at which the CLOCK-based phase could change, or null if none remains
+// (e.g. fully on-demand, or a live session whose remaining transition is poll-driven). Candidates:
+// scheduled start, the simulive pre-roll (start − 5min), scheduled end, and the DVR-availability
+// gate (eventStart + dvrDelayHours). Only timestamps strictly after nowMs are considered.
+export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}) {
+  const candidates = [];
+  const start = Date.parse(session.startTimeUtc) || null;
+  const end = Date.parse(session.endTimeUtc) || null;
+  if (start != null) {
+    candidates.push(start);
+    candidates.push(start - (5 * 60 * 1000)); // simulive pre-roll window opens
+  }
+  if (end != null) candidates.push(end);
+  if (session.dvrDelayHours != null && eventStartMs != null) {
+    candidates.push(eventStartMs + session.dvrDelayHours * HOUR_MS);
+  }
+  const future = candidates.filter((ms) => ms > nowMs);
+  return future.length ? Math.min(...future) : null;
+}
+
+export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
+  if (!session) return () => {};
+  const resolveEventStartMs = () => (eventStartMs != null ? eventStartMs : getEventStartMs());
+
+  let liveStreamActiveIds = new Set();
+  let lastPhase;
+  let timerId = null;
+  let stopped = false;
+
+  const emitIfChanged = (reason = 'init') => {
+    if (stopped) return;
+    const phase = getPlaybackPhase(session, {
+      nowMs: getNowMs(),
+      eventStartMs: resolveEventStartMs(),
+      liveStreamActiveIds,
+    });
+    // TEMP DEBUG
+    console.log('[watch-debug] emitIfChanged', {
+      reason, phase, lastPhase, changed: phase !== lastPhase, liveStreamActiveIds: [...liveStreamActiveIds],
+    });
+    if (phase !== lastPhase) {
+      lastPhase = phase;
+      onChange(phase);
+    }
+  };
+
+  const scheduleNextClockTick = () => {
+    if (timerId != null) { clearTimeout(timerId); timerId = null; }
+    const nowMs = getNowMs();
+    const boundary = nextPhaseBoundaryMs(session, { nowMs, eventStartMs: resolveEventStartMs() });
+    if (boundary == null) return;
+    // +500ms so we evaluate just AFTER the boundary, never a hair before it. MAX_TIMEOUT guards the
+    // 32-bit setTimeout ceiling (a far-future boundary would otherwise fire immediately).
+    const delay = Math.min((boundary - nowMs) + 500, 2 ** 31 - 1);
+    // TEMP DEBUG
+    console.log('[watch-debug] scheduleNextClockTick', { boundaryInMs: boundary - nowMs, delay, mrStreamId: session.mrStreamId });
+    timerId = setTimeout(() => { emitIfChanged('clock-boundary'); scheduleNextClockTick(); }, delay);
+  };
+
+  // POLL trigger — only live (mrStreamId) sessions have a stream to poll; the live→DVR flip rides
+  // on it, not the clock.
+  let unsubscribePoll = () => {};
+  if (session.mrStreamId) {
+    unsubscribePoll = subscribeToPoller(({ active }) => {
+      liveStreamActiveIds = new Set(active);
+      // TEMP DEBUG
+      console.log('[watch-debug] MR poll result', { active: [...active], mrStreamId: session.mrStreamId });
+      emitIfChanged('mr-poll');
+    }, [session.mrStreamId]);
+    registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
+    // TEMP DEBUG
+    console.log('[watch-debug] registered MR stream for polling', { mrStreamId: session.mrStreamId, mrEnv: deriveMrEnv() });
+  }
+
+  emitIfChanged('init');
+  scheduleNextClockTick();
+
+  return function stop() {
+    stopped = true;
+    if (timerId != null) { clearTimeout(timerId); timerId = null; }
+    if (session.mrStreamId) {
+      unsubscribePoll();
+      unregisterStreamIds([session.mrStreamId]);
+    }
   };
 }

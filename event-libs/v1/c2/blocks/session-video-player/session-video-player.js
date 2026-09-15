@@ -1,8 +1,5 @@
 import { createTag, LIBS } from '../../../utils/utils.js';
-import { getNowMs } from '../../../utils/session-state.js';
 import { getEventStartMs, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
-import { deriveMrEnv } from '../../../utils/session-store.js';
-import { registerStreamIds, unregisterStreamIds, subscribe as subscribeToPoller } from '../../../services/sessions/poller.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
@@ -16,7 +13,7 @@ import {
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
-  getPlaybackPhase,
+  watchPlaybackPhase,
   PLAYBACK_PHASE,
   buildSessionFromMetadata,
 } from '../../utils/video-session.js';
@@ -413,8 +410,6 @@ async function watchYouTubePlayback(sessionId, iframe) {
 // handleAnchorElement() uses to convert an authored link into a MobileRider embed; feeding
 // it directly skips the anchor/URL round-trip since we already have the raw video id.
 async function loadMobileRiderPlayer(el, video) {
-  // TEMP DEBUG
-  console.log('[svp-debug] loadMobileRiderPlayer START (DVR embed)', { video });
   const { default: initMobileRider } = await import('../mobile-rider/mobile-rider.js');
   el.querySelector('.milo-video')?.remove();
   const rider = createTag('div', { class: 'mobile-rider' }, '', { parent: el });
@@ -426,11 +421,6 @@ async function loadMobileRiderPlayer(el, video) {
   rider.dataset.extractedAutoplay = 'true';
   initMobileRider(rider);
   el.dataset.embedded = 'true';
-  // TEMP DEBUG
-  console.log('[svp-debug] loadMobileRiderPlayer DONE — mobile-rider mounted, data-embedded=true', {
-    extractedVideoId: rider.dataset.extractedVideoId,
-    extractedSkinId: rider.dataset.extractedSkinId,
-  });
 }
 
 function loadVideoPlayer(el, sessionId, video) {
@@ -535,19 +525,6 @@ function buildRenderModel(el) {
   return { sessionId, sessionTimes, session };
 }
 
-// Resolves the phase for `now` against the latest known live-stream set, then the video for that
-// phase. Returns { phase, video } where video is null when the phase isn't playable yet or has
-// no embeddable asset — the caller decides whether that means "wait" or "give up".
-function evaluatePhase({ session, sessionTimes }, liveStreamActiveIds) {
-  const nowMs = getNowMs();
-  const eventStartMs = getEventStartMs();
-  const phase = getPlaybackPhase(session, { nowMs, eventStartMs, liveStreamActiveIds });
-  const video = PLAYABLE_PHASES.includes(phase)
-    ? resolveVideoForPhase(phase, sessionTimes, session)
-    : null;
-  return { phase, video };
-}
-
 // The current tail of init() — preconnect, layout-decision wait, embed — kept as a one-shot so
 // the evaluate loop can call it exactly once at the transition to a playable phase. No loader is
 // shown at any point: nothing appears until the player is actually ready to embed.
@@ -575,28 +552,27 @@ export default async function init(el) {
   }
   const { sessionId, session, sessionTimes } = model;
 
-  // Updated by the live poll (below) for mrStreamId sessions; stays empty for everything else,
-  // exactly as the old one-shot waitForLiveStatus resolved for non-live sessions.
-  let liveStreamActiveIds = new Set();
   // The phase we last embedded a video for (null = nothing embedded yet). Tracked instead of a
   // one-way boolean so a session that moves BETWEEN playable phases re-embeds the right asset —
   // most importantly DVR_BUFFER → ON_DEMAND, where the transient MobileRider DVR/replay asset must
   // be swapped for the durable MPC/YouTube VOD once the DVR window elapses (or the poll drops the
-  // stream). Re-evaluated on load, on each session-state:changed tick, and on each poll result.
+  // stream).
   let embeddedPhase = null;
 
-  const evaluate = (trigger = 'init') => {
+  // Reacts to a resolved playback phase (delivered by watchPlaybackPhase, which owns both the clock
+  // boundary timer and the MobileRider poll — so this block no longer runs its own triggers).
+  const onPhase = (phase) => {
     if (!el.isConnected) return;
-    const { phase, video } = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
+    const video = PLAYABLE_PHASES.includes(phase)
+      ? resolveVideoForPhase(phase, sessionTimes, session)
+      : null;
     // TEMP DEBUG
-    console.log('[svp-debug] evaluate()', {
-      trigger,
+    console.log('[svp-debug] onPhase() from watcher', {
       phase,
       embeddedPhase,
       phaseChanged: phase !== embeddedPhase,
       video,
       insidePlaylistContainer: isInsidePlaylistContainer(el),
-      liveStreamActiveIds: [...(liveStreamActiveIds || [])],
       session: {
         mrStreamId: session.mrStreamId,
         mrDvrVideoId: session.mrDvrVideoId,
@@ -607,8 +583,7 @@ export default async function init(el) {
       },
     });
 
-    // Already showing the right asset for this phase — nothing to do (keeps repeated poll ticks
-    // idempotent so we don't reload the iframe every 30s while the phase is stable).
+    // Already showing the right asset for this phase — nothing to do.
     if (video && phase === embeddedPhase) {
       // TEMP DEBUG
       console.log('[svp-debug] phase unchanged → keep current asset (no-op)', { phase });
@@ -641,7 +616,7 @@ export default async function init(el) {
     // A playable phase that yields no embeddable asset is terminal — nothing will ever appear
     // (e.g. on-demand with no mpc/youtube id and no session-times video; or DVR-buffer with no
     // mrDvrVideoId). Remove the block, as before. Non-playable phases (pre-event / watch-live) are
-    // NOT terminal: the block stays (empty) to receive the next shared tick / poll result when the
+    // NOT terminal: the block stays (empty) to receive the next phase from the watcher when the
     // session flips to a playable phase. Only remove if nothing has embedded yet — once a video is
     // showing we keep it rather than tearing the player out on a transient no-asset phase.
     if (embeddedPhase === null && PLAYABLE_PHASES.includes(phase)) {
@@ -655,36 +630,17 @@ export default async function init(el) {
     }
   };
 
-  // The shared schedule tick: event-session-details' status timer fires session-state:changed at
-  // every start/end transition, which is exactly when a session flips to on-demand. Re-evaluate on
-  // it instead of running a second, duplicate boundary timer here.
-  const onStateChanged = () => evaluate('session-state:changed');
-  window.addEventListener('session-state:changed', onStateChanged);
-
-  // A live mrStreamId session's live→on-demand flip is driven by the poll (stream inactive), not a
-  // timestamp — subscribe persistently and re-evaluate on each poll result. Non-live sessions never
-  // poll (liveStreamActiveIds stays empty, as the old one-shot waitForLiveStatus resolved for them).
-  let unsubscribePoll = () => {};
-  if (session.mrStreamId) {
-    unsubscribePoll = subscribeToPoller(({ active }) => {
-      liveStreamActiveIds = new Set(active);
-      // TEMP DEBUG
-      console.log('[svp-debug] MR poll result → re-evaluating', { active: [...active], mrStreamId: session.mrStreamId });
-      evaluate('mr-poll');
-    }, [session.mrStreamId]);
-    registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
-    // TEMP DEBUG
-    console.log('[svp-debug] registered MR stream for polling', { mrStreamId: session.mrStreamId, mrEnv: deriveMrEnv() });
-  }
-
-  onElementDetached(el, () => {
-    window.removeEventListener('session-state:changed', onStateChanged);
-    if (session.mrStreamId) {
-      unsubscribePoll();
-      unregisterStreamIds([session.mrStreamId]);
-    }
+  // One shared watcher drives everything: it fires onPhase() now and on every phase change, running
+  // a clock-boundary timer for time-based transitions and subscribing to the MobileRider poll for a
+  // live session's poll-driven live→DVR→on-demand flips — the same source the eyebrow/playlist use.
+  // TEMP DEBUG
+  console.log('[svp-debug] init → starting watchPlaybackPhase', {
+    sessionId,
+    insidePlaylistContainer: isInsidePlaylistContainer(el),
+    mrStreamId: session.mrStreamId,
+    eventStartMs: getEventStartMs(),
   });
-
-  evaluate('init');
+  const stopWatching = watchPlaybackPhase(session, onPhase, { eventStartMs: getEventStartMs() });
+  onElementDetached(el, stopWatching);
 }
 
