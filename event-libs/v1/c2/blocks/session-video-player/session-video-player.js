@@ -413,6 +413,8 @@ async function watchYouTubePlayback(sessionId, iframe) {
 // handleAnchorElement() uses to convert an authored link into a MobileRider embed; feeding
 // it directly skips the anchor/URL round-trip since we already have the raw video id.
 async function loadMobileRiderPlayer(el, video) {
+  // TEMP DEBUG
+  console.log('[svp-debug] loadMobileRiderPlayer START (DVR embed)', { video });
   const { default: initMobileRider } = await import('../mobile-rider/mobile-rider.js');
   el.querySelector('.milo-video')?.remove();
   const rider = createTag('div', { class: 'mobile-rider' }, '', { parent: el });
@@ -424,6 +426,11 @@ async function loadMobileRiderPlayer(el, video) {
   rider.dataset.extractedAutoplay = 'true';
   initMobileRider(rider);
   el.dataset.embedded = 'true';
+  // TEMP DEBUG
+  console.log('[svp-debug] loadMobileRiderPlayer DONE — mobile-rider mounted, data-embedded=true', {
+    extractedVideoId: rider.dataset.extractedVideoId,
+    extractedSkinId: rider.dataset.extractedSkinId,
+  });
 }
 
 function loadVideoPlayer(el, sessionId, video) {
@@ -495,6 +502,12 @@ function resolveVideoForPhase(phase, sessionTimes, session) {
   // buildMiloVideo's iframe embeds (mobilerider.embed(), not a src URL), handled by
   // loadMobileRiderPlayer() instead.
   if (phase === PLAYBACK_PHASE.DVR_BUFFER) {
+    // TEMP DEBUG
+    console.log('[svp-debug] resolveVideoForPhase DVR_BUFFER', {
+      mrDvrVideoId: session?.mrDvrVideoId,
+      mrSkinId: session?.mrSkinId,
+      willReturnNull: !session?.mrDvrVideoId,
+    });
     if (!session?.mrDvrVideoId) return null;
     return { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
   }
@@ -532,14 +545,33 @@ function buildRenderModel(el) {
 // phase. Returns { phase, video } where video is null when the phase isn't playable yet or has
 // no embeddable asset — the caller decides whether that means "wait" or "give up".
 function evaluatePhase({ session, sessionTimes }, liveStreamActiveIds) {
-  const phase = getPlaybackPhase(session, {
-    nowMs: getNowMs(),
-    eventStartMs: getEventStartMs(),
-    liveStreamActiveIds,
-  });
+  const nowMs = getNowMs();
+  const eventStartMs = getEventStartMs();
+  const phase = getPlaybackPhase(session, { nowMs, eventStartMs, liveStreamActiveIds });
   const video = PLAYABLE_PHASES.includes(phase)
     ? resolveVideoForPhase(phase, sessionTimes, session)
     : null;
+  // TEMP DEBUG
+  console.log('[svp-debug] evaluatePhase', {
+    phase,
+    isPlayablePhase: PLAYABLE_PHASES.includes(phase),
+    video,
+    nowMs,
+    eventStartMs,
+    liveStreamActiveIds: [...(liveStreamActiveIds || [])],
+    session: {
+      mrStreamId: session.mrStreamId,
+      isLivestreamed: session.isLivestreamed,
+      mrDvrVideoId: session.mrDvrVideoId,
+      mrSkinId: session.mrSkinId,
+      mpcId: session.mpcId,
+      youTubeId: session.youTubeId,
+      dvrDelayHours: session.dvrDelayHours,
+      hasOnDemandFormat: session.hasOnDemandFormat,
+      startTimeUtc: session.startTimeUtc,
+      endTimeUtc: session.endTimeUtc,
+    },
+  });
   return { phase, video };
 }
 
@@ -552,6 +584,12 @@ function loadWhenDecided(el, sessionId, video) {
   (async () => {
     try {
       const isWinner = await awaitEmbedDecision(el);
+      // TEMP DEBUG
+      console.log('[svp-debug] layout decision resolved', {
+        isWinner,
+        insidePlaylistContainer: isInsidePlaylistContainer(el),
+        videoProvider: video.provider,
+      });
       if (!isWinner) return;
       loadVideoPlayer(el, sessionId, video);
     } catch (error) {
@@ -578,12 +616,21 @@ export default async function init(el) {
   // Re-evaluate the phase against the current clock/live state. Called on load, on each
   // session-state:changed tick (from event-session-details, the single shared schedule timer), and
   // on each live-poll result. embedded/isConnected guards keep it idempotent across all triggers.
-  const evaluate = () => {
+  const evaluate = (trigger = 'init') => {
+    // TEMP DEBUG
+    console.log('[svp-debug] evaluate() called', {
+      trigger,
+      alreadyEmbedded: embedded,
+      isConnected: el.isConnected,
+      insidePlaylistContainer: isInsidePlaylistContainer(el),
+    });
     if (embedded || !el.isConnected) return;
     const { phase, video } = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
 
     if (video) {
       embedded = true;
+      // TEMP DEBUG
+      console.log('[svp-debug] HAS VIDEO → firing playable + loadWhenDecided', { phase, video });
       // Tell the playlist the session just became playable so it renders alongside us on the same
       // tick. Fired before the layout-decision wait so the playlist can announce the decision this
       // block is about to await.
@@ -598,15 +645,20 @@ export default async function init(el) {
     // NOT terminal: the block stays (empty) to receive the next shared tick / poll result when the
     // session flips to a playable phase.
     if (PLAYABLE_PHASES.includes(phase)) {
+      // TEMP DEBUG
+      console.log('[svp-debug] playable phase but NO video → removing block', { phase });
       logError(`session is in "${phase}" phase with no embeddable video — removing`);
       el.remove();
+    } else {
+      // TEMP DEBUG
+      console.log('[svp-debug] non-playable phase → staying mounted, waiting', { phase });
     }
   };
 
   // The shared schedule tick: event-session-details' status timer fires session-state:changed at
   // every start/end transition, which is exactly when a session flips to on-demand. Re-evaluate on
   // it instead of running a second, duplicate boundary timer here.
-  const onStateChanged = () => evaluate();
+  const onStateChanged = () => evaluate('session-state:changed');
   window.addEventListener('session-state:changed', onStateChanged);
 
   // A live mrStreamId session's live→on-demand flip is driven by the poll (stream inactive), not a
@@ -616,9 +668,13 @@ export default async function init(el) {
   if (session.mrStreamId) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
-      evaluate();
+      // TEMP DEBUG
+      console.log('[svp-debug] MR poll result', { active: [...active], mrStreamId: session.mrStreamId });
+      evaluate('mr-poll');
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
+    // TEMP DEBUG
+    console.log('[svp-debug] registered MR stream for polling', { mrStreamId: session.mrStreamId, mrEnv: deriveMrEnv() });
   }
 
   onElementDetached(el, () => {
@@ -629,6 +685,6 @@ export default async function init(el) {
     }
   });
 
-  evaluate();
+  evaluate('init');
 }
 
