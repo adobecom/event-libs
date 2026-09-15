@@ -14,6 +14,7 @@ import {
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   findSectionWithStyle,
   getVideoProgress as readVideoProgress,
+  onElementDetached,
   parseJsonMetadata as parseSharedJsonMetadata,
   findEmbeddableVideos,
   readAuthoredConfig,
@@ -211,15 +212,6 @@ function findPlayerBottom(el) {
   return player ? player.getBoundingClientRect().bottom : null;
 }
 
-function onElementDetached(element, teardown) {
-  const observer = new MutationObserver(() => {
-    if (element.isConnected) return;
-    observer.disconnect();
-    teardown();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-  return observer;
-}
 
 class Drawer {
   constructor(el, { titleEl, toggleEl, handleEl, headerEl }) {
