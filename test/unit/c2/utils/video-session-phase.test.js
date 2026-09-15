@@ -24,8 +24,8 @@ const session = (overrides = {}) => ({
   ...overrides,
 });
 
-const phase = (s, { eventStartMs = EVENT_START, liveIds = new Set() } = {}) => getPlaybackPhase(s, {
-  nowMs: NOW, eventStartMs, liveStreamActiveIds: liveIds,
+const phase = (s, { eventStartMs = EVENT_START, liveIds = new Set(), wasActive = false } = {}) => getPlaybackPhase(s, {
+  nowMs: NOW, eventStartMs, liveStreamActiveIds: liveIds, streamWasEverActive: wasActive,
 });
 
 describe('classifySessionPlayback — identity + DVR gate, not Format', () => {
@@ -67,14 +67,21 @@ describe('livePhase — poll-driven live, eventStart-anchored DVR', () => {
     expect(phase(s, { liveIds: new Set(['mr-1']) })).to.equal(PLAYBACK_PHASE.WATCH_LIVE);
   });
 
-  it('leaves WATCH_LIVE the moment the poll goes inactive, even before the scheduled end', () => {
+  it('stays WATCH_LIVE when the stream was never active and now is still inside the scheduled window ("not live yet")', () => {
+    // Broadcast hasn't started/connected yet: poll empty, never seen active, now < end.
+    // Must NOT jump to DVR — the player renders nothing while we wait for the stream.
     const s = live({ endTimeUtc: new Date(NOW + HOUR).toISOString() });
-    // poll inactive + still inside DVR window (eventStart + 5h ahead) → DVR_BUFFER, not live
-    expect(phase(s, { liveIds: new Set() })).to.equal(PLAYBACK_PHASE.DVR_BUFFER);
+    expect(phase(s, { liveIds: new Set(), wasActive: false })).to.equal(PLAYBACK_PHASE.WATCH_LIVE);
   });
 
-  it('is DVR_BUFFER when the poll is inactive and now < eventStart + dvrDelayHours', () => {
-    // eventStart + 5h is in the future relative to NOW (eventStart = NOW - 2h)
+  it('is DVR_BUFFER when the stream WAS active and then went inactive (real live→ended), before the DVR window elapses', () => {
+    const s = live({ endTimeUtc: new Date(NOW + HOUR).toISOString() });
+    // Stream aired and dropped (wasActive) → DVR even though we are still inside the scheduled window.
+    expect(phase(s, { liveIds: new Set(), wasActive: true })).to.equal(PLAYBACK_PHASE.DVR_BUFFER);
+  });
+
+  it('is DVR_BUFFER for a late arrival: scheduled window has passed and now < eventStart + dvrDelayHours', () => {
+    // end is in the past (window over) so even without witnessing the stream active, DVR applies.
     expect(phase(live())).to.equal(PLAYBACK_PHASE.DVR_BUFFER);
   });
 
@@ -83,7 +90,7 @@ describe('livePhase — poll-driven live, eventStart-anchored DVR', () => {
     expect(phase(s)).to.equal(PLAYBACK_PHASE.ON_DEMAND);
   });
 
-  it('is ON_DEMAND straight away when no dvrDelayHours is authored and the poll is inactive', () => {
+  it('is ON_DEMAND straight away when no dvrDelayHours is authored and the window has ended', () => {
     expect(phase(live({ dvrDelayHours: null }))).to.equal(PLAYBACK_PHASE.ON_DEMAND);
   });
 });

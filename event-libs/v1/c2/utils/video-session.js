@@ -264,32 +264,45 @@ function simulivePhase(session, nowMs) {
   return PLAYBACK_PHASE.ON_DEMAND;
 }
 
-function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds) {
+function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasEverActive) {
   const start = Date.parse(session.startTimeUtc) || null;
   if (start && nowMs < start) return PLAYBACK_PHASE.PRE_EVENT;
 
-  // "Is it live right now" is the MobileRider poll alone — it goes inactive promptly when the
-  // stream really ends, whereas the authored endTime is unreliable (a session can end early or
-  // run long). So we do NOT gate live on the clock; an over-running broadcast stays WATCH_LIVE
-  // until the poll drops. (A livestreamed session without an mrStreamId has no poll to consult,
-  // so it falls back to the scheduled window.)
   const end = Date.parse(session.endTimeUtc) || null;
+
+  // "Is it live right now" is the MobileRider poll alone — it goes inactive promptly when the
+  // stream really ends, whereas the authored endTime is unreliable (a session can end early or run
+  // long). An over-running broadcast stays WATCH_LIVE until the poll drops.
   const isLiveNow = session.mrStreamId
     ? Boolean(liveStreamActiveIds?.has(session.mrStreamId))
-    : (end == null || nowMs < end);
+    : (end == null || nowMs < end); // no mrStreamId → no poll → fall back to the scheduled window
   if (isLiveNow) return PLAYBACK_PHASE.WATCH_LIVE;
 
-  // Stream is off air. DVR window, when authored, is event-wide and measured from eventStart —
-  // the same convention ipodPhase/dvrAvailableAtMs use (NOT the unreliable session endTime):
-  // before eventStart + dvrDelayHours → still buffering (play the DVR asset), after → the MPC VOD.
+  // The stream is not currently active — but that's TWO very different situations we must not
+  // conflate: "not live YET" (broadcast hasn't started/connected) vs "not live ANYMORE" (it aired
+  // and ended). DVR/on-demand only applies to the latter. For an mrStreamId session we know the
+  // difference from whether the poll has EVER reported it active this session (streamWasEverActive):
+  //   - never active + still inside the scheduled window → the broadcast just hasn't begun, so stay
+  //     WATCH_LIVE (the player renders nothing; the eyebrow's "Watch now" routes to the broadcast).
+  //   - was active then dropped, OR the scheduled window has ended → fall through to DVR/on-demand.
+  // (A livestreamed session without an mrStreamId has no poll to witness, so it relies purely on the
+  // scheduled window above — isLiveNow already went false at end, so it falls through here.)
+  if (session.mrStreamId && !streamWasEverActive && end != null && nowMs < end) {
+    return PLAYBACK_PHASE.WATCH_LIVE;
+  }
+
+  // Stream is off air (aired and ended, or window elapsed). DVR window, when authored, is event-wide
+  // and measured from eventStart — the same convention ipodPhase/dvrAvailableAtMs use (NOT the
+  // unreliable session endTime): before eventStart + dvrDelayHours → still buffering (play the DVR
+  // asset), after → the MPC VOD.
   if (session.dvrDelayHours != null) {
     const availableAt = dvrAvailableAtMs(session, eventStartMs);
     if (availableAt != null && nowMs < availableAt) return PLAYBACK_PHASE.DVR_BUFFER;
     return PLAYBACK_PHASE.ON_DEMAND;
   }
 
-  // No DVR delay authored: the VOD is ready as soon as the stream is off air (isLiveNow already
-  // false at this point), so go straight to on-demand — the MPC video's presence is the signal.
+  // No DVR delay authored: the VOD is ready as soon as the stream is off air, so go straight to
+  // on-demand — the MPC video's presence is the signal.
   return PLAYBACK_PHASE.ON_DEMAND;
 }
 
@@ -298,12 +311,14 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds) {
 // of the three cases (no on-demand format, no live identity, no mpc/youtube id) — callers
 // should treat that as "nothing to render".
 export function getPlaybackPhase(session, {
-  nowMs, eventStartMs = null, liveStreamActiveIds = null,
+  nowMs, eventStartMs = null, liveStreamActiveIds = null, streamWasEverActive = false,
 } = {}) {
   const playbackCase = classifySessionPlayback(session);
   if (playbackCase === PLAYBACK_CASE.IPOD) return ipodPhase(session, nowMs, eventStartMs);
   if (playbackCase === PLAYBACK_CASE.SIMULIVE) return simulivePhase(session, nowMs);
-  if (playbackCase === PLAYBACK_CASE.LIVE) return livePhase(session, nowMs, eventStartMs, liveStreamActiveIds);
+  if (playbackCase === PLAYBACK_CASE.LIVE) {
+    return livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasEverActive);
+  }
   return null;
 }
 
@@ -380,6 +395,10 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   const resolveEventStartMs = () => (eventStartMs != null ? eventStartMs : getEventStartMs());
 
   let liveStreamActiveIds = new Set();
+  // Latched true the first time the poll reports THIS session's stream active. Lets livePhase tell
+  // "not live yet" (broadcast hasn't started → stay WATCH_LIVE) from "not live anymore" (aired and
+  // ended → DVR/on-demand) — a distinction the pure phase function can't make from a single tick.
+  let streamWasEverActive = false;
   let lastPhase;
   let timerId = null;
   let stopped = false;
@@ -390,10 +409,11 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
       nowMs: getNowMs(),
       eventStartMs: resolveEventStartMs(),
       liveStreamActiveIds,
+      streamWasEverActive,
     });
     // TEMP DEBUG
     console.log('[watch-debug] emitIfChanged', {
-      reason, phase, lastPhase, changed: phase !== lastPhase, liveStreamActiveIds: [...liveStreamActiveIds],
+      reason, phase, lastPhase, changed: phase !== lastPhase, streamWasEverActive, liveStreamActiveIds: [...liveStreamActiveIds],
     });
     if (phase !== lastPhase) {
       lastPhase = phase;
@@ -420,8 +440,9 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   if (session.mrStreamId) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
+      if (liveStreamActiveIds.has(session.mrStreamId)) streamWasEverActive = true;
       // TEMP DEBUG
-      console.log('[watch-debug] MR poll result', { active: [...active], mrStreamId: session.mrStreamId });
+      console.log('[watch-debug] MR poll result', { active: [...active], streamWasEverActive, mrStreamId: session.mrStreamId });
       emitIfChanged('mr-poll');
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
