@@ -140,12 +140,6 @@ export function onElementDetached(element, teardown) {
   return watcher;
 }
 
-export function currentSessionHasEnded(sessionTimes, nowMs) {
-  const firstEntry = (sessionTimes || [])[0];
-  if (!firstEntry || !Number.isFinite(firstEntry.endTimeMillis)) return false;
-  return nowMs >= firstEntry.endTimeMillis;
-}
-
 export function findEmbeddableVideos(sessionTimes) {
   return (sessionTimes || [])
     .flatMap((entry) => entry?.videos || [])

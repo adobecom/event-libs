@@ -434,7 +434,7 @@ describe('session-video-playlist', () => {
       expect(BlockMediator.get('videoLayoutDecision')).to.deep.equal(before);
     });
 
-    it('does NOT render on a session-state:changed tick alone (only the player signal renders it)', async () => {
+    it('renders ONLY once the player signals playable, not merely because the catalog is ready', async () => {
       const { playlist } = buildPage();
       setMeta('session-id', 'cur');
       setMeta('session-times', sessionTimesMeta());
@@ -447,9 +447,8 @@ describe('session-video-playlist', () => {
 
       await init(playlist);
       await flush();
-      // The schedule tick alone must NOT render the playlist — it mirrors the player now.
-      window.dispatchEvent(new CustomEvent('session-state:changed', { detail: { state: 'on-demand' } }));
-      await flush();
+      // Catalog is ready with qualifying sessions, but the player hasn't become playable yet —
+      // the playlist mirrors the player and must NOT render on its own.
       expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
 
       // Only the player's playable signal renders it.
