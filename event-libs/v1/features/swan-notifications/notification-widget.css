@@ -173,7 +173,7 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
    background (the primary signal, per the Figma spec) and the dot below (kept as a
    secondary/at-a-glance cue, visible in the design's screenshot reference). */
 .swan-notif__row--unread {
-  background: var(--s2a-color-gray-75, #f8f8f8);
+  background: var(--s2a-color-gray-25, #f8f8f8);
 }
 
 .swan-notif__row--unread:hover,

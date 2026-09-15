@@ -3,7 +3,7 @@
 // so this is now a synchronous metadata read plus a couple of hardcoded defaults.
 import { getMetadata } from '../../utils/utils.js';
 
-const DEFAULT_UPCOMING_OFFSET_MINUTES = 5;
+const DEFAULT_UPCOMING_OFFSET_MINUTES = 9999999999999;
 const DEFAULT_NOTIFICATION_ICON_URL = '';
 const DEFAULT_LOCAL_NOTIFICATION_PERSIST_TILL_DAYS = 3;
 // Event-wide safety-net TTL for every stage (not just on-demand) — a backstop against an
