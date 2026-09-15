@@ -1,21 +1,24 @@
 import { createTag, LIBS } from '../../../utils/utils.js';
 import { getNowMs } from '../../../utils/session-state.js';
+import { getEventStartMs, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
+import { deriveMrEnv } from '../../../utils/session-store.js';
+import { registerStreamIds, unregisterStreamIds, subscribe as subscribeToPoller } from '../../../services/sessions/poller.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
-import { showVideoLayoutLoader, hideVideoLayoutLoader } from '../../utils/video-layout-loader.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
-  PROGRESS_STORAGE_KEY,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   closestSectionWithStyle,
-  readJsonFromStorage,
-  writeJsonToStorage,
   getVideoProgress as readVideoProgress,
+  saveVideoProgress as saveSharedVideoProgress,
+  onElementDetached,
   parseJsonMetadata as parseSharedJsonMetadata,
-  currentSessionHasEnded,
   findEmbeddableVideos,
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
+  getPlaybackPhase,
+  PLAYBACK_PHASE,
+  buildSessionFromMetadata,
 } from '../../utils/video-session.js';
 
 const LOG_SCOPE = 'session-video-player';
@@ -36,6 +39,10 @@ const VIDEO_PROVIDER_ORIGINS = {
   mpc: ['https://video.tv.adobe.com'],
 
   youtube: ['https://www.youtube.com', 'https://i.ytimg.com', 'https://www.google.com'],
+
+  // The DVR/replay player fetches its skin CSS + player.min.js from this separate origin, so
+  // warm the DNS/TLS handshake before loadMobileRiderPlayer() mounts the embed.
+  mobilerider: ['https://assets.mobilerider.com'],
 };
 
 function preconnectVideoProvider(provider) {
@@ -53,20 +60,25 @@ const RESUME_RESTART_THRESHOLD_SECONDS = 30;
 
 export const getVideoProgress = (sessionId) => readVideoProgress(sessionId, LOG_SCOPE);
 
-export function saveVideoProgress(sessionId, secondsWatched, length = null) {
-  if (!sessionId) return;
-  const progressBySession = readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, LOG_SCOPE);
-  const resolvedLength = length ?? progressBySession[sessionId]?.length ?? null;
-  progressBySession[sessionId] = {
-    secondsWatched,
-    length: resolvedLength,
-    completed: Boolean(resolvedLength && secondsWatched >= resolvedLength),
-  };
-  writeJsonToStorage(PROGRESS_STORAGE_KEY, progressBySession, LOG_SCOPE);
-}
+export const saveVideoProgress = (sessionId, secondsWatched, length = null) => saveSharedVideoProgress(sessionId, secondsWatched, length, LOG_SCOPE);
 
 function pickEmbeddableVideo(sessionTimes) {
   return findEmbeddableVideos(sessionTimes)[0] || null;
+}
+
+// session-times page metadata only ever carries a ready-to-embed onDemand-kind entry (see
+// README) — it has no representation of a simulive-playing or DVR-buffer video at all. For
+// those phases (and as a fallback when session-times has nothing for the on-demand phase
+// either), build the same shape directly from the catalog session's raw ids — the same
+// pattern session-broadcast's MpcPlayerAdapter/YouTubePlayerAdapter already use.
+function buildVideoFromCatalog(session) {
+  if (session?.mpcId) {
+    return { provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/${session.mpcId}?autoplay=true` };
+  }
+  if (session?.youTubeId) {
+    return { provider: 'youtube', url: session.youTubeId };
+  }
+  return null;
 }
 
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
@@ -198,29 +210,6 @@ function ensureMpcLength(sessionId, mpcVideoId, currentTime, length) {
     .catch((error) => logError(`could not backfill mpc duration: ${error.message}`));
 }
 
-const detachWatchers = new Set();
-let detachObserver = null;
-
-function onDetached(element, teardown) {
-  const watcher = { element, teardown };
-  detachWatchers.add(watcher);
-
-  if (!detachObserver) {
-    detachObserver = new MutationObserver(() => {
-      detachWatchers.forEach((w) => {
-        if (w.element.isConnected) return;
-        detachWatchers.delete(w);
-        w.teardown();
-      });
-      if (detachWatchers.size === 0) {
-        detachObserver.disconnect();
-        detachObserver = null;
-      }
-    });
-    detachObserver.observe(document.body, { childList: true, subtree: true });
-  }
-  return watcher;
-}
 
 function watchMpcPlayback(sessionId, iframe) {
 
@@ -285,7 +274,7 @@ function watchMpcPlayback(sessionId, iframe) {
   };
 
   window.addEventListener('message', handleMessage);
-  onDetached(iframe, () => window.removeEventListener('message', handleMessage));
+  onElementDetached(iframe, () => window.removeEventListener('message', handleMessage));
 }
 
 const YOUTUBE_IFRAME_API_URL = 'https://www.youtube.com/iframe_api';
@@ -364,7 +353,7 @@ async function watchYouTubePlayback(sessionId, iframe) {
     notifyProgressChanged(sessionId);
   };
 
-  onDetached(iframe, stopProgressPolling);
+  onElementDetached(iframe, stopProgressPolling);
 
   const handleStateChange = (event) => {
     const { PlayerState } = window.YT;
@@ -418,7 +407,40 @@ async function watchYouTubePlayback(sessionId, iframe) {
   }
 }
 
+// DVR-buffer plays the dedicated MobileRider DVR/replay asset via the standalone mobile-rider
+// block's own init — reused wholesale (script loading, mobilerider.embed()) rather than
+// reimplementing that SDK integration here. `dataset.extractedVideoId` is the same seam
+// handleAnchorElement() uses to convert an authored link into a MobileRider embed; feeding
+// it directly skips the anchor/URL round-trip since we already have the raw video id.
+async function loadMobileRiderPlayer(el, video) {
+  // TEMP DEBUG
+  console.log('[svp-debug] loadMobileRiderPlayer START (DVR embed)', { video });
+  const { default: initMobileRider } = await import('../mobile-rider/mobile-rider.js');
+  el.querySelector('.milo-video')?.remove();
+  const rider = createTag('div', { class: 'mobile-rider' }, '', { parent: el });
+  rider.dataset.extractedVideoId = video.videoId;
+  // Without a skin id, mobilerider.embed() mounts the player but never actually starts
+  // playback — this is the session's own authored skin (Kat's real sample: "adobe"), not a
+  // hardcoded default.
+  if (video.skinId) rider.dataset.extractedSkinId = video.skinId;
+  rider.dataset.extractedAutoplay = 'true';
+  initMobileRider(rider);
+  el.dataset.embedded = 'true';
+  // TEMP DEBUG
+  console.log('[svp-debug] loadMobileRiderPlayer DONE — mobile-rider mounted, data-embedded=true', {
+    extractedVideoId: rider.dataset.extractedVideoId,
+    extractedSkinId: rider.dataset.extractedSkinId,
+  });
+}
+
 function loadVideoPlayer(el, sessionId, video) {
+  if (video.provider === 'mobilerider') {
+    loadMobileRiderPlayer(el, video).catch((error) => {
+      logError(`could not load MobileRider DVR player: ${error.message}`);
+    });
+    return;
+  }
+
   const builtContainer = buildMiloVideo(video);
   const iframe = builtContainer.firstElementChild;
 
@@ -436,8 +458,6 @@ function loadVideoPlayer(el, sessionId, video) {
   el.dataset.embedded = 'true';
 }
 
-const DECISION_FALLBACK_MS = 4000;
-
 function isInsidePlaylistContainer(el) {
 
   return Boolean(closestSectionWithStyle(el, VIDEO_PLAYLIST_CONTAINER_CLASS));
@@ -447,6 +467,11 @@ function isWinningInstance(el, hasPlaylist) {
   return isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist;
 }
 
+// The playlist block is present on every session page and always resolves to a terminal
+// decision (renders rows → announces hasPlaylist:true, or removes itself → false). So the player
+// simply WAITS for that announcement — there is no timed fallback that could guess "no playlist"
+// before the playlist has decided (which previously stranded the playlist behind a full-width
+// player when both blocks resolved on their own timers).
 function awaitEmbedDecision(el) {
   const existingDecision = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
   if (existingDecision != null) {
@@ -454,79 +479,212 @@ function awaitEmbedDecision(el) {
   }
 
   return new Promise((resolve) => {
-    let settled = false;
-    let unsubscribe = () => {};
-
-    const settle = (hasPlaylist) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(fallbackTimer);
-      unsubscribe();
-      resolve(isWinningInstance(el, hasPlaylist));
-    };
-
-    unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
-
+    const unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
       if (newValue == null) return;
-      settle(Boolean(newValue.hasPlaylist));
+      unsubscribe();
+      resolve(isWinningInstance(el, Boolean(newValue.hasPlaylist)));
     });
-
-    const fallbackTimer = setTimeout(() => settle(false), DECISION_FALLBACK_MS);
   });
 }
 
-function resolveRenderContext(el) {
-  const config = readAuthoredConfig(el);
+// session-times' onDemand-only entry is preferred when present (it may carry provider query
+// params/tokens baked in server-side that a client-built URL can't replicate); everything
+// else — simulive, dvr-buffer, and on-demand once session-times has nothing — is built
+// directly from the catalog session's own ids.
+function resolveVideoForPhase(phase, sessionTimes, session) {
+  if (phase === PLAYBACK_PHASE.ON_DEMAND) {
+    return pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
+  }
+  if (phase === PLAYBACK_PHASE.SIMULIVE) {
+    return buildVideoFromCatalog(session);
+  }
+  // DVR_BUFFER plays the dedicated MobileRider DVR/replay asset — a distinct mechanism from
+  // buildMiloVideo's iframe embeds (mobilerider.embed(), not a src URL), handled by
+  // loadMobileRiderPlayer() instead.
+  if (phase === PLAYBACK_PHASE.DVR_BUFFER) {
+    if (!session?.mrDvrVideoId) return null;
+    return { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
+  }
+  return null;
+}
 
+// pre-event and watch-live are deliberately not this block's job — session-broadcast/
+// mobile-rider own the live-watching experience; this block only ever plays a video.
+const PLAYABLE_PHASES = [PLAYBACK_PHASE.SIMULIVE, PLAYBACK_PHASE.DVR_BUFFER, PLAYBACK_PHASE.ON_DEMAND];
+
+// Reads page metadata once (no catalog fetch). Returns null only for the genuine never-render
+// case (no session-id); otherwise the caller re-evaluates the phase on a timer, so pre-event is
+// a valid, non-terminal result rather than a reason to remove the block.
+function buildRenderModel(el) {
+  const config = readAuthoredConfig(el);
   const sessionId = resolveSessionId(config);
   if (!sessionId) {
     logError('no session-id (page metadata or authored) — nothing to render');
     return null;
   }
 
-  
+  // Metadata-only — `custom-attributes`/`session-times` are already authored on this page (same
+  // source session-video-playlist.js reads), so this block never waits on the async catalog.
   const sessionTimes = parseJsonMetadata('session-times');
+  const session = buildSessionFromMetadata(sessionTimes);
 
-  if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
-    logError('current session has not ended yet — nothing to render');
-    return null;
-  }
-  
-  const currentVideo = pickEmbeddableVideo(sessionTimes);
-  if (!currentVideo) {
-    logError('no embeddable video in session-times — nothing to render');
-    return null;
-  }
+  // Idempotent; other blocks call this defensively too, in case decorateEvent hasn't run it yet
+  // — otherwise getEventStartMs() silently returns null and IPOD/live DVR gates never open.
+  initTierOneEventConfig();
 
-  return { sessionId, currentVideo };
+  return { sessionId, sessionTimes, session };
+}
+
+// Resolves the phase for `now` against the latest known live-stream set, then the video for that
+// phase. Returns { phase, video } where video is null when the phase isn't playable yet or has
+// no embeddable asset — the caller decides whether that means "wait" or "give up".
+function evaluatePhase({ session, sessionTimes }, liveStreamActiveIds) {
+  const nowMs = getNowMs();
+  const eventStartMs = getEventStartMs();
+  const phase = getPlaybackPhase(session, { nowMs, eventStartMs, liveStreamActiveIds });
+  const video = PLAYABLE_PHASES.includes(phase)
+    ? resolveVideoForPhase(phase, sessionTimes, session)
+    : null;
+  return { phase, video };
+}
+
+// The current tail of init() — preconnect, layout-decision wait, embed — kept as a one-shot so
+// the evaluate loop can call it exactly once at the transition to a playable phase. No loader is
+// shown at any point: nothing appears until the player is actually ready to embed.
+function loadWhenDecided(el, sessionId, video) {
+  preconnectVideoProvider(video.provider);
+
+  (async () => {
+    try {
+      const isWinner = await awaitEmbedDecision(el);
+      if (!isWinner) return;
+      loadVideoPlayer(el, sessionId, video);
+    } catch (error) {
+      logError(`could not resolve the video layout decision: ${error.message}`);
+    }
+  })();
 }
 
 export default async function init(el) {
   ensureStylesheet('session-video-player-css', BLOCK_CSS_URL);
 
-  const context = resolveRenderContext(el);
-  if (!context) {
+  const model = buildRenderModel(el);
+  if (!model) {
     el.remove();
     return;
   }
-  const { sessionId, currentVideo } = context;
+  const { sessionId, session, sessionTimes } = model;
 
-  preconnectVideoProvider(currentVideo.provider);
+  // Updated by the live poll (below) for mrStreamId sessions; stays empty for everything else,
+  // exactly as the old one-shot waitForLiveStatus resolved for non-live sessions.
+  let liveStreamActiveIds = new Set();
+  // The phase we last embedded a video for (null = nothing embedded yet). Tracked instead of a
+  // one-way boolean so a session that moves BETWEEN playable phases re-embeds the right asset —
+  // most importantly DVR_BUFFER → ON_DEMAND, where the transient MobileRider DVR/replay asset must
+  // be swapped for the durable MPC/YouTube VOD once the DVR window elapses (or the poll drops the
+  // stream). Re-evaluated on load, on each session-state:changed tick, and on each poll result.
+  let embeddedPhase = null;
 
-  if (!isInsidePlaylistContainer(el)) {
-    showVideoLayoutLoader(el);
+  const evaluate = (trigger = 'init') => {
+    if (!el.isConnected) return;
+    const { phase, video } = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
+    // TEMP DEBUG
+    console.log('[svp-debug] evaluate()', {
+      trigger,
+      phase,
+      embeddedPhase,
+      phaseChanged: phase !== embeddedPhase,
+      video,
+      insidePlaylistContainer: isInsidePlaylistContainer(el),
+      liveStreamActiveIds: [...(liveStreamActiveIds || [])],
+      session: {
+        mrStreamId: session.mrStreamId,
+        mrDvrVideoId: session.mrDvrVideoId,
+        mrSkinId: session.mrSkinId,
+        mpcId: session.mpcId,
+        youTubeId: session.youTubeId,
+        dvrDelayHours: session.dvrDelayHours,
+      },
+    });
+
+    // Already showing the right asset for this phase — nothing to do (keeps repeated poll ticks
+    // idempotent so we don't reload the iframe every 30s while the phase is stable).
+    if (video && phase === embeddedPhase) {
+      // TEMP DEBUG
+      console.log('[svp-debug] phase unchanged → keep current asset (no-op)', { phase });
+      return;
+    }
+
+    if (video) {
+      const isFirstEmbed = embeddedPhase === null;
+      embeddedPhase = phase;
+      // On the first embed, announce playable so the playlist renders alongside us on the same tick
+      // (before the layout-decision wait the player is about to enter). On a later phase swap the
+      // layout is already settled, so just re-embed the new asset in place.
+      if (isFirstEmbed) {
+        // TEMP DEBUG
+        console.log('[svp-debug] FIRST EMBED → firing playable + loadWhenDecided', { phase, video });
+        window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
+        loadWhenDecided(el, sessionId, video);
+      } else if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
+        // TEMP DEBUG
+        console.log('[svp-debug] PHASE SWAP → re-embedding new asset in place', { newPhase: phase, video });
+        preconnectVideoProvider(video.provider);
+        loadVideoPlayer(el, sessionId, video);
+      } else {
+        // TEMP DEBUG
+        console.log('[svp-debug] PHASE SWAP but this instance is NOT the winner → skipping', { phase });
+      }
+      return;
+    }
+
+    // A playable phase that yields no embeddable asset is terminal — nothing will ever appear
+    // (e.g. on-demand with no mpc/youtube id and no session-times video; or DVR-buffer with no
+    // mrDvrVideoId). Remove the block, as before. Non-playable phases (pre-event / watch-live) are
+    // NOT terminal: the block stays (empty) to receive the next shared tick / poll result when the
+    // session flips to a playable phase. Only remove if nothing has embedded yet — once a video is
+    // showing we keep it rather than tearing the player out on a transient no-asset phase.
+    if (embeddedPhase === null && PLAYABLE_PHASES.includes(phase)) {
+      // TEMP DEBUG
+      console.log('[svp-debug] playable phase but NO video + nothing embedded → removing block', { phase });
+      logError(`session is in "${phase}" phase with no embeddable video — removing`);
+      el.remove();
+    } else {
+      // TEMP DEBUG
+      console.log('[svp-debug] no video, staying mounted (non-playable phase or already embedded)', { phase, embeddedPhase });
+    }
+  };
+
+  // The shared schedule tick: event-session-details' status timer fires session-state:changed at
+  // every start/end transition, which is exactly when a session flips to on-demand. Re-evaluate on
+  // it instead of running a second, duplicate boundary timer here.
+  const onStateChanged = () => evaluate('session-state:changed');
+  window.addEventListener('session-state:changed', onStateChanged);
+
+  // A live mrStreamId session's live→on-demand flip is driven by the poll (stream inactive), not a
+  // timestamp — subscribe persistently and re-evaluate on each poll result. Non-live sessions never
+  // poll (liveStreamActiveIds stays empty, as the old one-shot waitForLiveStatus resolved for them).
+  let unsubscribePoll = () => {};
+  if (session.mrStreamId) {
+    unsubscribePoll = subscribeToPoller(({ active }) => {
+      liveStreamActiveIds = new Set(active);
+      // TEMP DEBUG
+      console.log('[svp-debug] MR poll result → re-evaluating', { active: [...active], mrStreamId: session.mrStreamId });
+      evaluate('mr-poll');
+    }, [session.mrStreamId]);
+    registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
+    // TEMP DEBUG
+    console.log('[svp-debug] registered MR stream for polling', { mrStreamId: session.mrStreamId, mrEnv: deriveMrEnv() });
   }
 
-  (async () => {
-    try {
-      const isWinner = await awaitEmbedDecision(el);
-      hideVideoLayoutLoader();
-      if (!isWinner) return;
-      loadVideoPlayer(el, sessionId, currentVideo);
-    } catch (error) {
-
-      hideVideoLayoutLoader();
-      logError(`could not resolve the video layout decision: ${error.message}`);
+  onElementDetached(el, () => {
+    window.removeEventListener('session-state:changed', onStateChanged);
+    if (session.mrStreamId) {
+      unsubscribePoll();
+      unregisterStreamIds([session.mrStreamId]);
     }
-  })();
+  });
+
+  evaluate('init');
 }
+

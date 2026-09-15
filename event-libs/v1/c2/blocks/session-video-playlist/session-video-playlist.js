@@ -2,7 +2,7 @@ import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
   sessions, sessionsStatus, initSessionState, liveStreamActiveIds, favorited, pendingActions,
 } from '../../../utils/session-store.js';
-import { deriveSessionState, getNowMs, dvrAvailableAtMs } from '../../../utils/session-state.js';
+import { getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { initTierOneEventConfig, getEventStartMs } from '../../../utils/tier-1-event-config.js';
@@ -14,12 +14,14 @@ import {
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   findSectionWithStyle,
   getVideoProgress as readVideoProgress,
+  onElementDetached,
   parseJsonMetadata as parseSharedJsonMetadata,
-  currentSessionHasEnded,
   findEmbeddableVideos,
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
+  getPlaybackPhase,
+  PLAYBACK_PHASE,
 } from '../../utils/video-session.js';
 
 const LOG_SCOPE = 'session-video-playlist';
@@ -32,6 +34,12 @@ const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
 const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 
+// `window.location.assign` is non-configurable and can't be stubbed, so tests can't
+// exercise the auto-advance/row-select navigation without a real full-page reload (which
+// severs the Web Test Runner reporting channel and wipes the whole file's results). Route
+// navigation through this overridable seam so tests can stub `_internals.navigate` instead.
+export const _internals = { navigate: (href) => window.location.assign(href) };
+
 const BLOCK_CSS_URL = new URL('./session-video-playlist.css', import.meta.url).href;
 
 const DEFAULT_MIN_SESSIONS = 4;
@@ -40,7 +48,8 @@ const FALLBACK_EVENT_START_MS = new Date('2026-11-08T08:00:00-04:00').getTime();
 const DESKTOP_BREAKPOINT_PX = 1024;
 const VIEWPORT_CAP_GUTTER_PX = 24;
 const DRAWER_GAP_PX = 16;
-const DRAWER_FLOOR_PX = 75;
+const DRAWER_TOP_GAP_PX = 100;
+const DRAWER_FLOOR_PX = 78;
 const DRAWER_MIN_EXPANDED_PX = 150;
 const TITLE_LINE_CAP = 2;
 const AUTOPLAY_STORAGE_KEY = 'session-video-playlist:play-all';
@@ -75,12 +84,17 @@ export function computeProgressPercent(progress) {
 }
 
 export function computeDrawerCapPx(viewportHeight, titleBottom, {
-  floor = 0, gap = 0, playerBottom = null, minExpanded = 0,
+  floor = 0, gap = 0, playerBottom = null, minExpanded = 0, topGap = gap,
 } = {}) {
-  if (titleBottom == null) return Math.max(floor, viewportHeight * 0.7);
+  // Ceiling: the expanded drawer must never be taller than the viewport (leaving `topGap`
+  // clear at the top). When the page is scrolled so the title/player sit above the
+  // viewport, their getBoundingClientRect tops go negative and titleCap/playerCap balloon
+  // past the viewport height — without this clamp the drawer's top would spill off-screen.
+  const viewportCap = viewportHeight - topGap;
+  if (titleBottom == null) return Math.max(floor, Math.min(viewportHeight * 0.7, viewportCap));
   const titleCap = viewportHeight - titleBottom - gap;
   const playerCap = playerBottom == null ? Infinity : viewportHeight - playerBottom - gap;
-  return Math.max(floor, minExpanded, Math.min(titleCap, playerCap));
+  return Math.max(floor, minExpanded, Math.min(titleCap, playerCap, viewportCap));
 }
 
 export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
@@ -88,15 +102,17 @@ export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
   return titleTop + Math.min(titleHeight, capHeight);
 }
 
-function isOnDemand(session, nowMs) {
-  return deriveSessionState(session, liveStreamActiveIds.value, nowMs) === 'on-demand';
-}
-
+// Classifies the session as IPOD/Simulive/Live (see video-session.js) and resolves its
+// current playback phase against that case's own pre-event/simulive/dvr-buffer/on-demand
+// rules — replaces the old blunt "has a time window passed" check, which didn't distinguish
+// these three cases (e.g. it let a still-DVR-pending live session premiere immediately once
+// its time window ended).
 function hasPremiered(session, eventStartMs, nowMs) {
-  if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
-  const availableAt = dvrAvailableAtMs(session, eventStartMs);
-  if (availableAt == null) return false;
-  return nowMs >= availableAt;
+  return getPlaybackPhase(session, {
+    nowMs,
+    eventStartMs,
+    liveStreamActiveIds: liveStreamActiveIds.value,
+  }) === PLAYBACK_PHASE.ON_DEMAND;
 }
 
 function hasEmbeddableVideo(sessionTimes) {
@@ -110,8 +126,12 @@ function compareByStartTime(a, b) {
   return new Date(a.startTimeUtc).getTime() - new Date(b.startTimeUtc).getTime();
 }
 
+// A playlist row must have a real ON-DEMAND asset. That's always the MPC or YouTube VOD —
+// mrDvrVideoId is the transient MobileRider DVR/replay buffer asset (played only during the
+// DVR_BUFFER phase), NOT the durable on-demand video, so a DVR-only session has nothing to
+// play once it's actually on-demand and must not appear as a row.
 function hasVideoSource(session) {
-  return Boolean(session.mpcId || session.youTubeId || session.mrDvrVideoId);
+  return Boolean(session.mpcId || session.youTubeId);
 }
 
 export function resolveTopicPlaylist(
@@ -192,19 +212,12 @@ function findPlayerBottom(el) {
   return player ? player.getBoundingClientRect().bottom : null;
 }
 
-function onElementDetached(element, teardown) {
-  const observer = new MutationObserver(() => {
-    if (element.isConnected) return;
-    observer.disconnect();
-    teardown();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-  return observer;
-}
 
 class Drawer {
   constructor(el, { titleEl, toggleEl, handleEl, headerEl }) {
     this.el = el;
+    this.originalParent = el.parentElement;
+    this.originalNextSibling = el.nextSibling;
     this.titleEl = titleEl;
     this.toggleEl = toggleEl;
     this.handleEl = handleEl;
@@ -229,6 +242,7 @@ class Drawer {
     return computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
       floor: DRAWER_FLOOR_PX,
       gap: DRAWER_GAP_PX,
+      topGap: DRAWER_TOP_GAP_PX,
       playerBottom: findPlayerBottom(this.el),
       minExpanded: DRAWER_MIN_EXPANDED_PX,
     });
@@ -236,6 +250,25 @@ class Drawer {
 
   measureDragCapPx() {
     return window.innerHeight;
+  }
+
+  // The mobile drawer is position:fixed, but Milo's `container-*` grid section establishes a
+  // containing block (container-type/contain), which makes fixed positioning resolve against
+  // that section instead of the viewport. Move the drawer to <body> in mobile mode so
+  // bottom:0 pins to the viewport; restore it to its authored grid slot on desktop (where
+  // it's a normal side-by-side card, not fixed).
+  #reconcilePlacement() {
+    const inBody = this.el.parentElement === document.body;
+    if (!this.isDesktop() && !inBody) {
+      document.body.append(this.el);
+    } else if (this.isDesktop() && inBody) {
+      this.originalParent?.insertBefore(this.el, this.originalNextSibling);
+    }
+  }
+
+  reflow() {
+    this.#reconcilePlacement();
+    this.applyMobileHeight();
   }
 
   applyMobileHeight() {
@@ -256,7 +289,8 @@ class Drawer {
     this.el.classList.toggle('is-expanded', this.expanded);
     this.toggleEl?.setAttribute('aria-expanded', String(this.expanded));
     this.toggleEl?.setAttribute('aria-label', this.expanded ? 'Collapse playlist' : 'Expand playlist');
-    if (!this.isDesktop()) this.applyMobileHeight();
+    this.#reconcilePlacement();
+    this.applyMobileHeight();
   }
 
   toggle() {
@@ -413,7 +447,7 @@ function buildPlayButton(activate, title) {
   return button;
 }
 
-function buildRow(item, { onSelect }) {
+function buildRow(item, { onSelect, hideProgressBar = false }) {
   const row = createTag('div', {
     class: 'session-video-playlist-row',
     role: 'listitem',
@@ -433,11 +467,17 @@ function buildRow(item, { onSelect }) {
   const meta = createTag('div', { class: 'session-video-playlist-row-meta' }, '', { parent: content });
   createTag('span', { class: 'session-video-playlist-row-title' }, item.title, { parent: meta });
 
-  const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
-  const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
-  const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
-  fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
-  createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
+  // Inside .row-meta (beside the thumbnail) so it aligns to the thumbnail's bottom edge, with
+  // the title above it — .row-meta uses space-between to push the title to the top and this to
+  // the bottom of that thumbnail-height column. Skipped entirely (bar + duration) when the
+  // block is authored with hide-progress-bar: true.
+  if (!hideProgressBar) {
+    const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
+    const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
+    const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
+    fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
+    createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
+  }
 
   const activate = () => onSelect(item, row);
   const actions = createTag('div', { class: 'session-video-playlist-row-actions' }, '', { parent: row });
@@ -489,10 +529,12 @@ export function applyExpandedHeightCap(
 
 function buildTopicView(el, allRows, {
   maxSessions = DEFAULT_MAX_SESSIONS, defaultThumbnail = '', currentSessionId = null,
+  hideProgressBar = false,
 } = {}) {
 
   const rows = allRows;
-  const list = createTag('div', { class: 'session-video-playlist-list', role: 'list' }, '', { parent: el });
+  const wrapper = createTag('div', { class: 'session-video-playlist-wrapper' }, '', { parent: el });
+  const list = createTag('div', { class: 'session-video-playlist-list', role: 'list' }, '', { parent: wrapper });
   rows.forEach((session) => {
     const row = buildRow(
       {
@@ -512,8 +554,9 @@ function buildTopicView(el, allRows, {
       },
       {
         onSelect: (item) => {
-          if (item.href) window.location.assign(item.href);
+          if (item.href) _internals.navigate(item.href);
         },
+        hideProgressBar,
       },
     );
     list.append(row);
@@ -532,6 +575,12 @@ function buildTopicView(el, allRows, {
     });
   }
 
+  const capWrapperHeight = () => {
+    applyExpandedHeightCap(list, maxSessions);
+    wrapper.style.maxHeight = list.style.maxHeight;
+    list.style.maxHeight = '';
+  };
+
   if (rows.length > SHOW_MORE_INITIAL_ROWS) {
     const showMore = createTag('button', {
       type: 'button',
@@ -549,18 +598,18 @@ function buildTopicView(el, allRows, {
       showMore.setAttribute('aria-expanded', String(expanded));
       showMore.setAttribute('aria-label', expanded ? 'Show less sessions' : 'Show more sessions');
       label.textContent = expanded ? 'Show less' : 'Show more';
-      applyExpandedHeightCap(list, maxSessions);
+      capWrapperHeight();
     });
   }
 
-  applyExpandedHeightCap(list, maxSessions);
+  capWrapperHeight();
 
   let pendingFrame = null;
   const handleResize = () => {
     if (pendingFrame != null) return;
     pendingFrame = requestAnimationFrame(() => {
       pendingFrame = null;
-      applyExpandedHeightCap(list, maxSessions);
+      capWrapperHeight();
     });
   };
   window.addEventListener('resize', handleResize);
@@ -658,10 +707,10 @@ function resolveRenderContext(el) {
     return null;
   }
 
-  if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
-    logError('current session has not ended yet — nothing to render');
-    return null;
-  }
+  // NB: the "has the current session ended yet?" gate is NOT here — it's time-dependent, so it's
+  // re-checked on a timer in init() (see currentSessionPlayable). Failing it is a "wait", not a
+  // terminal "nothing to render", so it must not collapse to null here (which would removeBlock →
+  // announce hasPlaylist:false and strand the player behind a permanent full-width layout).
 
   return {
     config,
@@ -672,6 +721,7 @@ function resolveRenderContext(el) {
     minSessions: Number.parseInt(config['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS,
     maxSessions: Number.parseInt(config['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS,
     defaultThumbnail: readDefaultThumbnail(el) || config['default-thumbnail'] || '',
+    hideProgressBar: (config['hide-progress-bar'] ?? '').trim().toLowerCase() === 'true',
   };
 }
 
@@ -688,7 +738,7 @@ function listenForPlayerEvents(el, sessionId) {
     if (!nextRow?.dataset.href) return;
 
     el.dataset.autoAdvanceHref = nextRow.dataset.href;
-    window.location.assign(nextRow.dataset.href);
+    _internals.navigate(nextRow.dataset.href);
   };
 
   window.addEventListener('session-video-player:progress', handleProgress);
@@ -715,7 +765,7 @@ export default async function init(el) {
   }
   const {
     sessionId, sessionTimes, pageCustomAttributes, eventStartMs,
-    minSessions, maxSessions, defaultThumbnail, config: cfg,
+    minSessions, maxSessions, defaultThumbnail, hideProgressBar, config: cfg,
   } = context;
 
   const stopListeningForPlayerEvents = listenForPlayerEvents(el, sessionId);
@@ -780,7 +830,7 @@ export default async function init(el) {
       if (pendingResizeFrame != null) return;
       pendingResizeFrame = requestAnimationFrame(() => {
         pendingResizeFrame = null;
-        drawer.applyMobileHeight();
+        drawer.reflow();
       });
     };
     window.addEventListener('resize', handleResize);
@@ -811,20 +861,31 @@ export default async function init(el) {
     el.replaceChildren();
     const handle = createTag('div', { class: 'session-video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
     const { header, toggle } = buildHeader(displayRows);
-    buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
+    buildTopicView(el, displayRows, {
+      maxSessions, defaultThumbnail, currentSessionId: sessionId, hideProgressBar,
+    });
     el.querySelector('.session-video-playlist-list')?.setAttribute('id', LIST_ID);
     setUpDrawer({ header, toggle, handle });
+
+    // Reveal the block only now that it has real content — until this point it stays display:none
+    // (see CSS) so it never sits as an empty box during pre-event / live / DVR-buffer.
+    el.classList.add('is-rendered');
 
     el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
   };
 
-  const existing = sessions.value;
-  if (existing.length) {
-    render(existing);
-  } else if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
-    removeBlock(el);
-  } else {
-
+  // The actual render flow, run once the current session is playable — the catalog may be ready
+  // now, still loading (subscribe), or empty (removeBlock).
+  const runRenderFlow = () => {
+    const existing = sessions.value;
+    if (existing.length) {
+      render(existing);
+      return;
+    }
+    if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
+      removeBlock(el);
+      return;
+    }
     let unsubscribeSessions = () => {};
     let unsubscribeStatus = () => {};
     const stopWaiting = () => {
@@ -845,5 +906,33 @@ export default async function init(el) {
       stopWaiting();
       removeBlock(el);
     });
-  }
+  };
+
+  // The playlist mirrors the player: it renders ONLY once the player signals it has a video to
+  // show (session-video-player:playable), and never on its own. We wait for the player's own
+  // playback-phase decision rather than re-deriving "has the session ended?" from the clock here —
+  // that kept the two surfaces from diverging (a bare end-time gate would show the playlist while
+  // the current session was still in pre-event / DVR-buffer because of the DVR offset).
+  //
+  // We deliberately do NOT tear down on the player's "no video" case: a session can move THROUGH a
+  // phase with no asset (e.g. DVR-buffer with no DVR id) and only LATER reach a playable phase that
+  // does have one (on-demand with an mpc id). So while the player isn't playable we just stay
+  // mounted-but-idle and wait — a later `playable` still renders us. Staying idle strands nothing:
+  // we never announce hasPlaylist, and the full-width player wins its own layout independently (in
+  // the terminal no-video case it removes itself rather than awaiting our decision).
+  //
+  // The player fires `playable` BEFORE it awaits our layout decision, so there's no deadlock:
+  // playable → we announce hasPlaylist → player embeds into the winning container.
+  let started = false;
+  const onPlayable = (event) => {
+    if (event.detail?.sessionId !== sessionId) return;
+    if (started || !el.isConnected) return;
+    started = true;
+    runRenderFlow();
+  };
+
+  window.addEventListener('session-video-player:playable', onPlayable);
+  onElementDetached(el, () => {
+    window.removeEventListener('session-video-player:playable', onPlayable);
+  });
 }
