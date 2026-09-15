@@ -149,13 +149,14 @@
   position: relative;
   overflow: hidden;
   width: 255px;
-  height: 152px;
+  min-height: 152px;
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
   cursor: pointer;
   transition: background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+              width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              min-height 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .upcoming-sessions .sg-card:focus-visible {
@@ -170,7 +171,8 @@
 .upcoming-sessions .sg-card:hover {
   background: var(--s2a-color-gray-900, #131313);
   box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
-  transform: scale(1.05);
+  width: 268px;
+  min-height: 160px;
   z-index: 2;
 }
 
@@ -322,9 +324,14 @@
     flex-direction: row;
     align-items: flex-start;
     width: 431px;
-    height: 128px;
+    min-height: 128px;
     padding: var(--s2a-spacing-lg, 24px);
     gap: var(--s2a-spacing-lg, 24px);
+  }
+
+  .upcoming-sessions .sg-card:hover {
+    width: 453px;
+    min-height: 134px;
   }
 
   .upcoming-sessions .sg-card__body {
