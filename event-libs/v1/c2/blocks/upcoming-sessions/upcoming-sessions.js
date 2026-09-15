@@ -57,16 +57,26 @@ function toIsoTimes(session) {
   };
 }
 
+// Intl always renders the meridiem as uppercase AM/PM; lowercase it while leaving
+// the timezone abbreviation (e.g. PDT/PST) untouched.
+function lowercaseMeridiem(time) {
+  return time.replace(/\b(AM|PM)\b/, (meridiem) => meridiem.toLowerCase());
+}
+
 function formatTimeRange(session) {
   const { sessionTime } = session;
   if (!sessionTime) return '';
   const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
   try {
-    const start = new Date(sessionTime.startTimeMillis).toLocaleTimeString('en-US', timeOptions);
-    const end = new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', {
-      ...timeOptions,
-      timeZoneName: 'short',
-    });
+    const start = lowercaseMeridiem(
+      new Date(sessionTime.startTimeMillis).toLocaleTimeString('en-US', timeOptions),
+    );
+    const end = lowercaseMeridiem(
+      new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', {
+        ...timeOptions,
+        timeZoneName: 'short',
+      }),
+    );
     return `${start} - ${end}`;
   } catch (error) {
     window.lana?.log(`upcoming-sessions: time format failed: ${error.message}`);
