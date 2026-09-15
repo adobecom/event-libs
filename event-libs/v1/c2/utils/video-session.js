@@ -10,6 +10,12 @@ import {
 
 export const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
 
+// Set to the sessionId the moment the player becomes playable. A BlockMediator value (not a
+// one-shot window event) so a consumer that inits LATER than the player — e.g. the playlist, which
+// may register its listener after the player already fired — still sees it, by reading the current
+// value on init instead of only catching a future dispatch.
+export const VIDEO_PLAYABLE_KEY = 'videoPlayable';
+
 export const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
 
 export const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];

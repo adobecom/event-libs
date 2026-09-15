@@ -10,6 +10,7 @@ import { readBackgroundConfig } from '../../utils/background-config.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
+  VIDEO_PLAYABLE_KEY,
   VIDEO_CONTAINER_CLASS,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   findSectionWithStyle,
@@ -952,10 +953,22 @@ export default async function init(el) {
     runRenderFlow();
   };
 
-  // TEMP DEBUG
-  console.log('[pl-debug] onPlayable listener REGISTERED — waiting for player signal', { sessionId });
   window.addEventListener('session-video-player:playable', onPlayable);
   onElementDetached(el, () => {
     window.removeEventListener('session-video-player:playable', onPlayable);
   });
+
+  // The player may have already become playable and fired the one-shot event BEFORE this block's
+  // init registered the listener above (the player resolves its phase synchronously now). The
+  // durable BlockMediator value covers that race: if it's already set for our session, run the
+  // render flow now instead of waiting for an event that already passed.
+  const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
+  // TEMP DEBUG
+  console.log('[pl-debug] onPlayable listener REGISTERED', { sessionId, alreadyPlayable });
+  if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
+    started = true;
+    // TEMP DEBUG
+    console.log('[pl-debug] player was ALREADY playable → runRenderFlow now');
+    runRenderFlow();
+  }
 }

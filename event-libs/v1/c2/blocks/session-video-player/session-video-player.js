@@ -3,6 +3,7 @@ import { getEventStartMs, initTierOneEventConfig } from '../../../utils/tier-1-e
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
+  VIDEO_PLAYABLE_KEY,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   closestSectionWithStyle,
   getVideoProgress as readVideoProgress,
@@ -617,6 +618,10 @@ export default async function init(el) {
       if (isFirstEmbed) {
         // TEMP DEBUG
         console.log('[svp-debug] FIRST EMBED → firing playable + loadWhenDecided', { phase, video });
+        // Both a durable BlockMediator value AND the window event: the value covers a consumer
+        // (e.g. the playlist) that inits AFTER this fires and would miss the one-shot event; the
+        // event covers one that's already listening.
+        BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId });
         window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
         loadWhenDecided(el, sessionId, video);
       } else if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
