@@ -698,12 +698,19 @@ function resolveRenderContext(el) {
   const config = readAuthoredConfig(el);
 
   const sessionId = resolveSessionId(config);
+  // TEMP DEBUG
+  console.log('[pl-debug] resolveRenderContext: sessionId', { sessionId, config });
   if (!sessionId) {
     logError('no session-id (page metadata or authored) — nothing to render');
     return null;
   }
 
   const sessionTimes = parseJsonMetadata('session-times');
+  // TEMP DEBUG
+  console.log('[pl-debug] resolveRenderContext: hasEmbeddableVideo', {
+    hasEmbeddableVideo: hasEmbeddableVideo(sessionTimes),
+    sessionTimesVideos: (sessionTimes || []).flatMap((e) => e?.videos || []).map((v) => ({ provider: v.provider, kind: v.kind })),
+  });
   if (!hasEmbeddableVideo(sessionTimes)) {
     logError('no embeddable video on this page — nothing to render');
     return null;
@@ -753,6 +760,8 @@ function listenForPlayerEvents(el, sessionId) {
 }
 
 export default async function init(el) {
+  // TEMP DEBUG
+  console.log('[pl-debug] init() START', { isConnected: el.isConnected });
   ensureStylesheet('session-video-playlist-css', BLOCK_CSS_URL);
   playlistInstanceId += 1;
   const LIST_ID = `session-video-playlist-list-${playlistInstanceId}`;
@@ -761,7 +770,11 @@ export default async function init(el) {
   if (background) el.style.setProperty('--vp-authored-bg', background);
 
   const context = resolveRenderContext(el);
+  // TEMP DEBUG
+  console.log('[pl-debug] resolveRenderContext', { context: context ? { sessionId: context.sessionId, minSessions: context.minSessions } : null });
   if (!context) {
+    // TEMP DEBUG
+    console.log('[pl-debug] no context → removeBlock (announces hasPlaylist:false)');
     removeBlock(el);
     return;
   }
@@ -939,6 +952,8 @@ export default async function init(el) {
     runRenderFlow();
   };
 
+  // TEMP DEBUG
+  console.log('[pl-debug] onPlayable listener REGISTERED — waiting for player signal', { sessionId });
   window.addEventListener('session-video-player:playable', onPlayable);
   onElementDetached(el, () => {
     window.removeEventListener('session-video-player:playable', onPlayable);
