@@ -474,6 +474,12 @@ function isWinningInstance(el, hasPlaylist) {
 // player when both blocks resolved on their own timers).
 function awaitEmbedDecision(el) {
   const existingDecision = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
+  // TEMP DEBUG
+  console.log('[svp-debug] awaitEmbedDecision', {
+    insidePlaylistContainer: isInsidePlaylistContainer(el),
+    existingDecision,
+    waitingForPlaylist: existingDecision == null,
+  });
   if (existingDecision != null) {
     return Promise.resolve(isWinningInstance(el, existingDecision.hasPlaylist));
   }
@@ -481,6 +487,8 @@ function awaitEmbedDecision(el) {
   return new Promise((resolve) => {
     const unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
       if (newValue == null) return;
+      // TEMP DEBUG
+      console.log('[svp-debug] layout decision ARRIVED via subscribe', { newValue, insidePlaylistContainer: isInsidePlaylistContainer(el) });
       unsubscribe();
       resolve(isWinningInstance(el, Boolean(newValue.hasPlaylist)));
     });
@@ -617,14 +625,25 @@ export default async function init(el) {
   // session-state:changed tick (from event-session-details, the single shared schedule timer), and
   // on each live-poll result. embedded/isConnected guards keep it idempotent across all triggers.
   const evaluate = (trigger = 'init') => {
-    // TEMP DEBUG
+    // TEMP DEBUG — when already embedded, still compute the phase so we can SEE the transition
+    // the latch is ignoring (e.g. dvr-buffer → on-demand that never re-embeds).
+    if (embedded) {
+      const wouldBe = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
+      console.log('[svp-debug] evaluate() SKIPPED — already embedded (LATCH)', {
+        trigger,
+        insidePlaylistContainer: isInsidePlaylistContainer(el),
+        phaseNow: wouldBe.phase,
+        videoNow: wouldBe.video,
+        note: 'phase may have changed but the embedded latch prevents re-embed',
+      });
+      return;
+    }
     console.log('[svp-debug] evaluate() called', {
       trigger,
-      alreadyEmbedded: embedded,
       isConnected: el.isConnected,
       insidePlaylistContainer: isInsidePlaylistContainer(el),
     });
-    if (embedded || !el.isConnected) return;
+    if (!el.isConnected) return;
     const { phase, video } = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
 
     if (video) {
