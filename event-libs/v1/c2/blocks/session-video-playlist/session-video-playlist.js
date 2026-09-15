@@ -655,6 +655,8 @@ function hasEmbeddedVideoPlayer(container) {
 }
 
 function announceVideoDecision(hasPlaylist) {
+  // TEMP DEBUG
+  console.log('[pl-debug] announceVideoDecision', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
   if (hasPlaylist) {
@@ -925,6 +927,12 @@ export default async function init(el) {
   // playable → we announce hasPlaylist → player embeds into the winning container.
   let started = false;
   const onPlayable = (event) => {
+    // TEMP DEBUG
+    console.log('[pl-debug] onPlayable received', {
+      eventSessionId: event.detail?.sessionId, mySessionId: sessionId,
+      matches: event.detail?.sessionId === sessionId, started, isConnected: el.isConnected,
+      sessionsStatus: sessionsStatus.value, sessionsLen: sessions.value.length,
+    });
     if (event.detail?.sessionId !== sessionId) return;
     if (started || !el.isConnected) return;
     started = true;

@@ -534,12 +534,26 @@ function buildRenderModel(el) {
 // shown at any point: nothing appears until the player is actually ready to embed.
 function loadWhenDecided(el, sessionId, video) {
   preconnectVideoProvider(video.provider);
+  // TEMP DEBUG
+  console.log('[svp-debug] loadWhenDecided → awaiting layout decision', {
+    insidePlaylistContainer: isInsidePlaylistContainer(el),
+    existingDecision: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY),
+    video,
+  });
 
   (async () => {
     try {
       const isWinner = await awaitEmbedDecision(el);
+      // TEMP DEBUG
+      console.log('[svp-debug] layout decision RESOLVED', {
+        isWinner,
+        insidePlaylistContainer: isInsidePlaylistContainer(el),
+        decision: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY),
+      });
       if (!isWinner) return;
       loadVideoPlayer(el, sessionId, video);
+      // TEMP DEBUG
+      console.log('[svp-debug] loadVideoPlayer CALLED → embedded', { provider: video.provider, embedded: el.dataset.embedded });
     } catch (error) {
       logError(`could not resolve the video layout decision: ${error.message}`);
     }
