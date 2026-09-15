@@ -29,7 +29,7 @@ const DEFAULT_CTA_TEXT = {
 };
 
 function buildAuthoredCard(entry, cta) {
-  const card = createTag('div', { class: 'event-card media-wide' });
+  const card = createTag('div', { class: 'event-card media-square' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
     createTag('img', { src: entry.imageUrl, alt: '' }, '', { parent: mediaWrapper });
