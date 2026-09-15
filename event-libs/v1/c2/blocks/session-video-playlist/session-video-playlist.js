@@ -791,8 +791,19 @@ export default async function init(el) {
 
   function synthesizeCurrentSession() {
     const startTimeMillis = (sessionTimes || [])[0]?.startTimeMillis;
+    // TEMP DEBUG
+    console.log('[fav-debug] synthesizeCurrentSession', {
+      sessionId,
+      externalSessionId: getMetadata('external-session-id'),
+      rfSessionId: (getMetadata('external-session-id') || '').replace(/^rf-/, ''),
+    });
     return {
       id: sessionId,
+      // Favoriting keys on rfSessionId, which the catalog derives from externalSessionId by
+      // stripping the `rf-` prefix. On a single-session page the catalog may not have loaded (or may
+      // fail), so read it straight from the authored `external-session-id` metadata instead — else
+      // the favorite request would go out with an empty sessionId.
+      rfSessionId: (getMetadata('external-session-id') || '').replace(/^rf-/, ''),
       title: findSessionHeadingText(el) || getMetadata('og:title') || '',
       thumbnailUrl: getMetadata('og:image') || null,
       duration: 0,
