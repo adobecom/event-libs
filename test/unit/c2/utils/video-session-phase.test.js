@@ -115,6 +115,23 @@ describe('nextPhaseBoundaryMs — the clock boundaries the shared watcher schedu
     expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(end);
   });
 
+  it('includes the simulive on-demand flip (contentEnd + 5min post-roll) even when it falls after the scheduled end', () => {
+    const MIN = 60 * 1000;
+    const start = NOW - (5 * MIN); // premiering: started 5 min ago
+    const s = session({
+      startTimeUtc: new Date(start).toISOString(),
+      endTimeUtc: new Date(start + (10 * MIN)).toISOString(), // scheduled end 5 min from now
+      mpcId: '123',
+      videoDuration: '00:20:00', // 20-min video → contentEnd = start + 20min
+    });
+    // The simulive→on-demand flip is contentEnd(+20min) + 5min post-roll = start + 25min, which is
+    // LATER than the scheduled end (start + 10min) — so it must be the returned boundary here.
+    const simuliveFlip = start + (20 * MIN) + (5 * MIN);
+    expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(start + (10 * MIN)); // nearest is still `end`
+    // ...and past the scheduled end, the simulive flip is the next boundary.
+    expect(nextPhaseBoundaryMs(s, { nowMs: start + (11 * MIN) })).to.equal(simuliveFlip);
+  });
+
   it('includes the DVR-availability gate (eventStart + dvrDelayHours) as a boundary', () => {
     const eventStartMs = NOW - HOUR;
     const s = session({

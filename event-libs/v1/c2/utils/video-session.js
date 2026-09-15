@@ -380,7 +380,13 @@ export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}
   const end = Date.parse(session.endTimeUtc) || null;
   if (start != null) {
     candidates.push(start);
-    candidates.push(start - (5 * 60 * 1000)); // simulive pre-roll window opens
+    candidates.push(start - (SIMULIVE_PRE_ROLL_MIN * MINUTE_MS)); // simulive pre-roll window opens
+    // Simulive → on-demand flip: contentEnd + post-roll, where contentEnd is start + video duration
+    // (or the scheduled end). MUST mirror simulivePhase() exactly, and it can fall AFTER `end`, so
+    // it's a distinct boundary the timer would otherwise miss (leaving the VOD to never render).
+    const durationMs = parseVideoDurationMs(session.videoDuration);
+    const contentEndMs = durationMs != null ? start + durationMs : (end ?? start);
+    candidates.push(contentEndMs + (SIMULIVE_DEFAULT_DELAY_MIN * MINUTE_MS));
   }
   if (end != null) candidates.push(end);
   if (session.dvrDelayHours != null && eventStartMs != null) {
