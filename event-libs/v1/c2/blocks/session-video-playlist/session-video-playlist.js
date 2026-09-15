@@ -15,7 +15,6 @@ import {
   findSectionWithStyle,
   getVideoProgress as readVideoProgress,
   parseJsonMetadata as parseSharedJsonMetadata,
-  currentSessionHasEnded,
   findEmbeddableVideos,
   readAuthoredConfig,
   resolveSessionId,
@@ -126,8 +125,12 @@ function compareByStartTime(a, b) {
   return new Date(a.startTimeUtc).getTime() - new Date(b.startTimeUtc).getTime();
 }
 
+// A playlist row must have a real ON-DEMAND asset. That's always the MPC or YouTube VOD —
+// mrDvrVideoId is the transient MobileRider DVR/replay buffer asset (played only during the
+// DVR_BUFFER phase), NOT the durable on-demand video, so a DVR-only session has nothing to
+// play once it's actually on-demand and must not appear as a row.
 function hasVideoSource(session) {
-  return Boolean(session.mpcId || session.youTubeId || session.mrDvrVideoId);
+  return Boolean(session.mpcId || session.youTubeId);
 }
 
 export function resolveTopicPlaylist(
@@ -875,14 +878,7 @@ export default async function init(el) {
     el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
   };
 
-  // The playlist only shows related videos once the current session has ended (a simple
-  // end-time gate — the playlist doesn't need the player's finer playback-phase classification).
-  // Failing it is "wait", not "give up": while the session hasn't ended we must NOT removeBlock
-  // (that announces hasPlaylist:false and would strand the player behind a permanent full-width
-  // layout), so we re-check on the shared session-state tick and on the player's transition.
-  const currentSessionEnded = () => currentSessionHasEnded(sessionTimes, getNowMs());
-
-  // The actual render flow, run once the current session has ended — the catalog may be ready
+  // The actual render flow, run once the current session is playable — the catalog may be ready
   // now, still loading (subscribe), or empty (removeBlock).
   const runRenderFlow = () => {
     const existing = sessions.value;
@@ -916,27 +912,31 @@ export default async function init(el) {
     });
   };
 
-  // Render only once the current session is playable. While it isn't, DON'T removeBlock (that
-  // announces hasPlaylist:false and strands the player behind a permanent full-width layout) —
-  // just wait. The wait is driven by the SAME signals the player uses, so no duplicate timer here:
-  //  - session-state:changed, fired by event-session-details' shared schedule timer at each
-  //    start/end transition (exactly when a session flips to on-demand), and
-  //  - session-video-player:playable, fired by the player when IT becomes playable (covers the
-  //    live-poll / DVR cases the session-times schedule doesn't tick for).
+  // The playlist mirrors the player: it renders ONLY once the player signals it has a video to
+  // show (session-video-player:playable), and never on its own. We wait for the player's own
+  // playback-phase decision rather than re-deriving "has the session ended?" from the clock here —
+  // that kept the two surfaces from diverging (a bare end-time gate would show the playlist while
+  // the current session was still in pre-event / DVR-buffer because of the DVR offset).
+  //
+  // We deliberately do NOT tear down on the player's "no video" case: a session can move THROUGH a
+  // phase with no asset (e.g. DVR-buffer with no DVR id) and only LATER reach a playable phase that
+  // does have one (on-demand with an mpc id). So while the player isn't playable we just stay
+  // mounted-but-idle and wait — a later `playable` still renders us. Staying idle strands nothing:
+  // we never announce hasPlaylist, and the full-width player wins its own layout independently (in
+  // the terminal no-video case it removes itself rather than awaiting our decision).
+  //
+  // The player fires `playable` BEFORE it awaits our layout decision, so there's no deadlock:
+  // playable → we announce hasPlaylist → player embeds into the winning container.
   let started = false;
-  const gateAndRender = () => {
-    if (started || !el.isConnected || !currentSessionEnded()) return;
+  const onPlayable = (event) => {
+    if (event.detail?.sessionId !== sessionId) return;
+    if (started || !el.isConnected) return;
     started = true;
     runRenderFlow();
   };
 
-  const onTick = () => gateAndRender();
-  window.addEventListener('session-state:changed', onTick);
-  window.addEventListener('session-video-player:playable', onTick);
+  window.addEventListener('session-video-player:playable', onPlayable);
   onElementDetached(el, () => {
-    window.removeEventListener('session-state:changed', onTick);
-    window.removeEventListener('session-video-player:playable', onTick);
+    window.removeEventListener('session-video-player:playable', onPlayable);
   });
-
-  gateAndRender();
 }

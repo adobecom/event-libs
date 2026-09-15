@@ -139,7 +139,6 @@ export const PLAYBACK_PHASE = {
 };
 
 const MINUTE_MS = 60_000;
-const HOUR_MS = 3_600_000;
 
 // Classification is driven by the session's own identity + DVR gate, NOT the authored Format
 // attribute. Live identity wins first: a session with a livestream/DVR identity runs the full
@@ -206,11 +205,9 @@ function simulivePhase(session, nowMs) {
   // "Start time + how long the video is" or the official session end time, whichever applies.
   const contentEndMs = durationMs != null ? start + durationMs : (end ?? start);
 
-  const delayMs = session.dvrDelayHours != null
-    ? session.dvrDelayHours * HOUR_MS
-    : SIMULIVE_DEFAULT_DELAY_MIN * MINUTE_MS;
-
-  if (nowMs < contentEndMs + delayMs) return PLAYBACK_PHASE.SIMULIVE;
+  // A simulive session never carries a DVR delay — anything with dvrDelayHours classifies as
+  // IPOD/LIVE upstream (classifySessionPlayback), so this is always the default post-roll.
+  if (nowMs < contentEndMs + (SIMULIVE_DEFAULT_DELAY_MIN * MINUTE_MS)) return PLAYBACK_PHASE.SIMULIVE;
   return PLAYBACK_PHASE.ON_DEMAND;
 }
 
@@ -279,12 +276,7 @@ export function buildSessionFromMetadata(sessionTimes) {
     mpcId: getAttrText('MPC ID'),
     youTubeId: getAttrText('YouTube ID'),
     mrDvrVideoId: getAttrText('Mobilerider Video ID (DVR)'),
-    // Real payloads author this as 'SkinID' (no space); older/other sources use 'Skin ID' —
-    // try both rather than silently drop the skin id (an empty skin id means mobilerider.embed()
-    // mounts but never starts playback).
     mrSkinId: getAttrText('SkinID') || getAttrText('Skin ID'),
-    // 'Video Duration' is the name sessions-api.js looks for; some real payloads carry it as
-    // 'Video Duration (hr:min:sec)' instead — try both rather than repeat that mismatch here.
     videoDuration: getAttrText('Video Duration') || getAttrText('Video Duration (hr:min:sec)'),
     dvrDelayHours: parseDvrDelayHours(getAttrText('DVR Timing (in hours)')),
   };
