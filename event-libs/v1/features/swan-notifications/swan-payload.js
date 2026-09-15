@@ -1,6 +1,7 @@
 // Pure functions — session/config in, entry objects out. No fetch, no module-level
 // state, so these are trivially unit-testable in isolation from the storage/display layer.
-import { getTrackIcon, getOverrideTrackIcon } from '../../utils/tier-1-event-config.js';
+import { getTrackIcon, getOverrideTrackIcon, getHomepagePath } from '../../utils/tier-1-event-config.js';
+import { MAX_EVENT_PAGES } from '../../utils/constances.js';
 import { getWatchDestination } from '../../utils/session-state.js';
 import { safeUrl } from '../../utils/utils.js';
 
@@ -44,12 +45,16 @@ function resolveSessionUrl(path) {
 // LiveCard/SessionDetailOverlay and session-routing.js's resolveCardAction use — so a live
 // session goes to the homepage (isLivestreamed) or Broadcast (isOnline) instead of its own
 // session page, matching every other entry point into a live session. getWatchDestination
-// doesn't model 'reminder' (it only knows 'live'/'on-demand'), so that stage keeps linking to
-// the session's own page, same as before. It also returns '' for a live session that's neither
-// isLivestreamed nor isOnline (e.g. in-person-only) — falling back to sessionPageUrl there,
-// rather than leaving the row pointing at the bare origin, since that's still a real page.
+// doesn't model 'reminder' at all, so that stage is handled here directly: a session that will
+// livestream on the homepage already points there during its reminder window too (that's
+// where its pre-show/countdown content lives), while every other upcoming session type still
+// links to its own page. Also falls back to sessionPageUrl whenever getWatchDestination has
+// nothing to offer (e.g. a live session that's neither isLivestreamed nor isOnline, like an
+// in-person-only one) rather than leaving the row pointing at the bare origin.
 function resolveActionPath(session, stage) {
-  if (stage === 'reminder') return session.sessionPageUrl;
+  if (stage === 'reminder') {
+    return session.isLivestreamed ? (getHomepagePath() || MAX_EVENT_PAGES.homepage) : session.sessionPageUrl;
+  }
   return getWatchDestination(session, stage) || session.sessionPageUrl;
 }
 

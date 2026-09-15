@@ -100,9 +100,14 @@ describe('swan-payload', () => {
       expect(stages).to.deep.equal(['reminder', 'live', 'on-demand']);
     });
 
-    it('still links a reminder to the session\'s own page', () => {
+    it('links a reminder for a non-livestreamed session to its own page', () => {
       const entry = buildNotificationEntry(session, 'reminder', swanConfig);
       expect(entry.actionUrl).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
+    });
+
+    it('sends a reminder for a livestreamed-on-homepage session to the homepage already, not its own page', () => {
+      const entry = buildNotificationEntry({ ...session, isLivestreamed: true }, 'reminder', swanConfig);
+      expect(entry.actionUrl).to.equal(new URL(MAX_EVENT_PAGES.homepage, window.location.origin).toString());
     });
 
     it('still links an on-demand session to its own page', () => {
