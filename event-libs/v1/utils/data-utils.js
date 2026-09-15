@@ -1,3 +1,5 @@
+import { BACKEND_PHONE_RE } from './constances.js';
+
 /**
  * @typedef {Object} EventAttendeeDataFilter
  * @property {string} type - The type of the attribute.
@@ -106,6 +108,23 @@ export function getBaseAttendeePayload(attendeeData) {
     if (BASE_ATTENDEE_DATA_FILTER[key] && isValidAttribute(value)) {
       acc[key] = value;
     }
+    return acc;
+  }, {});
+}
+
+const LEGACY_PHONE_FIELDS = new Set(
+  Object.keys(BASE_ATTENDEE_DATA_FILTER).filter((key) => /phone$/i.test(key)),
+);
+
+export function sanitizeLegacyPhoneFields(existingData, newData) {
+  if (!existingData) return existingData;
+  const submitted = newData || {};
+  return Object.entries(existingData).reduce((acc, [key, value]) => {
+    const isStaleInvalidPhone = LEGACY_PHONE_FIELDS.has(key)
+      && !Object.prototype.hasOwnProperty.call(submitted, key)
+      && typeof value === 'string'
+      && !BACKEND_PHONE_RE.test(value);
+    if (!isStaleInvalidPhone) acc[key] = value;
     return acc;
   }, {});
 }

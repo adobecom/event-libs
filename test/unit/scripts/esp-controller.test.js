@@ -504,6 +504,53 @@ describe('Adobe Event Service API', () => {
       expect(result.data.registrationStatus).to.equal('registered');
     });
 
+    it('should drop a dirty legacy businessPhone from the update payload when the current form does not ask for it', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      const staleAttendeeResp = { ...attendeeResp, businessPhone: 'None' };
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (staleAttendeeResp), ok: true, status: 200 });
+      fetchStub.onCall(2).resolves({ json: () => (staleAttendeeResp), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+      const updateOptions = fetchStub.getCall(2).args[1];
+      const updateBody = JSON.parse(updateOptions.body);
+      expect(updateBody).to.not.have.property('businessPhone');
+      expect(result.ok).to.be.true;
+    });
+
+    it('should still send a phone field to update when the current form explicitly submits it, even if the stale profile value was invalid', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      const staleAttendeeResp = { ...attendeeResp, businessPhone: 'None' };
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (staleAttendeeResp), ok: true, status: 200 });
+      fetchStub.onCall(2).resolves({ json: () => (staleAttendeeResp), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const dataWithPhone = { ...attendeeData, businessPhone: '+1 555 123 4567' };
+      await api.getAndCreateAndAddAttendee(eventId, dataWithPhone);
+
+      const updateOptions = fetchStub.getCall(2).args[1];
+      const updateBody = JSON.parse(updateOptions.body);
+      expect(updateBody.businessPhone).to.equal('+1 555 123 4567');
+    });
+
+    it('should still forward a stale non-phone field on update', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      const staleAttendeeResp = { ...attendeeResp, companyName: 'N/A' };
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (staleAttendeeResp), ok: true, status: 200 });
+      fetchStub.onCall(2).resolves({ json: () => (staleAttendeeResp), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+      const updateOptions = fetchStub.getCall(2).args[1];
+      const updateBody = JSON.parse(updateOptions.body);
+      expect(updateBody.companyName).to.equal('N/A');
+    });
+
     it('should authenticate the create-attendee and add-to-event calls via the rsvp-token header when a guest registers with a token', async () => {
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1' });
       const fetchStub = sandbox.stub(window, 'fetch');
