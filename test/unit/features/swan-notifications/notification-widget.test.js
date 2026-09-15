@@ -24,13 +24,22 @@ describe('notification-widget', () => {
   }
 
   before(async () => {
+    const gnavNotificationsMeta = document.createElement('meta');
+    gnavNotificationsMeta.name = 'gnav-notifications';
+    gnavNotificationsMeta.content = 'on';
+    document.head.appendChild(gnavNotificationsMeta);
+
     mountPoint = document.createElement('div');
     mountPoint.className = 'feds-notifications-wrapper';
     document.body.append(mountPoint);
 
     // mountNotificationWidget() is a module-level singleton (guarded by its own `mounted`
     // flag), so it's called exactly once for this whole file; every test below interacts
-    // with this one mounted instance via the real, shared notification-store.js.
+    // with this one mounted instance via the real, shared notification-store.js. This file
+    // is the one sanctioned successful, permanent mount in the whole suite — it must run
+    // after notification-widget-gnav-gate.test.js and notification-widget-mount-retry.test.js
+    // (both of which deliberately never let a real build complete, so `mounted` reaches this
+    // file still false); see either of their header comments for the full ordering chain.
     mountNotificationWidget();
     // `.feds-notifications-wrapper` already exists, so waitForElement() resolves on a
     // microtask — this macrotask tick guarantees buildWidget() has already run.
@@ -39,6 +48,7 @@ describe('notification-widget', () => {
 
   after(() => {
     mountPoint.remove();
+    document.head.querySelector('meta[name="gnav-notifications"]')?.remove();
   });
 
   beforeEach(() => {

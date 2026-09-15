@@ -46,7 +46,7 @@ describe('session-store: toggleSchedule keeps the local SWAN notification store 
 
     const meta = document.createElement('meta');
     meta.name = 'swan-notifications';
-    meta.content = 'true';
+    meta.content = 'feds';
     document.head.appendChild(meta);
 
     setMetadata('tier-1-event-config', JSON.stringify({}));

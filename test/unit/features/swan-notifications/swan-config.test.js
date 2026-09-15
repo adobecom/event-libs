@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
-import { isSwanEnabled, getSwanConfig } from '../../../../event-libs/v1/features/swan-notifications/swan-config.js';
+import {
+  getSwanMode, isGnavNotificationsEnabled, getSwanConfig,
+} from '../../../../event-libs/v1/features/swan-notifications/swan-config.js';
 
 function setMeta(name, content) {
   document.head.querySelector(`meta[name="${name}"]`)?.remove();
@@ -13,22 +15,44 @@ function setMeta(name, content) {
 describe('swan-config', () => {
   afterEach(() => {
     setMeta('swan-notifications');
+    setMeta('gnav-notifications');
     setMeta('tier-1-event-config');
   });
 
-  describe('isSwanEnabled', () => {
-    it('is disabled when the swan-notifications metadata flag is absent', () => {
-      expect(isSwanEnabled()).to.equal(false);
+  describe('getSwanMode', () => {
+    it('is "off" when the swan-notifications metadata flag is absent', () => {
+      expect(getSwanMode()).to.equal('off');
     });
 
-    it('is disabled for any value other than the literal string "true"', () => {
-      setMeta('swan-notifications', 'yes');
-      expect(isSwanEnabled()).to.equal(false);
-    });
-
-    it('is enabled once the flag is authored as "true"', () => {
+    it('is "off" for any value other than the literal strings "feds" or "unc"', () => {
       setMeta('swan-notifications', 'true');
-      expect(isSwanEnabled()).to.equal(true);
+      expect(getSwanMode()).to.equal('off');
+    });
+
+    it('is "feds" once the flag is authored as "feds"', () => {
+      setMeta('swan-notifications', 'feds');
+      expect(getSwanMode()).to.equal('feds');
+    });
+
+    it('is "unc" once the flag is authored as "unc"', () => {
+      setMeta('swan-notifications', 'unc');
+      expect(getSwanMode()).to.equal('unc');
+    });
+  });
+
+  describe('isGnavNotificationsEnabled', () => {
+    it('is false when the gnav-notifications metadata flag is absent', () => {
+      expect(isGnavNotificationsEnabled()).to.equal(false);
+    });
+
+    it('is false for any value other than the literal string "on"', () => {
+      setMeta('gnav-notifications', 'true');
+      expect(isGnavNotificationsEnabled()).to.equal(false);
+    });
+
+    it('is true once the flag is authored as "on"', () => {
+      setMeta('gnav-notifications', 'on');
+      expect(isGnavNotificationsEnabled()).to.equal(true);
     });
   });
 

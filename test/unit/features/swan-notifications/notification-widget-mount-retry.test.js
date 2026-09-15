@@ -3,23 +3,36 @@ import sinon from 'sinon';
 import { mountNotificationWidget } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
 import { upsertEntry, getEntries, removeEntry } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
 
+function setMeta(name, content) {
+  document.head.querySelector(`meta[name="${name}"]`)?.remove();
+  if (content === undefined) return;
+  const meta = document.createElement('meta');
+  meta.name = name;
+  meta.content = content;
+  document.head.appendChild(meta);
+}
+
 // mountNotificationWidget() guards itself with a module-level `mounted` singleton that
-// lives for the whole browser test run. This file must be the first thing in the suite to
-// ever call mountNotificationWidget(), so it can exercise the "gnav placeholder never
-// appeared" path — where .feds-notifications-wrapper genuinely doesn't exist yet — before
+// lives for the whole browser test run. This file must run after
+// notification-widget-gnav-gate.test.js (which proves the gate itself) but before
 // notification-widget.test.js's own before() hook does a normal, successful mount (which
-// would otherwise leave `mounted` permanently true for the rest of the run). The filename
-// is chosen to sort alphabetically ahead of notification-widget.test.js ('-' < '.' in
-// ASCII), matching @web/test-runner's default glob ordering.
+// would otherwise leave `mounted` permanently true for the rest of the run), so it can
+// exercise the "gnav placeholder never appeared" path — where .feds-notifications-wrapper
+// genuinely doesn't exist yet, with gnav-notifications already "on" so the gate itself
+// isn't what's skipping the mount here. The filename is chosen to sort alphabetically
+// ahead of notification-widget.test.js ('-' < '.' in ASCII), matching @web/test-runner's
+// default glob ordering.
 describe('notification-widget: mount retry after a failed wait', () => {
   afterEach(() => {
     sinon.restore();
+    setMeta('gnav-notifications');
     document.querySelector('.feds-notifications-wrapper')?.remove();
     getEntries().forEach((entry) => removeEntry(entry.rfCode));
   });
 
   it('resets its mounted guard on a timed-out wait, so a later call can still succeed', async () => {
     const clock = sinon.useFakeTimers();
+    setMeta('gnav-notifications', 'on');
     mountNotificationWidget();
     // gnav-wait.js's default timeout — nothing in the document matches
     // .feds-notifications-wrapper.

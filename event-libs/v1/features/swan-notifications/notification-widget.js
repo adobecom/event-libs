@@ -11,6 +11,7 @@ import {
 import { STAGE_COPY } from './swan-payload.js';
 import { waitForElement } from './gnav-wait.js';
 import { fetchFederalTrackIcon } from '../icons/federal-icons.js';
+import { isGnavNotificationsEnabled } from './swan-config.js';
 
 // Page-level, framework-agnostic widget — same shape as features/toast/toast.js (a signal
 // for state, createTag/loadStyle for vanilla DOM, a mounted guard) rather than a full
@@ -319,6 +320,11 @@ function buildWidget(mount) {
 
 export function mountNotificationWidget() {
   if (mounted) return;
+  // Federal only renders `.feds-notifications-wrapper` when the page also carries
+  // gnav-notifications=on — skip the wait entirely rather than timing out against an
+  // element that will never appear. The swanMountFallback dev path intentionally bypasses
+  // gnav altogether, so it keeps working regardless of this flag.
+  if (MOUNT_SELECTOR === '.feds-notifications-wrapper' && !isGnavNotificationsEnabled()) return;
   mounted = true;
 
   loadStyle(new URL('./notification-widget.css', import.meta.url).href);

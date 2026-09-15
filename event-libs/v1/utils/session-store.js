@@ -12,7 +12,7 @@ import { mountToast } from '../features/toast/toast.js';
 import {
   reconcileSwanNotifications, notifySessionScheduled, notifySessionUnscheduled,
 } from '../features/swan-notifications/swan-notifications.js';
-import { isSwanEnabled } from '../features/swan-notifications/swan-config.js';
+import { getSwanMode } from '../features/swan-notifications/swan-config.js';
 import { mountNotificationWidget } from '../features/swan-notifications/notification-widget.js';
 
 // Shared, page-level state. Preact reads `.value` directly; non-Preact code uses `.subscribe()`/`.peek()`.
@@ -94,13 +94,14 @@ function syncAuth() {
     isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
     userFirstName: profile?.first_name ?? null,
   };
-  // Gated on real login, not just isSwanEnabled(): scheduling (the only thing that ever
+  // Gated on real login, not just the mode flag: scheduling (the only thing that ever
   // populates the notification store) requires an RF auth token from a real IMS profile,
   // so an anonymous visitor's bell would only ever render empty. This also matches real
   // UNC's own behavior — its notifications icon is excluded from SIGNED_OUT_ICONS too.
   // mountNotificationWidget() is itself idempotent, so re-firing on every syncAuth() call
-  // (e.g. a later profile update) is harmless.
-  if (auth.value.isLoggedIn && isSwanEnabled()) mountNotificationWidget();
+  // (e.g. a later profile update) is harmless. Only feds mode has a local widget to mount —
+  // unc mode relies entirely on gnav's own existing UNC-rendered bell.
+  if (auth.value.isLoggedIn && getSwanMode() === 'feds') mountNotificationWidget();
   if (auth.value.isLoggedIn && profile.userId) {
     exchangeRfAuthToken(profile.userId);
   } else {

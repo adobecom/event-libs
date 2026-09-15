@@ -24,10 +24,20 @@ function parseTierOneEventConfig() {
   }
 }
 
-// A single boolean flag replaces the old ansEndpoint-presence check — there's no more
-// per-event config to resolve, so enabling the feature is a straight opt-in.
-export function isSwanEnabled() {
-  return getMetadata('swan-notifications') === 'true';
+// The metadata value itself selects which SWAN implementation runs: 'feds' (this repo's
+// local widget), 'unc' (milo gnav's own UNC engine, driven from swan-notifications-unc.js),
+// or 'off'/missing/anything else, which no-ops both.
+const SWAN_MODES = ['feds', 'unc'];
+
+export function getSwanMode() {
+  const raw = getMetadata('swan-notifications');
+  return SWAN_MODES.includes(raw) ? raw : 'off';
+}
+
+// Federal only renders `.feds-notifications-wrapper` (feds mode's mount point) when the page
+// also carries this flag — see notification-widget.js's mountNotificationWidget().
+export function isGnavNotificationsEnabled() {
+  return getMetadata('gnav-notifications') === 'on';
 }
 
 export function getSwanConfig() {
