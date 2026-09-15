@@ -233,6 +233,12 @@ function ipodPhase(session, nowMs, eventStartMs) {
 
   if (session.dvrDelayHours == null) return PLAYBACK_PHASE.ON_DEMAND;
   const availableAt = dvrAvailableAtMs(session, eventStartMs);
+  // TEMP DEBUG
+  console.log('[ipod-debug] DVR gate', {
+    nowMs, eventStartMs, dvrDelayHours: session.dvrDelayHours, availableAt,
+    nowLessThanAvailable: availableAt == null ? 'availableAt is null' : nowMs < availableAt,
+    end, nowVsEnd: end ? nowMs >= end : 'no end',
+  });
   if (availableAt == null || nowMs < availableAt) return PLAYBACK_PHASE.PRE_EVENT;
   return PLAYBACK_PHASE.ON_DEMAND;
 }
