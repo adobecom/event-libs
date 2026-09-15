@@ -118,6 +118,28 @@ function addConfigRow(el, key, value) {
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
 describe('session-video-player', () => {
+  // Several tests mount real iframe elements (asserting their src/attributes). The browser
+  // navigates each iframe to its cross-origin src, and scripts inside that frame raise an opaque
+  // window-level "Script error." (no message detail, no filename). Mocha catches uncaught errors
+  // via window.onerror, so under the full concurrent suite that async cross-origin error lands on
+  // whichever test is mid-run and fails it. These tests only ever inspect the iframe ELEMENT,
+  // never its content, so wrap window.onerror to swallow that one opaque error and defer every
+  // real error (anything with a message or filename) to Mocha's own handler.
+  let previousOnError;
+
+  before(() => {
+    previousOnError = window.onerror;
+    window.onerror = function onError(message, source, ...rest) {
+      const isOpaqueCrossOrigin = message === 'Script error.' && !source;
+      if (isOpaqueCrossOrigin) return true; // handled — do not propagate to Mocha
+      return previousOnError ? previousOnError.call(this, message, source, ...rest) : false;
+    };
+  });
+
+  after(() => {
+    window.onerror = previousOnError;
+  });
+
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
