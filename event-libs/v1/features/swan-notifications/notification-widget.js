@@ -1,5 +1,5 @@
 import {
-  createTag, loadStyle, getEventConfig, getFallbackLocale, getMetadata,
+  createTag, loadStyle, getEventConfig, getFallbackLocale, getMetadata, isNonProdHost,
 } from '../../utils/utils.js';
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
@@ -24,8 +24,9 @@ import { fetchFederalTrackIcon } from '../icons/federal-icons.js';
 // widget is tested against: `.feds-notifications-wrapper` doesn't exist in deployed gnav
 // markup until then, so `?swanMountFallback=true` in the URL opts back into the old
 // `#universal-nav` stopgap purely so the widget itself can still be exercised locally in
-// the meantime.
-const MOUNT_SELECTOR = new URLSearchParams(window.location.search).get('swanMountFallback') === 'true'
+// the meantime. Gated to non-prod hosts (isNonProdHost()) — this can't be triggered on a
+// real adobe.com page.
+const MOUNT_SELECTOR = isNonProdHost() && new URLSearchParams(window.location.search).get('swanMountFallback') === 'true'
   ? '#universal-nav'
   : '.feds-notifications-wrapper';
 
