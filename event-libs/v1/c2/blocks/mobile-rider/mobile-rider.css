@@ -309,3 +309,16 @@
   margin: revert;
   scroll-margin-top: revert;
 }
+
+/*
+ * MWPW-207444: MobileRider's player bundle injects a global, unscoped `.label`
+ * rule (from its Map.js overlay widget) with `position: absolute; bottom: -20px`.
+ * This leaks onto any element with class="label" on the page, including Milo's
+ * base-card `standalone-link label` CTA, pulling it out of flow and misaligning it.
+ */
+.standalone-link.label {
+  position: static;
+  inset: auto;
+  margin: 0;
+  text-align: left;
+}
