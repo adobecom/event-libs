@@ -117,27 +117,33 @@ function addConfigRow(el, key, value) {
 /** Lets the not-awaited async decision/embed flow inside init() settle. */
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
+// The `embedding` describe stubs iframe src → about:blank (so nothing loads) and stashes the real
+// value on data-src. This reads back the src the block actually built, for assertion.
+const getIframeSrc = (iframe) => iframe.getAttribute('data-src') ?? iframe.getAttribute('src');
+
 describe('session-video-player', () => {
-  // Several tests mount real iframe elements (asserting their src/attributes). The browser
-  // navigates each iframe to its cross-origin src, and scripts inside that frame raise an opaque
-  // window-level "Script error." (no message detail, no filename). Mocha catches uncaught errors
-  // via window.onerror, so under the full concurrent suite that async cross-origin error lands on
-  // whichever test is mid-run and fails it. These tests only ever inspect the iframe ELEMENT,
-  // never its content, so wrap window.onerror to swallow that one opaque error and defer every
-  // real error (anything with a message or filename) to Mocha's own handler.
-  let previousOnError;
+  // Several tests mount real iframe elements and assert the src the block builds. We assert that
+  // src WITHOUT the browser ever loading the cross-origin document: a real load pulls in the
+  // frame's own scripts, which both hit the network and raise an opaque "Script error." that Mocha
+  // (via window.onerror) attributes to whichever test is mid-run under the concurrent suite. So
+  // while these tests run, intercept setAttribute('src', …) on iframes — stash the intended value
+  // on a data-src attribute (which the tests assert via getIframeSrc) and point the live src at
+  // about:blank so nothing is ever fetched. Fully fake: no network, no external scripts.
+  let originalSetAttribute;
 
   before(() => {
-    previousOnError = window.onerror;
-    window.onerror = function onError(message, source, ...rest) {
-      const isOpaqueCrossOrigin = message === 'Script error.' && !source;
-      if (isOpaqueCrossOrigin) return true; // handled — do not propagate to Mocha
-      return previousOnError ? previousOnError.call(this, message, source, ...rest) : false;
+    originalSetAttribute = HTMLIFrameElement.prototype.setAttribute;
+    HTMLIFrameElement.prototype.setAttribute = function setAttribute(name, value) {
+      if (name === 'src') {
+        originalSetAttribute.call(this, 'data-src', value);
+        return originalSetAttribute.call(this, 'src', 'about:blank');
+      }
+      return originalSetAttribute.call(this, name, value);
     };
   });
 
   after(() => {
-    window.onerror = previousOnError;
+    HTMLIFrameElement.prototype.setAttribute = originalSetAttribute;
   });
 
   beforeEach(() => {
@@ -145,9 +151,16 @@ describe('session-video-player', () => {
     document.head.innerHTML = '';
     localStorage.clear();
     window.lana = { log: sinon.stub() };
+    // Present-but-inert YT global so ensureYouTubeIframeApi() short-circuits instead of injecting
+    // the real https://www.youtube.com/iframe_api script (disallowed in unit tests).
+    window.YT = {
+      Player: function StubPlayer() {},
+      PlayerState: { PLAYING: 1, PAUSED: 2, ENDED: 0 },
+    };
   });
 
   afterEach(() => {
+    delete window.YT;
     sinon.restore();
   });
 
@@ -459,19 +472,6 @@ describe('session-video-player', () => {
     beforeEach(() => {
       setMeta('session-id', 's-1');
       BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
-      // Present-but-inert YT global so ensureYouTubeIframeApi() short-circuits instead of
-      // injecting the real https://www.youtube.com/iframe_api script, which this repo's
-      // test harness disallows.
-      window.YT = {
-        Player: function StubPlayer() {},
-        PlayerState: {
-          PLAYING: 1, PAUSED: 2, ENDED: 0,
-        },
-      };
-    });
-
-    afterEach(() => {
-      delete window.YT;
     });
 
     async function embedFullWidth() {
@@ -487,7 +487,7 @@ describe('session-video-player', () => {
       const el = await embedFullWidth();
 
       const iframe = el.querySelector('iframe.adobetv');
-      expect(iframe.getAttribute('src')).to.equal(`${ADOBE_TV_ORIGIN}/v/3458940`);
+      expect(getIframeSrc(iframe)).to.equal(`${ADOBE_TV_ORIGIN}/v/3458940`);
       expect(iframe.getAttribute('title')).to.equal('Adobe Video Publishing Cloud Player');
       expect(iframe.getAttribute('loading')).to.equal('lazy');
     });
@@ -543,8 +543,8 @@ describe('session-video-player', () => {
 
         const iframe = el.querySelector('iframe.youtube');
         expect(iframe.id).to.equal('session-video-player-yt-abcdefghijk');
-        expect(iframe.getAttribute('src')).to.contain('/embed/abcdefghijk');
-        expect(iframe.getAttribute('src')).to.contain('enablejsapi=1');
+        expect(getIframeSrc(iframe)).to.contain('/embed/abcdefghijk');
+        expect(getIframeSrc(iframe)).to.contain('enablejsapi=1');
       });
     });
 
@@ -556,7 +556,7 @@ describe('session-video-player', () => {
       const el = await embedFullWidth();
 
       const iframe = el.querySelector('iframe.youtube');
-      expect(iframe.getAttribute('src')).to.equal('https://example.com/nope');
+      expect(getIframeSrc(iframe)).to.equal('https://example.com/nope');
       expect(iframe.id).to.equal('');
     });
   });
