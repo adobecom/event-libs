@@ -59,8 +59,12 @@ export const getVideoProgress = (sessionId) => readVideoProgress(sessionId, LOG_
 
 export const saveVideoProgress = (sessionId, secondsWatched, length = null) => saveSharedVideoProgress(sessionId, secondsWatched, length, LOG_SCOPE);
 
+// Strictly onDemand-only: session-times can also carry a `liveStream` (youtube) and a `dvr`
+// (mobilerider) entry, and those must NEVER be picked as the on-demand VOD (the liveStream is the
+// live broadcast video; DVR is the replay buffer). Only the `kind: 'onDemand'` mpc/youtube entry is
+// the durable VOD. Mirrors the eyebrow's hasPlayableVideo() check in session-state-view.js.
 function pickEmbeddableVideo(sessionTimes) {
-  return findEmbeddableVideos(sessionTimes)[0] || null;
+  return findEmbeddableVideos(sessionTimes).find((video) => video.kind === 'onDemand') || null;
 }
 
 // session-times page metadata only ever carries a ready-to-embed onDemand-kind entry (see

@@ -284,7 +284,10 @@ describe('session-video-player', () => {
       expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
-    it('keeps a liveStream video once the session has ended (kind is not gated)', async () => {
+    it('does NOT pick a liveStream session-times entry as the on-demand video (kind must be onDemand)', async () => {
+      // session-times has ONLY a liveStream mpc entry — pickEmbeddableVideo must skip it (it's the
+      // live broadcast video, not the VOD). The player falls back to the catalog session's mpcId.
+      sessions.value = [catalogSession({ mpcId: '9990000', youTubeId: '' })];
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
       setMeta('session-times', sessionTimes({
@@ -292,8 +295,12 @@ describe('session-video-player', () => {
       }));
 
       await init(fullWidthPlayer);
+      await flush();
 
-      expect(fullWidthPlayer.isConnected).to.be.true;
+      const iframe = fullWidthPlayer.querySelector('iframe.adobetv');
+      expect(iframe).to.exist;
+      // Built from the catalog mpcId (9990000), NOT the liveStream session-times entry (/v/1).
+      expect(iframe.getAttribute('src')).to.equal(`${ADOBE_TV_ORIGIN}/v/9990000?autoplay=true`);
     });
 
     it('removes the block when no video has an embeddable provider anywhere', async () => {
