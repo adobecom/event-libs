@@ -209,18 +209,6 @@ export function classifySessionPlayback(session) {
   return null;
 }
 
-// RF's "Video Duration", HH:MM:SS — minutes can exceed 59 (e.g. "00:60:00"), so this sums
-// weighted parts, no range validation. Duplicated from session-broadcast/utils/
-// broadcast-schedule.js's parseVideoDurationMs — kept local so this shared C2 util doesn't
-// depend on a specific block's utils.
-function parseVideoDurationMs(videoDuration) {
-  if (!videoDuration) return null;
-  const parts = videoDuration.split(':').map(Number);
-  if (parts.some(Number.isNaN)) return null;
-  const [h = 0, m = 0, s = 0] = parts;
-  return ((h * 3600) + (m * 60) + s) * 1000;
-}
-
 // dvrDelayHours is authored large (e.g. 772h) and REMOVED once the on-demand asset is
 // actually available — so once the session's own window has closed, its absence IS the
 // ready-now signal, same as Live's post-broadcast gate. Its presence still gates by
@@ -244,8 +232,11 @@ function ipodPhase(session, nowMs, eventStartMs) {
 }
 
 const SIMULIVE_PRE_ROLL_MIN = 5;
-const SIMULIVE_DEFAULT_DELAY_MIN = 5;
 
+// A simulive video "premieres" (plays as if live) on its schedule, then flips to normal on-demand.
+// The flip is the scheduled end time, plain and simple: SIMULIVE while now <= end, ON_DEMAND after.
+// (Watched on the Broadcast page during the premiere; the session-page player only renders the VOD
+// once it's ON_DEMAND.)
 function simulivePhase(session, nowMs) {
   const start = Date.parse(session.startTimeUtc) || null;
   // No schedule at all means nothing to gate on — treat as already available.
@@ -254,14 +245,8 @@ function simulivePhase(session, nowMs) {
   if (nowMs < start - (SIMULIVE_PRE_ROLL_MIN * MINUTE_MS)) return PLAYBACK_PHASE.PRE_EVENT;
 
   const end = Date.parse(session.endTimeUtc) || null;
-  const durationMs = parseVideoDurationMs(session.videoDuration);
-  // "Start time + how long the video is" or the official session end time, whichever applies.
-  const contentEndMs = durationMs != null ? start + durationMs : (end ?? start);
-
-  // A simulive session never carries a DVR delay — anything with dvrDelayHours classifies as
-  // IPOD/LIVE upstream (classifySessionPlayback), so this is always the default post-roll.
-  if (nowMs < contentEndMs + (SIMULIVE_DEFAULT_DELAY_MIN * MINUTE_MS)) return PLAYBACK_PHASE.SIMULIVE;
-  return PLAYBACK_PHASE.ON_DEMAND;
+  if (end != null && nowMs > end) return PLAYBACK_PHASE.ON_DEMAND;
+  return PLAYBACK_PHASE.SIMULIVE;
 }
 
 function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasEverActive) {
@@ -381,13 +366,8 @@ export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}
   if (start != null) {
     candidates.push(start);
     candidates.push(start - (SIMULIVE_PRE_ROLL_MIN * MINUTE_MS)); // simulive pre-roll window opens
-    // Simulive → on-demand flip: contentEnd + post-roll, where contentEnd is start + video duration
-    // (or the scheduled end). MUST mirror simulivePhase() exactly, and it can fall AFTER `end`, so
-    // it's a distinct boundary the timer would otherwise miss (leaving the VOD to never render).
-    const durationMs = parseVideoDurationMs(session.videoDuration);
-    const contentEndMs = durationMs != null ? start + durationMs : (end ?? start);
-    candidates.push(contentEndMs + (SIMULIVE_DEFAULT_DELAY_MIN * MINUTE_MS));
   }
+  // The scheduled end is where a live/simulive session flips to DVR/on-demand.
   if (end != null) candidates.push(end);
   if (session.dvrDelayHours != null && eventStartMs != null) {
     candidates.push(eventStartMs + session.dvrDelayHours * HOUR_MS);

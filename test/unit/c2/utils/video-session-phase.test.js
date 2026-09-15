@@ -50,6 +50,35 @@ describe('classifySessionPlayback — identity + DVR gate, not Format', () => {
   });
 });
 
+describe('simulivePhase — premieres on schedule, flips to on-demand at the scheduled end', () => {
+  const simulive = (overrides) => session({ mpcId: '123', dvrDelayHours: null, ...overrides });
+
+  it('is PRE_EVENT before the 5-minute pre-roll window', () => {
+    const s = simulive({
+      startTimeUtc: new Date(NOW + (10 * 60 * 1000)).toISOString(), // starts in 10 min
+      endTimeUtc: new Date(NOW + (30 * 60 * 1000)).toISOString(),
+    });
+    expect(phase(s)).to.equal(PLAYBACK_PHASE.PRE_EVENT);
+  });
+
+  it('is SIMULIVE while now is at/after start and before the scheduled end', () => {
+    const s = simulive({
+      startTimeUtc: new Date(NOW - (5 * 60 * 1000)).toISOString(), // started 5 min ago
+      endTimeUtc: new Date(NOW + (5 * 60 * 1000)).toISOString(), // ends in 5 min
+    });
+    expect(phase(s)).to.equal(PLAYBACK_PHASE.SIMULIVE);
+  });
+
+  it('flips to ON_DEMAND once now is past the scheduled end (plain end time, no post-roll)', () => {
+    const s = simulive({
+      startTimeUtc: new Date(NOW - (30 * 60 * 1000)).toISOString(),
+      endTimeUtc: new Date(NOW - (60 * 1000)).toISOString(), // ended 1 min ago
+      videoDuration: '01:00:00', // long video is irrelevant now — the flip is the scheduled end
+    });
+    expect(phase(s)).to.equal(PLAYBACK_PHASE.ON_DEMAND);
+  });
+});
+
 describe('livePhase — poll-driven live, eventStart-anchored DVR', () => {
   const live = (overrides) => session({ mrStreamId: 'mr-1', dvrDelayHours: 5, ...overrides });
 
@@ -113,23 +142,6 @@ describe('nextPhaseBoundaryMs — the clock boundaries the shared watcher schedu
       endTimeUtc: new Date(end).toISOString(),
     });
     expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(end);
-  });
-
-  it('includes the simulive on-demand flip (contentEnd + 5min post-roll) even when it falls after the scheduled end', () => {
-    const MIN = 60 * 1000;
-    const start = NOW - (5 * MIN); // premiering: started 5 min ago
-    const s = session({
-      startTimeUtc: new Date(start).toISOString(),
-      endTimeUtc: new Date(start + (10 * MIN)).toISOString(), // scheduled end 5 min from now
-      mpcId: '123',
-      videoDuration: '00:20:00', // 20-min video → contentEnd = start + 20min
-    });
-    // The simulive→on-demand flip is contentEnd(+20min) + 5min post-roll = start + 25min, which is
-    // LATER than the scheduled end (start + 10min) — so it must be the returned boundary here.
-    const simuliveFlip = start + (20 * MIN) + (5 * MIN);
-    expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(start + (10 * MIN)); // nearest is still `end`
-    // ...and past the scheduled end, the simulive flip is the next boundary.
-    expect(nextPhaseBoundaryMs(s, { nowMs: start + (11 * MIN) })).to.equal(simuliveFlip);
   });
 
   it('includes the DVR-availability gate (eventStart + dvrDelayHours) as a boundary', () => {
