@@ -310,6 +310,7 @@
   scroll-margin-top: revert;
 }
 
+/* MWPW-207444: MobileRider's vendor player injects a global, unscoped .label rule that leaks onto Milo's base-card CTA. */
 .standalone-link.label {
   position: static;
   inset: auto;
