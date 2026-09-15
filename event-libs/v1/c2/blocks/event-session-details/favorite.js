@@ -19,9 +19,21 @@ export function renderFavorite() {
   };
 
   let session = sessions.value.find((s) => s.id === sessionId) || { id: sessionId };
+  // TEMP DEBUG
+  console.log('[fav-debug] init', {
+    sessionId,
+    foundInCatalog: sessions.value.some((s) => s.id === sessionId),
+    catalogLen: sessions.value.length,
+    rfSessionId: session.rfSessionId,
+    isStub: !session.rfSessionId,
+  });
   if (!session.rfSessionId) {
     const unsubscribe = sessions.subscribe((list) => {
       const found = list.find((s) => s.id === sessionId);
+      // TEMP DEBUG
+      console.log('[fav-debug] catalog updated', {
+        catalogLen: list.length, foundOurSession: !!found, rfSessionId: found?.rfSessionId,
+      });
       if (found) { session = found; unsubscribe(); }
     });
   }
@@ -44,6 +56,13 @@ export function renderFavorite() {
   favorited.subscribe(paint);
 
   btn.addEventListener('click', () => {
+    // TEMP DEBUG
+    console.log('[fav-debug] CLICK → toggleFavorite', {
+      sessionId,
+      rfSessionId: session.rfSessionId,
+      willSendEmptySessionId: !session.rfSessionId,
+      session,
+    });
     toggleFavoriteWithFeedback(session, {
       eventConfig,
       isFavorited: favorited.value.has(sessionId),
