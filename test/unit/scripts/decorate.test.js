@@ -2260,7 +2260,11 @@ describe('decorateEvent - Array Iteration', () => {
   });
 
   describe('processAutoBlockLinks', () => {
-    afterEach(() => sinon.restore());
+    // A present window.mobilerider makes the mobile-rider block's loadScript() short-circuit, so it
+    // never injects the real assets.mobilerider.com/player.min.js <script> (disallowed in unit
+    // tests). Same stub the mobile-rider block's own test file uses.
+    beforeEach(() => { globalThis.mobilerider = { embed: sinon.stub() }; });
+    afterEach(() => { delete globalThis.mobilerider; sinon.restore(); });
 
     it('should add link-block class and call initBlock for selfInit blocks', async () => {
       const parent = document.createElement('div');
