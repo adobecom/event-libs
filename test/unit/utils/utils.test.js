@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 
 import {
   getValidCampaignIdFromUrl, resolveRoutedCampaignId, resetCampaignMapCache, getRsvpToken,
-  shouldForceGuestSignIn, safeUrl,
+  shouldForceGuestSignIn, safeUrl, isNonProdHost,
 } from '../../../event-libs/v1/utils/utils.js';
 
 function mockCampaignMap(rules) {
@@ -117,6 +117,26 @@ describe('shouldForceGuestSignIn', () => {
   it('does not force sign-in when profile is null/undefined', () => {
     expect(shouldForceGuestSignIn(null, false)).to.equal(false);
     expect(shouldForceGuestSignIn(undefined, false)).to.equal(false);
+  });
+});
+
+describe('isNonProdHost', () => {
+  // Shared gate for debug/test query params (?milolibs=, ?serverTime=, ?swanMountFallback=)
+  // — real prod domains must never match, or those overrides would work on adobe.com itself.
+  it('rejects real production domains', () => {
+    expect(isNonProdHost('www.adobe.com')).to.equal(false);
+    expect(isNonProdHost('business.adobe.com')).to.equal(false);
+    expect(isNonProdHost('milo.adobe.com')).to.equal(false);
+  });
+
+  it('accepts Helix/AEM preview and live domains', () => {
+    expect(isNonProdHost('main--event-libs--adobecom.hlx.page')).to.equal(true);
+    expect(isNonProdHost('main--event-libs--adobecom.aem.live')).to.equal(true);
+  });
+
+  it('accepts local dev hosts', () => {
+    expect(isNonProdHost('localhost')).to.equal(true);
+    expect(isNonProdHost('local.adobe.com')).to.equal(true);
   });
 });
 
