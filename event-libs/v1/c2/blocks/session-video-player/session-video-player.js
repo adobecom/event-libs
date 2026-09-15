@@ -485,9 +485,6 @@ function resolveVideoForPhase(phase, sessionTimes, session) {
   if (phase === PLAYBACK_PHASE.ON_DEMAND) {
     return pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
   }
-  if (phase === PLAYBACK_PHASE.SIMULIVE) {
-    return buildVideoFromCatalog(session);
-  }
   // DVR_BUFFER plays the dedicated MobileRider DVR/replay asset — a distinct mechanism from
   // buildMiloVideo's iframe embeds (mobilerider.embed(), not a src URL), handled by
   // loadMobileRiderPlayer() instead.
@@ -498,9 +495,12 @@ function resolveVideoForPhase(phase, sessionTimes, session) {
   return null;
 }
 
-// pre-event and watch-live are deliberately not this block's job — session-broadcast/
-// mobile-rider own the live-watching experience; this block only ever plays a video.
-const PLAYABLE_PHASES = [PLAYBACK_PHASE.SIMULIVE, PLAYBACK_PHASE.DVR_BUFFER, PLAYBACK_PHASE.ON_DEMAND];
+// pre-event, watch-live AND simulive are deliberately not this block's job — session-broadcast/
+// mobile-rider own the live-watching experience, and a simulive "premiere" is watched on the
+// Broadcast page (the eyebrow's "Watch now" CTA), not inline here. This block only renders the
+// durable on-demand VOD (ON_DEMAND) or the DVR/replay buffer (DVR_BUFFER); a simulive session plays
+// here only once it flips to ON_DEMAND after its premiere ends.
+const PLAYABLE_PHASES = [PLAYBACK_PHASE.DVR_BUFFER, PLAYBACK_PHASE.ON_DEMAND];
 
 // Reads page metadata once (no catalog fetch). Returns null only for the genuine never-render
 // case (no session-id); otherwise the caller re-evaluates the phase on a timer, so pre-event is
