@@ -227,12 +227,6 @@ function ipodPhase(session, nowMs, eventStartMs) {
 
   if (session.dvrDelayHours == null) return PLAYBACK_PHASE.ON_DEMAND;
   const availableAt = dvrAvailableAtMs(session, eventStartMs);
-  // TEMP DEBUG
-  console.log('[ipod-debug] DVR gate', {
-    nowMs, eventStartMs, dvrDelayHours: session.dvrDelayHours, availableAt,
-    nowLessThanAvailable: availableAt == null ? 'availableAt is null' : nowMs < availableAt,
-    end, nowVsEnd: end ? nowMs >= end : 'no end',
-  });
   if (availableAt == null || nowMs < availableAt) return PLAYBACK_PHASE.PRE_EVENT;
   return PLAYBACK_PHASE.ON_DEMAND;
 }
@@ -395,17 +389,13 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   let timerId = null;
   let stopped = false;
 
-  const emitIfChanged = (reason = 'init') => {
+  const emitIfChanged = () => {
     if (stopped) return;
     const phase = getPlaybackPhase(session, {
       nowMs: getNowMs(),
       eventStartMs: resolveEventStartMs(),
       liveStreamActiveIds,
       streamWasEverActive,
-    });
-    // TEMP DEBUG
-    console.log('[watch-debug] emitIfChanged', {
-      reason, phase, lastPhase, changed: phase !== lastPhase, streamWasEverActive, liveStreamActiveIds: [...liveStreamActiveIds],
     });
     if (phase !== lastPhase) {
       lastPhase = phase;
@@ -421,9 +411,7 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
     // +500ms so we evaluate just AFTER the boundary, never a hair before it. MAX_TIMEOUT guards the
     // 32-bit setTimeout ceiling (a far-future boundary would otherwise fire immediately).
     const delay = Math.min((boundary - nowMs) + 500, 2 ** 31 - 1);
-    // TEMP DEBUG
-    console.log('[watch-debug] scheduleNextClockTick', { boundaryInMs: boundary - nowMs, delay, mrStreamId: session.mrStreamId });
-    timerId = setTimeout(() => { emitIfChanged('clock-boundary'); scheduleNextClockTick(); }, delay);
+    timerId = setTimeout(() => { emitIfChanged(); scheduleNextClockTick(); }, delay);
   };
 
   // POLL trigger — only live (mrStreamId) sessions have a stream to poll; the live→DVR flip rides
@@ -433,16 +421,12 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
       if (liveStreamActiveIds.has(session.mrStreamId)) streamWasEverActive = true;
-      // TEMP DEBUG
-      console.log('[watch-debug] MR poll result', { active: [...active], streamWasEverActive, mrStreamId: session.mrStreamId });
-      emitIfChanged('mr-poll');
+      emitIfChanged();
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
-    // TEMP DEBUG
-    console.log('[watch-debug] registered MR stream for polling', { mrStreamId: session.mrStreamId, mrEnv: deriveMrEnv() });
   }
 
-  emitIfChanged('init');
+  emitIfChanged();
   scheduleNextClockTick();
 
   return function stop() {

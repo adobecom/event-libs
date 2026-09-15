@@ -259,14 +259,6 @@ export async function toggleSchedule(session) {
 export async function toggleFavorite(session) {
   const isFavorited = favorited.value.has(session.id);
   setPending(session.id, true);
-  // TEMP DEBUG
-  console.log('[fav-debug] toggleFavorite → toggleSessionInterest', {
-    sessionId: session.id,
-    rfSessionId: session.rfSessionId,
-    hasRfAuthToken: !!rfAuthToken,
-    rfProfileId: eventApiConfig?.rfProfileId,
-    apiUrl: eventApiConfig?.apiUrl,
-  });
   try {
     // Favoriting keys on rfSessionId, not rfCode — sessionTimeId is left empty.
     await toggleSessionInterest('', session.rfSessionId, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);

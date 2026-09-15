@@ -535,26 +535,12 @@ function buildRenderModel(el) {
 // shown at any point: nothing appears until the player is actually ready to embed.
 function loadWhenDecided(el, sessionId, video) {
   preconnectVideoProvider(video.provider);
-  // TEMP DEBUG
-  console.log('[svp-debug] loadWhenDecided → awaiting layout decision', {
-    insidePlaylistContainer: isInsidePlaylistContainer(el),
-    existingDecision: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY),
-    video,
-  });
 
   (async () => {
     try {
       const isWinner = await awaitEmbedDecision(el);
-      // TEMP DEBUG
-      console.log('[svp-debug] layout decision RESOLVED', {
-        isWinner,
-        insidePlaylistContainer: isInsidePlaylistContainer(el),
-        decision: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY),
-      });
       if (!isWinner) return;
       loadVideoPlayer(el, sessionId, video);
-      // TEMP DEBUG
-      console.log('[svp-debug] loadVideoPlayer CALLED → embedded', { provider: video.provider, embedded: el.dataset.embedded });
     } catch (error) {
       logError(`could not resolve the video layout decision: ${error.message}`);
     }
@@ -585,27 +571,9 @@ export default async function init(el) {
     const video = PLAYABLE_PHASES.includes(phase)
       ? resolveVideoForPhase(phase, sessionTimes, session)
       : null;
-    // TEMP DEBUG
-    console.log('[svp-debug] onPhase() from watcher', {
-      phase,
-      embeddedPhase,
-      phaseChanged: phase !== embeddedPhase,
-      video,
-      insidePlaylistContainer: isInsidePlaylistContainer(el),
-      session: {
-        mrStreamId: session.mrStreamId,
-        mrDvrVideoId: session.mrDvrVideoId,
-        mrSkinId: session.mrSkinId,
-        mpcId: session.mpcId,
-        youTubeId: session.youTubeId,
-        dvrDelayHours: session.dvrDelayHours,
-      },
-    });
 
     // Already showing the right asset for this phase — nothing to do.
     if (video && phase === embeddedPhase) {
-      // TEMP DEBUG
-      console.log('[svp-debug] phase unchanged → keep current asset (no-op)', { phase });
       return;
     }
 
@@ -616,8 +584,6 @@ export default async function init(el) {
       // (before the layout-decision wait the player is about to enter). On a later phase swap the
       // layout is already settled, so just re-embed the new asset in place.
       if (isFirstEmbed) {
-        // TEMP DEBUG
-        console.log('[svp-debug] FIRST EMBED → firing playable + loadWhenDecided', { phase, video });
         // Both a durable BlockMediator value AND the window event: the value covers a consumer
         // (e.g. the playlist) that inits AFTER this fires and would miss the one-shot event; the
         // event covers one that's already listening.
@@ -625,13 +591,8 @@ export default async function init(el) {
         window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
         loadWhenDecided(el, sessionId, video);
       } else if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
-        // TEMP DEBUG
-        console.log('[svp-debug] PHASE SWAP → re-embedding new asset in place', { newPhase: phase, video });
         preconnectVideoProvider(video.provider);
         loadVideoPlayer(el, sessionId, video);
-      } else {
-        // TEMP DEBUG
-        console.log('[svp-debug] PHASE SWAP but this instance is NOT the winner → skipping', { phase });
       }
       return;
     }
@@ -643,26 +604,14 @@ export default async function init(el) {
     // session flips to a playable phase. Only remove if nothing has embedded yet — once a video is
     // showing we keep it rather than tearing the player out on a transient no-asset phase.
     if (embeddedPhase === null && PLAYABLE_PHASES.includes(phase)) {
-      // TEMP DEBUG
-      console.log('[svp-debug] playable phase but NO video + nothing embedded → removing block', { phase });
       logError(`session is in "${phase}" phase with no embeddable video — removing`);
       el.remove();
-    } else {
-      // TEMP DEBUG
-      console.log('[svp-debug] no video, staying mounted (non-playable phase or already embedded)', { phase, embeddedPhase });
     }
   };
 
   // One shared watcher drives everything: it fires onPhase() now and on every phase change, running
   // a clock-boundary timer for time-based transitions and subscribing to the MobileRider poll for a
   // live session's poll-driven live→DVR→on-demand flips — the same source the eyebrow/playlist use.
-  // TEMP DEBUG
-  console.log('[svp-debug] init → starting watchPlaybackPhase', {
-    sessionId,
-    insidePlaylistContainer: isInsidePlaylistContainer(el),
-    mrStreamId: session.mrStreamId,
-    eventStartMs: getEventStartMs(),
-  });
   const stopWatching = watchPlaybackPhase(session, onPhase, { eventStartMs: getEventStartMs() });
   onElementDetached(el, stopWatching);
 }

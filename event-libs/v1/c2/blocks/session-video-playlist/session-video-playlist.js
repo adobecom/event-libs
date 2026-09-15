@@ -656,8 +656,6 @@ function hasEmbeddedVideoPlayer(container) {
 }
 
 function announceVideoDecision(hasPlaylist) {
-  // TEMP DEBUG
-  console.log('[pl-debug] announceVideoDecision', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
   if (hasPlaylist) {
@@ -699,19 +697,12 @@ function resolveRenderContext(el) {
   const config = readAuthoredConfig(el);
 
   const sessionId = resolveSessionId(config);
-  // TEMP DEBUG
-  console.log('[pl-debug] resolveRenderContext: sessionId', { sessionId, config });
   if (!sessionId) {
     logError('no session-id (page metadata or authored) — nothing to render');
     return null;
   }
 
   const sessionTimes = parseJsonMetadata('session-times');
-  // TEMP DEBUG
-  console.log('[pl-debug] resolveRenderContext: hasEmbeddableVideo', {
-    hasEmbeddableVideo: hasEmbeddableVideo(sessionTimes),
-    sessionTimesVideos: (sessionTimes || []).flatMap((e) => e?.videos || []).map((v) => ({ provider: v.provider, kind: v.kind })),
-  });
   if (!hasEmbeddableVideo(sessionTimes)) {
     logError('no embeddable video on this page — nothing to render');
     return null;
@@ -761,8 +752,6 @@ function listenForPlayerEvents(el, sessionId) {
 }
 
 export default async function init(el) {
-  // TEMP DEBUG
-  console.log('[pl-debug] init() START', { isConnected: el.isConnected });
   ensureStylesheet('session-video-playlist-css', BLOCK_CSS_URL);
   playlistInstanceId += 1;
   const LIST_ID = `session-video-playlist-list-${playlistInstanceId}`;
@@ -771,11 +760,7 @@ export default async function init(el) {
   if (background) el.style.setProperty('--vp-authored-bg', background);
 
   const context = resolveRenderContext(el);
-  // TEMP DEBUG
-  console.log('[pl-debug] resolveRenderContext', { context: context ? { sessionId: context.sessionId, minSessions: context.minSessions } : null });
   if (!context) {
-    // TEMP DEBUG
-    console.log('[pl-debug] no context → removeBlock (announces hasPlaylist:false)');
     removeBlock(el);
     return;
   }
@@ -791,12 +776,6 @@ export default async function init(el) {
 
   function synthesizeCurrentSession() {
     const startTimeMillis = (sessionTimes || [])[0]?.startTimeMillis;
-    // TEMP DEBUG
-    console.log('[fav-debug] synthesizeCurrentSession', {
-      sessionId,
-      externalSessionId: getMetadata('external-session-id'),
-      rfSessionId: (getMetadata('external-session-id') || '').replace(/^rf-/, ''),
-    });
     return {
       id: sessionId,
       // Favoriting keys on rfSessionId, which the catalog derives from externalSessionId by
@@ -952,12 +931,6 @@ export default async function init(el) {
   // playable → we announce hasPlaylist → player embeds into the winning container.
   let started = false;
   const onPlayable = (event) => {
-    // TEMP DEBUG
-    console.log('[pl-debug] onPlayable received', {
-      eventSessionId: event.detail?.sessionId, mySessionId: sessionId,
-      matches: event.detail?.sessionId === sessionId, started, isConnected: el.isConnected,
-      sessionsStatus: sessionsStatus.value, sessionsLen: sessions.value.length,
-    });
     if (event.detail?.sessionId !== sessionId) return;
     if (started || !el.isConnected) return;
     started = true;
@@ -974,12 +947,8 @@ export default async function init(el) {
   // durable BlockMediator value covers that race: if it's already set for our session, run the
   // render flow now instead of waiting for an event that already passed.
   const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
-  // TEMP DEBUG
-  console.log('[pl-debug] onPlayable listener REGISTERED', { sessionId, alreadyPlayable });
   if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
     started = true;
-    // TEMP DEBUG
-    console.log('[pl-debug] player was ALREADY playable → runRenderFlow now');
     runRenderFlow();
   }
 }
