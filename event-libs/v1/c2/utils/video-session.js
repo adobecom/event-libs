@@ -30,6 +30,7 @@ export function sectionHasStyle(section, styleClass) {
     return (valueCell?.textContent || '')
       .split(',')
       .map((style) => style.trim().replaceAll(' ', '-'))
+      .filter(Boolean)
       .includes(styleClass);
   });
 }
@@ -79,6 +80,53 @@ export function parseJsonMetadata(name, scope) {
 
 export function getVideoProgress(sessionId, scope) {
   return readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, scope)[sessionId] || null;
+}
+
+// Persists a session's watch progress to the shared progress map. `completed` is derived so the
+// playlist's progress bar and the player's resume logic agree on what "watched" means.
+export function saveVideoProgress(sessionId, secondsWatched, length = null, scope) {
+  if (!sessionId) return;
+  const progressBySession = readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, scope);
+  const resolvedLength = length ?? progressBySession[sessionId]?.length ?? null;
+  progressBySession[sessionId] = {
+    secondsWatched,
+    length: resolvedLength,
+    completed: Boolean(resolvedLength && secondsWatched >= resolvedLength),
+  };
+  writeJsonToStorage(PROGRESS_STORAGE_KEY, progressBySession, scope);
+}
+
+// Runs `teardown` once `element` leaves the DOM. A single shared MutationObserver watches all
+// registered elements (cheaper than one observer per element) and disconnects itself once none
+// remain. Used by both the player and playlist to clean up listeners/timers on block removal.
+const detachWatchers = new Set();
+let detachObserver = null;
+export function onElementDetached(element, teardown) {
+  const watcher = { element, teardown };
+  detachWatchers.add(watcher);
+
+  if (!detachObserver) {
+    detachObserver = new MutationObserver(() => {
+      detachWatchers.forEach((w) => {
+        if (w.element.isConnected) return;
+        detachWatchers.delete(w);
+        // Isolate each teardown: a throw in one watcher must not skip the rest (they share this
+        // one callback, unlike the old per-element observers). teardowns are benign cleanup
+        // (removeEventListener / clearInterval / unsubscribe), so swallowing here is safe.
+        try {
+          w.teardown();
+        } catch (error) {
+          logError('video-session', `element-detached teardown failed: ${error.message}`);
+        }
+      });
+      if (detachWatchers.size === 0) {
+        detachObserver.disconnect();
+        detachObserver = null;
+      }
+    });
+    detachObserver.observe(document.body, { childList: true, subtree: true });
+  }
+  return watcher;
 }
 
 export function currentSessionHasEnded(sessionTimes, nowMs) {

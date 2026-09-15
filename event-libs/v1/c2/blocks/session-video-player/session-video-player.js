@@ -6,12 +6,11 @@ import { registerStreamIds, unregisterStreamIds, subscribe as subscribeToPoller 
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
-  PROGRESS_STORAGE_KEY,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   closestSectionWithStyle,
-  readJsonFromStorage,
-  writeJsonToStorage,
   getVideoProgress as readVideoProgress,
+  saveVideoProgress as saveSharedVideoProgress,
+  onElementDetached,
   parseJsonMetadata as parseSharedJsonMetadata,
   findEmbeddableVideos,
   readAuthoredConfig,
@@ -61,17 +60,7 @@ const RESUME_RESTART_THRESHOLD_SECONDS = 30;
 
 export const getVideoProgress = (sessionId) => readVideoProgress(sessionId, LOG_SCOPE);
 
-export function saveVideoProgress(sessionId, secondsWatched, length = null) {
-  if (!sessionId) return;
-  const progressBySession = readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, LOG_SCOPE);
-  const resolvedLength = length ?? progressBySession[sessionId]?.length ?? null;
-  progressBySession[sessionId] = {
-    secondsWatched,
-    length: resolvedLength,
-    completed: Boolean(resolvedLength && secondsWatched >= resolvedLength),
-  };
-  writeJsonToStorage(PROGRESS_STORAGE_KEY, progressBySession, LOG_SCOPE);
-}
+export const saveVideoProgress = (sessionId, secondsWatched, length = null) => saveSharedVideoProgress(sessionId, secondsWatched, length, LOG_SCOPE);
 
 function pickEmbeddableVideo(sessionTimes) {
   return findEmbeddableVideos(sessionTimes)[0] || null;
@@ -221,29 +210,6 @@ function ensureMpcLength(sessionId, mpcVideoId, currentTime, length) {
     .catch((error) => logError(`could not backfill mpc duration: ${error.message}`));
 }
 
-const detachWatchers = new Set();
-let detachObserver = null;
-
-function onDetached(element, teardown) {
-  const watcher = { element, teardown };
-  detachWatchers.add(watcher);
-
-  if (!detachObserver) {
-    detachObserver = new MutationObserver(() => {
-      detachWatchers.forEach((w) => {
-        if (w.element.isConnected) return;
-        detachWatchers.delete(w);
-        w.teardown();
-      });
-      if (detachWatchers.size === 0) {
-        detachObserver.disconnect();
-        detachObserver = null;
-      }
-    });
-    detachObserver.observe(document.body, { childList: true, subtree: true });
-  }
-  return watcher;
-}
 
 function watchMpcPlayback(sessionId, iframe) {
 
@@ -308,7 +274,7 @@ function watchMpcPlayback(sessionId, iframe) {
   };
 
   window.addEventListener('message', handleMessage);
-  onDetached(iframe, () => window.removeEventListener('message', handleMessage));
+  onElementDetached(iframe, () => window.removeEventListener('message', handleMessage));
 }
 
 const YOUTUBE_IFRAME_API_URL = 'https://www.youtube.com/iframe_api';
@@ -387,7 +353,7 @@ async function watchYouTubePlayback(sessionId, iframe) {
     notifyProgressChanged(sessionId);
   };
 
-  onDetached(iframe, stopProgressPolling);
+  onElementDetached(iframe, stopProgressPolling);
 
   const handleStateChange = (event) => {
     const { PlayerState } = window.YT;
@@ -655,7 +621,7 @@ export default async function init(el) {
     registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
   }
 
-  onDetached(el, () => {
+  onElementDetached(el, () => {
     window.removeEventListener('session-state:changed', onStateChanged);
     if (session.mrStreamId) {
       unsubscribePoll();
