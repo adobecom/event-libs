@@ -927,7 +927,13 @@ describe('session-video-playlist', () => {
       setMeta('custom-attributes', playlistAttribute());
       ({ playlist } = buildPage());
       addConfigRow(playlist, 'minimum-sessions', '2');
-      sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
+      // No page URL, so this playlist never auto-advances (empty data-href → the handler
+      // returns before assign). Only the auto-advance test's own playlist navigates, so a
+      // stray ended+autoplay event can't reload the runner via this shared instance.
+      sessions.value = [
+        catalogSession({ id: 'a', sessionPageUrl: '' }),
+        catalogSession({ id: 'b', sessionPageUrl: '' }),
+      ];
       await init(playlist);
       await flush();
     });
