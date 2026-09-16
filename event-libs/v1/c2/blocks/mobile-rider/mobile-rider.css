@@ -300,11 +300,6 @@
   }
 }
 
-/* Neutralize the page's global heading styles that leak into the MobileRider player DOM. It must
-   NOT touch MobileRider's OWN skinned overlay headings (.overlays-wrapper .titlecontainer, e.g. the
-   video title / live badge) — those carry MR's intended skin font (AdobeClean-Bold), and reverting
-   font-family there drops them to the browser's generic font (MWPW MR-font issue). So the overlay
-   headings are excluded from the reset and left to MR's own skin CSS. */
 .mobile-rider :is(h1, h2, h3, h4, h5, h6):not(.mobile-rider-info-bar-title, .overlays-wrapper *) {
   font-size: revert;
   font-weight: revert;
@@ -315,10 +310,6 @@
   scroll-margin-top: revert;
 }
 
-/* MobileRider's overlay headings are excluded from the reset above so MR's skin font wins — but
-   the page's global heading rules still leak in for properties MR's skin doesn't set (e.g.
-   letter-spacing). Neutralize just those here (NOT font-family, which MR's skin owns) so the
-   overlay text matches MR's intended styling instead of inheriting the page's heading tokens. */
 .mobile-rider .overlays-wrapper :is(h1, h2, h3, h4, h5, h6) {
   letter-spacing: normal;
 }
