@@ -36,6 +36,7 @@ describe('services/sessions/sessions-api', () => {
         {
           speakerId: 'sp-2', firstName: 'Grace', lastName: 'Hopper',
           localizations: { 'en-US': { title: 'Admiral' } },
+          photo: { imageKind: 'speaker-photo', imageUrl: 'grace-hopper.jpg' },
         },
       ],
       sessionTimes: [
@@ -280,7 +281,11 @@ describe('services/sessions/sessions-api', () => {
     it('joins speakers by id, sorted by ordinal', () => {
       expect(full.speakers.map((sp) => sp.name)).to.deep.equal(['Ada Lovelace', 'Grace Hopper']);
       expect(full.speakers[0].title).to.equal('Engineer');
+    });
+
+    it('maps a speaker photo to its imageUrl, and falls back to null when absent', () => {
       expect(full.speakers[0].photo).to.be.null;
+      expect(full.speakers[1].photo).to.equal('grace-hopper.jpg');
     });
 
     // Detail-view copy (Sessions Guide VizD R1). Both text attributes are rendered
