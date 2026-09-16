@@ -158,9 +158,29 @@ function deterministicShuffle(arr, seed) {
 }
 
 // Category ids are ESP attributeIds; the flat-field fallback covers a plain session field.
+// This is the filter *identity* — a machine slug — used for activeFilters/URL matching.
 export function getFilterValue(session, categoryId) {
   const v = session.customAttributeValues?.[categoryId];
   return v !== undefined ? v : session[categoryId];
+}
+
+// Display counterpart of getFilterValue: the human label for the same category's values.
+// Falls back to getFilterValue itself, so a flat-field category (no separate label source)
+// shows its own value as the label.
+export function getFilterLabel(session, categoryId) {
+  const v = session.customAttributeLabels?.[categoryId];
+  return v !== undefined ? v : getFilterValue(session, categoryId);
+}
+
+// [{ value, label }] for one session's values in a category — value is what activeFilters/the
+// URL key on, label is what the filter panel shows. Index-paired with getFilterValue/
+// getFilterLabel, since both come from the same underlying attr.values order.
+export function getFilterOptions(session, categoryId) {
+  const values = getFilterValue(session, categoryId);
+  const labels = getFilterLabel(session, categoryId);
+  const valueList = Array.isArray(values) ? values : [values].filter((v) => v !== undefined && v !== null && v !== '');
+  const labelList = Array.isArray(labels) ? labels : [labels];
+  return valueList.map((value, i) => ({ value, label: labelList[i] ?? value }));
 }
 
 // activeFilters: { [categoryId]: Set<string> }. Returns a new array; does not mutate input.

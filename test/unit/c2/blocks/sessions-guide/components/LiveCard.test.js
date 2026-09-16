@@ -189,7 +189,7 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Session-Card-Open"');
   });
 
-  it('renders the title as plain text (not an interactive control) on the page surface', () => {
+  it('renders the title as a navigating button (no onCardClick) on the page surface', () => {
     const store = buildStore(preact);
     store.SessionGuideContext._current = {
       state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
@@ -197,8 +197,62 @@ describe('LiveCard', () => {
     };
     const LiveCard = buildLiveCard(preact, store);
     const html = LiveCard({ session: LIVE_SESSION });
-    expect(html).to.not.include('daa-ll="Session-Card-Open"');
-    expect(html).to.include('<p class="sg-live-card__title">MAX Keynote</p>');
+    expect(html).to.include('daa-ll="Session-Card-Open"');
+    expect(html).to.include('sg-live-card__title-btn');
+  });
+
+  // The title's accessible name must match what handleCardClick actually does on the page
+  // surface, since it's now always a real button there (see the two tests above/below).
+  describe('title accessible name reflects its click destination (page surface)', () => {
+    function pageStore() {
+      const store = buildStore(preact);
+      store.SessionGuideContext._current = {
+        state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
+        dispatch: () => {},
+      };
+      return store;
+    }
+
+    it('labels a live, streamed session as "Watch ... now"', () => {
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(LiveCard({ session: LIVE_SESSION })).to.include('aria-label="Watch MAX Keynote now"');
+    });
+
+    it('labels an on-demand session as "Watch ... now"', () => {
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(LiveCard({ session: ON_DEMAND_SESSION })).to.include('aria-label="Watch MAX Keynote now"');
+    });
+
+    it('labels an upcoming session as "View ... details"', () => {
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(LiveCard({ session: UPCOMING_SESSION })).to.include('aria-label="View MAX Keynote details"');
+    });
+
+    // getWatchDestination returns '' for a live session with no stream (in-person-only) —
+    // handleCardClick falls through to sessionPageUrl instead of a broken window.location
+    // assignment, and the label must match that fallback, not the (unavailable) watch path.
+    it('labels a live, in-person-only session (no stream) as "View ... details"', () => {
+      const noStreamSession = { ...LIVE_SESSION, id: 'session-live-no-stream', isOnline: false };
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(LiveCard({ session: noStreamSession })).to.include('aria-label="View MAX Keynote details"');
+    });
+
+    // The schedule/favorite buttons have their own aria-labels, so assert on the title
+    // button's own markup specifically rather than the whole card's rendered string.
+    const titleButtonMarkup = (html) => {
+      const start = html.indexOf('sg-live-card__title-btn');
+      return html.slice(start, html.indexOf('>', start) + 1);
+    };
+
+    it('omits the aria-label on the widget surface (plain title text is the accessible name)', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      expect(titleButtonMarkup(LiveCard({ session: LIVE_SESSION }))).to.not.include('aria-label');
+    });
+
+    it('omits the aria-label when onCardClick is supplied (broadcast owns the semantics)', () => {
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(titleButtonMarkup(LiveCard({ session: LIVE_SESSION, onCardClick: () => {} }))).to.not.include('aria-label');
+    });
   });
 
   it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {
@@ -370,22 +424,79 @@ describe('LiveCard', () => {
       })).to.not.throw();
     });
 
-    // Deliberately NOT identical: the title becomes a real, keyboard-focusable <button> when
-    // onCardClick is supplied on the page surface (matching the widget surface's own already-
-    // accessible pattern) — a bare <div onclick> with no focusable equivalent inside it would
-    // otherwise make "open session detail" mouse/pointer-only for session-broadcast's cards.
-    it('renders the title as a button when onCardClick is supplied on the page surface', () => {
+    // The title is always a real, keyboard-focusable <button> on the page surface, whether or
+    // not onCardClick is supplied — with no callback it self-navigates to sessionPageUrl
+    // (matching SessionCard.js's handleClick), so "open session detail" is never a dead click.
+    it('renders the title as a button on the page surface, with or without onCardClick', () => {
       const LiveCard = buildLiveCard(preact, pageSurfaceStore());
       const withCallback = LiveCard({ session: LIVE_SESSION, onCardClick: () => {} });
       const without = LiveCard({ session: LIVE_SESSION });
       expect(withCallback).to.include('sg-live-card__title-btn');
-      expect(without).to.not.include('sg-live-card__title-btn');
+      expect(without).to.include('sg-live-card__title-btn');
     });
 
     it('onWatchSamePage alone does not affect the title markup', () => {
       const LiveCard = buildLiveCard(preact, pageSurfaceStore());
       const out = LiveCard({ session: LIVE_SESSION, onWatchSamePage: () => {} });
-      expect(out).to.not.include('sg-live-card__title-btn');
+      expect(out).to.include('sg-live-card__title-btn');
+    });
+  });
+
+  // Figma 8463:87698 — mobile only, 'live' variant only. matchesMobile() reads window.matchMedia
+  // directly (not gated behind useEffect, which is a no-op in this string-render harness), so
+  // forcing it here is enough to exercise the branch without a real resize.
+  describe('mobile layout (title-then-badges, live variant only)', () => {
+    let originalMatchMedia;
+
+    beforeEach(() => { originalMatchMedia = window.matchMedia; });
+    afterEach(() => { window.matchMedia = originalMatchMedia; });
+
+    const forceMobile = (mobile) => {
+      window.matchMedia = (q) => ({
+        matches: q.includes('max-width: 767px') ? mobile : !mobile,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      });
+    };
+
+    it('renders the title before the badges block on a mobile live card', () => {
+      forceMobile(true);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_SESSION });
+      expect(out).to.include('sg-live-card__badges');
+      expect(out.indexOf('MAX Keynote')).to.be.lessThan(out.indexOf('sg-live-card__badges'));
+    });
+
+    it('drops the description on a mobile live card', () => {
+      forceMobile(true);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      expect(LiveCard({ session: LIVE_SESSION })).to.not.include('sg-live-card__desc');
+    });
+
+    it('stacks up to two badges, both sized down (iconSize 16 / size="sm")', () => {
+      forceMobile(true);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_TWO_TRACKS });
+      expect(out).to.include('sg-live-card__badges');
+      expect(out).to.include('sg-category-badge--sm');
+      expect(out).to.include('Branding');
+    });
+
+    it('keeps the desktop meta-then-title layout when not mobile, even for the live variant', () => {
+      forceMobile(false);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_SESSION });
+      expect(out).to.not.include('sg-live-card__badges');
+      expect(out).to.include('sg-live-card__meta');
+    });
+
+    it('leaves the recommended variant on its current meta-then-title layout, even on mobile', () => {
+      forceMobile(true);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended' });
+      expect(out).to.not.include('sg-live-card__badges');
+      expect(out).to.include('sg-live-card__meta');
+      expect(out).to.include('sg-live-card__desc');
     });
   });
 
