@@ -1,5 +1,5 @@
 import { fetchLiveStatus } from './mobile-rider.js';
-import { getEventApiConfig } from '../../utils/session-store.js';
+import { getEventApiConfig, deriveMrEnv } from '../../utils/session-store.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
@@ -10,7 +10,7 @@ function group(intervalMs) {
   let g = groups.get(intervalMs);
   if (!g) {
     g = {
-      refCounts: new Map(), intervalId: null, inFlight: false, refetchNeeded: false, immediatePending: false, env: null,
+      refCounts: new Map(), intervalId: null, inFlight: false, refetchNeeded: false, immediatePending: false,
     };
     groups.set(intervalMs, g);
   }
@@ -26,7 +26,10 @@ async function tick(g) {
   if (!ids.length) return;
   g.inFlight = true;
   try {
-    const { active, inactive } = await fetchLiveStatus(ids, g.env ?? getEventApiConfig()?.mrEnv);
+    // mrEnv is event/page-wide (a pure host-derived value), so resolve it here rather than
+    // threading it through every caller. Prefer the loaded event config; fall back to deriving it
+    // directly for callers (e.g. the phase watcher) that poll before initSessionState() has run.
+    const { active, inactive } = await fetchLiveStatus(ids, getEventApiConfig()?.mrEnv ?? deriveMrEnv());
     const result = { active: [...active], inactive: [...inactive] };
     listeners.forEach((entry) => entry.notify(result, ids));
   } catch (error) {
@@ -66,10 +69,9 @@ function stopPollingIfIdle(g, intervalMs) {
   groups.delete(intervalMs);
 }
 
-export function registerStreamIds(ids, { intervalMs = DEFAULT_POLL_INTERVAL_MS, env = null } = {}) {
+export function registerStreamIds(ids, { intervalMs = DEFAULT_POLL_INTERVAL_MS } = {}) {
   if (!ids?.length) return;
   const g = group(intervalMs);
-  if (env && !g.env) g.env = env;
   const hasNewIds = ids.some((id) => !g.refCounts.has(id));
   ids.forEach((id) => g.refCounts.set(id, (g.refCounts.get(id) || 0) + 1));
   if (g.intervalId && hasNewIds) {

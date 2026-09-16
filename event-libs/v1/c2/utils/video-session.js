@@ -3,7 +3,6 @@ import { dvrAvailableAtMs, getNowMs } from '../../utils/session-state.js';
 import { getAttrText, getAttrValues } from './custom-attributes.js';
 import { hasOnDemandFormat, parseDvrDelayHours } from '../../services/sessions/sessions-api.js';
 import { getEventStartMs } from '../../utils/tier-1-event-config.js';
-import { deriveMrEnv } from '../../utils/session-store.js';
 import {
   registerStreamIds, unregisterStreamIds, subscribe as subscribeToPoller,
 } from '../../services/sessions/poller.js';
@@ -315,7 +314,7 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
       if (liveStreamActiveIds.has(session.mrStreamId)) streamWasEverActive = true;
       emitIfChanged();
     }, [session.mrStreamId]);
-    registerStreamIds([session.mrStreamId], { env: deriveMrEnv() });
+    registerStreamIds([session.mrStreamId]);
   }
 
   emitIfChanged();
