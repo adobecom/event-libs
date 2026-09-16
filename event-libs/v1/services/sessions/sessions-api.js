@@ -356,7 +356,7 @@ export function mapEslPayloadToRawSessions(payload) {
       .map((sp) => ({
         name: `${sp.firstName || ''} ${sp.lastName || ''}`.trim(),
         title: sp.localizations?.['en-US']?.title || '',
-        photo: null,
+        photo: sp.photo?.imageUrl ?? null,
       }));
 
     const isLivestreamed = getSessionIsLivestreamed(session);
