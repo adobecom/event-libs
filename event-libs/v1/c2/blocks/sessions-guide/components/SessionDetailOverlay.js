@@ -295,8 +295,7 @@ export function SessionDetailOverlay({ onBack }) {
     const href = safeUrl(product?.pageUrl);
     const inner = html`
                       ${product?.icon
-    ? html`<${Icon} name=${product.icon} size=${32} resolve=${fetchFederalProductIcon} className="sg-detail__product-icon" />`
-    : html`<span class="sg-detail__product-icon sg-detail__product-icon--placeholder" aria-hidden="true"></span>`}
+    && html`<${Icon} name=${product.icon} size=${32} resolve=${fetchFederalProductIcon} className="sg-detail__product-icon" />`}
                       <span class="sg-detail__product-name">${p}</span>
                       ${href && html`<span class="sg-detail__product-linkout" aria-hidden="true"><${IconLinkOut} /></span>`}
                     `;
