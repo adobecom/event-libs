@@ -35,10 +35,6 @@ const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
 const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 
-// `window.location.assign` is non-configurable and can't be stubbed, so tests can't
-// exercise the auto-advance/row-select navigation without a real full-page reload (which
-// severs the Web Test Runner reporting channel and wipes the whole file's results). Route
-// navigation through this overridable seam so tests can stub `_internals.navigate` instead.
 export const _internals = { navigate: (href) => window.location.assign(href) };
 
 const BLOCK_CSS_URL = new URL('./session-video-playlist.css', import.meta.url).href;
@@ -87,10 +83,6 @@ export function computeProgressPercent(progress) {
 export function computeDrawerCapPx(viewportHeight, titleBottom, {
   floor = 0, gap = 0, playerBottom = null, minExpanded = 0, topGap = gap,
 } = {}) {
-  // Ceiling: the expanded drawer must never be taller than the viewport (leaving `topGap`
-  // clear at the top). When the page is scrolled so the title/player sit above the
-  // viewport, their getBoundingClientRect tops go negative and titleCap/playerCap balloon
-  // past the viewport height — without this clamp the drawer's top would spill off-screen.
   const viewportCap = viewportHeight - topGap;
   if (titleBottom == null) return Math.max(floor, Math.min(viewportHeight * 0.7, viewportCap));
   const titleCap = viewportHeight - titleBottom - gap;
@@ -103,11 +95,6 @@ export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
   return titleTop + Math.min(titleHeight, capHeight);
 }
 
-// Classifies the session as IPOD/Simulive/Live (see video-session.js) and resolves its
-// current playback phase against that case's own pre-event/simulive/dvr-buffer/on-demand
-// rules — replaces the old blunt "has a time window passed" check, which didn't distinguish
-// these three cases (e.g. it let a still-DVR-pending live session premiere immediately once
-// its time window ended).
 function hasPremiered(session, eventStartMs, nowMs) {
   return getPlaybackPhase(session, {
     nowMs,
@@ -127,10 +114,6 @@ function compareByStartTime(a, b) {
   return new Date(a.startTimeUtc).getTime() - new Date(b.startTimeUtc).getTime();
 }
 
-// A playlist row must have a real ON-DEMAND asset. That's always the MPC or YouTube VOD —
-// mrDvrVideoId is the transient MobileRider DVR/replay buffer asset (played only during the
-// DVR_BUFFER phase), NOT the durable on-demand video, so a DVR-only session has nothing to
-// play once it's actually on-demand and must not appear as a row.
 function hasVideoSource(session) {
   return Boolean(session.mpcId || session.youTubeId);
 }
@@ -213,7 +196,6 @@ function findPlayerBottom(el) {
   return player ? player.getBoundingClientRect().bottom : null;
 }
 
-
 class Drawer {
   constructor(el, { titleEl, toggleEl, handleEl, headerEl }) {
     this.el = el;
@@ -253,11 +235,6 @@ class Drawer {
     return window.innerHeight;
   }
 
-  // The mobile drawer is position:fixed, but Milo's `container-*` grid section establishes a
-  // containing block (container-type/contain), which makes fixed positioning resolve against
-  // that section instead of the viewport. Move the drawer to <body> in mobile mode so
-  // bottom:0 pins to the viewport; restore it to its authored grid slot on desktop (where
-  // it's a normal side-by-side card, not fixed).
   #reconcilePlacement() {
     const inBody = this.el.parentElement === document.body;
     if (!this.isDesktop() && !inBody) {
@@ -468,10 +445,6 @@ function buildRow(item, { onSelect, hideProgressBar = false }) {
   const meta = createTag('div', { class: 'session-video-playlist-row-meta' }, '', { parent: content });
   createTag('span', { class: 'session-video-playlist-row-title' }, item.title, { parent: meta });
 
-  // Inside .row-meta (beside the thumbnail) so it aligns to the thumbnail's bottom edge, with
-  // the title above it — .row-meta uses space-between to push the title to the top and this to
-  // the bottom of that thumbnail-height column. Skipped entirely (bar + duration) when the
-  // block is authored with hide-progress-bar: true.
   if (!hideProgressBar) {
     const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
     const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
@@ -708,11 +681,6 @@ function resolveRenderContext(el) {
     return null;
   }
 
-  // NB: the "has the current session ended yet?" gate is NOT here — it's time-dependent, so it's
-  // re-checked on a timer in init() (see currentSessionPlayable). Failing it is a "wait", not a
-  // terminal "nothing to render", so it must not collapse to null here (which would removeBlock →
-  // announce hasPlaylist:false and strand the player behind a permanent full-width layout).
-
   return {
     config,
     sessionId,
@@ -778,10 +746,6 @@ export default async function init(el) {
     const startTimeMillis = (sessionTimes || [])[0]?.startTimeMillis;
     return {
       id: sessionId,
-      // Favoriting keys on rfSessionId, which the catalog derives from externalSessionId by
-      // stripping the `rf-` prefix. On a single-session page the catalog may not have loaded (or may
-      // fail), so read it straight from the authored `external-session-id` metadata instead — else
-      // the favorite request would go out with an empty sessionId.
       rfSessionId: (getMetadata('external-session-id') || '').replace(/^rf-/, ''),
       title: findSessionHeadingText(el) || getMetadata('og:title') || '',
       thumbnailUrl: getMetadata('og:image') || null,
@@ -873,15 +837,11 @@ export default async function init(el) {
     el.querySelector('.session-video-playlist-list')?.setAttribute('id', LIST_ID);
     setUpDrawer({ header, toggle, handle });
 
-    // Reveal the block only now that it has real content — until this point it stays display:none
-    // (see CSS) so it never sits as an empty box during pre-event / live / DVR-buffer.
     el.classList.add('is-rendered');
 
     el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
   };
 
-  // The actual render flow, run once the current session is playable — the catalog may be ready
-  // now, still loading (subscribe), or empty (removeBlock).
   const runRenderFlow = () => {
     const existing = sessions.value;
     if (existing.length) {
@@ -914,21 +874,6 @@ export default async function init(el) {
     });
   };
 
-  // The playlist mirrors the player: it renders ONLY once the player signals it has a video to
-  // show (session-video-player:playable), and never on its own. We wait for the player's own
-  // playback-phase decision rather than re-deriving "has the session ended?" from the clock here —
-  // that kept the two surfaces from diverging (a bare end-time gate would show the playlist while
-  // the current session was still in pre-event / DVR-buffer because of the DVR offset).
-  //
-  // We deliberately do NOT tear down on the player's "no video" case: a session can move THROUGH a
-  // phase with no asset (e.g. DVR-buffer with no DVR id) and only LATER reach a playable phase that
-  // does have one (on-demand with an mpc id). So while the player isn't playable we just stay
-  // mounted-but-idle and wait — a later `playable` still renders us. Staying idle strands nothing:
-  // we never announce hasPlaylist, and the full-width player wins its own layout independently (in
-  // the terminal no-video case it removes itself rather than awaiting our decision).
-  //
-  // The player fires `playable` BEFORE it awaits our layout decision, so there's no deadlock:
-  // playable → we announce hasPlaylist → player embeds into the winning container.
   let started = false;
   const onPlayable = (event) => {
     if (event.detail?.sessionId !== sessionId) return;
@@ -942,10 +887,6 @@ export default async function init(el) {
     window.removeEventListener('session-video-player:playable', onPlayable);
   });
 
-  // The player may have already become playable and fired the one-shot event BEFORE this block's
-  // init registered the listener above (the player resolves its phase synchronously now). The
-  // durable BlockMediator value covers that race: if it's already set for our session, run the
-  // render flow now instead of waiting for an event that already passed.
   const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
   if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
     started = true;

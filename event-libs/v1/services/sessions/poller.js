@@ -26,10 +26,6 @@ async function tick(g) {
   if (!ids.length) return;
   g.inFlight = true;
   try {
-    // mrEnv is event-wide, never per-stream — the first caller to supply one for this
-    // interval group wins; getEventApiConfig() is only a fallback for callers (e.g.
-    // session-routing.js) that never supply their own, relying on some other block having
-    // already run initSessionState().
     const { active, inactive } = await fetchLiveStatus(ids, g.env ?? getEventApiConfig()?.mrEnv);
     const result = { active: [...active], inactive: [...inactive] };
     listeners.forEach((entry) => entry.notify(result, ids));

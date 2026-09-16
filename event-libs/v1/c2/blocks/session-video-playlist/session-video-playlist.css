@@ -8,9 +8,6 @@
     /* stylelint-disable-next-line color-no-hex -- exact Figma progress-track color on the light
        desktop pod; no --s2a- token resolves to #D3D3D3 */
     --vp-track-bg: #d3d3d3;
-
-    /* Figma "S2AC/Palette/gray/700" light value = #505050 (the non-playing row duration on the
-       light desktop pod). */
     --vp-muted: var(--s2a-color-gray-700);
     --vp-playing-bg: var(--s2a-color-gray-900);
     --vp-playing-fg: var(--s2a-color-gray-25);
@@ -19,15 +16,7 @@
        dark mode (the is-playing/hover row is dark even on desktop) = #AFAFAF. Our --s2a-color-
        gray-700 only carries the light value (#505050), so the dark-mode hex is inlined here. */
     --vp-playing-muted: #afafaf;
-
-    /* Figma "neutral-subdued-content" (gray-800): resolves to #292929 in light mode here and
-       #DBDBDB in the dark mobile block below — same design token, flipped by theme mode. */
     --vp-subdued-content: var(--s2a-color-gray-800);
-
-    /* Figma "content-default": gray-1000 (#000) in light mode here, gray-25 (#fff) in the dark
-       mobile block. --s2a-color-content-default itself is root-theme-scoped and our block sits
-       under the light root on both viewports, so it can't be used directly — this slot carries
-       content-default's two mode values so the row title flips correctly. */
     --vp-title: var(--s2a-color-gray-1000);
 
     flex: 0 0 349px;
@@ -64,9 +53,6 @@
   }
 }
 
-/* Hidden until the player signals it is playable and render() builds the rows (adds
-   .is-rendered). The block stays mounted-but-idle while the session is pre-event / live / DVR so
-   it can render on a later transition — but it must not occupy layout as an empty box until then. */
 .session-video-playlist {
   display: none;
   flex-direction: column;
@@ -328,9 +314,6 @@
   }
 }
 
-/* space-between pins the title to the top of this column and the progress bar to the bottom,
-   so the progress aligns with the thumbnail's bottom edge (this column stretches to the
-   thumbnail's height via the row's align-items: stretch). */
 .session-video-playlist-row-meta {
   display: flex;
   flex: 1 1 auto;
@@ -356,9 +339,6 @@
   align-self: stretch;
 }
 
-/* The title sets its own color (--vp-title), so it doesn't inherit .row-content's playing-row
-   color swap — restore it here so the title flips to --vp-playing-fg on the is-playing/hover
-   row too. */
 .session-video-playlist-row.is-playing .session-video-playlist-row-title {
   color: var(--vp-playing-fg);
 }
@@ -493,10 +473,6 @@
 }
 
 @media (min-width: 1024px) {
-  /* Sibling of .session-video-playlist-wrapper (not inside it) so it stays visible below the
-     scrollable list when expanded — inside the wrapper it would be clipped by the wrapper's
-     capped max-height/overflow once "Show more" scrolls the list. Its own left padding matches
-     the wrapper's so it lines up with the rows. */
   .session-video-playlist-show-more {
     display: flex;
     padding: var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md);
@@ -548,8 +524,6 @@
     /* stylelint-disable-next-line color-no-hex -- dark-mode value of Figma "neutral-subdued-
        content" (gray-800 → #DBDBDB); no --s2a- token resolves to this exact hex */
     --vp-subdued-content: #dbdbdb;
-
-    /* Figma "content-default" dark-mode value (gray-25 / #fff), see desktop block. */
     --vp-title: var(--s2a-color-gray-25);
 
     position: fixed;
@@ -557,10 +531,6 @@
     right: var(--s2a-spacing-xs);
     bottom: var(--s2a-spacing-xs);
     z-index: 2;
-
-    /* Collapsed: a floating card inset from all edges with all four corners rounded. Expanded
-       overrides this to sit flush to the left/right/bottom edges with only the top corners
-       rounded (a bottom sheet). */
     border-radius: var(--s2a-border-radius-md, 16px);
     transition: max-height 0.3s ease, inset 0.3s ease, border-radius 0.3s ease;
   }
@@ -581,9 +551,6 @@
     margin: 0 var(--s2a-spacing-xs) 0 0;
   }
 
-  /* Collapsed only shows the header (with the "Up next" peek). Hide the list wrapper so it
-     never pokes out below the header when the up-next title is a single line (the fixed
-     collapsed height can otherwise exceed the header). Revealed when expanded. */
   .session-video-playlist:not(.is-expanded) .session-video-playlist-wrapper {
     display: none;
   }
@@ -596,10 +563,6 @@
     position: relative;
   }
 
-  /* Heart is lifted out of the flex flow to the top-right corner, so .row-content (and the
-     progress bar nested in its .row-meta) can use the full row width and the progress track
-     runs under the heart into the hidden play button's freed space. The title reserves room
-     on its right (32px chip + gap) so it never runs beneath the heart. */
   .session-video-playlist-row-actions {
     position: absolute;
     top: var(--s2a-spacing-2xs);
@@ -621,8 +584,6 @@
   .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
   .session-video-playlist-row.is-playing .session-video-playlist-row-play {
     background: var(--vp-playing-bg);
-
-    /* Figma: black (#000) outline on the current row's light card, per the chip spec. */
     border-color: var(--s2a-color-gray-1000);
     margin: var(--s2a-spacing-xs) 0 var(--s2a-spacing-3xs) 0;
   }
