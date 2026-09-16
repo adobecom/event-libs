@@ -28,6 +28,45 @@ const DEFAULT_CTA_TEXT = {
   after: 'Watch on-demand',
 };
 
+const TIME_PARTS_OPTIONS = { hour: 'numeric', minute: '2-digit', hour12: true };
+
+function meridiemOf(parts) {
+  return parts.find((part) => part.type === 'dayPeriod')?.value.toLowerCase() || '';
+}
+
+function digitsOf(parts) {
+  return parts
+    .filter((part) => part.type !== 'dayPeriod' && !(part.type === 'literal' && part.value.trim() === ''))
+    .map((part) => part.value)
+    .join('');
+}
+
+export function formatSessionDateTime(sessionTime) {
+  if (!sessionTime?.startTimeMillis || !sessionTime?.endTimeMillis) return '';
+  try {
+    const start = new Date(sessionTime.startTimeMillis);
+    const end = new Date(sessionTime.endTimeMillis);
+    const dateStr = start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+
+    const startParts = new Intl.DateTimeFormat('en-US', TIME_PARTS_OPTIONS).formatToParts(start);
+    const endParts = new Intl.DateTimeFormat('en-US', {
+      ...TIME_PARTS_OPTIONS,
+      timeZoneName: 'short',
+    }).formatToParts(end);
+
+    const startMeridiem = meridiemOf(startParts);
+    const endMeridiem = meridiemOf(endParts);
+    const startLabel = digitsOf(startParts) + (startMeridiem === endMeridiem ? '' : startMeridiem);
+    const endLabel = digitsOf(endParts) + endMeridiem;
+    const tzAbbr = endParts.find((part) => part.type === 'timeZoneName')?.value || '';
+
+    return `${dateStr}, ${startLabel}–${endLabel}${tzAbbr ? ` ${tzAbbr}` : ''}`;
+  } catch (error) {
+    window.lana?.log(`featured-sessions: date/time format failed: ${error.message}`);
+    return '';
+  }
+}
+
 function buildAuthoredCard(entry, cta) {
   const card = createTag('div', { class: 'event-card media-square' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
@@ -38,7 +77,7 @@ function buildAuthoredCard(entry, cta) {
   const contentWrapper = createTag('div', {}, '', { parent: card });
   const textRoot = createTag('div', {}, '', { parent: contentWrapper });
   createTag('p', {}, '', { parent: textRoot }).textContent = entry.enTitle || '';
-  createTag('p', {}, '', { parent: textRoot }).textContent = entry.track || '';
+  createTag('p', {}, '', { parent: textRoot }).textContent = formatSessionDateTime(entry.sessionTime);
   const ctaP = createTag('p', {}, '', { parent: textRoot });
   const ctaHref = safeUrl(entry.url);
   if (ctaHref) {
