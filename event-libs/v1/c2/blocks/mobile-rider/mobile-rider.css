@@ -300,7 +300,7 @@
   }
 }
 
-.mobile-rider :is(h1, h2, h3, h4, h5, h6):not(.mobile-rider-info-bar-title) {
+.mobile-rider :is(h1, h2, h3, h4, h5, h6):not(.mobile-rider-info-bar-title, .overlays-wrapper *) {
   font-size: revert;
   font-weight: revert;
   font-family: revert;
@@ -308,6 +308,10 @@
   letter-spacing: revert;
   margin: revert;
   scroll-margin-top: revert;
+}
+
+.mobile-rider .overlays-wrapper :is(h1, h2, h3, h4, h5, h6) {
+  letter-spacing: normal;
 }
 
 .standalone-link.label {
