@@ -258,6 +258,8 @@ class MobileRider {
       badgeSlot.replaceChildren();
       const badge = buildCategoryBadge(track);
       if (badge) badgeSlot.append(badge);
+      // Nothing to show — keep the slot out of layout entirely rather than leaving an empty area.
+      badgeSlot.hidden = !badge;
     };
     paintCategory(null);
 
