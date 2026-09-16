@@ -789,7 +789,13 @@ describe('session-video-playlist', () => {
       setMeta('custom-attributes', playlistAttribute());
       ({ playlist } = buildPage());
       addConfigRow(playlist, 'minimum-sessions', '2');
-      sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
+      // No page URL, so this playlist never auto-advances (empty data-href → the handler
+      // returns before assign). Only the auto-advance test's own playlist navigates, so a
+      // stray ended+autoplay event can't reload the runner via this shared instance.
+      sessions.value = [
+        catalogSession({ id: 'a', sessionPageUrl: '' }),
+        catalogSession({ id: 'b', sessionPageUrl: '' }),
+      ];
       await init(playlist);
       await flush();
     });
@@ -814,17 +820,17 @@ describe('session-video-playlist', () => {
     });
 
     // window.location.assign is non-configurable and cannot be stubbed in a real browser,
-    // which is exactly why the source records its resolved target on the element first —
-    // that dataset attribute is the assertable part of this behavior. The rows here point
-    // at the CURRENT url so the real assign() call is a same-document no-op rather than
-    // navigating the test runner away mid-suite.
+    // so the source's real assign() call does run — recording the target on the element
+    // first is what makes the behavior assertable. The row points at a fragment of the
+    // CURRENT page, so that assign() is a same-document no-op (a full-URL assign, even to
+    // the current URL, reloads and would interrupt the suite).
     it('records the next href when the current session ends and autoplay is on', async () => {
-      const selfUrl = window.location.pathname + window.location.search;
+      const nextHref = `${window.location.pathname}${window.location.search}#svp-autoplay`;
       const { playlist: selfLinked } = buildPage();
       addConfigRow(selfLinked, 'minimum-sessions', '2');
       sessions.value = [
-        catalogSession({ id: 'a', sessionPageUrl: selfUrl }),
-        catalogSession({ id: 'b', sessionPageUrl: selfUrl }),
+        catalogSession({ id: 'a', sessionPageUrl: nextHref }),
+        catalogSession({ id: 'b', sessionPageUrl: nextHref }),
       ];
       await init(selfLinked);
       await flush();
@@ -834,7 +840,7 @@ describe('session-video-playlist', () => {
         detail: { sessionId: 'cur', state: 'ended' },
       }));
 
-      expect(selfLinked.dataset.autoAdvanceHref).to.equal(selfUrl);
+      expect(selfLinked.dataset.autoAdvanceHref).to.equal(nextHref);
     });
 
     it('does not advance when autoplay is off', () => {

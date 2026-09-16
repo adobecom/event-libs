@@ -112,6 +112,14 @@ describe('SessionCard', () => {
     expect(html).to.include('Add Building with AI to schedule');
   });
 
+  // sg-icon-btn--outlined.sg-icon-btn--on-dark renders a white border/icon on transparent
+  // background — invisible on this card's plain light background (no image/dark fill).
+  it('renders action buttons with an on-light context, not on-dark', () => {
+    const html = renderCard(UPCOMING_SESSION);
+    expect(html).to.include('sg-icon-btn--on-light');
+    expect(html).to.not.include('sg-icon-btn--on-dark');
+  });
+
   it('shows on-demand label and hides schedule button for on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION);
     expect(html).to.include('ON DEMAND');

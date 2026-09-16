@@ -53,24 +53,31 @@ describe('featured-sessions', () => {
   });
 
   it('sets session-routing data attributes from the entry before hydrating the card', async () => {
-    const el = buildBlock({
-      entries: [entry({
-        mrStreamId: 'mr-1',
-        isLivestreamed: true,
-        isOnline: true,
-        sessionTime: { startTimeMillis: 1750000000000, endTimeMillis: 1750003600000 },
-      })],
-    });
-    await init(el);
+    const originalFetch = window.fetch;
+    window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ active: [], inactive: [] }) });
 
-    const card = el.querySelector('.event-card');
-    expect(card.dataset.sessionId).to.equal('session-1');
-    expect(card.dataset.mrStreamId).to.equal('mr-1');
-    expect(card.dataset.isLivestreamed).to.equal('true');
-    expect(card.dataset.isOnline).to.equal('true');
-    expect(card.dataset.sessionUrl).to.equal('https://example.com/sessions/s-001');
-    expect(card.dataset.startTimeUtc).to.equal(new Date(1750000000000).toISOString());
-    expect(card.dataset.endTimeUtc).to.equal(new Date(1750003600000).toISOString());
+    try {
+      const el = buildBlock({
+        entries: [entry({
+          mrStreamId: 'mr-1',
+          isLivestreamed: true,
+          isOnline: true,
+          sessionTime: { startTimeMillis: 1750000000000, endTimeMillis: 1750003600000 },
+        })],
+      });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.dataset.sessionId).to.equal('session-1');
+      expect(card.dataset.mrStreamId).to.equal('mr-1');
+      expect(card.dataset.isLivestreamed).to.equal('true');
+      expect(card.dataset.isOnline).to.equal('true');
+      expect(card.dataset.sessionUrl).to.equal('https://example.com/sessions/s-001');
+      expect(card.dataset.startTimeUtc).to.equal(new Date(1750000000000).toISOString());
+      expect(card.dataset.endTimeUtc).to.equal(new Date(1750003600000).toISOString());
+    } finally {
+      window.fetch = originalFetch;
+    }
   });
 
   describe('authored watchDestination (per session)', () => {
