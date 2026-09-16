@@ -870,8 +870,7 @@
   flex-direction: column;
   align-items: stretch;
   flex-shrink: 0;
-  width: calc(100vw - 56px);
-  max-width: 300px;
+  width: 311px;
   overflow: hidden;
   transition: background 0.2s, border-color 0.2s;
 }
@@ -889,7 +888,6 @@
   height: 168px;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 15%);
 }
 
 .sg-live-card__image img {
@@ -906,7 +904,7 @@
 
 .sg-live-card__progress-row {
   position: absolute;
-  bottom: 16px;
+  bottom: 12px;
   left: 16px;
   right: 16px;
   display: flex;
@@ -962,6 +960,27 @@
   display: inline-flex;
   align-items: center;
   min-width: 0;
+}
+
+/* Figma 8463:87698 — mobile 'live' card only (see LiveCard.js's useMobileLayout). Fixed height
+   so a 1-badge card and a 2-badge card are always the same total card height; space-between
+   puts a lone badge at the top rather than centering it oddly in the reserved space. */
+.sg-live-card__badges {
+  display: flex;
+  flex-direction: column;
+
+  /* Figma 8463:87698's auto-layout metadata reports this slot as 32px (2x16px rows, no gap),
+     but pixel-measuring the rendered design screenshot shows a real ~8px gap between the two
+     badge rows — the metadata is unreliable for this nested instance. Trusting the rendered
+     pixels: 16 + 8 + 16 = 40px. Fixed height so a 1-badge card is the same height as a 2-badge
+     one — the lone badge just leaves the second row's space empty. */
+  gap: var(--s2a-spacing-xs);
+  height: 40px;
+  width: 100%;
+
+  /* .sg-live-card__body has gap:0 (spacing is per-child margins) — this is title-to-badges
+     gap. Figma 8463:87698 uses the same 16px rhythm for every other gap in this card. */
+  margin-top: var(--s2a-spacing-sm);
 }
 
 .sg-live-card__body {
@@ -1055,6 +1074,20 @@
   overflow: hidden;
 }
 
+/* Mobile 'live' card (Figma 8463:87698): title renders first, so its usual top margin (which
+   creates the gap below the now-absent preceding meta block) would just be leading whitespace. */
+.sg-live-card--mobile-live .sg-live-card__title {
+  margin-top: 0;
+}
+
+/* Figma 8463:87698 — 311x355 total (pixel-verified; the design file's own auto-layout metadata
+   under-reports the badges gap, see .sg-live-card__badges). Scoped to the modifier class (not
+   the shared .sg-live-card rules used by recommended/desktop) so trimming this card's height
+   doesn't touch either. */
+.sg-live-card--mobile-live .sg-live-card__image {
+  height: 175px;
+}
+
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
 
 /* Hidden mobile through regular tablet (<1024px) — re-shown at 1024px+ below. */
@@ -1067,6 +1100,11 @@
   align-items: center;
   gap: 12px;
   margin-top: var(--s2a-spacing-lg);
+}
+
+/* Figma 8463:87698 — same 16px rhythm as the rest of this card, instead of the shared 24px. */
+.sg-live-card--mobile-live .sg-live-card__actions {
+  margin-top: var(--s2a-spacing-sm);
 }
 
 /* `live` variant only (Also Live carousel) — own margin so other row consumers are unaffected. */
@@ -1091,6 +1129,11 @@
   white-space: nowrap;
   line-height: 1.2;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+/* Figma 8463:87698 — this card's buttons are 32px, not the shared 40px. */
+.sg-live-card--mobile-live .sg-live-card__btn {
+  height: 32px;
 }
 
 .sg-live-card__btn--watch {
@@ -1126,6 +1169,11 @@
   padding: 0;
   flex-shrink: 0;
   justify-content: center;
+}
+
+/* Keeps the favorite button a circle at the shrunk height above (base rule is a fixed 40px square). */
+.sg-live-card--mobile-live .sg-live-card__btn--favorite {
+  width: 32px;
 }
 
 /* ── Time Slot Row ───────────────────────────────────────── */
@@ -1739,8 +1787,7 @@
 
   .sg-live-card {
     flex-direction: column;
-    width: calc(100vw - 56px);
-    max-width: 300px;
+    width: 311px;
     flex-shrink: 0;
     border-radius: var(--s2a-border-radius-md);
     border: none;
@@ -2110,6 +2157,17 @@
     gap: var(--s2a-spacing-md);
   }
 
+  /* Full page (Figma 8463:87660): wider side gutter than the widget's drawer, and a shorter
+     top padding (xl, not 2xl) — this frame covers desktop only, big desktop (1920) is separate. */
+  .sg-full-page__header-wrap .sg-header {
+    padding-top: var(--s2a-spacing-xl);
+  }
+
+  .sg-full-page .sg-header-title-row,
+  .sg-full-page .sg-header-controls {
+    padding: 0 156px;
+  }
+
   /* ── Date Tabs ─────────────────────────────────────────────── */
 
   .sg-date-tabs {
@@ -2282,6 +2340,12 @@
     overflow: visible;
   }
 
+  /* Full page (Figma 8463:87648): wider side gutter than the widget's drawer. */
+  .sg-full-page .sg-carousel-section {
+    padding-left: 156px;
+    padding-right: 156px;
+  }
+
   .sg-section-title {
     font-family: var(--heading-font-family);
     font-weight: var(--s2a-font-weight-adobe-clean-display-black);
@@ -2300,6 +2364,12 @@
     color: var(--s2a-color-content-default);
     margin: 0;
     padding: var(--s2a-spacing-lg) var(--s2a-spacing-20) var(--s2a-spacing-sm);
+  }
+
+  /* Full page (Figma 8463:87648): wider side gutter than the widget's drawer. */
+  .sg-full-page .sg-upcoming-title {
+    padding-left: 156px;
+    padding-right: 156px;
   }
 
   /* ── Carousel ──────────────────────────────────────────────── */
@@ -2362,6 +2432,14 @@
     max-width: 1104px;
     border: 4px solid #fff;
     border-radius: 20px;
+  }
+
+  /* Full page has more available width than the widget at this breakpoint — always this exact
+     width, not just a cap, so it doesn't shrink to fit a narrower flex container. */
+  .sg-full-page .sg-live-card {
+    width: 1156px;
+    max-width: 1156px;
+    flex-shrink: 0;
   }
 
   .sg-live-card:is(:hover, :focus-within) {
@@ -2524,6 +2602,12 @@
     background: #fff;
     overflow-x: clip;
     overflow-y: visible;
+  }
+
+  /* Full page (Figma 8463:87648): wider left gutter than the widget's drawer, matching
+     .sg-full-page .sg-upcoming-title; right stays 0 so the carousel still runs to the edge. */
+  .sg-full-page .sg-time-row {
+    padding-left: 156px;
   }
 
   .sg-time-row:last-child { border-bottom: none; }
