@@ -175,10 +175,17 @@
   outline-offset: 2px;
 }
 
-/* Favorited heart inherits the surface content color (as in session-broadcast), not a generic
-   brand red — the info bar sits on the dark video surface, so this stays theme-consistent. */
+/* Favorited flips to a filled chip — white circle with a dark heart — matching the
+   upcoming-sessions / live-card favorite pattern, so the favorited state reads clearly on the
+   dark video surface. */
 .mobile-rider .mobile-rider-info-bar-favorite.is-favorited {
-  color: var(--s2a-color-content-default);
+  background: var(--s2a-color-gray-25, #fff);
+  border-color: var(--s2a-color-gray-25, #fff);
+  color: var(--s2a-color-gray-1000, #000);
+}
+
+.mobile-rider .mobile-rider-info-bar-favorite.is-favorited:hover {
+  background: var(--s2a-color-gray-25, #fff);
 }
 
 .mobile-rider .mobile-rider-info-bar-category-slot {
