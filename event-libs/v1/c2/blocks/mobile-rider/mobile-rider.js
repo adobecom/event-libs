@@ -42,10 +42,12 @@ function buildCategoryBadge(track) {
   (async () => {
     try {
       const svg = await fetchFederalTrackIcon(entry.icon);
-      if (!svg) return;
+      // No icon resolved — drop the empty color span so there's no blank slot before the label.
+      if (!svg) { iconColor.remove(); return; }
       svg.classList.add('mobile-rider-info-bar-category-icon');
       iconColor.append(svg);
     } catch (error) {
+      iconColor.remove();
       window.lana?.log(`[MobileRider] category icon resolution failed for "${entry.icon}": ${error.message}`);
     }
   })();
