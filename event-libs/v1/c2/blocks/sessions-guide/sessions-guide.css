@@ -2340,10 +2340,11 @@
     overflow: visible;
   }
 
-  /* Full page (Figma 8463:87648): wider side gutter than the widget's drawer. */
+  /* Full page (Figma 8463:87648): wider left gutter than the widget's drawer. Right stays at
+     the base 20px — .sg-carousel__track's -20px margin cancels exactly that much so the card
+     track still bleeds to the true edge (same "runs to the edge" pattern as .sg-time-row). */
   .sg-full-page .sg-carousel-section {
     padding-left: 156px;
-    padding-right: 156px;
   }
 
   .sg-section-title {
@@ -2434,12 +2435,27 @@
     border-radius: 20px;
   }
 
-  /* Full page has more available width than the widget at this breakpoint — always this exact
-     width, not just a cap, so it doesn't shrink to fit a narrower flex container. */
+  /* Full page has more available width than the widget at this breakpoint. A hard `width:
+     1156px` (rather than just a cap) got cut off by .sg-carousel__track's overflow-x: clip
+     between 1280px and ~1470px viewports, where 1156px + the 156px side gutters (312px total)
+     doesn't actually fit — width stays 100% (from the base rule above) so it shrinks to fill
+     whatever space the carousel track actually has, capping at 1156px once there's room. */
   .sg-full-page .sg-live-card {
-    width: 1156px;
     max-width: 1156px;
-    flex-shrink: 0;
+  }
+
+  /* Root cause of the cut-off: .sg-carousel__card-wrap has no explicit width, so it sizes to
+     its own content (the live card's internal image+body layout, ~1096px) instead of the
+     track's actual available space — a percentage width on .sg-live-card can't resolve
+     against a content-sized ("flex-basis: auto") flex item. flex-basis: 100% gives the wrap a
+     definite size (the track's real width) for .sg-live-card's own width/max-width to clamp
+     against, so it actually shrinks between 1280px and ~1470px instead of overflowing past
+     .sg-carousel__track's overflow-x: clip. Scoped to .sg-full-page — only the full page's
+     1156px cap is wide enough to hit this at these viewports; the widget's own 1104px cap
+     inside its narrower, already-capped .sg-drawer isn't a reported problem, so it's left
+     untouched rather than risking an unverified change there. */
+  .sg-full-page .sg-carousel-section--live .sg-carousel__card-wrap {
+    flex: 0 0 100%;
   }
 
   .sg-live-card:is(:hover, :focus-within) {
@@ -3015,6 +3031,12 @@
   }
 }
 
+@media (min-width: 1280px) {
+  .sg-full-page__body {
+    padding-top: 4px;
+  }
+}
+
 /* Large desktop (Figma 8463-87634): even wider content gutter than the 1280px tier's 156px.
    Live card stays 1156px at this size too — no override needed. */
 @media (min-width: 1920px) {
@@ -3023,9 +3045,9 @@
     padding: 0 160px;
   }
 
+  /* Right stays at the base 20px — see the 1280px tier's identical comment. */
   .sg-full-page .sg-carousel-section {
     padding-left: 160px;
-    padding-right: 160px;
   }
 
   .sg-full-page .sg-upcoming-title {

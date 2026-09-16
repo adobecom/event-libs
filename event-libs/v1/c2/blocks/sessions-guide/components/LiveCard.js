@@ -163,19 +163,29 @@ export function LiveCard({
     // A non-widget caller like session-broadcast has no in-widget overlay to navigate away
     // from — onCardClick lets it supply its own "open detail" behavior instead.
     if (onCardClick) { onCardClick(session); return; }
-    // Full page: a live session has nowhere else to go but its stream, so the whole card
-    // click reuses the same watch-destination routing as the Watch Now button (homepage
-    // player for a keynote, channel page otherwise). Only 'upcoming' has an actual session
-    // info page to land on (same pattern as SessionCard.js's handleClick).
-    if (sessionState === 'live') { handleWatch(e); return; }
+    // Full page: a live session's card click reuses the same watch-destination routing as
+    // the Watch Now button (homepage player for a keynote, channel page otherwise) — but
+    // only when there actually is one; an in-person-only session has no stream to jump to
+    // (getWatchDestination returns '' for it), so it falls through to its session page like
+    // 'upcoming' does (same pattern as SessionCard.js's handleClick).
+    if (sessionState === 'live' && watchHref) { handleWatch(e); return; }
     const dest = safeUrl(session.sessionPageUrl);
     if (dest) window.location.href = dest;
   }
+
+  // Full page (no onCardClick): the click destination differs by state (watch vs. session info
+  // page), so the accessible name says which — same distinction handleCardClick itself makes.
+  const selfNavigates = surface !== 'widget' && !onCardClick;
+  const opensWatch = sessionState === 'on-demand' || (sessionState === 'live' && !!watchHref);
+  const titleAriaLabel = selfNavigates
+    ? (opensWatch ? `Watch ${session.title} now` : `View ${session.title} details`)
+    : undefined;
 
   const titleBlock = html`<button
               class="sg-live-card__title sg-live-card__title-btn"
               type="button"
               onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
+              aria-label=${titleAriaLabel}
               daa-ll="Session-Card-Open"
             >${session.title}</button>`;
 

@@ -201,6 +201,60 @@ describe('LiveCard', () => {
     expect(html).to.include('sg-live-card__title-btn');
   });
 
+  // The title's accessible name must match what handleCardClick actually does on the page
+  // surface, since it's now always a real button there (see the two tests above/below).
+  describe('title accessible name reflects its click destination (page surface)', () => {
+    function pageStore() {
+      const store = buildStore(preact);
+      store.SessionGuideContext._current = {
+        state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
+        dispatch: () => {},
+      };
+      return store;
+    }
+
+    it('labels a live, streamed session as "Watch ... now"', () => {
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(LiveCard({ session: LIVE_SESSION })).to.include('aria-label="Watch MAX Keynote now"');
+    });
+
+    it('labels an on-demand session as "Watch ... now"', () => {
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(LiveCard({ session: ON_DEMAND_SESSION })).to.include('aria-label="Watch MAX Keynote now"');
+    });
+
+    it('labels an upcoming session as "View ... details"', () => {
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(LiveCard({ session: UPCOMING_SESSION })).to.include('aria-label="View MAX Keynote details"');
+    });
+
+    // getWatchDestination returns '' for a live session with no stream (in-person-only) —
+    // handleCardClick falls through to sessionPageUrl instead of a broken window.location
+    // assignment, and the label must match that fallback, not the (unavailable) watch path.
+    it('labels a live, in-person-only session (no stream) as "View ... details"', () => {
+      const noStreamSession = { ...LIVE_SESSION, id: 'session-live-no-stream', isOnline: false };
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(LiveCard({ session: noStreamSession })).to.include('aria-label="View MAX Keynote details"');
+    });
+
+    // The schedule/favorite buttons have their own aria-labels, so assert on the title
+    // button's own markup specifically rather than the whole card's rendered string.
+    const titleButtonMarkup = (html) => {
+      const start = html.indexOf('sg-live-card__title-btn');
+      return html.slice(start, html.indexOf('>', start) + 1);
+    };
+
+    it('omits the aria-label on the widget surface (plain title text is the accessible name)', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      expect(titleButtonMarkup(LiveCard({ session: LIVE_SESSION }))).to.not.include('aria-label');
+    });
+
+    it('omits the aria-label when onCardClick is supplied (broadcast owns the semantics)', () => {
+      const LiveCard = buildLiveCard(preact, pageStore());
+      expect(titleButtonMarkup(LiveCard({ session: LIVE_SESSION, onCardClick: () => {} }))).to.not.include('aria-label');
+    });
+  });
+
   it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
