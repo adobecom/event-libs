@@ -10,7 +10,7 @@ import {
 } from '../../utils/utils.js';
 import { dictionaryManager, getInviteOnlyNoCampaignMessage, getEventWaitlistBannerMessage } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
-import { buildModalContent } from '../profile-cards/profile-cards.js';
+import { buildModalContent, getProfileName } from '../profile-cards/profile-cards.js';
 import { createSmartDateRange } from '../../utils/date-time-helper.js';
 import {
   getCaasTags,
@@ -555,17 +555,17 @@ function renderSpeakerAvatars(speakers) {
       class: 'sh-avatar-btn',
       type: 'button',
       'data-speaker-id': sp.speakerId,
-      'aria-label': `${sp.firstName} ${sp.lastName}`,
+      'aria-label': getProfileName(sp),
     });
     if (sp.photo?.imageUrl) {
       btn.append(createTag('img', {
         src: sp.photo.imageUrl,
-        alt: sp.photo.altText || `${sp.firstName} ${sp.lastName}`,
+        alt: sp.photo.altText || getProfileName(sp),
         width: 32,
         height: 32,
       }));
     } else {
-      const initials = `${sp.firstName.charAt(0)}${sp.lastName.charAt(0)}`.toUpperCase();
+      const initials = `${(sp.firstName || '').charAt(0)}${(sp.lastName || '').charAt(0)}`.toUpperCase();
       btn.append(createTag('span', { class: 'sh-avatar-initials', 'aria-hidden': 'true' }, initials));
     }
     wrap.append(btn);
@@ -1146,7 +1146,7 @@ async function openSpeakerModal(speaker) {
     id: `sh-speaker-${speaker.speakerId}`,
     content,
     class: 'profile-cards-modal',
-    title: `${speaker.firstName} ${speaker.lastName}`,
+    title: getProfileName(speaker),
   });
 }
 

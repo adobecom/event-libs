@@ -170,6 +170,19 @@ describe('LiveCard', () => {
     expect(out).to.include('daa-ll="Watch-On-Demand"');
   });
 
+  // Session-broadcast's Also Live carousel already vetted these via its own MPC-video-
+  // duration-aware liveness check (broadcast-schedule.js), which can disagree with
+  // deriveSessionState's endTimeUtc-only view — forceLive overrides it so that section never
+  // bleeds a "Watch on demand" card, regardless of what deriveSessionState would say on its own.
+  it('forceLive keeps the watch button labeled "Watch now" even for a session that has ended', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    const out = LiveCard({ session: ON_DEMAND_SESSION, forceLive: true });
+    expect(out).to.include('Watch now');
+    expect(out).to.not.include('Watch on demand');
+    expect(out).to.include('daa-ll="Watch-Now"');
+  });
+
   it('tags the card title button with daa-ll=Session-Card-Open on the widget surface', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);

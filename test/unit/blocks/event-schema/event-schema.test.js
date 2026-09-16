@@ -56,7 +56,102 @@ describe('Event Schema Module', () => {
           name: 'Adobe',
           url: window.location.href,
         },
+        offers: {
+          '@type': 'Offer',
+          url: window.location.href,
+        },
       });
+    });
+
+    it('should use the canonical link as offers.url when present', () => {
+      const canonical = createTag('link', { rel: 'canonical', href: 'https://example.com/canonical-event' });
+      document.head.appendChild(canonical);
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', JSON.stringify({ venueName: 'Sample Venue' }));
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      const schemaData = JSON.parse(script.textContent);
+      expect(schemaData.offers).to.deep.equal({
+        '@type': 'Offer',
+        url: 'https://example.com/canonical-event',
+      });
+    });
+
+    it('should not inject schema when venue metadata is missing', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('end-date', '2024-08-02T00:00:00Z');
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      expect(script).to.be.null;
+    });
+
+    it('should fall back to the event-card-image when no event-hero-image is present', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', JSON.stringify({ venueName: 'Sample Venue' }));
+      setMetadata('photos', JSON.stringify([
+        { imageKind: 'event-card-image', imageUrl: 'http://example.com/card.jpg' },
+      ]));
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      const schemaData = JSON.parse(script.textContent);
+      expect(schemaData.image).to.equal('http://example.com/card.jpg');
+    });
+
+    it('should not inject schema when venue metadata is malformed, even if photos parses fine', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', 'invalid JSON');
+      setMetadata('photos', JSON.stringify([
+        { imageKind: 'event-hero-image', imageUrl: 'http://example.com/hero.jpg' },
+      ]));
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      expect(script).to.be.null;
+    });
+
+    it('should still build location from valid venue when photos metadata is malformed', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', JSON.stringify({
+        venueName: 'Sample Venue',
+        address: '123 Main St',
+        city: 'Sample City',
+        stateCode: 'SC',
+        postalCode: '12345',
+        country: 'US',
+      }));
+      setMetadata('photos', 'invalid JSON');
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      const schemaData = JSON.parse(script.textContent);
+      expect(schemaData.location?.name).to.equal('Sample Venue');
+      expect(schemaData.image).to.be.undefined;
+    });
+
+    it('should omit image when photos metadata parses to a non-array value', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', JSON.stringify({ venueName: 'Sample Venue' }));
+      setMetadata('photos', JSON.stringify({ imageKind: 'event-hero-image', imageUrl: 'http://example.com/hero.jpg' }));
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      const schemaData = JSON.parse(script.textContent);
+      expect(schemaData.image).to.be.undefined;
     });
 
     it('should handle missing metadata gracefully', () => {
@@ -110,6 +205,10 @@ describe('Event Schema Module', () => {
         organizer: {
           '@type': 'Organization',
           name: 'Adobe',
+          url: window.location.href,
+        },
+        offers: {
+          '@type': 'Offer',
           url: window.location.href,
         },
       });
@@ -179,6 +278,10 @@ describe('Event Schema Module', () => {
           name: 'Adobe',
           url: window.location.href,
         },
+        offers: {
+          '@type': 'Offer',
+          url: window.location.href,
+        },
       });
     });
 
@@ -191,13 +294,18 @@ describe('Event Schema Module', () => {
       expect(script).to.be.null;
     });
 
-    it('should log an error if metadata parsing fails and remove the element', () => {
+    it('should log an error and remove the element without injecting schema when venue metadata fails to parse', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
       setMetadata('venue', 'invalid JSON');
       setMetadata('photos', 'invalid JSON');
 
       init(el);
 
       expect(el.parentNode).to.be.null;
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      expect(script).to.be.null;
     });
   });
 });

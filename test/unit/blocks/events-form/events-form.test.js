@@ -1403,14 +1403,59 @@ describe('addTerms', () => {
     expect(paragraphs[1].textContent).to.equal('Second line that must not be dropped.');
   });
 
-  it('strips <li> elements from the cell', () => {
+  it('preserves <ul>/<li> elements in the cell instead of stripping them', () => {
     const form = buildForm();
     const terms = document.createElement('div');
-    terms.innerHTML = '<p>Intro paragraph.</p><ul><li>should be stripped</li></ul>';
+    terms.innerHTML = '<p>Intro paragraph.</p><ul><li>should be kept</li></ul>';
 
     addTerms(form, terms);
 
-    expect(form.querySelectorAll('.event-terms-wrapper li').length).to.equal(0);
+    const wrapper = form.querySelector('.event-terms-wrapper');
+    const li = wrapper.querySelector('li');
+    expect(li).to.not.equal(null);
+    expect(li.textContent).to.equal('should be kept');
+  });
+
+  it('keeps multiple <p> and a <ul> together in document order', () => {
+    const form = buildForm();
+    const terms = document.createElement('div');
+    terms.innerHTML = '<p>First.</p><p>Second.</p><ul><li>One</li><li>Two</li></ul>';
+
+    addTerms(form, terms);
+
+    const wrapper = form.querySelector('.event-terms-wrapper');
+    const tagOrder = [...wrapper.children].map((el) => el.tagName);
+    expect(tagOrder).to.deep.equal(['P', 'P', 'UL']);
+    expect(wrapper.querySelectorAll('li').length).to.equal(2);
+  });
+
+  it('keeps document order when a <ul> is authored before a <p>', () => {
+    const form = buildForm();
+    const terms = document.createElement('div');
+    terms.innerHTML = '<ul><li>Bullet</li></ul><p>Trailing paragraph.</p>';
+
+    addTerms(form, terms);
+
+    const wrapper = form.querySelector('.event-terms-wrapper');
+    const tagOrder = [...wrapper.children].map((el) => el.tagName);
+    expect(tagOrder).to.deep.equal(['UL', 'P']);
+  });
+
+  it('does not pull a <p> nested inside a <li> out of its list item', () => {
+    const form = buildForm();
+    const terms = document.createElement('div');
+    terms.innerHTML = '<p>Intro.</p><ul><li><p>Bullet one</p></li><li><p>Bullet two</p></li></ul>';
+
+    addTerms(form, terms);
+
+    const wrapper = form.querySelector('.event-terms-wrapper');
+    const tagOrder = [...wrapper.children].map((el) => el.tagName);
+    expect(tagOrder).to.deep.equal(['P', 'UL']);
+
+    const listItems = wrapper.querySelectorAll('li');
+    expect(listItems.length).to.equal(2);
+    expect(listItems[0].textContent).to.equal('Bullet one');
+    expect(listItems[1].textContent).to.equal('Bullet two');
   });
 
   it('does nothing when the cell is empty', () => {
@@ -1420,6 +1465,20 @@ describe('addTerms', () => {
     addTerms(form, terms);
 
     expect(form.querySelector('.event-terms-wrapper')).to.equal(null);
+  });
+
+  it('resolves content wrapped in a cell div, matching authored block markup', () => {
+    const form = buildForm();
+    const terms = document.createElement('div');
+    terms.innerHTML = '<div><p>First.</p><p>Second.</p><ul><li>One</li><li>Two</li></ul></div>';
+
+    addTerms(form, terms);
+
+    const wrapper = form.querySelector('.event-terms-wrapper');
+    const tagOrder = [...wrapper.children].map((el) => el.tagName);
+    expect(tagOrder).to.deep.equal(['P', 'P', 'UL']);
+    expect(wrapper.children.length).to.equal(3);
+    expect(wrapper.querySelectorAll('li').length).to.equal(2);
   });
 });
 

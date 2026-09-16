@@ -1,61 +1,31 @@
-// Dev-only, gated behind `?debug` — safe to delete once development wraps up.
+// Dev-only, gated behind `?debug`.
 import { isBroadcastEligible } from '../../../../utils/session-state.js';
 import {
-  hasPlayableVideoSource, getSessionBucket, isSessionLiveNow, groupSessionsByStart,
+  hasPlayableVideoSource, getSessionBucket, isSessionLiveNow, groupSessionsByStart, sessionEndsAtMs,
+  parseVideoDurationMs,
 } from './broadcast-schedule.js';
 
 const DEBUG_ENABLED = new URLSearchParams(window.location.search).has('debug');
-
-function videoType(session) {
-  if (session.youTubeId) return 'youtube';
-  if (session.mpcId) return 'mpc';
-  if (session.mrStreamId) return 'mobile-rider';
-  return 'unknown';
-}
-
-function toRow(session, role) {
-  return {
-    role,
-    id: session.id,
-    rfCode: session.rfCode,
-    title: session.title,
-    videoType: videoType(session),
-    isOnline: !!session.isOnline,
-    isLivestreamed: !!session.isLivestreamed,
-    startTimeUtc: session.startTimeUtc,
-    startMs: Date.parse(session.startTimeUtc),
-    endTimeUtc: session.endTimeUtc,
-    endMs: Date.parse(session.endTimeUtc),
-    videoDuration: session.videoDuration || '',
-    primaryTrack: session.primaryTrack,
-  };
-}
-
-// Logs only the sessions actually rendered (the filtered schedule), not the raw catalog.
-export function logBroadcastSchedule(schedule) {
-  if (!DEBUG_ENABLED) return;
-  const rows = [
-    ...(schedule.activeSession ? [toRow(schedule.activeSession, 'active')] : []),
-    ...(schedule.pendingCandidates || []).map((s) => toRow(s, 'pendingCandidate')),
-    ...schedule.alsoLive.map((s) => toRow(s, 'alsoLive')),
-    ...schedule.upNext.map((s) => toRow(s, 'upNext')),
-  ];
-  // eslint-disable-next-line no-console
-  console.table(rows);
-}
 
 function groupStatus(group, liveStreamActiveIds, nowMs) {
   if (group.members.some((m) => isSessionLiveNow(m, liveStreamActiveIds, nowMs))) return 'live';
   return group.startMs > nowMs ? 'upcoming' : 'ended';
 }
 
-// "mm:ss" until start, sign-prefixed once passed — e.g. "-02:15" = started 2m15s ago.
+// "hh:mm:ss" until start, sign-prefixed once passed — e.g. "-01:02:15" = started 1h2m15s ago.
 function formatRelativeTime(deltaMs) {
   const sign = deltaMs < 0 ? '-' : '';
   const totalSeconds = Math.round(Math.abs(deltaMs) / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return `${sign}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+// Mirrors sessionEndsAtMs's branching to report which field ('videoDuration'/'endTime') was used.
+function endSource(session) {
+  if (getSessionBucket(session) === 'mpc' && parseVideoDurationMs(session.videoDuration) != null) return 'videoDuration';
+  return 'endTime';
 }
 
 function groupRow(group, index, liveStreamActiveIds, nowMs) {
@@ -65,12 +35,14 @@ function groupRow(group, index, liveStreamActiveIds, nowMs) {
     relativeTime: formatRelativeTime(group.startMs - nowMs),
     startTimeUtc: new Date(group.startMs).toISOString(),
     startMs: group.startMs,
-    members: group.members.map((m) => m.title).join(', '),
+    // sessionEndsAtMs is the same boundary isSessionLiveNow() uses to decide liveness.
+    members: group.members.map(
+      (m) => `${m.title} (ends ${formatRelativeTime(sessionEndsAtMs(m) - nowMs)}, via ${endSource(m)})`,
+    ),
   };
 }
 
-// Every bucket's groups from the raw catalog, independent of what's committed — sanity-checks
-// resolveBucketSchedule's "next group" logic.
+// Sanity-checks resolveBucketSchedule's "next group" logic against the raw catalog.
 export function logBucketGroups(sessionList, liveStreamActiveIds, nowMs) {
   if (!DEBUG_ENABLED) return;
   const eligible = sessionList.filter((s) => isBroadcastEligible(s) && hasPlayableVideoSource(s));
@@ -91,4 +63,41 @@ export function logBucketGroups(sessionList, liveStreamActiveIds, nowMs) {
     // eslint-disable-next-line no-console
     console.groupEnd();
   });
+}
+
+// Brackets one tick's console output so repeated 5s ticks don't blur together.
+const TICK_DIVIDER = '='.repeat(20);
+
+export function logTickStart(nowMs) {
+  if (!DEBUG_ENABLED) return;
+  // eslint-disable-next-line no-console
+  console.log(`\n${TICK_DIVIDER}\n[broadcast-debug] TICK ${new Date(nowMs).toISOString()}\n${TICK_DIVIDER}`);
+}
+
+export function logTickEnd() {
+  if (!DEBUG_ENABLED) return;
+  // eslint-disable-next-line no-console
+  console.log(`${TICK_DIVIDER}\n`);
+}
+
+// Logs the active/ended session and its relative time to the next state transition.
+export function logActiveSession(schedule, nowMs) {
+  if (!DEBUG_ENABLED) return;
+
+  if (schedule.activeSession) {
+    const s = schedule.activeSession;
+    // eslint-disable-next-line no-console
+    console.log(`[broadcast-debug] active: "${s.title}" — ends ${formatRelativeTime(sessionEndsAtMs(s) - nowMs)} (via ${endSource(s)})`);
+    return;
+  }
+
+  if (schedule.endedSession) {
+    const s = schedule.endedSession;
+    const next = schedule.upNext?.[0];
+    const nextLabel = next
+      ? `next session "${next.title}" in ${formatRelativeTime(Date.parse(next.startTimeUtc) - nowMs)}`
+      : 'no upcoming session';
+    // eslint-disable-next-line no-console
+    console.log(`[broadcast-debug] ended: "${s.title}" — ${nextLabel}`);
+  }
 }

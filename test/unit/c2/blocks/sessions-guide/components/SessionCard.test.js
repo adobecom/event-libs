@@ -112,6 +112,14 @@ describe('SessionCard', () => {
     expect(html).to.include('Add Building with AI to schedule');
   });
 
+  // sg-icon-btn--outlined.sg-icon-btn--on-dark renders a white border/icon on transparent
+  // background — invisible on this card's plain light background (no image/dark fill).
+  it('renders action buttons with an on-light context, not on-dark', () => {
+    const html = renderCard(UPCOMING_SESSION);
+    expect(html).to.include('sg-icon-btn--on-light');
+    expect(html).to.not.include('sg-icon-btn--on-dark');
+  });
+
   it('shows on-demand label and hides schedule button for on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION);
     expect(html).to.include('ON DEMAND');
@@ -322,6 +330,17 @@ describe('SessionCard', () => {
 
     it('shows ON DEMAND for a session with no dvrDelayHours, even with a real eventStartMs', () => {
       const html = renderCard(ONDEMAND_SESSION);
+      expect(html).to.include('ON DEMAND');
+      expect(html).to.not.include('AVAILABLE SOON');
+    });
+
+    // Mobile Rider livestreamed sessions skip the delay window entirely — their DVR
+    // recording is live the moment the stream ends, so they never show AVAILABLE SOON.
+    it('shows ON DEMAND for a Mobile Rider livestreamed session, even mid-DVR-delay-window', () => {
+      const mrPending = {
+        ...ONDEMAND_SESSION, id: 'session-mr-pending', dvrDelayHours: 10, mrStreamId: 'QqsopWFnrC',
+      };
+      const html = renderCard(mrPending);
       expect(html).to.include('ON DEMAND');
       expect(html).to.not.include('AVAILABLE SOON');
     });

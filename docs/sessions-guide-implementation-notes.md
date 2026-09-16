@@ -166,18 +166,23 @@ session carries whichever it was produced for, so an empty field means "not this
 
 | | Attribute | Field | Player | State |
 |---|---|---|---|---|
-| LIVE | `Mobilerider Live Stream ID` | `mrStreamId` | Mobile Rider live, polled for on-air status | inbound; name tentative |
-| VOD | `MPC ID` | `mpcId` | Adobe Video TV | mapped, unread |
-| VOD | `YouTube ID` | `youTubeId` | YouTube | mapped, unread |
-| VOD | `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider recording of a finished stream, gated by `DVR Timing (in hours)` | mapped, unread |
+| LIVE | `Mobilerider Video ID (Livestream)` | `mrStreamId` | Mobile Rider live, polled for on-air status | mapped (2026-09-03) |
+| VOD | `MPC ID` | `mpcId` | Adobe Video TV | mapped; read by session-broadcast's `PlayerHost.js`/`MpcPlayerAdapter.js` |
+| VOD | `YouTube ID` | `youTubeId` | YouTube | mapped; read by session-broadcast's `PlayerHost.js`/`YouTubePlayerAdapter.js` |
+| VOD | `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider recording of a finished stream, gated by `DVR Timing (in hours)` | mapped; only read for presence today (`session-video-playlist.js`) — no DVR player wired up yet |
 
-The `mr` prefix marks the two Mobile Rider sources, which is also exactly the pair `Skin ID`
-(`mrSkinId`) applies to.
+The `mr` prefix marks the three Mobile Rider sources, which is also exactly the set `Skin ID`
+(`mrSkinId`, still unread anywhere) applies to.
 
-`mrStreamId` is the one with no data: it is authored in RainFocus and inbound on the catalog.
-Mapping it is the single change that switches stream polling on — see
-`REAL-API-CHECKLIST.md` and the on-demand-vs-live question in `not-tracked/PM-QUESTIONS.md`
-before flipping it.
+**`mrStreamId` now carries real data** (previously always `null` — the attribute simply
+wasn't in the catalog). The real ESP attribute name is `Mobilerider Video ID (Livestream)`,
+confirmed against a live capture 2026-09-03 — not the earlier tentative
+`Mobilerider Live Stream ID` guess. `sessions-api.js` maps it the same way as the other three
+video-source fields. `mobile-rider.js`'s `fetchLiveStatus()` already hits the real Mobile
+Rider `media-status` endpoint (not a mock — see the now-corrected PLAN.md risk-table entry),
+so tracing the code, live polling should be wired end-to-end for any session carrying this
+attribute. **Not yet verified against an actual live Mobile Rider stream in the browser** —
+confirm before relying on it.
 
 `videoDuration` is kept verbatim: the catalog writes 60 minutes as `00:60:00`, so it is not
 reliably `HH:MM:SS`.

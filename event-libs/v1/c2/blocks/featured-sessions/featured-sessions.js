@@ -3,37 +3,32 @@ import { safeUrl } from '../sessions-guide/utils/url.js';
 import initEventCard from '../event-card/event-card.js';
 import initEventCarousel from '../event-carousel/event-carousel.js';
 
-// Mirrors hydrate/event-card.js's retired applySessionData mapping — the only piece of
-// that mechanism still worth keeping, since these data-* attributes are what
-// session-routing.js (wired up by event-card.js's own init(), see below) reads to
-// resolve a card's click behavior.
 function setRoutingData(card, entry) {
   if (entry.sessionId) card.dataset.sessionId = entry.sessionId;
   if (entry.mrStreamId) card.dataset.mrStreamId = entry.mrStreamId;
   if (entry.url) card.dataset.sessionUrl = entry.url;
-  if (entry.watchUrl) card.dataset.watchUrl = entry.watchUrl;
+  if (entry.isLivestreamed) card.dataset.isLivestreamed = 'true';
+  if (entry.isOnline) card.dataset.isOnline = 'true';
+
+  if (entry.watchDestination === 'homepage' || entry.watchDestination === 'broadcast') {
+    card.dataset.watchDestination = entry.watchDestination;
+    if (entry.watchDestination === 'homepage' && entry.homepageAnchorId) {
+      card.dataset.homepageAnchorId = entry.homepageAnchorId;
+    }
+  }
 
   const { startTimeMillis, endTimeMillis } = entry.sessionTime || {};
   if (startTimeMillis) card.dataset.startTimeUtc = new Date(startTimeMillis).toISOString();
   if (endTimeMillis) card.dataset.endTimeUtc = new Date(endTimeMillis).toISOString();
 }
 
-// Builds the same "pre-hydration" DOM shape event-card.js's own init() already expects
-// from hand-authored markup (media wrapper with an <img>, content wrapper with
-// title/description/CTA <p>s) — letting init() do the real work (buildMedia/buildBody,
-// plus wiring session-routing.js off the data-session-id we set below) instead of
-// duplicating any of that here. A session with no image is left for event-card.js's own
-// existing rule ("a card with no image is not a valid authored card") to drop.
-//
-// entry.enTitle/entry.track are attacker-influenced (decoded straight from the link's
-// hash payload, not hand-authored in DA) — createTag's string `html` argument runs
-// through insertAdjacentHTML, so these are set via .textContent instead to keep them
-// as inert text rather than parsed markup. Same reasoning applies to entry.url below:
-// it's set as an href only after passing safeUrl's http(s)/relative allowlist, since a
-// card with no sessionId never gets session-routing.js's click interception (and thus
-// never gets safeUrl's own re-check) and would otherwise navigate a raw click straight
-// off the unsanitized href.
-function buildAuthoredCard(entry) {
+const DEFAULT_CTA_TEXT = {
+  prior: 'Learn more',
+  during: 'Watch now',
+  after: 'Watch on-demand',
+};
+
+function buildAuthoredCard(entry, cta) {
   const card = createTag('div', { class: 'event-card media-wide' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
@@ -46,7 +41,12 @@ function buildAuthoredCard(entry) {
   createTag('p', {}, '', { parent: textRoot }).textContent = entry.track || '';
   const ctaP = createTag('p', {}, '', { parent: textRoot });
   const ctaHref = safeUrl(entry.url);
-  if (ctaHref) createTag('a', { href: ctaHref }, 'Learn more', { parent: ctaP });
+  if (ctaHref) {
+    const ctaLink = createTag('a', { href: ctaHref }, cta?.prior || DEFAULT_CTA_TEXT.prior, { parent: ctaP });
+    ctaLink.dataset.ctaPrior = cta?.prior || DEFAULT_CTA_TEXT.prior;
+    ctaLink.dataset.ctaDuring = cta?.during || DEFAULT_CTA_TEXT.during;
+    ctaLink.dataset.ctaAfter = cta?.after || DEFAULT_CTA_TEXT.after;
+  }
 
   setRoutingData(card, entry);
   return card;
@@ -73,7 +73,7 @@ export default async function init(el) {
   el.setAttribute('aria-label', 'Featured Sessions');
 
   const track = createTag('div', { class: 'carousel-track' });
-  const cards = entries.map(buildAuthoredCard);
+  const cards = entries.map((entry) => buildAuthoredCard(entry, config.cta));
   cards.forEach((card) => track.append(card));
 
   const marker = createTag('div', { class: 'event-carousel' });

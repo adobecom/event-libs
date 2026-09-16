@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, html } from '../../v1/deps/htm-preact.js';
+import {
+  useState, useEffect, useMemo, useRef, html,
+} from '../../v1/deps/htm-preact.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
@@ -8,7 +10,7 @@ import {
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig, copyHomepageConfigLink,
 } from '../utils.js';
 import {
-  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType, HOMEPAGE_THEME_OPTIONS,
+  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType,
 } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
@@ -21,7 +23,7 @@ export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
-    updateOverrideTrackIcon, updateProduct, updateConfigField,
+    updateOverrideTrackIcon, updateProduct, updateConfigField, syncActiveConfigWithCatalog,
     setToastSuccess, setToastError, getSessionCatalogForRow,
   } = useConfigs();
   const { org, repo } = useDA();
@@ -38,9 +40,7 @@ export default function ConfigEditor() {
   const isHomepage = isHomepageConfigType(configType);
   const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[configType];
 
-  // getSessionCatalogForRow caches by (eventId, env) — if Library.js already prefetched this
-  // row (Homepage rows are prefetched as soon as the library loads), opening it for edit right
-  // after reuses that result instead of hitting ESP a second time.
+  // Caches by (eventId, env), so a Library.js prefetch is reused instead of re-hitting ESP.
   useEffect(() => {
     if (!eventId) return undefined;
     let cancelled = false;
@@ -61,22 +61,41 @@ export default function ConfigEditor() {
   }, [eventId, eventServiceEnv, getSessionCatalogForRow]);
 
   const primaryTracks = useMemo(() => extractDistinctPrimaryTracks(sessions), [sessions]);
-  // Track icons/colors map every track a session can badge, so it covers Additional Event
-  // Site Tracks too — `primaryTracks` above stays primary-only for the featured-sessions
-  // picker, whose filter matches on the primary track alone.
+  // Includes Additional Event Site Tracks; primaryTracks above stays primary-only.
   const iconTracks = useMemo(() => extractDistinctAllTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
   const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
+
+  // Runs once per (eventId, env); skipped on an empty catalog (likely a transient fetch issue).
+  const syncedCatalogKey = useRef(null);
+  useEffect(() => {
+    if (isHomepage || isLoadingSessions || sessionsError || sessions.length === 0) return;
+    const catalogKey = `${eventId}:${eventServiceEnv}`;
+    if (syncedCatalogKey.current === catalogKey) return;
+    syncedCatalogKey.current = catalogKey;
+    const result = syncActiveConfigWithCatalog({ tracks: iconTracks, overrideTexts, products });
+    if (!result?.hasChanges) return;
+    const removedParts = [
+      result.removed.trackIcons.length && `${result.removed.trackIcons.length} track icon${result.removed.trackIcons.length === 1 ? '' : 's'}`,
+      result.removed.overrideTrackIcons.length && `${result.removed.overrideTrackIcons.length} override icon${result.removed.overrideTrackIcons.length === 1 ? '' : 's'}`,
+      result.removed.products.length && `${result.removed.products.length} product icon${result.removed.products.length === 1 ? '' : 's'}`,
+    ].filter(Boolean);
+    // Persistent — an author needs to notice this and either Save or investigate.
+    setToastSuccess({
+      message: `Removed ${removedParts.join(', ')} no longer found in this event's sessions — save to apply`,
+      persistent: true,
+    });
+  }, [
+    isHomepage, isLoadingSessions, sessionsError, sessions.length, eventId, eventServiceEnv,
+    iconTracks, overrideTexts, products, syncActiveConfigWithCatalog, setToastSuccess,
+  ]);
 
   const configPreview = useMemo(() => {
     if (!activeConfig) return '';
     return stringifyConfig(activeConfig.config);
   }, [activeConfig]);
 
-  // A color authored with no icon to apply it to doesn't make sense (icon
-  // alone is fine — color implicitly defaults to black) — flagged here
-  // rather than silently saved in a state that can't render (PLAN.md Phase 4).
-  // Global-only: Homepage configs don't author track icons at all.
+  // A color authored with no icon can't render — flagged before Save. Global-only.
   const incompleteTracks = useMemo(() => {
     if (!activeConfig || isHomepage) return [];
     return iconTracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
@@ -113,8 +132,7 @@ export default function ConfigEditor() {
   };
 
   const handleCopy = async () => {
-    // Minified, not configPreview's pretty-printed form: DA joins a metadata cell's
-    // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
+    // Minified: DA joins a multi-line metadata cell with ", ", corrupting pretty-printed JSON.
     const ok = await copyTextToClipboard(JSON.stringify(activeConfig.config));
     if (ok) setToastSuccess('Config copied — paste it into the page\'s tier-1-event-config metadata');
     else setToastError('Could not copy config — select and copy the JSON block manually');
@@ -132,25 +150,29 @@ export default function ConfigEditor() {
         </div>
       </div>
 
-      ${isHomepage && html`
-        <section class="tec-editor__section">
-          <h2>Config name</h2>
-          <p class="tec-editor__section-hint">Name this config so it's easy to find in the library later. Purely a label — never pasted anywhere.</p>
-          <input
-            type="text"
-            class="tec-field tec-editor__title-input"
-            placeholder=${`e.g. "${activeConfig.backendEventTitle} homepage config"`}
-            value=${activeConfig.config.configName || ''}
-            onInput=${(e) => updateConfigField('configName', e.target.value)}
-          />
-        </section>
-      `}
+      <section class="tec-editor__section">
+        <h2>Config name</h2>
+        <p class="tec-editor__section-hint">
+          Name this config so it's easy to find in the library later${!isHomepage ? ' — especially useful now that an event can have more than one Global config' : ''}. Purely a label — never pasted anywhere.
+        </p>
+        <label class="tec-editor__field-label" for="tec-config-name">Config name</label>
+        <input
+          id="tec-config-name"
+          type="text"
+          class="tec-field tec-editor__title-input"
+          placeholder=${`e.g. "${activeConfig.backendEventTitle}${isHomepage ? ' homepage' : ''} config"`}
+          value=${activeConfig.config.configName || ''}
+          onInput=${(e) => updateConfigField('configName', e.target.value)}
+        />
+      </section>
 
       ${!isHomepage && html`
         <section class="tec-editor__section">
           <h2>Event title</h2>
           <p class="tec-editor__section-hint">Optional alternative display name for this event. Leave blank to use the backend title ("${activeConfig.backendEventTitle}") everywhere this is shown.</p>
+          <label class="tec-editor__field-label" for="tec-event-title">Event title</label>
           <input
+            id="tec-event-title"
             type="text"
             class="tec-field tec-editor__title-input"
             placeholder=${activeConfig.backendEventTitle}
@@ -343,16 +365,23 @@ export default function ConfigEditor() {
               onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
             />
           `}
-          ${homepageMeta.themeField && html`
-            <label class="tec-editor__field-label" for="tec-homepage-theme">Card theme</label>
-            <select
-              id="tec-homepage-theme"
-              class="tec-field"
-              value=${activeConfig.config[homepageMeta.themeField] || 'light'}
-              onChange=${(e) => updateConfigField(homepageMeta.themeField, e.target.value)}
-            >
-              ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
-            </select>
+          ${homepageMeta.ctaFields && html`
+            <p class="tec-editor__section-hint">${homepageMeta.ctaHint}</p>
+            <div class="tec-editor__cta-fields">
+              ${Object.entries(homepageMeta.ctaFields).map(([state, field]) => html`
+                <label class="tec-editor__field-label" for="tec-cta-${state}" key=${state}>
+                  CTA text — ${state}
+                </label>
+                <input
+                  id="tec-cta-${state}"
+                  type="text"
+                  class="tec-field tec-editor__heading-input"
+                  placeholder=${homepageMeta.ctaDefaults?.[state] || ''}
+                  value=${activeConfig.config[field] || ''}
+                  onInput=${(e) => updateConfigField(field, e.target.value)}
+                />
+              `)}
+            </div>
           `}
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}

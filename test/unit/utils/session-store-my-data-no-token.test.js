@@ -59,7 +59,7 @@ describe('session-store: myData is skipped without an rfAuthToken', () => {
     expect(myDataCalled).to.be.false;
   });
 
-  it('leaves isRegistered unknown (undefined) rather than asserting false', () => {
-    expect(auth.value.isRegistered).to.be.undefined;
+  it('settles isRegistered to null (checked, unknown) rather than leaving it undefined forever', () => {
+    expect(auth.value.isRegistered).to.be.null;
   });
 });
