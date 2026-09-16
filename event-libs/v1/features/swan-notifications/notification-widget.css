@@ -34,7 +34,7 @@
 
 .swan-notif__bell:hover,
 .swan-notif__bell:focus-visible {
-  background: var(--s2a-color-transparent-white-12, rgb(255 255 255 / 12%));
+  background: var(--s2a-color-gray-200, #E1E1E1);
 }
 
 .swan-notif__bell-icon {
