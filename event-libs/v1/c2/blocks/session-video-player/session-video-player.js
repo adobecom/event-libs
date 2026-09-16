@@ -529,6 +529,8 @@ export default async function init(el) {
       const isFirstEmbed = embeddedPhase === null;
       embeddedPhase = phase;
       if (isFirstEmbed) {
+        // eslint-disable-next-line no-console
+        console.log('[svp-debug] player emitting playable', { sessionId, phase });
         BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId });
         window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
         loadWhenDecided(el, sessionId, video);
