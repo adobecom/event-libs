@@ -166,10 +166,6 @@
   cursor: pointer;
 }
 
-.mobile-rider .mobile-rider-info-bar .mobile-rider-action:hover {
-  background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
-}
-
 .mobile-rider .mobile-rider-info-bar .mobile-rider-action:focus-visible {
   outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
   outline-offset: 2px;
@@ -182,10 +178,6 @@
   background: var(--s2a-color-gray-25, #fff);
   border-color: var(--s2a-color-gray-25, #fff);
   color: var(--s2a-color-gray-1000, #000);
-}
-
-.mobile-rider .mobile-rider-info-bar-favorite.is-favorited:hover {
-  background: var(--s2a-color-gray-25, #fff);
 }
 
 .mobile-rider .mobile-rider-info-bar-category-slot {
