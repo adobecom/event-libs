@@ -289,14 +289,13 @@ export async function toggleSchedule(session) {
 
 export async function toggleFavorite(session) {
   const isFavorited = favorited.value.has(session.id);
-  const rfSessionId = session.rfSessionId || session.sessionId;
-  if (!rfSessionId) {
-    throw new Error('Session is missing the RainFocus session id');
+  if (!session.id) {
+    throw new Error('Session is missing the session id');
   }
   setPending(session.id, true);
   try {
-    // Favoriting keys on the session-level RF id, not rfCode.
-    await toggleSessionInterest('', rfSessionId, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
+    // RainFocus expects the catalog session id; scheduling uses rfCode instead.
+    await toggleSessionInterest('', session.id, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
   } catch (err) {
     setPending(session.id, false);
     throw err;
