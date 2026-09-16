@@ -329,7 +329,9 @@
     gap: var(--s2a-spacing-lg, 24px);
   }
 
-  .upcoming-sessions .sg-card:hover {
+  .upcoming-sessions .sg-card:is(:hover, :focus-within),
+  .upcoming-sessions .sg-card.is-scheduled,
+  .upcoming-sessions .sg-card.is-favorited {
     width: 453px;
     min-height: 134px;
   }
@@ -376,18 +378,29 @@
 
   .upcoming-sessions .sg-card__actions {
     flex-direction: column;
-    width: var(--s2a-spacing-2xl, 48px);
+    width: 0;
     margin-top: 0;
-    opacity: 1;
-    pointer-events: auto;
+    opacity: 0;
+    pointer-events: none;
     align-items: center;
     justify-content: flex-start;
+    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+  }
+
+  /* stylelint-disable-next-line no-descending-specificity */
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__actions,
+  .upcoming-sessions .sg-card.is-scheduled .sg-card__actions,
+  .upcoming-sessions .sg-card.is-favorited .sg-card__actions {
+    width: var(--s2a-spacing-2xl, 48px);
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .upcoming-sessions .sg-card__actions::after {
     display: none;
   }
 
+  /* stylelint-disable no-descending-specificity */
   .upcoming-sessions.dark-card .sg-card,
   .upcoming-sessions.dark-card .sg-card.is-scheduled,
   .upcoming-sessions.dark-card .sg-card.is-favorited {
@@ -400,6 +413,7 @@
     background: #292929;
     backdrop-filter: none;
   }
+  /* stylelint-enable no-descending-specificity */
 
   /* stylelint-disable no-descending-specificity */
   .upcoming-sessions.dark-card .sg-card__time,
