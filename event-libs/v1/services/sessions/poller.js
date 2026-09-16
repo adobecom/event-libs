@@ -26,9 +26,6 @@ async function tick(g) {
   if (!ids.length) return;
   g.inFlight = true;
   try {
-    // mrEnv is event/page-wide (a pure host-derived value), so resolve it here rather than
-    // threading it through every caller. Prefer the loaded event config; fall back to deriving it
-    // directly for callers (e.g. the phase watcher) that poll before initSessionState() has run.
     const { active, inactive } = await fetchLiveStatus(ids, getEventApiConfig()?.mrEnv ?? deriveMrEnv());
     const result = { active: [...active], inactive: [...inactive] };
     listeners.forEach((entry) => entry.notify(result, ids));
