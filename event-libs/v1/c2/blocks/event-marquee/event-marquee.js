@@ -173,6 +173,11 @@ function resolveSession(sessionId, render) {
 }
 
 function decorateActions(textCol, config) {
+  // Favorite/share actions are disabled for now — render nothing. The button builders and the
+  // rest of this function are kept intact so the feature can be re-enabled by removing this guard.
+  const ACTIONS_ENABLED = false;
+  if (!ACTIONS_ENABLED) return;
+
   const shareEnabled = config.shareEnabled ?? true;
   const favoriteEnabled = (config.favoriteEnabled ?? true) && !!config.sessionId;
   if (!shareEnabled && !favoriteEnabled) return;
