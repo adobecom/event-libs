@@ -95,7 +95,7 @@ function toRfSession(session) {
   const { startTimeUtc, endTimeUtc } = toIsoTimes(session);
   return {
     id: session.sessionId,
-    rfCode: session.sessionCode,
+    rfCode: session.rfCode,
     rfSessionId: session.rfSessionId,
     startTimeUtc,
     endTimeUtc,
