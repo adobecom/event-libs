@@ -164,8 +164,9 @@
   cursor: pointer;
 }
 
-/* Figma: only the favorite chip carries a circular outline; share is a bare icon. */
-.mobile-rider .mobile-rider-info-bar-favorite {
+/* Figma: only the favorite chip carries a circular outline; share is a bare icon. Selector
+   matches .mobile-rider-action's specificity (3 classes) so it wins over its `border: none`. */
+.mobile-rider .mobile-rider-info-bar .mobile-rider-info-bar-favorite {
   border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-border-default);
 }
 
