@@ -19,14 +19,6 @@
   padding-bottom: 273px;
 }
 
-body:has(.in-person-banner) .section:has(.event-marquee):not(.rounded-corners-top):not(.rounded-corners) {
-  border-radius: var(--s2a-border-radius-lg) var(--s2a-border-radius-lg) 0 0;
-  overflow: clip;
-  z-index: 3;
-  margin-top: calc(-1 * var(--s2a-border-radius-lg));
-  margin-bottom: initial;
-}
-
 .event-marquee-background {
   position: absolute;
   inset: 0;
