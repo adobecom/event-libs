@@ -139,6 +139,20 @@ conversation history for the byte-count comparison. No open action here.
 
 ---
 
+### 6. Block lives in its own `sessions-guide-full-page/` folder ✅ Implemented
+Milo requires `blocks/<name>/<name>.js` matching the authored block name, so
+`sessions-guide-full-page.js` can't live inside the `sessions-guide/` folder —
+it moved to its own folder, importing the shared store/components/utils from
+`sessions-guide/` (see that block's PLAN.md "File Structure" for what's
+shared vs. block-local).
+
+While relocating it, also fixed a real bug: the old file dynamically imported
+Preact from Milo's own `deps/htm-preact.js` (`${miloLibs}/deps/htm-preact.js`),
+a *different* module instance than the one `SessionGuideProvider`'s
+`useReducer` runs on — two Preact instances sharing one component tree broke
+hook state with `Cannot read properties of undefined (reading '__$f')`. The
+new file imports the same local vendored copy `sessions-guide.js` uses.
+
 ## Still reviewing / not yet decided
 
 - Whether `utils/url.js` (currently widget-only: `setSessionsParam` /

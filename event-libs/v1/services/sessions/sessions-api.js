@@ -243,9 +243,7 @@ export function extractCustomAttributeSlugs(session, name) {
 }
 
 // attributeId-keyed, so newly authored filter categories resolve with no per-field mapping.
-// `values` is RF's own slug (`v.value`) — the filter identity activeFilters/the URL key on.
-// `labels` is the human string — what the filter panel displays. See getFilterOptions() in
-// session-filters.js, which pairs the two back up.
+// `values` is RF's own slug (the filter identity); `labels` is the human display string.
 function buildCustomAttributeMaps(session) {
   const values = {};
   const labels = {};

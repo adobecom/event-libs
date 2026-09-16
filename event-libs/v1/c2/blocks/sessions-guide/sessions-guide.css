@@ -962,24 +962,13 @@
   min-width: 0;
 }
 
-/* Figma 8463:87698 — mobile 'live' card only (see LiveCard.js's useMobileLayout). Fixed height
-   so a 1-badge card and a 2-badge card are always the same total card height; space-between
-   puts a lone badge at the top rather than centering it oddly in the reserved space. */
+/* Figma 8463:87698, mobile 'live' card only. Fixed height keeps 1- and 2-badge cards the same size. */
 .sg-live-card__badges {
   display: flex;
   flex-direction: column;
-
-  /* Figma 8463:87698's auto-layout metadata reports this slot as 32px (2x16px rows, no gap),
-     but pixel-measuring the rendered design screenshot shows a real ~8px gap between the two
-     badge rows — the metadata is unreliable for this nested instance. Trusting the rendered
-     pixels: 16 + 8 + 16 = 40px. Fixed height so a 1-badge card is the same height as a 2-badge
-     one — the lone badge just leaves the second row's space empty. */
   gap: var(--s2a-spacing-xs);
   height: 40px;
   width: 100%;
-
-  /* .sg-live-card__body has gap:0 (spacing is per-child margins) — this is title-to-badges
-     gap. Figma 8463:87698 uses the same 16px rhythm for every other gap in this card. */
   margin-top: var(--s2a-spacing-sm);
 }
 
@@ -1074,16 +1063,13 @@
   overflow: hidden;
 }
 
-/* Mobile 'live' card (Figma 8463:87698): title renders first, so its usual top margin (which
-   creates the gap below the now-absent preceding meta block) would just be leading whitespace. */
+/* Mobile 'live' card: title renders first, so its usual top margin is just leading whitespace. */
 .sg-live-card--mobile-live .sg-live-card__title {
   margin-top: 0;
 }
 
-/* Figma 8463:87698 — 311x355 total (pixel-verified; the design file's own auto-layout metadata
-   under-reports the badges gap, see .sg-live-card__badges). Scoped to the modifier class (not
-   the shared .sg-live-card rules used by recommended/desktop) so trimming this card's height
-   doesn't touch either. */
+/* Figma 8463:87698 — 311x355 total. Scoped to the modifier class so recommended/desktop keep
+   their own height. */
 .sg-live-card--mobile-live .sg-live-card__image {
   height: 175px;
 }
@@ -2340,9 +2326,8 @@
     overflow: visible;
   }
 
-  /* Full page (Figma 8463:87648): wider left gutter than the widget's drawer. Right stays at
-     the base 20px — .sg-carousel__track's -20px margin cancels exactly that much so the card
-     track still bleeds to the true edge (same "runs to the edge" pattern as .sg-time-row). */
+  /* Wider left gutter than the widget's drawer. Right stays at the base 20px so the card
+     track still bleeds to the true edge (see .sg-carousel__track's -20px margin). */
   .sg-full-page .sg-carousel-section {
     padding-left: 156px;
   }
@@ -2435,25 +2420,15 @@
     border-radius: 20px;
   }
 
-  /* Full page has more available width than the widget at this breakpoint. A hard `width:
-     1156px` (rather than just a cap) got cut off by .sg-carousel__track's overflow-x: clip
-     between 1280px and ~1470px viewports, where 1156px + the 156px side gutters (312px total)
-     doesn't actually fit — width stays 100% (from the base rule above) so it shrinks to fill
-     whatever space the carousel track actually has, capping at 1156px once there's room. */
+  /* Full page has more available width than the widget — a cap, not a fixed width, so it can
+     still shrink on narrower viewports in this range. */
   .sg-full-page .sg-live-card {
     max-width: 1156px;
   }
 
-  /* Root cause of the cut-off: .sg-carousel__card-wrap has no explicit width, so it sizes to
-     its own content (the live card's internal image+body layout, ~1096px) instead of the
-     track's actual available space — a percentage width on .sg-live-card can't resolve
-     against a content-sized ("flex-basis: auto") flex item. flex-basis: 100% gives the wrap a
-     definite size (the track's real width) for .sg-live-card's own width/max-width to clamp
-     against, so it actually shrinks between 1280px and ~1470px instead of overflowing past
-     .sg-carousel__track's overflow-x: clip. Scoped to .sg-full-page — only the full page's
-     1156px cap is wide enough to hit this at these viewports; the widget's own 1104px cap
-     inside its narrower, already-capped .sg-drawer isn't a reported problem, so it's left
-     untouched rather than risking an unverified change there. */
+  /* .sg-carousel__card-wrap has no explicit width, so a % width on .sg-live-card can't resolve
+     against it (content-sized flex item). flex-basis: 100% gives it a definite size to clamp
+     against. Scoped to full page — the widget's smaller cap doesn't hit this. */
   .sg-full-page .sg-carousel-section--live .sg-carousel__card-wrap {
     flex: 0 0 100%;
   }
@@ -2993,10 +2968,8 @@
   background: var(--s2a-color-background-default);
 }
 
-/* Static, at every breakpoint — only GNAV stays pinned while scrolling. Sticky here made a
-   ~300px control cluster (date tabs + view dropdown + filter/search) permanently glue itself
-   to the top of the screen for the entire page, not just while near the top. Still needs its
-   own top clearance, though — nothing else pushes this below GNAV on load. */
+/* Static, not sticky — sticky glued the ~300px control cluster to the top for the whole page.
+   Still needs its own top clearance since nothing else pushes it below GNAV on load. */
 .sg-full-page__header-wrap {
   border-bottom: 1px solid var(--s2a-color-border-subtle);
   background: var(--s2a-color-background-default);

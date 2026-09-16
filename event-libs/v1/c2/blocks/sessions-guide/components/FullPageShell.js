@@ -5,10 +5,8 @@ import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
 
-// filterCategories: [{ id, label, slug }] (see parse-config.js). `id` (attributeId) is what
-// activeFilters/session data key on; `slug` is the readable ?filter= key. A slug/id with no
-// match (a stale or renamed category) is dropped rather than erroring or leaking a raw
-// attributeId into the URL.
+// filterCategories: [{ id, label, slug }] (see parse-config.js). No match (stale/renamed
+// category) is dropped rather than leaking a raw attributeId into the URL.
 export function categoryIdForSlug(filterCategories, slug) {
   return filterCategories?.find((c) => c.slug === slug)?.id || null;
 }

@@ -18,9 +18,7 @@ export const buildLiveCard = () => LiveCard;
 // Non-MR sessions need this manual tick; MR sessions get an equivalent refresh from the poller.
 export const PROGRESS_REFRESH_MS = 30_000;
 
-// Mirrors FilterPanel.js's own hook — same breakpoint, same pattern, not shared as a util since
-// it's a small, self-contained piece of view state (matches use-carousel-row.js's precedent of
-// each caller keeping its own matchMedia hook rather than a shared one).
+// Mirrors FilterPanel.js's own hook rather than a shared util — small, self-contained view state.
 const MOBILE_QUERY = '(max-width: 767px)';
 const matchesMobile = () => !!window.matchMedia?.(MOBILE_QUERY).matches;
 function useIsMobile() {
@@ -163,11 +161,8 @@ export function LiveCard({
     // A non-widget caller like session-broadcast has no in-widget overlay to navigate away
     // from — onCardClick lets it supply its own "open detail" behavior instead.
     if (onCardClick) { onCardClick(session); return; }
-    // Full page: a live session's card click reuses the same watch-destination routing as
-    // the Watch Now button (homepage player for a keynote, channel page otherwise) — but
-    // only when there actually is one; an in-person-only session has no stream to jump to
-    // (getWatchDestination returns '' for it), so it falls through to its session page like
-    // 'upcoming' does (same pattern as SessionCard.js's handleClick).
+    // Full page: reuse the Watch Now routing, but only if a watch destination actually exists
+    // (an in-person-only live session has none) — otherwise fall through to the session page.
     if (sessionState === 'live' && watchHref) { handleWatch(e); return; }
     const dest = safeUrl(session.sessionPageUrl);
     if (dest) window.location.href = dest;

@@ -540,9 +540,6 @@
 
 .sb-carousel-section--also-live .sg-carousel__cards { gap: var(--s2a-spacing-md); }
 
-/* width/progress-row no longer overridden here — the shared .sg-live-card rule now matches
-   this exactly (311px, bottom-positioned progress row, Figma 8463:87698), so this stays
-   pixel-identical to the session-guide/widget card without a broadcast-specific duplicate. */
 .sb-carousel-section--also-live .sg-live-card__image {
   height: auto;
   aspect-ratio: 300 / 188;

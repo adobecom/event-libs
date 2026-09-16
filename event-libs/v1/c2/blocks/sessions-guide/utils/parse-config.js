@@ -1,16 +1,12 @@
 import { detectUserTimezone } from './time.js';
 
-// RainFocus gives categories a UUID and a label, no slug — this is ours, for the ?filter=
-// URL param (an attributeId there would be unreadable and isn't stable across schema
-// regenerations anyway, see gotcha 22 in not-tracked/session-catalog-response.md).
+// RainFocus gives categories a UUID and a label, no slug — this is ours, for the ?filter= key.
 function slugifyCategoryLabel(label) {
   return label ? label.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
 }
 
-// Authored { attributeId, displayName, enabled } -> FilterPanel's { id, label, slug }. `id` is
-// the attributeId getFilterValue() resolves against customAttributeValues; `slug` is the
-// ?filter= URL key. Two categories authored down to the same slug get -2/-3/... suffixes, in
-// authoring order, so the URL key stays unique and deterministic without erroring.
+// Authored { attributeId, displayName, enabled } -> FilterPanel's { id, label, slug }. Two
+// categories slugifying to the same value get -2/-3/... suffixes in authoring order.
 function mapAuthoredFilterCategories(authoredCategories) {
   const categories = authoredCategories
     .filter((c) => c.enabled !== false)
