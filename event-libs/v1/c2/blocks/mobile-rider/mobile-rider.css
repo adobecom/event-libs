@@ -98,15 +98,20 @@
 .mobile-rider .mobile-rider-info-bar-toggle {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s2a-spacing-xs);
   flex-shrink: 0;
+
+  /* Figma: 32x32 tap target with 9px padding around the 14px caret. */
+  width: var(--s2a-spacing-2xl, 32px);
+  height: var(--s2a-spacing-2xl, 32px);
   border: none;
   border-radius: var(--s2a-border-radius-sm, 4px);
   background: none;
   color: inherit;
   font-family: inherit;
   font-size: var(--s2a-font-size-md);
-  padding: 0;
+  padding: 9px;
   cursor: pointer;
 }
 
