@@ -1,10 +1,9 @@
-import { html, useEffect, useRef, useState } from '../../../../deps/htm-preact.js';
+import { html, useEffect, useState } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { sessionsStatus } from '../../../../utils/session-store.js';
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
-import { BackToTop } from './BackToTop.js';
 
 // filterCategories: [{ id, label, slug }] (see parse-config.js). `id` (attributeId) is what
 // activeFilters/session data key on; `slug` is the readable ?filter= key. A slug/id with no
@@ -22,9 +21,6 @@ export function FullPageShell() {
   const { state, dispatch } = useSessionGuide();
   const { activeView, activeFilters, searchQuery, guideConfig } = state;
   const [filterOpen, setFilterOpen] = useState(false);
-  // Where focus lands after a Back to top jump; tabindex="-1" below keeps it out of the tab
-  // order while still accepting programmatic focus — see the comment in BackToTop.js.
-  const rootRef = useRef(null);
 
   // On mount: read URL params and populate store
   useEffect(() => {
@@ -91,7 +87,7 @@ export function FullPageShell() {
   function noop() {}
 
   return html`
-    <div class="sg-full-page" ref=${rootRef} tabindex="-1">
+    <div class="sg-full-page">
       <div class="sg-full-page__header-wrap">
         <${DrawerHeader}
           onClose=${noop}
@@ -107,7 +103,6 @@ export function FullPageShell() {
         ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}
         ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
       </div>
-      ${sessionsStatus.value === 'ready' && html`<${BackToTop} fixed=${true} focusRef=${rootRef} />`}
     </div>
   `;
 }

@@ -2977,12 +2977,6 @@
   background: var(--s2a-color-background-default);
 }
 
-/* tabindex="-1" is only a Back-to-top landing target, so the UA focus ring here is noise. */
-.sg-full-page:focus,
-.sg-full-page:focus-visible {
-  outline: none;
-}
-
 /* Static, at every breakpoint — only GNAV stays pinned while scrolling. Sticky here made a
    ~300px control cluster (date tabs + view dropdown + filter/search) permanently glue itself
    to the top of the screen for the entire page, not just while near the top. Still needs its
@@ -3018,6 +3012,29 @@
   .sg-full-page .sg-header-title-row,
   .sg-full-page .sg-header-controls {
     padding: 0 var(--s2a-spacing-lg);
+  }
+}
+
+/* Large desktop (Figma 8463-87634): even wider content gutter than the 1280px tier's 156px.
+   Live card stays 1156px at this size too — no override needed. */
+@media (min-width: 1920px) {
+  .sg-full-page .sg-header-title-row,
+  .sg-full-page .sg-header-controls {
+    padding: 0 160px;
+  }
+
+  .sg-full-page .sg-carousel-section {
+    padding-left: 160px;
+    padding-right: 160px;
+  }
+
+  .sg-full-page .sg-upcoming-title {
+    padding-left: 160px;
+    padding-right: 160px;
+  }
+
+  .sg-full-page .sg-time-row {
+    padding-left: 160px;
   }
 }
 

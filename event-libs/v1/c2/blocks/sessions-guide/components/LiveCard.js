@@ -160,17 +160,24 @@ export function LiveCard({
       history.pushState({}, '', setSessionParam(sessionParamValue(session)));
       return;
     }
-    onCardClick?.(session);
+    // A non-widget caller like session-broadcast has no in-widget overlay to navigate away
+    // from — onCardClick lets it supply its own "open detail" behavior instead.
+    if (onCardClick) { onCardClick(session); return; }
+    // Full page: a live session has nowhere else to go but its stream, so the whole card
+    // click reuses the same watch-destination routing as the Watch Now button (homepage
+    // player for a keynote, channel page otherwise). Only 'upcoming' has an actual session
+    // info page to land on (same pattern as SessionCard.js's handleClick).
+    if (sessionState === 'live') { handleWatch(e); return; }
+    const dest = safeUrl(session.sessionPageUrl);
+    if (dest) window.location.href = dest;
   }
 
-  const titleBlock = (surface === 'widget' || onCardClick)
-    ? html`<button
+  const titleBlock = html`<button
               class="sg-live-card__title sg-live-card__title-btn"
               type="button"
               onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
               daa-ll="Session-Card-Open"
-            >${session.title}</button>`
-    : html`<p class="sg-live-card__title">${session.title}</p>`;
+            >${session.title}</button>`;
 
   // Current layout: horizontal, divider-separated, used everywhere except the new mobile 'live' case below.
   const metaBlock = html`

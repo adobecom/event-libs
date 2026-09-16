@@ -189,7 +189,7 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Session-Card-Open"');
   });
 
-  it('renders the title as plain text (not an interactive control) on the page surface', () => {
+  it('renders the title as a navigating button (no onCardClick) on the page surface', () => {
     const store = buildStore(preact);
     store.SessionGuideContext._current = {
       state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
@@ -197,8 +197,8 @@ describe('LiveCard', () => {
     };
     const LiveCard = buildLiveCard(preact, store);
     const html = LiveCard({ session: LIVE_SESSION });
-    expect(html).to.not.include('daa-ll="Session-Card-Open"');
-    expect(html).to.include('<p class="sg-live-card__title">MAX Keynote</p>');
+    expect(html).to.include('daa-ll="Session-Card-Open"');
+    expect(html).to.include('sg-live-card__title-btn');
   });
 
   it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {
@@ -370,22 +370,21 @@ describe('LiveCard', () => {
       })).to.not.throw();
     });
 
-    // Deliberately NOT identical: the title becomes a real, keyboard-focusable <button> when
-    // onCardClick is supplied on the page surface (matching the widget surface's own already-
-    // accessible pattern) — a bare <div onclick> with no focusable equivalent inside it would
-    // otherwise make "open session detail" mouse/pointer-only for session-broadcast's cards.
-    it('renders the title as a button when onCardClick is supplied on the page surface', () => {
+    // The title is always a real, keyboard-focusable <button> on the page surface, whether or
+    // not onCardClick is supplied — with no callback it self-navigates to sessionPageUrl
+    // (matching SessionCard.js's handleClick), so "open session detail" is never a dead click.
+    it('renders the title as a button on the page surface, with or without onCardClick', () => {
       const LiveCard = buildLiveCard(preact, pageSurfaceStore());
       const withCallback = LiveCard({ session: LIVE_SESSION, onCardClick: () => {} });
       const without = LiveCard({ session: LIVE_SESSION });
       expect(withCallback).to.include('sg-live-card__title-btn');
-      expect(without).to.not.include('sg-live-card__title-btn');
+      expect(without).to.include('sg-live-card__title-btn');
     });
 
     it('onWatchSamePage alone does not affect the title markup', () => {
       const LiveCard = buildLiveCard(preact, pageSurfaceStore());
       const out = LiveCard({ session: LIVE_SESSION, onWatchSamePage: () => {} });
-      expect(out).to.not.include('sg-live-card__title-btn');
+      expect(out).to.include('sg-live-card__title-btn');
     });
   });
 
