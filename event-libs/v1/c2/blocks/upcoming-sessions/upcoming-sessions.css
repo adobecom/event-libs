@@ -287,6 +287,12 @@
   color: #000;
 }
 
+.upcoming-sessions .sg-card.is-favorited .sg-card__btn--favorite {
+  background: #fff;
+  border-color: #e9e9e9;
+  color: #000;
+}
+
 .upcoming-sessions .sg-card:hover .sg-card__actions::after {
   color: rgb(255 255 255 / 50%);
 }
