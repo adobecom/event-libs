@@ -46,7 +46,7 @@ let rfAuthTokenStarted = false;
 let rfAuthTokenSettled = false;
 
 // The media-relay backend only has dev/stage/prod, so the finer-grained envs collapse.
-function deriveMrEnv() {
+export function deriveMrEnv() {
   const env = getEventServiceEnv()?.name || 'dev';
   if (env.startsWith('stage')) return 'stage';
   if (env === 'prod') return 'prod';
