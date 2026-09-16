@@ -528,10 +528,31 @@ function extractVideoParamsFromHref(anchor) {
 }
 
 function handleAnchorElement(anchor) {
-  if (anchor.tagName !== 'A' || !anchor.classList.contains('link-block')) return anchor;
+  // eslint-disable-next-line no-console
+  console.log('[MR-debug] handleAnchorElement called', {
+    tagName: anchor?.tagName,
+    classList: anchor?.className,
+    isLinkBlock: anchor?.classList?.contains('link-block'),
+    hasParent: !!anchor?.parentNode,
+    parentTag: anchor?.parentNode?.tagName,
+    isConnected: anchor?.isConnected,
+    href: anchor?.getAttribute?.('href'),
+  });
+
+  if (anchor.tagName !== 'A' || !anchor.classList.contains('link-block')) {
+    // eslint-disable-next-line no-console
+    console.log('[MR-debug] EARLY RETURN: not an A.link-block');
+    return anchor;
+  }
 
   const params = extractVideoParamsFromHref(anchor);
-  if (!params || !params.videoId) return anchor;
+  // eslint-disable-next-line no-console
+  console.log('[MR-debug] extracted params', params);
+  if (!params || !params.videoId) {
+    // eslint-disable-next-line no-console
+    console.log('[MR-debug] EARLY RETURN: no videoId from href');
+    return anchor;
+  }
 
   const mobileRiderDiv = createTag('div', { class: 'mobile-rider' });
 
@@ -540,8 +561,23 @@ function handleAnchorElement(anchor) {
   if (params.autoplay) mobileRiderDiv.dataset.extractedAutoplay = params.autoplay;
   if (params.thumbnail) mobileRiderDiv.dataset.extractedThumbnail = params.thumbnail;
 
+  // eslint-disable-next-line no-console
+  console.log('[MR-debug] BEFORE swap', {
+    anchorParent: anchor.parentNode?.tagName,
+    anchorConnected: anchor.isConnected,
+  });
+
   anchor.insertAdjacentElement('afterend', mobileRiderDiv);
   anchor.remove();
+
+  // eslint-disable-next-line no-console
+  console.log('[MR-debug] AFTER swap', {
+    divConnected: mobileRiderDiv.isConnected,
+    divParent: mobileRiderDiv.parentNode?.tagName,
+    anchorStillConnected: anchor.isConnected,
+    anchorInDoc: document.contains(anchor),
+    mobileRiderInDoc: document.querySelectorAll('.mobile-rider').length,
+  });
 
   return mobileRiderDiv;
 }
