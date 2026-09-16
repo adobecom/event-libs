@@ -96,7 +96,7 @@ function toRfSession(session) {
   return {
     id: session.sessionId,
     rfCode: session.sessionCode,
-    rfSessionId: session.rfSessionId || session.externalSessionId?.replace(/^rf-/, ''),
+    rfSessionId: session.rfSessionId,
     startTimeUtc,
     endTimeUtc,
     title: session.enTitle,
