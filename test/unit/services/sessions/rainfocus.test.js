@@ -157,6 +157,19 @@ describe('services/sessions/rainfocus', () => {
       expect(url.searchParams.get('sessionId')).to.equal('sess-3');
     });
 
+    it('rejects before making a request when sessionId is missing', async () => {
+      stubFetch({ responseCode: '0' });
+      let error;
+      try {
+        await toggleSessionInterest('', '', null, 'profile-1', 'https://example.com/rf/');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('RainFocus sessionId is required to toggle session interest');
+      expect(lastRequest).to.equal(null);
+    });
+
     it('rejects on a schedule-conflict responseCode', async () => {
       stubFetch({ responseCode: '13' });
       let error;

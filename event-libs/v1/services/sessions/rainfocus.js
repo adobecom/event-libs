@@ -116,6 +116,7 @@ export async function dropAndSwapSession(sessionTimeId, dropSessionItems, rfAuth
 }
 
 export async function toggleSessionInterest(sessionTimeId, sessionId, rfAuthToken, rfApiProfileId, rfApiUrl) {
+  if (!sessionId) throw new Error('RainFocus sessionId is required to toggle session interest');
   const data = await rawFetch(rfApiUrl, ENDPOINTS.TOGGLE_FAVORITES, {
     rfApiProfileId, rfAuthToken, sessionTimeId, sessionId,
   });
