@@ -27,9 +27,9 @@ body:has(.in-person-banner) main > .section:first-child:not(.rounded-corners-top
 }
 
 .in-person-banner.in-person-banner-nav-overlay ~ header.global-navigation {
-  transform: translateY(calc(
+  top: calc(
     var(--in-person-banner-height, var(--global-height-nav, 80px)) - var(--in-person-banner-scroll-progress, 0px)
-  ));
+  );
 }
 
 body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
