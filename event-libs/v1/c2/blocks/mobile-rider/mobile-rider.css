@@ -47,11 +47,13 @@
     "description"
     "more"
     "actions";
-  gap: var(--s2a-spacing-2xs);
+
+  /* Figma: 16px between rows; 24px top / 32px bottom outer padding. */
+  gap: var(--s2a-spacing-md);
   background: transparent;
   color: var(--s2a-color-content-default);
   font-family: var(--body-font-family);
-  padding: var(--s2a-spacing-lg) 0;
+  padding: var(--s2a-spacing-lg) 0 var(--s2a-spacing-xl);
   border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
   overflow: hidden;
 }
@@ -264,13 +266,13 @@
   }
 
   .mobile-rider .mobile-rider-info-bar {
-    padding: var(--s2a-spacing-lg);
+    padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-xl);
   }
 }
 
 @media (min-width: 768px) and (max-width: 1024px) {
   .mobile-rider .mobile-rider-info-bar {
-    padding: var(--s2a-spacing-lg) 88px;
+    padding: var(--s2a-spacing-lg) 88px var(--s2a-spacing-xl);
   }
 }
 
