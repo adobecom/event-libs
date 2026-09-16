@@ -157,13 +157,16 @@
   width: var(--s2a-spacing-2xl);
   height: var(--s2a-spacing-2xl);
   padding: 0;
-
-  /* Figma: heart/share chips carry a circular outline over the surface, no fill. */
-  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-border-default);
+  border: none;
   border-radius: var(--s2a-border-radius-round);
   background: transparent;
   color: inherit;
   cursor: pointer;
+}
+
+/* Figma: only the favorite chip carries a circular outline; share is a bare icon. */
+.mobile-rider .mobile-rider-info-bar-favorite {
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-border-default);
 }
 
 .mobile-rider .mobile-rider-info-bar .mobile-rider-action:focus-visible {
