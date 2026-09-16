@@ -141,6 +141,7 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
   const entry = {
     sessionId: session.sessionId,
     sessionCode: session.sessionCode,
+    rfSessionId: session.externalSessionId?.replace(/^rf-/, ''),
     enTitle: session.enTitle,
     track: getSessionPrimaryTrack(session) || '',
     url: session.url,
