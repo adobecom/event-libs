@@ -282,7 +282,7 @@ describe('featured-sessions', () => {
       const startParts = new Intl.DateTimeFormat('en-US', timeOptions).formatToParts(start);
       const endParts = new Intl.DateTimeFormat('en-US', { ...timeOptions, timeZoneName: 'short' }).formatToParts(end);
       const digits = (parts) => parts
-        .filter((p) => p.type !== 'dayPeriod' && !(p.type === 'literal' && p.value.trim() === ''))
+        .filter((p) => p.type !== 'dayPeriod' && p.type !== 'timeZoneName' && !(p.type === 'literal' && p.value.trim() === ''))
         .map((p) => p.value).join('');
       const meridiem = (parts) => parts.find((p) => p.type === 'dayPeriod')?.value.toLowerCase() || '';
       const startMeridiem = meridiem(startParts);

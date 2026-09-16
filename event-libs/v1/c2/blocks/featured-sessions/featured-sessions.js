@@ -36,7 +36,9 @@ function meridiemOf(parts) {
 
 function digitsOf(parts) {
   return parts
-    .filter((part) => part.type !== 'dayPeriod' && !(part.type === 'literal' && part.value.trim() === ''))
+    .filter((part) => part.type !== 'dayPeriod'
+      && part.type !== 'timeZoneName'
+      && !(part.type === 'literal' && part.value.trim() === ''))
     .map((part) => part.value)
     .join('');
 }
