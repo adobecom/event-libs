@@ -629,6 +629,8 @@ function hasEmbeddedVideoPlayer(container) {
 }
 
 function announceVideoDecision(hasPlaylist) {
+  // eslint-disable-next-line no-console
+  console.log('[pl-debug] announceVideoDecision', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
   if (hasPlaylist) {
@@ -646,6 +648,12 @@ function announceVideoDecision(hasPlaylist) {
 }
 
 function removeBlock(el) {
+  // eslint-disable-next-line no-console
+  console.log('[pl-debug] removeBlock CALLED — playlist being removed. announceVideoDecision(false) → tells player to embed full-width', {
+    wasConnected: el.isConnected,
+  });
+  // eslint-disable-next-line no-console
+  console.trace('[pl-debug] removeBlock stack trace');
   window.dispatchEvent(new CustomEvent('session-video-playlist:removed'));
   announceVideoDecision(false);
   el.remove();
@@ -817,17 +825,34 @@ export default async function init(el) {
   }
 
   const render = (sessionList) => {
-    if (hasEmbeddedVideoPlayer(findSectionWithStyle(VIDEO_CONTAINER_CLASS))) {
+    const fullWidthContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
+    const embeddedPlayer = hasEmbeddedVideoPlayer(fullWidthContainer);
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] render() called', {
+      hasEmbeddedFullWidthPlayer: embeddedPlayer,
+      layoutDecision: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY),
+      fullWidthPlayerEl: !!fullWidthContainer?.querySelector('.session-video-player'),
+      fullWidthEmbeddedAttr: fullWidthContainer?.querySelector('.session-video-player')?.dataset.embedded,
+    });
+    if (embeddedPlayer) {
+      // eslint-disable-next-line no-console
+      console.log('[pl-debug] render: full-width player already embedded — REMOVING playlist');
       removeBlock(el);
       return;
     }
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] render: resolved rows', { rowCount: rows.length, topics });
     if (!rows.length) {
+      // eslint-disable-next-line no-console
+      console.log('[pl-debug] render: no rows — REMOVING playlist');
       removeBlock(el);
       return;
     }
     announceVideoDecision(true);
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] render: building rows + adding is-rendered');
 
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
     const displayRows = [current, ...rows.slice().sort(compareByStartTime)];
