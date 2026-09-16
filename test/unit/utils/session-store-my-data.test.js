@@ -27,11 +27,21 @@ function waitForSessionsReady() {
 
 describe('session-store: myData maps RF ids to our session ids', () => {
   let originalFetch;
+  let originalEvents;
   let jwtRequestUrl;
   let myDataRequestUrl;
+  let registrationDetailsCalled;
 
   before(async () => {
     originalFetch = window.fetch;
+    originalEvents = window.events;
+    registrationDetailsCalled = false;
+    window.events = {
+      getRegistrationDetails: async () => {
+        registrationDetailsCalled = true;
+        return { isRegistered: true };
+      },
+    };
     // mySchedule matches by sessionTimeID (→ rfCode); sessionInterests matches by sessionID
     // (→ rfSessionId) — two different, non-interchangeable ids. 'UNKNOWN' has no match either way.
     window.fetch = async (url) => {
@@ -90,6 +100,7 @@ describe('session-store: myData maps RF ids to our session ids', () => {
 
   after(() => {
     window.fetch = originalFetch;
+    window.events = originalEvents;
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
     // BlockMediator is a real, shared singleton across test files (unlike session-store.js's
     // cache-busted copy) — reset so this profile doesn't leak into whichever test runs next.
@@ -107,7 +118,8 @@ describe('session-store: myData maps RF ids to our session ids', () => {
     expect(favorited.value).to.deep.equal(new Set(['k-001']));
   });
 
-  it('derives isRegistered from a populated loggedInUser', () => {
+  it('uses registration details as the authoritative registration state', () => {
+    expect(registrationDetailsCalled).to.be.true;
     expect(auth.value.isRegistered).to.be.true;
   });
 });

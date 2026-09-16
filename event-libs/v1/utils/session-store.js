@@ -44,6 +44,7 @@ let realAuthConfirmed = false;
 let rfAuthToken = null;
 let rfAuthTokenStarted = false;
 let rfAuthTokenSettled = false;
+let registrationDetailsAttempted = false;
 
 // The media-relay backend only has dev/stage/prod, so the finer-grained envs collapse.
 function deriveMrEnv() {
@@ -74,17 +75,42 @@ async function exchangeRfAuthToken(clientId) {
   maybeLoadMyData();
 }
 
-// isRegistered is not set here: rsvpData doesn't apply to T1 events. loadMyData() derives it.
+async function loadRegistrationDetails() {
+  if (registrationDetailsAttempted || typeof window.events?.getRegistrationDetails !== 'function') return;
+  registrationDetailsAttempted = true;
+
+  try {
+    const details = await window.events.getRegistrationDetails();
+    const { isRegistered } = details || {};
+    auth.value = {
+      ...auth.value,
+      isRegistered: typeof isRegistered === 'boolean' ? isRegistered : null,
+    };
+  } catch (err) {
+    window.lana?.log(`[session-store] registration details lookup failed: ${err.message}`);
+    auth.value = { ...auth.value, isRegistered: null };
+  }
+}
+
+// isRegistered is not set here: rsvpData doesn't apply to T1 events. Registration details
+// are authoritative when the shared events API is available; loadMyData() is the fallback.
 function syncAuth() {
   const profile = BlockMediator.get('imsProfile');
   if (profile === undefined) return;
   realAuthConfirmed = true;
+  const isLoggedIn = !!(profile && !profile.noProfile && profile.account_type !== 'guest');
   auth.value = {
     ...auth.value,
-    isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
+    isLoggedIn,
     userFirstName: profile?.first_name ?? null,
+    ...(isLoggedIn ? {} : { isRegistered: false }),
   };
-  if (auth.value.isLoggedIn && profile.userId) {
+  if (isLoggedIn) {
+    loadRegistrationDetails();
+  } else {
+    registrationDetailsAttempted = false;
+  }
+  if (isLoggedIn && profile.userId) {
     exchangeRfAuthToken(profile.userId);
   } else {
     // Mark settled either way, so maybeLoadMyData() isn't blocked forever.
@@ -106,7 +132,12 @@ async function loadMyData() {
     batch(() => {
       scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode'));
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
-      auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
+      if (typeof window.events?.getRegistrationDetails !== 'function') {
+        auth.value = {
+          ...auth.value,
+          isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0),
+        };
+      }
     });
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
