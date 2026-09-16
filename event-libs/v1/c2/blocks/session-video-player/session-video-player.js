@@ -419,11 +419,14 @@ function loadVideoPlayer(el, sessionId, video) {
   const builtContainer = buildMiloVideo(video);
   const iframe = builtContainer.firstElementChild;
 
+  // A prior phase may have mounted the MobileRider DVR player; always clear it before mounting the
+  // iframe so a DVR_BUFFER → ON_DEMAND swap replaces the old player rather than stacking beside it.
+  el.querySelector('.mobile-rider')?.remove();
+
   const authoredMiloVideo = el.querySelector('.milo-video');
   if (authoredMiloVideo) {
     authoredMiloVideo.replaceChildren(iframe);
   } else {
-    el.querySelector('.mobile-rider')?.remove();
     el.append(builtContainer);
   }
 
