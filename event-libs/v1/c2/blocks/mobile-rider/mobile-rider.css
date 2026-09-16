@@ -309,3 +309,10 @@
   margin: revert;
   scroll-margin-top: revert;
 }
+
+.standalone-link.label {
+  position: static;
+  inset: auto;
+  margin: 0;
+  text-align: left;
+}

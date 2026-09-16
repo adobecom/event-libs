@@ -19,11 +19,13 @@ detail view" (`resolveClickAction`).
 `sessionTime.timezone` — `startTimeMillis`/`endTimeMillis` are real UTC instants, so
 `timeZone` is intentionally omitted from the `Intl`/`toLocaleTimeString` options, letting
 it default to the browser's own zone. The end time also carries `timeZoneName: 'short'`
-so the displayed range is self-labeling (e.g. `9:00 AM - 10:00 AM PDT`) regardless of
+so the displayed range is self-labeling (e.g. `9:00am - 10:00am PDT`) regardless of
 which timezone the viewer or the session happens to be in. `sessionTime.timezone` itself
 is still authored/present on the session shape but is no longer read by this function —
 it describes what zone the millis were originally authored against, not how they should
-render.
+render. `Intl`/`toLocaleTimeString` always renders the meridiem as uppercase `AM`/`PM`;
+`formatTimeRange()` lowercases it afterward (leaving the `timeZoneName` abbreviation,
+e.g. `PDT`/`PST`, untouched).
 
 ## Card removal / state timers
 
@@ -154,9 +156,13 @@ the same section, but only if that block opts in via an `attach-upcoming` class
      since 431px doesn't actually fit 3 cards + gaps in that frame's stated 1440px
      width — flagged to design), and the "grows on hover" cue comes from
      `transform: scale()` instead.
-  2. **Action buttons** — sessions-guide reveals the action-icon column only on
-     hover/`.is-scheduled`/`.is-favorited`, which leaves buttons unreachable on
-     touch/keyboard otherwise. This card keeps them always visible at every breakpoint.
+  2. **Action buttons** — on mobile/tablet (<1280px) the action-icon column stays
+     always visible, since sessions-guide's hover-only reveal would leave the buttons
+     unreachable on touch there. At desktop (`@media (min-width: 1280px)`) this now
+     matches sessions-guide exactly: the action-icon column (and the wider "hover"
+     card width) is revealed via `:is(:hover, :focus-within)` or `.is-scheduled`/
+     `.is-favorited`, hidden (`width: 0; opacity: 0; pointer-events: none;`)
+     otherwise — see MWPW-207701.
 - The dark surface variant is authored as `dark-card` (not `dark`) deliberately —
   `dark` is a reserved global Milo class that paints a solid dark background site-wide,
   which would collide with this block's own local "dark card surface" meaning. There's no

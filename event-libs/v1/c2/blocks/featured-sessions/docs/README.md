@@ -31,14 +31,28 @@ falls back to a built-in default ("Learn more" / "Watch now" / "Watch on-demand"
 
 For each entry, `init()` builds the same "pre-hydration" DOM shape
 `event-card.js`'s own `init()` already expects from hand-authored markup (a media
-wrapper with an `<img>`, a content wrapper with title/track/CTA `<p>`s), always with
-the `media-wide` variant class, sets the session-routing `data-*` attributes
-(`data-session-id`, `data-mr-stream-id`, `data-watch-url`, `data-session-url`,
-`data-start-time-utc`, `data-end-time-utc`), then calls `event-card.js`'s own
-`init(cardEl)` on it directly — reusing its media/body build and `session-routing.js`
-wiring verbatim. An entry with no `imageUrl` is dropped by `event-card.js`'s own
-existing rule ("a card with no image is not a valid authored card"), with no
-special-casing needed here.
+wrapper with an `<img>`, a content wrapper with title/description/CTA `<p>`s), always
+with the `media-square` (1:1) variant class, sets the session-routing `data-*`
+attributes (`data-session-id`, `data-mr-stream-id`, `data-watch-url`,
+`data-session-url`, `data-start-time-utc`, `data-end-time-utc`), then calls
+`event-card.js`'s own `init(cardEl)` on it directly — reusing its media/body build and
+`session-routing.js` wiring verbatim. An entry with no `imageUrl` is dropped by
+`event-card.js`'s own existing rule ("a card with no image is not a valid authored
+card"), with no special-casing needed here.
+
+The description `<p>` (which `event-card.js` turns into `.card-description`) is the
+session's date/time, not its track — `formatSessionDateTime()` builds
+`"November 11, 10:00–11:00am EST"` from the entry's own `sessionTime`
+(`startTimeMillis`/`endTimeMillis`): long month + day, an en dash–joined start–end
+time range with the meridiem collapsed onto the end time when start and end share it
+(e.g. `10:00–11:00am`, but `11:30am–12:30pm` when they don't), and the timezone
+abbreviation. Like `upcoming-sessions.js`'s `formatTimeRange()`, this always renders
+in the *viewer's* local timezone/locale — no explicit `timeZone` is passed to `Intl`,
+letting it default to the browser's own zone, and `Intl`'s uppercase `AM`/`PM` is
+lowercased to match. An entry with no `sessionTime` renders an empty description
+(no track fallback). `formatSessionDateTime()` is also exported and reused by the
+Tier 1 Event Configurator's `FeaturedSessionsEditor` so an author's session-picker
+preview matches what actually renders on the card.
 
 This replaced the retired `hydrate`/`featured-sessions`-classname/session-code
 mechanism (`event-libs/v1/hydrate/event-card.js`, now deleted) that required one
