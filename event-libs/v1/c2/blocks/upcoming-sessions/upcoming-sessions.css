@@ -323,7 +323,7 @@
   .upcoming-sessions .sg-card {
     flex-direction: row;
     align-items: flex-start;
-    width: 431px;
+    width: 375px;
     min-height: 128px;
     padding: var(--s2a-spacing-lg, 24px);
     gap: var(--s2a-spacing-lg, 24px);
@@ -332,7 +332,7 @@
   .upcoming-sessions .sg-card:is(:hover, :focus-within),
   .upcoming-sessions .sg-card.is-scheduled,
   .upcoming-sessions .sg-card.is-favorited {
-    width: 453px;
+    width: 431px;
     min-height: 134px;
   }
 
