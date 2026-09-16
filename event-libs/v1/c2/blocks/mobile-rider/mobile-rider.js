@@ -231,6 +231,7 @@ class MobileRider {
       role: 'region',
       'aria-label': 'Session info',
     }, '', { parent: this.root });
+    // Header row: title with the caret immediately after it (not pushed to the far edge).
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
     const titleEl = createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
     const paintTitle = (session) => {
@@ -247,17 +248,9 @@ class MobileRider {
     createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'Show more session info', { parent: toggle });
     createTag('span', { class: 'mobile-rider-info-bar-chevron', 'aria-hidden': 'true' }, ICON_CHEVRON_DOWN, { parent: toggle });
 
-    const toggleLabel = toggle.querySelector('.mobile-rider-info-bar-toggle-label');
-    toggle.addEventListener('click', () => {
-      const expanded = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', String(!expanded));
-      toggleLabel.textContent = expanded ? 'Show more session info' : 'Show less session info';
-      bar.classList.toggle('is-expanded', !expanded);
-    });
-
-    const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
-    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel', id: panelId }, '', { parent: panelWrap });
-    const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: panel });
+    // Category, description and actions live OUTSIDE the collapsible region so they are visible in
+    // the collapsed state (per Figma). The toggle only expands/collapses the description clamp.
+    const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: bar });
     const paintCategory = (session) => {
       const track = session?.primaryTrack || cfg['session-category'] || '';
       badgeSlot.replaceChildren();
@@ -266,7 +259,7 @@ class MobileRider {
     };
     paintCategory(null);
 
-    const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'] || '', { parent: panel });
+    const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description', id: panelId }, cfg['session-description'] || '', { parent: bar });
     const paintDescription = (session) => {
       const text = session?.description || cfg['session-description'] || '';
       descriptionEl.textContent = text;
@@ -274,17 +267,23 @@ class MobileRider {
     };
     paintDescription(null);
 
-    const viewAllDetailsLabel = cfg['view-all-details-label'];
-    if (viewAllDetailsLabel) {
-      const more = createTag('button', {
-        type: 'button',
-        class: 'mobile-rider-info-bar-more',
-        'daa-ll': 'View-All-Details',
-      }, viewAllDetailsLabel, { parent: panel });
-      more.addEventListener('click', () => openSessionGuideDetail(sessionId));
-    }
+    const toggleLabel = toggle.querySelector('.mobile-rider-info-bar-toggle-label');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      toggleLabel.textContent = expanded ? 'Show more session info' : 'Show less session info';
+      bar.classList.toggle('is-expanded', !expanded);
+    });
 
-    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
+    const viewAllDetailsLabel = cfg['view-all-details-label'] || 'View all details';
+    const more = createTag('button', {
+      type: 'button',
+      class: 'mobile-rider-info-bar-more',
+      'daa-ll': 'View-All-Details',
+    }, viewAllDetailsLabel, { parent: bar });
+    more.addEventListener('click', () => openSessionGuideDetail(sessionId));
+
+    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: bar });
 
     initSessionState();
     // Share button is built only once the session resolves - safeUrl(undefined) would no-op.

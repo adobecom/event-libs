@@ -34,8 +34,20 @@
   display: none;
 }
 
+/* A grid of named areas so category, description and actions are all visible in the collapsed
+   state (per Figma), not hidden behind an expand. The toggle only expands/collapses the
+   description clamp. */
 .mobile-rider .mobile-rider-info-bar {
   box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "header"
+    "category"
+    "description"
+    "more"
+    "actions";
+  gap: var(--s2a-spacing-2xs);
   background: transparent;
   color: var(--s2a-color-content-default);
   font-family: var(--body-font-family);
@@ -43,7 +55,6 @@
   border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
   overflow: hidden;
 }
-
 
 @media (min-width: 1024px) {
   .mobile-rider .mobile-rider-info-bar[style*="background"] {
@@ -57,14 +68,16 @@
 }
 
 .mobile-rider .mobile-rider-info-bar-header {
+  grid-area: header;
   display: flex;
   align-items: center;
-  gap: var(--s2a-spacing-md);
+  gap: var(--s2a-spacing-xs);
 }
 
-/* Figma: "s2a/typography/heading-5" — 2-line clamp, not single-line ellipsis. */
+/* Figma: "s2a/typography/heading-5" — 2-line clamp, not single-line ellipsis. The caret sits
+   directly after the title, so the title only takes the width it needs (flex: 0 1 auto). */
 .mobile-rider .mobile-rider-info-bar-title {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   overflow: hidden;
@@ -75,6 +88,7 @@
   line-height: var(--s2a-typography-line-height-heading-5);
   letter-spacing: var(--s2a-font-letter-spacing-4xl);
   text-overflow: ellipsis;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -123,11 +137,12 @@
 }
 
 .mobile-rider .mobile-rider-info-bar-actions {
+  grid-area: actions;
   display: flex;
   align-items: center;
   gap: var(--s2a-spacing-xs);
   flex-shrink: 0;
-  margin-top: var(--s2a-spacing-md);
+  margin-top: var(--s2a-spacing-2xs);
 }
 
 .mobile-rider .mobile-rider-info-bar .mobile-rider-action {
@@ -137,7 +152,9 @@
   width: var(--s2a-spacing-2xl);
   height: var(--s2a-spacing-2xl);
   padding: 0;
-  border: none;
+
+  /* Figma: heart/share chips carry a circular outline, not just a fill. */
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-border-default);
   border-radius: var(--s2a-border-radius-round);
   background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
   color: inherit;
@@ -153,29 +170,14 @@
   outline-offset: 2px;
 }
 
+/* Favorited heart inherits the surface content color (as in session-broadcast), not a generic
+   brand red — the info bar sits on the dark video surface, so this stays theme-consistent. */
 .mobile-rider .mobile-rider-info-bar-favorite.is-favorited {
-  color: var(--s2a-color-brand-adobe-red);
+  color: var(--s2a-color-content-default);
 }
 
-.mobile-rider .mobile-rider-info-bar-panel-wrap {
-  display: grid;
-  grid-template-rows: 0fr;
-  overflow: hidden;
-  transition: grid-template-rows 0.25s ease;
-}
-
-.mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-panel-wrap {
-  grid-template-rows: 1fr;
-}
-
-.mobile-rider .mobile-rider-info-bar-panel {
-  min-height: 0;
-  padding-top: 0;
-  transition: padding-top 0.25s ease;
-}
-
-.mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-panel {
-  padding-top: var(--s2a-spacing-md);
+.mobile-rider .mobile-rider-info-bar-category-slot {
+  grid-area: category;
 }
 
 .mobile-rider .mobile-rider-info-bar-category {
@@ -211,8 +213,9 @@
 }
 
 .mobile-rider .mobile-rider-info-bar-description {
+  grid-area: description;
   overflow: hidden;
-  margin: 0 0 var(--s2a-spacing-md);
+  margin: 0;
   color: var(--s2a-color-content-subtle);
   font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-sm, 14px);
@@ -227,8 +230,16 @@
   line-clamp: 2;
 }
 
+/* Expanded only lifts the 2-line clamp on the description; the rest is always visible. */
+.mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-description {
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
 .mobile-rider .mobile-rider-info-bar-more {
+  grid-area: more;
   display: block;
+  justify-self: start;
   border: none;
   background: none;
   color: inherit;
@@ -242,11 +253,6 @@
 @media (max-width: 767px) {
   .mobile-rider .mobile-rider-info-bar-title {
     font-size: var(--s2a-font-size-md);
-  }
-
-  .mobile-rider .mobile-rider-info-bar-description {
-    -webkit-line-clamp: unset;
-    line-clamp: unset;
   }
 
   .mobile-rider .mobile-rider-info-bar {
@@ -293,6 +299,11 @@
   .mobile-rider .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
+  }
+
+  /* Figma: the description is constrained to roughly the left half of the bar, not full width. */
+  .mobile-rider .mobile-rider-info-bar-description {
+    max-width: 60%;
   }
 
   .mobile-rider-player:has(.mobile-rider-info-bar) .mobile-rider-container {
