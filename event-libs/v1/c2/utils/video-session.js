@@ -218,14 +218,41 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasE
   const isLiveNow = session.mrStreamId
     ? Boolean(liveStreamActiveIds?.has(session.mrStreamId))
     : (end == null || nowMs < end);
-  if (isLiveNow) return PLAYBACK_PHASE.WATCH_LIVE;
+  // eslint-disable-next-line no-console
+  console.log('[vs-dvr] livePhase', {
+    nowIso: new Date(nowMs).toISOString(),
+    endIso: end != null ? new Date(end).toISOString() : null,
+    nowPastEnd: end != null ? nowMs > end : null,
+    isLiveNow,
+    pollHasThisStream: Boolean(liveStreamActiveIds?.has(session.mrStreamId)),
+    liveStreamActiveIds: [...(liveStreamActiveIds || [])],
+    streamWasEverActive,
+    mrStreamId: session.mrStreamId,
+  });
+  if (isLiveNow) {
+    // eslint-disable-next-line no-console
+    console.log('[vs-dvr] → WATCH_LIVE (isLiveNow: poll says stream is active right now)');
+    return PLAYBACK_PHASE.WATCH_LIVE;
+  }
 
   if (session.mrStreamId && !streamWasEverActive && end != null && nowMs < end) {
+    // eslint-disable-next-line no-console
+    console.log('[vs-dvr] → WATCH_LIVE (not live yet: never active + still inside scheduled window)');
     return PLAYBACK_PHASE.WATCH_LIVE;
   }
 
   if (session.dvrDelayHours != null) {
     const availableAt = dvrAvailableAtMs(session, eventStartMs);
+    // eslint-disable-next-line no-console
+    console.log('[vs-dvr] livePhase DVR gate', {
+      dvrDelayHours: session.dvrDelayHours,
+      eventStartMs,
+      availableAt,
+      availableAtIso: availableAt != null ? new Date(availableAt).toISOString() : null,
+      nowMs,
+      nowBeforeAvailableAt: availableAt != null ? nowMs < availableAt : 'availableAt-is-null',
+      result: (availableAt != null && nowMs < availableAt) ? 'DVR_BUFFER' : 'ON_DEMAND',
+    });
     if (availableAt != null && nowMs < availableAt) return PLAYBACK_PHASE.DVR_BUFFER;
     return PLAYBACK_PHASE.ON_DEMAND;
   }
