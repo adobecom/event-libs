@@ -2,6 +2,13 @@ import { LIBS } from '../../../utils/utils.js';
 
 export default async function init(el) {
   const link = el.querySelector('a');
+  // eslint-disable-next-line no-console
+  console.log('[gc-race] grid-column init()', {
+    linkHref: link?.href,
+    isFragmentLink: link?.href?.includes('/fragments/'),
+    linkClass: link?.className,
+    linkClosest: link?.closest('.session-video-playlist') ? 'inside-playlist-row' : 'other',
+  });
   if (!link) return;
   if (!link.href.includes('/fragments/')) {
     window.lana?.log(`grid-column: link is missing the required /fragments/ path segment - ${link.href}`, {
