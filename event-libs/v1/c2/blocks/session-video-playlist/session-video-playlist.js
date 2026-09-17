@@ -613,10 +613,12 @@ function announceVideoDecision(hasPlaylist) {
 
 function removeBlock(el) {
   // eslint-disable-next-line no-console
-  console.log('[pl-race] removeBlock() → playlist removed + announce(false)');
+  console.log('[pl-race] removeBlock() → playlist HIDDEN (not removed) + announce(false)');
   window.dispatchEvent(new CustomEvent('session-video-playlist:removed'));
   announceVideoDecision(false);
-  el.remove();
+  // Hide instead of remove: removing a Milo section/block retriggers loadArea (and grid-column
+  // re-loads a fragment from a leftover playlist-row link), causing a re-decoration loop.
+  el.classList.add('session-video-hidden');
 }
 
 function resolveEventStartMs() {
