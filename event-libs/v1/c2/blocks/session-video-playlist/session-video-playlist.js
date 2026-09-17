@@ -629,16 +629,8 @@ function hasEmbeddedVideoPlayer(container) {
 }
 
 function announceVideoDecision(hasPlaylist) {
-  // eslint-disable-next-line no-console
-  console.log('[pl-debug] playlist SENDING SIGNAL → announceVideoDecision', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
-  // DEBUG: temporarily skip the collapseAndRemove side effects to test if they drive the loop.
-  // eslint-disable-next-line no-console
-  console.log('[pl-debug] announceVideoDecision: SKIPPING collapseAndRemove (debug isolation)');
-  return;
-
-  // eslint-disable-next-line no-unreachable
   if (hasPlaylist) {
 
     const videoContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
@@ -731,20 +723,12 @@ export default async function init(el) {
   ensureStylesheet('session-video-playlist-css', BLOCK_CSS_URL);
   playlistInstanceId += 1;
   const LIST_ID = `session-video-playlist-list-${playlistInstanceId}`;
-  // eslint-disable-next-line no-console
-  console.log('[pl-debug] ===== init() CALLED =====', { instanceId: playlistInstanceId, elConnected: el.isConnected, alreadyRendered: el.classList.contains('is-rendered') });
-  if (playlistInstanceId <= 3) {
-    // eslint-disable-next-line no-console
-    console.trace('[pl-debug] init() call stack');
-  }
 
   const background = readBackgroundConfig(el);
   if (background) el.style.setProperty('--vp-authored-bg', background);
 
   const context = resolveRenderContext(el);
   if (!context) {
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] removing: no render context (bad/missing config)');
     removeBlock(el);
     return;
   }
@@ -829,22 +813,16 @@ export default async function init(el) {
   }
 
   const render = (sessionList) => {
-    // The playlist is the single source of truth for the layout decision: it renders (and claims
-    // the video) purely from whether it has rows, never from whether the full-width player has
-    // already embedded. The player waits for announceVideoDecision() before embedding either
-    // instance, so there is no race — do NOT gate this on the player's embed state.
-    const topics = resolveCurrentSessionTopics(pageCustomAttributes);
-    const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] render() resolved rows', { rowCount: rows.length });
-    if (!rows.length) {
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] removing: no rows to render');
+    if (hasEmbeddedVideoPlayer(findSectionWithStyle(VIDEO_CONTAINER_CLASS))) {
       removeBlock(el);
       return;
     }
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] rendering playlist with rows');
+    const topics = resolveCurrentSessionTopics(pageCustomAttributes);
+    const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
+    if (!rows.length) {
+      removeBlock(el);
+      return;
+    }
     announceVideoDecision(true);
 
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
@@ -866,20 +844,14 @@ export default async function init(el) {
 
   const runRenderFlow = () => {
     const existing = sessions.value;
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] runRenderFlow', { sessionCount: existing.length, status: sessionsStatus.value });
     if (existing.length) {
       render(existing);
       return;
     }
     if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] removing: status terminal + no sessions', { status: sessionsStatus.value });
       removeBlock(el);
       return;
     }
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] waiting for sessions to load…');
     let unsubscribeSessions = () => {};
     let unsubscribeStatus = () => {};
     const stopWaiting = () => {
@@ -897,8 +869,6 @@ export default async function init(el) {
     unsubscribeStatus = sessionsStatus.subscribe((status) => {
       if (status !== 'ready' && status !== 'error') return;
       if (sessions.value.length) return;
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] removing: catalog resolved terminal with no sessions (e.g. API error)', { status });
       stopWaiting();
       removeBlock(el);
     });
@@ -920,8 +890,6 @@ export default async function init(el) {
   const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
   if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
     started = true;
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] init: durable playable matched → runRenderFlow', { instanceId: playlistInstanceId });
     runRenderFlow();
   }
 }
