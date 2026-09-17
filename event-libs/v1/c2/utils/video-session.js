@@ -133,8 +133,6 @@ export function findEmbeddableVideos(sessionTimes) {
     .filter((video) => EMBEDDABLE_PROVIDERS.includes(video?.provider));
 }
 
-// Shared by the eyebrow (session-state-view.js hasPlayableVideo). Returns true when the first
-// session-times entry's end time has passed; missing/invalid end time is treated as ended.
 export function currentSessionHasEnded(sessionTimes, nowMs) {
   const firstEntry = (sessionTimes || [])[0];
   if (!firstEntry || !Number.isFinite(firstEntry.endTimeMillis)) return true;
