@@ -629,8 +629,6 @@ function hasEmbeddedVideoPlayer(container) {
 }
 
 function announceVideoDecision(hasPlaylist) {
-  // eslint-disable-next-line no-console
-  console.log('[pl-debug] announceVideoDecision', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
   if (hasPlaylist) {
@@ -648,12 +646,6 @@ function announceVideoDecision(hasPlaylist) {
 }
 
 function removeBlock(el) {
-  // eslint-disable-next-line no-console
-  console.log('[pl-debug] removeBlock CALLED — playlist being removed. announceVideoDecision(false) → tells player to embed full-width', {
-    wasConnected: el.isConnected,
-  });
-  // eslint-disable-next-line no-console
-  console.trace('[pl-debug] removeBlock stack trace');
   window.dispatchEvent(new CustomEvent('session-video-playlist:removed'));
   announceVideoDecision(false);
   el.remove();
@@ -736,11 +728,7 @@ export default async function init(el) {
   if (background) el.style.setProperty('--vp-authored-bg', background);
 
   const context = resolveRenderContext(el);
-  // eslint-disable-next-line no-console
-  console.log('[pl-debug] init: context resolved?', !!context, { sessionId: context?.sessionId });
   if (!context) {
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] init: NO context — removing block');
     removeBlock(el);
     return;
   }
@@ -825,34 +813,17 @@ export default async function init(el) {
   }
 
   const render = (sessionList) => {
-    const fullWidthContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
-    const embeddedPlayer = hasEmbeddedVideoPlayer(fullWidthContainer);
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] render() called', {
-      hasEmbeddedFullWidthPlayer: embeddedPlayer,
-      layoutDecision: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY),
-      fullWidthPlayerEl: !!fullWidthContainer?.querySelector('.session-video-player'),
-      fullWidthEmbeddedAttr: fullWidthContainer?.querySelector('.session-video-player')?.dataset.embedded,
-    });
-    if (embeddedPlayer) {
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] render: full-width player already embedded — REMOVING playlist');
-      removeBlock(el);
-      return;
-    }
+    // The playlist is the single source of truth for the layout decision: it renders (and claims
+    // the video) purely from whether it has rows, never from whether the full-width player has
+    // already embedded. The player waits for announceVideoDecision() before embedding either
+    // instance, so there is no race — do NOT gate this on the player's embed state.
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] render: resolved rows', { rowCount: rows.length, topics });
     if (!rows.length) {
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] render: no rows — REMOVING playlist');
       removeBlock(el);
       return;
     }
     announceVideoDecision(true);
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] render: building rows + adding is-rendered');
 
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
     const displayRows = [current, ...rows.slice().sort(compareByStartTime)];
@@ -873,22 +844,14 @@ export default async function init(el) {
 
   const runRenderFlow = () => {
     const existing = sessions.value;
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] runRenderFlow', { sessionCount: existing.length, status: sessionsStatus.value });
     if (existing.length) {
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] runRenderFlow: rendering with existing sessions');
       render(existing);
       return;
     }
     if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] runRenderFlow: status terminal + no sessions — removing block');
       removeBlock(el);
       return;
     }
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] runRenderFlow: waiting for sessions to load…');
     let unsubscribeSessions = () => {};
     let unsubscribeStatus = () => {};
     const stopWaiting = () => {
@@ -900,16 +863,12 @@ export default async function init(el) {
     onElementDetached(el, stopWaiting);
     unsubscribeSessions = sessions.subscribe((list) => {
       if (!list.length) return;
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] sessions arrived via subscribe — rendering', { count: list.length });
       stopWaiting();
       render(list);
     });
     unsubscribeStatus = sessionsStatus.subscribe((status) => {
       if (status !== 'ready' && status !== 'error') return;
       if (sessions.value.length) return;
-      // eslint-disable-next-line no-console
-      console.log('[pl-debug] status terminal via subscribe + no sessions — removing block', { status });
       stopWaiting();
       removeBlock(el);
     });
@@ -917,15 +876,9 @@ export default async function init(el) {
 
   let started = false;
   const onPlayable = (event) => {
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] onPlayable event received', {
-      eventSessionId: event.detail?.sessionId, mySessionId: sessionId, started, connected: el.isConnected,
-    });
     if (event.detail?.sessionId !== sessionId) return;
     if (started || !el.isConnected) return;
     started = true;
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] onPlayable event MATCHED — running render flow');
     runRenderFlow();
   };
 
@@ -935,14 +888,8 @@ export default async function init(el) {
   });
 
   const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
-  // eslint-disable-next-line no-console
-  console.log('[pl-debug] init: checked durable VIDEO_PLAYABLE_KEY', {
-    alreadyPlayable, mySessionId: sessionId, started, connected: el.isConnected,
-  });
   if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
     started = true;
-    // eslint-disable-next-line no-console
-    console.log('[pl-debug] durable playable MATCHED on init — running render flow');
     runRenderFlow();
   }
 }
