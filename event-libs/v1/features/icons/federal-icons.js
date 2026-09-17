@@ -1,3 +1,5 @@
+import { logError } from '../../utils/lana-log.js';
+
 // Adobe's federal icon CDN, reimplemented here since this module also runs without Milo loaded.
 const PROD_ROOT = 'https://www.adobe.com';
 
@@ -54,7 +56,7 @@ async function fetchSvgFrom(url) {
     const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
     return doc.querySelector('svg');
   } catch (err) {
-    window.lana?.log(`[federal-icons] failed to fetch ${url}: ${err.message}`);
+    logError('federal-icons', `failed to fetch ${url}`, err);
     return null;
   }
 }
@@ -121,7 +123,7 @@ export function fetchFederalIconList() {
         const { data = [] } = await resp.json();
         return data.map((entry) => entry.key).filter(Boolean);
       } catch (err) {
-        window.lana?.log(`[federal-icons] failed to fetch icons.json: ${err.message}`);
+        logError('federal-icons', 'failed to fetch icons.json', err);
         return [];
       }
     })();

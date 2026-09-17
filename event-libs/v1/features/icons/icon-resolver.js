@@ -1,4 +1,5 @@
 import { LIBS, getEventConfig } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
 import { fetchFederalIcon } from './federal-icons.js';
 
 // Page-level, framework-agnostic icon resolver: any block (Preact or vanilla) can resolve
@@ -18,7 +19,7 @@ async function fetchMiloIcons(miloLibs) {
     const icons = await fetchIcons({ miloLibs });
     return icons || {};
   } catch (err) {
-    window.lana?.log(`[icon-resolver] failed to load Milo icons: ${err.message}`);
+    logError('icon-resolver', 'failed to load Milo icons', err);
     return {};
   }
 }

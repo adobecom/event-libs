@@ -1,4 +1,5 @@
 import { getMetadata, createTag, getImageSource } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
 
 
 async function decorateTextContainer(el, createTag) {
@@ -31,7 +32,7 @@ function decorateImage(el, createTag) {
   try {
     venueAdditionalImageObj = JSON.parse(getMetadata('photos')).find((photo) => photo.imageKind === 'venue-additional-image');
   } catch (e) {
-    window.lana?.log(`Error while parsing venue additional image metadata:\n${JSON.stringify(e, null, 2)}`);
+    logError('venue-additional-info', 'Error while parsing venue additional image metadata', e);
   }
 
   if (!venueAdditionalImageObj) return;

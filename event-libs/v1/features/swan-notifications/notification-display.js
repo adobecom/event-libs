@@ -1,4 +1,5 @@
 import { upsertEntry, removeEntry } from './notification-store.js';
+import { logError } from '../../utils/lana-log.js';
 
 // Thin, never-throw wrapper around notification-store.js's mutations — a local write can't
 // meaningfully fail, but callers only ever see true/false, never a throw, matching the same
@@ -8,7 +9,7 @@ export function upsertNotification(rfCode, entry) {
     upsertEntry(rfCode, entry);
     return true;
   } catch (err) {
-    window.lana?.log(`[notification-display] failed to upsert notification for ${rfCode}: ${err.message}`);
+    logError('notification-display', `failed to upsert notification for ${rfCode}`, err);
     return false;
   }
 }
@@ -18,7 +19,7 @@ export function removeNotification(rfCode) {
     removeEntry(rfCode);
     return true;
   } catch (err) {
-    window.lana?.log(`[notification-display] failed to remove notification for ${rfCode}: ${err.message}`);
+    logError('notification-display', `failed to remove notification for ${rfCode}`, err);
     return false;
   }
 }

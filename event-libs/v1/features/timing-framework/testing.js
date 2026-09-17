@@ -1,3 +1,5 @@
+import { logWarning } from '../../utils/lana-log.js';
+
 export default class TestingManager {
   constructor() {
     this.timeOffset = 0;
@@ -31,7 +33,7 @@ export default class TestingManager {
         const currentTime = new Date().getTime();
         this.timeOffset = serverTime - currentTime;
       } else {
-        window.lana?.log(`Invalid serverTime provided for testing: ${testingData.serverTime}`);
+        logWarning('testing', `Invalid serverTime provided for testing: ${testingData.serverTime}`);
       }
     }
 
@@ -46,7 +48,7 @@ export default class TestingManager {
         const currentTime = new Date().getTime();
         this.timeOffset = toggleTime - currentTime;
       } else {
-        window.lana?.log(`Invalid toggleTime provided for testing: ${testingData.toggleTime}`);
+        logWarning('testing', `Invalid toggleTime provided for testing: ${testingData.toggleTime}`);
       }
     }
   }

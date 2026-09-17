@@ -1,21 +1,23 @@
+import { logWarning } from './lana-log.js';
+
 export function parseRsvpFieldLimit(raw) {
   if (raw == null || raw === '') return undefined;
   if (typeof raw === 'number') {
     const n = Math.trunc(raw);
     if (Number.isFinite(n) && n >= 1) return n;
-    window.lana?.log('events-form: limit must be a positive integer');
+    logWarning('sanitize-utils', 'limit must be a positive integer');
     return undefined;
   }
   if (typeof raw === 'string') {
     const s = raw.trim();
     if (!s) return undefined;
     if (!/^\d+$/.test(s)) {
-      window.lana?.log('events-form: limit must be a positive integer (digits only)');
+      logWarning('sanitize-utils', 'limit must be a positive integer (digits only)');
       return undefined;
     }
     return parseInt(s, 10);
   }
-  window.lana?.log('events-form: limit must be a positive integer');
+  logWarning('sanitize-utils', 'limit must be a positive integer');
   return undefined;
 }
 

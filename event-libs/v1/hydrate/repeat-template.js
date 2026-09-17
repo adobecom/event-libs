@@ -37,7 +37,7 @@ function setTokenIndex(row, collection, index) {
     if (!token.startsWith(collection)) return match;
 
     if (token.includes('?(')) {
-      logHydration(`Hydrator: per-item conditionals are not supported in a hydrated template ("${token}"); it will evaluate against the whole "${collection}" collection`);
+      logHydration(`Hydrator: per-item conditionals are not supported in a hydrated template ("${token}"); it will evaluate against the whole "${collection}" collection`, { tags: 'hydrate,repeat-template', severity: 'warning' });
       return match;
     }
 
@@ -56,12 +56,12 @@ export default function repeatTemplate(block, { selectItems } = {}) {
     .filter(({ tokens }) => tokens.length > 0);
 
   if (!candidates.length) {
-    logHydration(`Hydrator: no [[token]] template row authored in ${blockName}`);
+    logHydration(`Hydrator: no [[token]] template row authored in ${blockName}`, { tags: 'hydrate,repeat-template', severity: 'warning' });
     return false;
   }
 
   if (candidates.length > 1) {
-    logHydration(`Hydrator: ${blockName} has ${candidates.length} rows with [[tokens]]; only the first row whose tokens resolve to metadata is used as the template`);
+    logHydration(`Hydrator: ${blockName} has ${candidates.length} rows with [[tokens]]; only the first row whose tokens resolve to metadata is used as the template`, { tags: 'hydrate,repeat-template', severity: 'warning' });
   }
 
   const templateRows = candidates.map(({ row }) => row);
@@ -77,7 +77,7 @@ export default function repeatTemplate(block, { selectItems } = {}) {
   }
 
   if (!collection) {
-    logHydration(`Hydrator: no metadata array matches the [[tokens]] in ${blockName}; check the collection name is spelled correctly and its metadata is present`);
+    logHydration(`Hydrator: no metadata array matches the [[tokens]] in ${blockName}; check the collection name is spelled correctly and its metadata is present`, { tags: 'hydrate,repeat-template', severity: 'warning' });
     templateRows.forEach((row) => row.remove());
     return false;
   }
@@ -86,7 +86,7 @@ export default function repeatTemplate(block, { selectItems } = {}) {
   const selected = selectItems ? selectItems(items, block) : items;
 
   if (!selected.length) {
-    logHydration(`Hydrator: no "${name}" items to render in ${blockName}`);
+    logHydration(`Hydrator: no "${name}" items to render in ${blockName}`, { tags: 'hydrate,repeat-template', severity: 'warning' });
     templateRows.forEach((row) => row.remove());
     return false;
   }
@@ -96,7 +96,7 @@ export default function repeatTemplate(block, { selectItems } = {}) {
   selected.forEach((item) => {
     const index = items.indexOf(item);
     if (index === -1) {
-      logHydration(`Hydrator: selectItems for ${blockName} returned an item that is not in the "${name}" metadata; return the original objects, not copies`);
+      logHydration(`Hydrator: selectItems for ${blockName} returned an item that is not in the "${name}" metadata; return the original objects, not copies`, { tags: 'hydrate,repeat-template', severity: 'warning' });
       return;
     }
 
