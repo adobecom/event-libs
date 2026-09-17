@@ -472,13 +472,32 @@ function awaitEmbedDecision(el) {
 }
 
 function resolveVideoForPhase(phase, sessionTimes, session) {
+  // eslint-disable-next-line no-console
+  console.log('[svp-dvr] resolveVideoForPhase()', {
+    phase,
+    mrDvrVideoId: session?.mrDvrVideoId,
+    mrSkinId: session?.mrSkinId,
+    mpcId: session?.mpcId,
+  });
   if (phase === PLAYBACK_PHASE.ON_DEMAND) {
-    return pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
+    const v = pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
+    // eslint-disable-next-line no-console
+    console.log('[svp-dvr] ON_DEMAND video resolved', v);
+    return v;
   }
   if (phase === PLAYBACK_PHASE.DVR_BUFFER) {
-    if (!session?.mrDvrVideoId) return null;
-    return { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
+    if (!session?.mrDvrVideoId) {
+      // eslint-disable-next-line no-console
+      console.log('[svp-dvr] DVR_BUFFER but NO mrDvrVideoId → null (nothing to play)');
+      return null;
+    }
+    const v = { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
+    // eslint-disable-next-line no-console
+    console.log('[svp-dvr] DVR_BUFFER video resolved', v);
+    return v;
   }
+  // eslint-disable-next-line no-console
+  console.log('[svp-dvr] phase not playable → null', { phase });
   return null;
 }
 
@@ -533,12 +552,18 @@ export default async function init(el) {
   let embeddedPhase = null;
 
   const onPhase = (phase) => {
+    // eslint-disable-next-line no-console
+    console.log('[svp-dvr] onPhase() fired', {
+      phase, isPlayablePhase: PLAYABLE_PHASES.includes(phase), embeddedPhase, connected: el.isConnected,
+    });
     if (!el.isConnected) return;
     const video = PLAYABLE_PHASES.includes(phase)
       ? resolveVideoForPhase(phase, sessionTimes, session)
       : null;
 
     if (video && phase === embeddedPhase) {
+      // eslint-disable-next-line no-console
+      console.log('[svp-dvr] onPhase: already embedded this phase — skipping', { phase });
       return;
     }
 
