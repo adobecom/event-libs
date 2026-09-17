@@ -133,6 +133,12 @@ export function findEmbeddableVideos(sessionTimes) {
     .filter((video) => EMBEDDABLE_PROVIDERS.includes(video?.provider));
 }
 
+export function currentSessionHasEnded(sessionTimes, nowMs) {
+  const firstEntry = (sessionTimes || [])[0];
+  if (!firstEntry || !Number.isFinite(firstEntry.endTimeMillis)) return true;
+  return nowMs >= firstEntry.endTimeMillis;
+}
+
 export function readAuthoredConfig(el) {
   return [...el.querySelectorAll(':scope > div > div:first-child')].reduce((config, labelCell) => {
     const key = labelCell.textContent.trim().toLowerCase().replace(/ /g, '-');
