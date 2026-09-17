@@ -321,7 +321,15 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   if (session.mrStreamId) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
-      if (liveStreamActiveIds.has(session.mrStreamId)) streamWasEverActive = true;
+      const isActiveNow = liveStreamActiveIds.has(session.mrStreamId);
+      if (isActiveNow) streamWasEverActive = true;
+      // eslint-disable-next-line no-console
+      console.log('[MRPoll] watcher received poll result', {
+        mrStreamId: session.mrStreamId,
+        activeIds: [...liveStreamActiveIds],
+        thisStreamActiveNow: isActiveNow,
+        streamWasEverActive,
+      });
       emitIfChanged();
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId]);
