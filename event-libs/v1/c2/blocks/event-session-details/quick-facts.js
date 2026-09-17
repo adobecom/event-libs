@@ -6,7 +6,7 @@ const QUICK_FACTS = [
   { label: 'Track', name: 'Track' },
   { label: 'AI Focus', name: 'AI Focus' },
   { label: 'Audience', name: 'Audience' },
-  { label: 'Category', name: 'Category' },
+  { label: 'Category', name: 'Programming Category' },
 ];
 
 export function renderQuickFacts(doc = document) {

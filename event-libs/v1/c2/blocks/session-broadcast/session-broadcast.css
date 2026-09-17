@@ -540,19 +540,9 @@
 
 .sb-carousel-section--also-live .sg-carousel__cards { gap: var(--s2a-spacing-md); }
 
-.sb-carousel-section--also-live .sg-live-card {
-  width: 311px;
-  max-width: none;
-}
-
 .sb-carousel-section--also-live .sg-live-card__image {
   height: auto;
   aspect-ratio: 300 / 188;
-}
-
-.sb-carousel-section--also-live .sg-live-card__progress-row {
-  top: 6px;
-  bottom: auto;
 }
 
 .sb-carousel-section--also-live .sg-category-badge__label { font-size: var(--s2a-font-size-xs); }
