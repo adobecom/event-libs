@@ -127,6 +127,32 @@ describe('Content Update Script', () => {
     expect(checkForDoubleSquareBrackets()).to.be.false;
   });
 
+  it('does not let an unparsable link href abort decoration (processHashtagLinks)', () => {
+    // `a[href*="#"]` is namespace-agnostic and also matches inline SVG <a> elements (e.g. an
+    // icon link inside fetched fragment content). An SVG anchor's `.href` is an
+    // SVGAnimatedString object, not a string, so `new URL(a.href)` throws
+    // "Failed to construct 'URL': Invalid URL" - the exact error seen in production.
+    const container = document.createElement('div');
+    container.innerHTML = '<a href="#rsvp-form">RSVP</a>';
+    container.innerHTML += '<svg xmlns="http://www.w3.org/2000/svg"><a href="#some-icon-link"><rect width="10" height="10"/></a></svg>';
+    document.body.appendChild(container);
+
+    const lanaSpy = sinon.spy(window.lana, 'log');
+    const miloDeps = {
+      getConfig: () => ({
+        locale: { ietf: 'en-US' },
+        miloConfig: { locale: { ietf: 'en-US' } },
+      }),
+      miloLibs: LIBS,
+    };
+
+    expect(() => decorateEvent(container, miloDeps)).to.not.throw();
+    expect(lanaSpy.called).to.be.true;
+
+    lanaSpy.restore();
+    container.remove();
+  });
+
   it('handles RSVP buttons correctly', async () => {
     document.body.innerHTML = body;
 
