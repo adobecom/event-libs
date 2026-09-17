@@ -609,6 +609,8 @@ const COLLAPSE_TRANSITION_MS = 250;
 const COLLAPSE_FALLBACK_MS = COLLAPSE_TRANSITION_MS + 100;
 
 function collapseAndRemove(target) {
+  // eslint-disable-next-line no-console
+  console.log('[pl-race] collapseAndRemove', { targetClass: target?.className, alreadyCollapsing: target?.classList?.contains('is-collapsing') });
   if (!target || target.classList.contains('is-collapsing')) return;
   target.classList.add('is-collapsing');
 
@@ -629,11 +631,16 @@ function hasEmbeddedVideoPlayer(container) {
 }
 
 function announceVideoDecision(hasPlaylist) {
+  // eslint-disable-next-line no-console
+  console.log('[pl-race] >>> announceVideoDecision (playlist SIGNAL)', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
   if (hasPlaylist) {
 
     const videoContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
+    const embedded = hasEmbeddedVideoPlayer(videoContainer);
+    // eslint-disable-next-line no-console
+    console.log('[pl-race] announce(true): full-width videoContainer', { found: !!videoContainer, fullWidthEmbedded: embedded, willCollapse: !!videoContainer && !embedded });
     if (!hasEmbeddedVideoPlayer(videoContainer)) collapseAndRemove(videoContainer);
     return;
   }
@@ -646,6 +653,8 @@ function announceVideoDecision(hasPlaylist) {
 }
 
 function removeBlock(el) {
+  // eslint-disable-next-line no-console
+  console.log('[pl-race] removeBlock() → playlist removed + announce(false)');
   window.dispatchEvent(new CustomEvent('session-video-playlist:removed'));
   announceVideoDecision(false);
   el.remove();
@@ -723,6 +732,8 @@ export default async function init(el) {
   ensureStylesheet('session-video-playlist-css', BLOCK_CSS_URL);
   playlistInstanceId += 1;
   const LIST_ID = `session-video-playlist-list-${playlistInstanceId}`;
+  // eslint-disable-next-line no-console
+  console.log('[pl-race] init()', { instanceId: playlistInstanceId });
 
   const background = readBackgroundConfig(el);
   if (background) el.style.setProperty('--vp-authored-bg', background);
@@ -813,28 +824,21 @@ export default async function init(el) {
   }
 
   const render = (sessionList) => {
-    const videoContainerSection = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
-    const playlistContainerSection = findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS);
-    // eslint-disable-next-line no-console
-    console.log('[pl-race] render() guard check', {
-      videoContainerFound: !!videoContainerSection,
-      videoContainerHasEmbeddedPlayer: hasEmbeddedVideoPlayer(videoContainerSection),
-      playlistContainerFound: !!playlistContainerSection,
-      playlistContainerHasEmbeddedPlayer: hasEmbeddedVideoPlayer(playlistContainerSection),
-      allSectionStyles: [...document.querySelectorAll('.section')].map((s) => s.className).filter((c) => c.includes('video')),
-    });
-    if (hasEmbeddedVideoPlayer(findSectionWithStyle(VIDEO_CONTAINER_CLASS))) {
-      // eslint-disable-next-line no-console
-      console.log('[pl-race] GUARD FIRED → removing playlist (full-width player embedded)');
-      removeBlock(el);
-      return;
-    }
+    // The playlist gives the player a single yes/no answer based purely on its own row count,
+    // never on whether the player has already embedded. The player waits for this answer
+    // (awaitEmbedDecision) before embedding either full-width or inside the playlist container.
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
+    // eslint-disable-next-line no-console
+    console.log('[pl-race] render()', { instanceId: playlistInstanceId, topicCount: topics.length, rowCount: rows.length, minSessions });
     if (!rows.length) {
+      // eslint-disable-next-line no-console
+      console.log('[pl-race] render: not enough rows → answer NO');
       removeBlock(el);
       return;
     }
+    // eslint-disable-next-line no-console
+    console.log('[pl-race] render: has rows → answer YES, building playlist');
     announceVideoDecision(true);
 
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
@@ -856,14 +860,20 @@ export default async function init(el) {
 
   const runRenderFlow = () => {
     const existing = sessions.value;
+    // eslint-disable-next-line no-console
+    console.log('[pl-race] runRenderFlow', { instanceId: playlistInstanceId, sessionCount: existing.length, status: sessionsStatus.value });
     if (existing.length) {
       render(existing);
       return;
     }
     if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
+      // eslint-disable-next-line no-console
+      console.log('[pl-race] runRenderFlow: terminal status + no sessions → answer NO');
       removeBlock(el);
       return;
     }
+    // eslint-disable-next-line no-console
+    console.log('[pl-race] runRenderFlow: waiting for sessions…');
     let unsubscribeSessions = () => {};
     let unsubscribeStatus = () => {};
     const stopWaiting = () => {

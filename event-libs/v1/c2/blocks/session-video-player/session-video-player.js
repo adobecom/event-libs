@@ -494,8 +494,14 @@ function loadWhenDecided(el, sessionId, video) {
 
   (async () => {
     try {
+      // eslint-disable-next-line no-console
+      console.log('[svp-race] player waiting for playlist decision…', { insidePlaylist: isInsidePlaylistContainer(el) });
       const isWinner = await awaitEmbedDecision(el);
+      // eslint-disable-next-line no-console
+      console.log('[svp-race] player decision resolved', { isWinner, insidePlaylist: isInsidePlaylistContainer(el), decision: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY) });
       if (!isWinner) return;
+      // eslint-disable-next-line no-console
+      console.log('[svp-race] player EMBEDDING', { insidePlaylist: isInsidePlaylistContainer(el) });
       loadVideoPlayer(el, sessionId, video);
     } catch (error) {
       logError(`could not resolve the video layout decision: ${error.message}`);
