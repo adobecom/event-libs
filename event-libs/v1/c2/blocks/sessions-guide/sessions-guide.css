@@ -2428,9 +2428,20 @@
 
   /* .sg-carousel__card-wrap has no explicit width, so a % width on .sg-live-card can't resolve
      against it (content-sized flex item). flex-basis: 100% gives it a definite size to clamp
-     against. Scoped to full page — the widget's smaller cap doesn't hit this. */
+     against. max-width mirrors .sg-live-card's own cap so the wrap never renders wider than the
+     card sitting inside it — otherwise excess track width past the cap becomes dead space before
+     the next card, instead of a real card-to-card gap. With the wrap capped like the card, once
+     the track is wider than one card the next one naturally peeks in from the right edge — no
+     arbitrary reserved width needed. Scoped to full page — the widget's smaller cap doesn't hit
+     this. */
   .sg-full-page .sg-carousel-section--live .sg-carousel__card-wrap {
     flex: 0 0 100%;
+    max-width: 1156px;
+  }
+
+  /* Base gap (--s2a-spacing-xs, 8px) reads too tight at this card size; Figma calls for 24px. */
+  .sg-full-page .sg-carousel-section--live .sg-carousel__cards {
+    gap: var(--s2a-spacing-lg);
   }
 
   .sg-live-card:is(:hover, :focus-within) {
