@@ -633,6 +633,12 @@ function announceVideoDecision(hasPlaylist) {
   console.log('[pl-debug] playlist SENDING SIGNAL → announceVideoDecision', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
+  // DEBUG: temporarily skip the collapseAndRemove side effects to test if they drive the loop.
+  // eslint-disable-next-line no-console
+  console.log('[pl-debug] announceVideoDecision: SKIPPING collapseAndRemove (debug isolation)');
+  return;
+
+  // eslint-disable-next-line no-unreachable
   if (hasPlaylist) {
 
     const videoContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
