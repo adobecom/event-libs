@@ -493,9 +493,9 @@ function processHashtagLinks(parent) {
   const links = parent.querySelectorAll('a[href*="#"]');
 
   links.forEach((a) => {
-    const url = new URL(a.href);
-    const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
     try {
+      const url = new URL(a.href);
+      const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
       if (cmsType === 'SP') {
         processTemplateInLinkText(a);
 
