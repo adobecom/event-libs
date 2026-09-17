@@ -218,41 +218,16 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasE
   const isLiveNow = session.mrStreamId
     ? Boolean(liveStreamActiveIds?.has(session.mrStreamId))
     : (end == null || nowMs < end);
-  // eslint-disable-next-line no-console
-  console.log('[vs-dvr] livePhase', {
-    nowIso: new Date(nowMs).toISOString(),
-    endIso: end != null ? new Date(end).toISOString() : null,
-    nowPastEnd: end != null ? nowMs > end : null,
-    isLiveNow,
-    pollHasThisStream: Boolean(liveStreamActiveIds?.has(session.mrStreamId)),
-    liveStreamActiveIds: [...(liveStreamActiveIds || [])],
-    streamWasEverActive,
-    mrStreamId: session.mrStreamId,
-  });
   if (isLiveNow) {
-    // eslint-disable-next-line no-console
-    console.log('[vs-dvr] → WATCH_LIVE (isLiveNow: poll says stream is active right now)');
     return PLAYBACK_PHASE.WATCH_LIVE;
   }
 
   if (session.mrStreamId && !streamWasEverActive && end != null && nowMs < end) {
-    // eslint-disable-next-line no-console
-    console.log('[vs-dvr] → WATCH_LIVE (not live yet: never active + still inside scheduled window)');
     return PLAYBACK_PHASE.WATCH_LIVE;
   }
 
   if (session.dvrDelayHours != null) {
     const availableAt = dvrAvailableAtMs(session, eventStartMs);
-    // eslint-disable-next-line no-console
-    console.log('[vs-dvr] livePhase DVR gate', {
-      dvrDelayHours: session.dvrDelayHours,
-      eventStartMs,
-      availableAt,
-      availableAtIso: availableAt != null ? new Date(availableAt).toISOString() : null,
-      nowMs,
-      nowBeforeAvailableAt: availableAt != null ? nowMs < availableAt : 'availableAt-is-null',
-      result: (availableAt != null && nowMs < availableAt) ? 'DVR_BUFFER' : 'ON_DEMAND',
-    });
     if (availableAt != null && nowMs < availableAt) return PLAYBACK_PHASE.DVR_BUFFER;
     return PLAYBACK_PHASE.ON_DEMAND;
   }
@@ -319,29 +294,12 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   let timerId = null;
   let stopped = false;
 
-  const emitIfChanged = (reason) => {
+  const emitIfChanged = () => {
     if (stopped) return;
-    const nowMs = getNowMs();
-    const evStart = resolveEventStartMs();
     const phase = getPlaybackPhase(session, {
-      nowMs,
-      eventStartMs: evStart,
+      nowMs: getNowMs(),
+      eventStartMs: resolveEventStartMs(),
       liveStreamActiveIds,
-      streamWasEverActive,
-    });
-    // eslint-disable-next-line no-console
-    console.log('[vs-timer] emitIfChanged', {
-      reason,
-      phase,
-      changedFrom: lastPhase,
-      nowMs,
-      nowIso: new Date(nowMs).toISOString(),
-      eventStartMs: evStart,
-      mrStreamId: session.mrStreamId,
-      dvrDelayHours: session.dvrDelayHours,
-      startTimeUtc: session.startTimeUtc,
-      endTimeUtc: session.endTimeUtc,
-      liveStreamActiveIds: [...liveStreamActiveIds],
       streamWasEverActive,
     });
     if (phase !== lastPhase) {
@@ -354,42 +312,22 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
     if (timerId != null) { clearTimeout(timerId); timerId = null; }
     const nowMs = getNowMs();
     const boundary = nextPhaseBoundaryMs(session, { nowMs, eventStartMs: resolveEventStartMs() });
-    // eslint-disable-next-line no-console
-    console.log('[vs-timer] scheduleNextClockTick', {
-      nowIso: new Date(nowMs).toISOString(),
-      boundary,
-      boundaryIso: boundary != null ? new Date(boundary).toISOString() : null,
-      delayMs: boundary != null ? (boundary - nowMs) + 500 : null,
-      delayMinutes: boundary != null ? Math.round(((boundary - nowMs) + 500) / 60000) : null,
-    });
     if (boundary == null) return;
     const delay = Math.min((boundary - nowMs) + 500, 2 ** 31 - 1);
-    timerId = setTimeout(() => {
-      // eslint-disable-next-line no-console
-      console.log('[vs-timer] ⏰ clock boundary FIRED — re-evaluating phase');
-      emitIfChanged('clock-tick');
-      scheduleNextClockTick();
-    }, delay);
+    timerId = setTimeout(() => { emitIfChanged(); scheduleNextClockTick(); }, delay);
   };
 
   let unsubscribePoll = () => {};
   if (session.mrStreamId) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
-      const isActiveNow = liveStreamActiveIds.has(session.mrStreamId);
-      if (isActiveNow) streamWasEverActive = true;
-      // eslint-disable-next-line no-console
-      console.log('[vs-timer] 📡 poll result', {
-        activeIds: [...liveStreamActiveIds],
-        thisStreamActive: isActiveNow,
-        streamWasEverActive,
-      });
-      emitIfChanged('poll');
+      if (liveStreamActiveIds.has(session.mrStreamId)) streamWasEverActive = true;
+      emitIfChanged();
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId]);
   }
 
-  emitIfChanged('initial');
+  emitIfChanged();
   scheduleNextClockTick();
 
   return function stop() {

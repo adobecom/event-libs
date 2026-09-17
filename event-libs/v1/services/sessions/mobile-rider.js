@@ -10,20 +10,10 @@ function mrBaseUrl(env) {
 export async function fetchLiveStatus(mrStreamIds, env) {
   if (!mrStreamIds?.length) return { active: new Set(), inactive: new Set() };
 
-  const url = `${mrBaseUrl(env)}/api/media-status?ids=${mrStreamIds.join(',')}`;
-  // eslint-disable-next-line no-console
-  console.log('[mr-poll] → CALLING MobileRider', { url, env, ids: mrStreamIds });
-  const res = await fetch(url);
+  const res = await fetch(`${mrBaseUrl(env)}/api/media-status?ids=${mrStreamIds.join(',')}`);
   if (!res.ok) {
-    // eslint-disable-next-line no-console
-    console.log('[mr-poll] ✗ response NOT OK', { status: res.status, url });
     throw new Error(`Mobile Rider media-status fetch failed: ${res.status}`);
   }
-  const json = await res.json();
-  const { active = [], inactive = [] } = json;
-  // eslint-disable-next-line no-console
-  console.log('[mr-poll] ✓ MobileRider response', {
-    status: res.status, rawJson: json, active, inactive,
-  });
+  const { active = [], inactive = [] } = await res.json();
   return { active: new Set(active), inactive: new Set(inactive) };
 }

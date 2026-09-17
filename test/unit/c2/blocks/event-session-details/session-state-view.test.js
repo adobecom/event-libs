@@ -1,9 +1,10 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
-  getSessionTimes, getAllSessionTimes, getState, nextBoundary, formatDateTime, renderStatus,
-  mountSessionState, readStatusLabels,
+  getSessionTimes, getAllSessionTimes, getState, stateForPhase, nextBoundary, formatDateTime,
+  renderStatus, mountSessionState, readStatusLabels,
 } from '../../../../../event-libs/v1/c2/blocks/event-session-details/session-state-view.js';
+import { PLAYBACK_PHASE } from '../../../../../event-libs/v1/c2/utils/video-session.js';
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
 
@@ -146,6 +147,17 @@ describe('session-state-view', () => {
         expect(getState(1500, reversed)).to.equal('live');
       });
     });
+  });
+
+  // stateForPhase maps the shared playback phase (from watchPlaybackPhase, used for livestreamed
+  // sessions so the eyebrow and video player never disagree) to the eyebrow's status.
+  describe('stateForPhase', () => {
+    it('pre-event is upcoming', () => expect(stateForPhase(PLAYBACK_PHASE.PRE_EVENT)).to.equal('upcoming'));
+    it('watch-live is live', () => expect(stateForPhase(PLAYBACK_PHASE.WATCH_LIVE)).to.equal('live'));
+    it('simulive is live', () => expect(stateForPhase(PLAYBACK_PHASE.SIMULIVE)).to.equal('live'));
+    it('dvr-buffer is live (VOD not final yet)', () => expect(stateForPhase(PLAYBACK_PHASE.DVR_BUFFER)).to.equal('live'));
+    it('on-demand is on-demand', () => expect(stateForPhase(PLAYBACK_PHASE.ON_DEMAND)).to.equal('on-demand'));
+    it('null/unknown falls back to on-demand', () => expect(stateForPhase(null)).to.equal('on-demand'));
   });
 
   describe('nextBoundary', () => {

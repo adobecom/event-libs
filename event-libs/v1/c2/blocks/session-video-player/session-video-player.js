@@ -473,8 +473,9 @@ function awaitEmbedDecision(el) {
 
 function resolveVideoForPhase(phase, sessionTimes, session) {
   // eslint-disable-next-line no-console
-  console.log('[svp-dvr] resolveVideoForPhase()', {
+  console.log('[svp-resolve] resolveVideoForPhase() CALLED', {
     phase,
+    isPlayablePhase: PLAYABLE_PHASES.includes(phase),
     mrDvrVideoId: session?.mrDvrVideoId,
     mrSkinId: session?.mrSkinId,
     mpcId: session?.mpcId,
@@ -482,22 +483,22 @@ function resolveVideoForPhase(phase, sessionTimes, session) {
   if (phase === PLAYBACK_PHASE.ON_DEMAND) {
     const v = pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
     // eslint-disable-next-line no-console
-    console.log('[svp-dvr] ON_DEMAND video resolved', v);
+    console.log('[svp-resolve] → ON_DEMAND video', v);
     return v;
   }
   if (phase === PLAYBACK_PHASE.DVR_BUFFER) {
     if (!session?.mrDvrVideoId) {
       // eslint-disable-next-line no-console
-      console.log('[svp-dvr] DVR_BUFFER but NO mrDvrVideoId → null (nothing to play)');
+      console.log('[svp-resolve] → DVR_BUFFER but no mrDvrVideoId → null');
       return null;
     }
     const v = { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
     // eslint-disable-next-line no-console
-    console.log('[svp-dvr] DVR_BUFFER video resolved', v);
+    console.log('[svp-resolve] → DVR_BUFFER video', v);
     return v;
   }
   // eslint-disable-next-line no-console
-  console.log('[svp-dvr] phase not playable → null', { phase });
+  console.log('[svp-resolve] → phase is NOT playable (e.g. WATCH_LIVE / PRE_EVENT) → no video, no embed', { phase });
   return null;
 }
 
@@ -552,18 +553,21 @@ export default async function init(el) {
   let embeddedPhase = null;
 
   const onPhase = (phase) => {
-    // eslint-disable-next-line no-console
-    console.log('[svp-dvr] onPhase() fired', {
-      phase, isPlayablePhase: PLAYABLE_PHASES.includes(phase), embeddedPhase, connected: el.isConnected,
-    });
     if (!el.isConnected) return;
+    // eslint-disable-next-line no-console
+    console.log('[svp-resolve] onPhase() received phase', {
+      phase,
+      isPlayable: PLAYABLE_PHASES.includes(phase),
+      willCallResolve: PLAYABLE_PHASES.includes(phase),
+      note: PLAYABLE_PHASES.includes(phase)
+        ? 'playable → resolving a video to embed'
+        : 'NOT playable (e.g. WATCH_LIVE while stream is live) → no video, nothing embeds',
+    });
     const video = PLAYABLE_PHASES.includes(phase)
       ? resolveVideoForPhase(phase, sessionTimes, session)
       : null;
 
     if (video && phase === embeddedPhase) {
-      // eslint-disable-next-line no-console
-      console.log('[svp-dvr] onPhase: already embedded this phase — skipping', { phase });
       return;
     }
 

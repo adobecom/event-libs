@@ -1,7 +1,14 @@
 import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
 import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
-import { currentSessionHasEnded, findEmbeddableVideos } from '../../utils/video-session.js';
+import {
+  currentSessionHasEnded,
+  findEmbeddableVideos,
+  watchPlaybackPhase,
+  buildSessionFromMetadata,
+  parseJsonMetadata,
+  PLAYBACK_PHASE,
+} from '../../utils/video-session.js';
 import { renderSchedule } from './schedule.js';
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
@@ -37,6 +44,22 @@ export function getState(nowMs, slots) {
   if (!list.length) return 'on-demand';
   if (list.some(({ start, end }) => nowMs >= start && nowMs <= end)) return 'live';
   return nowMs < Math.min(...list.map(({ start }) => start)) ? 'upcoming' : 'on-demand';
+}
+
+// Maps the shared playback phase (from watchPlaybackPhase — the same poll-aware engine the video
+// player uses) to the eyebrow's status. This keeps the eyebrow and the player in sync: while the
+// MobileRider stream is live the phase stays WATCH_LIVE, so the eyebrow reads 'live' instead of
+// flipping to 'on-demand' at the authored end time. DVR_BUFFER (the just-aired replay, VOD not
+// final yet) also reads 'live'; SIMULIVE is a premiere, also 'live'.
+export function stateForPhase(phase) {
+  switch (phase) {
+    case PLAYBACK_PHASE.PRE_EVENT: return 'upcoming';
+    case PLAYBACK_PHASE.SIMULIVE:
+    case PLAYBACK_PHASE.WATCH_LIVE:
+    case PLAYBACK_PHASE.DVR_BUFFER: return 'live';
+    case PLAYBACK_PHASE.ON_DEMAND: return 'on-demand';
+    default: return 'on-demand';
+  }
 }
 
 export function nextBoundary(nowMs, slots) {
@@ -193,6 +216,21 @@ export function mountSessionState({
     if (ccEl) ccEl.hidden = state !== 'on-demand';
   };
 
+  const session = buildSessionFromMetadata(parseJsonMetadata('session-times', 'session-details'));
+
+  // A livestreamed session (mrStreamId) is driven by the same poll-aware engine the video player
+  // uses (watchPlaybackPhase), so the eyebrow and player never disagree: while the MobileRider
+  // stream is live the phase stays WATCH_LIVE and the eyebrow reads 'live' rather than flipping to
+  // 'on-demand' at the authored end time. Non-live sessions keep the simple clock-based loop.
+  if (session?.mrStreamId) {
+    const stop = watchPlaybackPhase(session, (phase) => {
+      const now = getNowMs();
+      const state = phase == null ? getState(now, slots) : stateForPhase(phase);
+      apply(state, now);
+    });
+    return stop;
+  }
+
   const evaluate = () => {
     const now = getNowMs();
     apply(getState(now, slots), now);
@@ -200,4 +238,5 @@ export function mountSessionState({
     if (boundary !== null) setTimeout(evaluate, Math.min((boundary - now) + 500, MAX_TIMEOUT));
   };
   evaluate();
+  return undefined;
 }
