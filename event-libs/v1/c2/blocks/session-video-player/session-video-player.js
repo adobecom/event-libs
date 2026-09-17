@@ -4,6 +4,7 @@ import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
   VIDEO_PLAYABLE_KEY,
+  VIDEO_CONTAINER_CLASS,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   closestSectionWithStyle,
   getVideoProgress as readVideoProgress,
@@ -445,6 +446,16 @@ function isWinningInstance(el, hasPlaylist) {
   return isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist;
 }
 
+// Hide the losing player without removing any Milo section from the DOM (a section removal
+// retriggers loadArea and loops). The full-width losing instance hides its whole
+// session-video-container section; a losing instance inside the playlist container hides only its
+// own element so the playlist itself stays visible.
+function hideLosingInstance(el) {
+  const fullWidthSection = closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS);
+  const target = fullWidthSection || el;
+  target.classList.add('session-video-hidden');
+}
+
 function awaitEmbedDecision(el) {
   const existingDecision = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
   if (existingDecision != null) {
@@ -494,14 +505,14 @@ function loadWhenDecided(el, sessionId, video) {
 
   (async () => {
     try {
-      // eslint-disable-next-line no-console
-      console.log('[svp-race] player waiting for playlist decision…', { insidePlaylist: isInsidePlaylistContainer(el) });
       const isWinner = await awaitEmbedDecision(el);
-      // eslint-disable-next-line no-console
-      console.log('[svp-race] player decision resolved', { isWinner, insidePlaylist: isInsidePlaylistContainer(el), decision: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY) });
-      if (!isWinner) return;
-      // eslint-disable-next-line no-console
-      console.log('[svp-race] player EMBEDDING', { insidePlaylist: isInsidePlaylistContainer(el) });
+      if (!isWinner) {
+        // The losing instance hides ITSELF (display:none via a class) rather than having the
+        // playlist remove its section. Removing a Milo section from the DOM retriggers loadArea and
+        // loops; a hidden-but-present section does not.
+        hideLosingInstance(el);
+        return;
+      }
       loadVideoPlayer(el, sessionId, video);
     } catch (error) {
       logError(`could not resolve the video layout decision: ${error.message}`);

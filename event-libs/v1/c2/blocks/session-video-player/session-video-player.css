@@ -41,3 +41,10 @@
     animation: none;
   }
 }
+
+/* A losing player instance (it lost the layout decision to the other instance) hides its own
+   container in place instead of the playlist removing the Milo section — removing a section
+   retriggers loadArea and loops. */
+.session-video-hidden {
+  display: none;
+}

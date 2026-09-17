@@ -11,9 +11,6 @@ import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
   VIDEO_PLAYABLE_KEY,
-  VIDEO_CONTAINER_CLASS,
-  VIDEO_PLAYLIST_CONTAINER_CLASS,
-  findSectionWithStyle,
   getVideoProgress as readVideoProgress,
   onElementDetached,
   parseJsonMetadata as parseSharedJsonMetadata,
@@ -605,51 +602,13 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
-const COLLAPSE_TRANSITION_MS = 250;
-const COLLAPSE_FALLBACK_MS = COLLAPSE_TRANSITION_MS + 100;
-
-function collapseAndRemove(target) {
-  // eslint-disable-next-line no-console
-  console.log('[pl-race] collapseAndRemove', { targetClass: target?.className, alreadyCollapsing: target?.classList?.contains('is-collapsing') });
-  if (!target || target.classList.contains('is-collapsing')) return;
-  target.classList.add('is-collapsing');
-
-  let removed = false;
-  const removeOnce = () => {
-    if (removed) return;
-    removed = true;
-    clearTimeout(fallbackTimer);
-    target.remove();
-  };
-
-  target.addEventListener('transitionend', removeOnce, { once: true });
-  const fallbackTimer = setTimeout(removeOnce, COLLAPSE_FALLBACK_MS);
-}
-
-function hasEmbeddedVideoPlayer(container) {
-  return container?.querySelector('.session-video-player')?.dataset.embedded === 'true';
-}
-
+// The playlist's ONLY job here is to publish its yes/no answer. It does not remove any Milo
+// section (doing so retriggers loadArea and loops) — each losing player instance hides itself,
+// and the playlist removes only its own block via removeBlock() on the NO path.
 function announceVideoDecision(hasPlaylist) {
   // eslint-disable-next-line no-console
   console.log('[pl-race] >>> announceVideoDecision (playlist SIGNAL)', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
-
-  if (hasPlaylist) {
-
-    const videoContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
-    const embedded = hasEmbeddedVideoPlayer(videoContainer);
-    // eslint-disable-next-line no-console
-    console.log('[pl-race] announce(true): full-width videoContainer', { found: !!videoContainer, fullWidthEmbedded: embedded, willCollapse: !!videoContainer && !embedded });
-    if (!hasEmbeddedVideoPlayer(videoContainer)) collapseAndRemove(videoContainer);
-    return;
-  }
-
-  const playlistContainer = findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS);
-  if (!hasEmbeddedVideoPlayer(playlistContainer)) {
-    collapseAndRemove(playlistContainer?.querySelector('.session-video-player'));
-  }
-  collapseAndRemove(playlistContainer?.querySelector('.session-video-playlist'));
 }
 
 function removeBlock(el) {
