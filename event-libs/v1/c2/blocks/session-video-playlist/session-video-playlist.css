@@ -735,9 +735,3 @@
     aspect-ratio: 136 / 77;
   }
 }
-
-/* Hide-in-place instead of removing the block: removing a Milo section retriggers loadArea and
-   loops (grid-column re-loads a fragment from a leftover playlist-row link). */
-.session-video-hidden {
-  display: none;
-}

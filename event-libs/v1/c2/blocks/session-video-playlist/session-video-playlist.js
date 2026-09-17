@@ -606,19 +606,13 @@ function buildAutoplayToggle(el) {
 // section (doing so retriggers loadArea and loops) — each losing player instance hides itself,
 // and the playlist removes only its own block via removeBlock() on the NO path.
 function announceVideoDecision(hasPlaylist) {
-  // eslint-disable-next-line no-console
-  console.log('[pl-race] >>> announceVideoDecision (playlist SIGNAL)', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 }
 
 function removeBlock(el) {
-  // eslint-disable-next-line no-console
-  console.log('[pl-race] removeBlock() → playlist HIDDEN (not removed) + announce(false)');
   window.dispatchEvent(new CustomEvent('session-video-playlist:removed'));
   announceVideoDecision(false);
-  // Hide instead of remove: removing a Milo section/block retriggers loadArea (and grid-column
-  // re-loads a fragment from a leftover playlist-row link), causing a re-decoration loop.
-  el.classList.add('session-video-hidden');
+  el.remove();
 }
 
 function resolveEventStartMs() {
@@ -693,8 +687,6 @@ export default async function init(el) {
   ensureStylesheet('session-video-playlist-css', BLOCK_CSS_URL);
   playlistInstanceId += 1;
   const LIST_ID = `session-video-playlist-list-${playlistInstanceId}`;
-  // eslint-disable-next-line no-console
-  console.log('[pl-race] init()', { instanceId: playlistInstanceId });
 
   const background = readBackgroundConfig(el);
   if (background) el.style.setProperty('--vp-authored-bg', background);
@@ -790,16 +782,10 @@ export default async function init(el) {
     // (awaitEmbedDecision) before embedding either full-width or inside the playlist container.
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
-    // eslint-disable-next-line no-console
-    console.log('[pl-race] render()', { instanceId: playlistInstanceId, topicCount: topics.length, rowCount: rows.length, minSessions });
     if (!rows.length) {
-      // eslint-disable-next-line no-console
-      console.log('[pl-race] render: not enough rows → answer NO');
       removeBlock(el);
       return;
     }
-    // eslint-disable-next-line no-console
-    console.log('[pl-race] render: has rows → answer YES, building playlist');
     announceVideoDecision(true);
 
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
@@ -821,20 +807,14 @@ export default async function init(el) {
 
   const runRenderFlow = () => {
     const existing = sessions.value;
-    // eslint-disable-next-line no-console
-    console.log('[pl-race] runRenderFlow', { instanceId: playlistInstanceId, sessionCount: existing.length, status: sessionsStatus.value });
     if (existing.length) {
       render(existing);
       return;
     }
     if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
-      // eslint-disable-next-line no-console
-      console.log('[pl-race] runRenderFlow: terminal status + no sessions → answer NO');
       removeBlock(el);
       return;
     }
-    // eslint-disable-next-line no-console
-    console.log('[pl-race] runRenderFlow: waiting for sessions…');
     let unsubscribeSessions = () => {};
     let unsubscribeStatus = () => {};
     const stopWaiting = () => {

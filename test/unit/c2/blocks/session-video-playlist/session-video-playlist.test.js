@@ -598,7 +598,10 @@ describe('session-video-playlist', () => {
       setMeta('session-times', sessionTimesMeta());
     });
 
-    it('collapses the losing session-video-container when a playlist renders', async () => {
+    // The playlist no longer removes/collapses any Milo section — it only publishes its yes/no
+    // layout decision, and each losing player instance hides itself. Removing a section retriggers
+    // Milo's loadArea (grid-column re-loads a fragment from a leftover playlist-row link) and loops.
+    it('announces hasPlaylist:true and does not collapse the video container when it renders', async () => {
       setMeta('custom-attributes', playlistAttribute());
       const { playlist, videoSection } = buildPage();
       sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
@@ -606,34 +609,23 @@ describe('session-video-playlist', () => {
 
       await initAndPlay(playlist);
 
-      expect(videoSection.classList.contains('is-collapsing')).to.be.true;
+      expect(BlockMediator.get('videoLayoutDecision')).to.deep.equal({ hasPlaylist: true });
+      expect(videoSection.classList.contains('is-collapsing')).to.be.false;
+      expect(videoSection.isConnected).to.be.true;
     });
 
-    it('collapses only the video blocks, never the shared container or its siblings', async () => {
-      const { playlist, playlistSection, playlistPlayer, sibling } = buildPage();
+    it('announces hasPlaylist:false without collapsing sibling sections when empty', async () => {
+      const { playlist, playlistSection, sibling } = buildPage();
       // Terminal-but-empty catalog: nothing to show, so this block removes itself and
-      // announces hasPlaylist:false — the branch that targets the playlist container.
+      // announces hasPlaylist:false.
       sessionsStatus.value = 'ready';
 
       await initAndPlay(playlist);
 
-      expect(playlistPlayer.classList.contains('is-collapsing')).to.be.true;
+      expect(BlockMediator.get('videoLayoutDecision')).to.deep.equal({ hasPlaylist: false });
       expect(playlistSection.classList.contains('is-collapsing')).to.be.false;
       expect(sibling.classList.contains('is-collapsing')).to.be.false;
       expect(sibling.isConnected).to.be.true;
-    });
-
-    it('leaves an already-embedded player alone rather than tearing it out', async () => {
-      setMeta('custom-attributes', playlistAttribute());
-      const { playlist, videoSection, fullWidthPlayer } = buildPage();
-      fullWidthPlayer.dataset.embedded = 'true';
-      sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
-      addConfigRow(playlist, 'minimum-sessions', '2');
-
-      await initAndPlay(playlist);
-
-      expect(videoSection.classList.contains('is-collapsing')).to.be.false;
-      expect(videoSection.isConnected).to.be.true;
     });
   });
 
