@@ -629,6 +629,8 @@ function hasEmbeddedVideoPlayer(container) {
 }
 
 function announceVideoDecision(hasPlaylist) {
+  // eslint-disable-next-line no-console
+  console.log('[pl-debug] playlist SENDING SIGNAL → announceVideoDecision', { hasPlaylist });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
   if (hasPlaylist) {
@@ -729,6 +731,8 @@ export default async function init(el) {
 
   const context = resolveRenderContext(el);
   if (!context) {
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] removing: no render context (bad/missing config)');
     removeBlock(el);
     return;
   }
@@ -819,10 +823,16 @@ export default async function init(el) {
     // instance, so there is no race — do NOT gate this on the player's embed state.
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] render() resolved rows', { rowCount: rows.length });
     if (!rows.length) {
+      // eslint-disable-next-line no-console
+      console.log('[pl-debug] removing: no rows to render');
       removeBlock(el);
       return;
     }
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] rendering playlist with rows');
     announceVideoDecision(true);
 
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
@@ -844,14 +854,20 @@ export default async function init(el) {
 
   const runRenderFlow = () => {
     const existing = sessions.value;
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] runRenderFlow', { sessionCount: existing.length, status: sessionsStatus.value });
     if (existing.length) {
       render(existing);
       return;
     }
     if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
+      // eslint-disable-next-line no-console
+      console.log('[pl-debug] removing: status terminal + no sessions', { status: sessionsStatus.value });
       removeBlock(el);
       return;
     }
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] waiting for sessions to load…');
     let unsubscribeSessions = () => {};
     let unsubscribeStatus = () => {};
     const stopWaiting = () => {
@@ -869,6 +885,8 @@ export default async function init(el) {
     unsubscribeStatus = sessionsStatus.subscribe((status) => {
       if (status !== 'ready' && status !== 'error') return;
       if (sessions.value.length) return;
+      // eslint-disable-next-line no-console
+      console.log('[pl-debug] removing: catalog resolved terminal with no sessions (e.g. API error)', { status });
       stopWaiting();
       removeBlock(el);
     });
