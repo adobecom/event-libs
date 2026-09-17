@@ -155,7 +155,7 @@ describe('session-state-view', () => {
     it('pre-event is upcoming', () => expect(stateForPhase(PLAYBACK_PHASE.PRE_EVENT)).to.equal('upcoming'));
     it('watch-live is live', () => expect(stateForPhase(PLAYBACK_PHASE.WATCH_LIVE)).to.equal('live'));
     it('simulive is live', () => expect(stateForPhase(PLAYBACK_PHASE.SIMULIVE)).to.equal('live'));
-    it('dvr-buffer is live (VOD not final yet)', () => expect(stateForPhase(PLAYBACK_PHASE.DVR_BUFFER)).to.equal('live'));
+    it('dvr-buffer is on-demand (live stream ended, replay/VOD playing)', () => expect(stateForPhase(PLAYBACK_PHASE.DVR_BUFFER)).to.equal('on-demand'));
     it('on-demand is on-demand', () => expect(stateForPhase(PLAYBACK_PHASE.ON_DEMAND)).to.equal('on-demand'));
     it('null/unknown falls back to on-demand', () => expect(stateForPhase(null)).to.equal('on-demand'));
   });

@@ -49,14 +49,15 @@ export function getState(nowMs, slots) {
 // Maps the shared playback phase (from watchPlaybackPhase — the same poll-aware engine the video
 // player uses) to the eyebrow's status. This keeps the eyebrow and the player in sync: while the
 // MobileRider stream is live the phase stays WATCH_LIVE, so the eyebrow reads 'live' instead of
-// flipping to 'on-demand' at the authored end time. DVR_BUFFER (the just-aired replay, VOD not
-// final yet) also reads 'live'; SIMULIVE is a premiere, also 'live'.
+// flipping to 'on-demand' at the authored end time. Once the live stream ends the player switches
+// to the DVR replay — per product, the eyebrow reads 'on-demand' from that point on (DVR_BUFFER and
+// ON_DEMAND both). SIMULIVE is a premiere, so 'live'.
 export function stateForPhase(phase) {
   switch (phase) {
     case PLAYBACK_PHASE.PRE_EVENT: return 'upcoming';
     case PLAYBACK_PHASE.SIMULIVE:
-    case PLAYBACK_PHASE.WATCH_LIVE:
-    case PLAYBACK_PHASE.DVR_BUFFER: return 'live';
+    case PLAYBACK_PHASE.WATCH_LIVE: return 'live';
+    case PLAYBACK_PHASE.DVR_BUFFER:
     case PLAYBACK_PHASE.ON_DEMAND: return 'on-demand';
     default: return 'on-demand';
   }
