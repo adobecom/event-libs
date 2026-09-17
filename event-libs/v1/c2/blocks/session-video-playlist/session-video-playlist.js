@@ -813,7 +813,19 @@ export default async function init(el) {
   }
 
   const render = (sessionList) => {
+    const videoContainerSection = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
+    const playlistContainerSection = findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS);
+    // eslint-disable-next-line no-console
+    console.log('[pl-race] render() guard check', {
+      videoContainerFound: !!videoContainerSection,
+      videoContainerHasEmbeddedPlayer: hasEmbeddedVideoPlayer(videoContainerSection),
+      playlistContainerFound: !!playlistContainerSection,
+      playlistContainerHasEmbeddedPlayer: hasEmbeddedVideoPlayer(playlistContainerSection),
+      allSectionStyles: [...document.querySelectorAll('.section')].map((s) => s.className).filter((c) => c.includes('video')),
+    });
     if (hasEmbeddedVideoPlayer(findSectionWithStyle(VIDEO_CONTAINER_CLASS))) {
+      // eslint-disable-next-line no-console
+      console.log('[pl-race] GUARD FIRED → removing playlist (full-width player embedded)');
       removeBlock(el);
       return;
     }
