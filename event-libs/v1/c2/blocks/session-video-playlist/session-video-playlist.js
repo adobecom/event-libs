@@ -725,6 +725,8 @@ export default async function init(el) {
   ensureStylesheet('session-video-playlist-css', BLOCK_CSS_URL);
   playlistInstanceId += 1;
   const LIST_ID = `session-video-playlist-list-${playlistInstanceId}`;
+  // eslint-disable-next-line no-console
+  console.log('[pl-debug] ===== init() CALLED =====', { instanceId: playlistInstanceId, elConnected: el.isConnected, alreadyRendered: el.classList.contains('is-rendered') });
 
   const background = readBackgroundConfig(el);
   if (background) el.style.setProperty('--vp-authored-bg', background);
@@ -908,6 +910,8 @@ export default async function init(el) {
   const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
   if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
     started = true;
+    // eslint-disable-next-line no-console
+    console.log('[pl-debug] init: durable playable matched → runRenderFlow', { instanceId: playlistInstanceId });
     runRenderFlow();
   }
 }
