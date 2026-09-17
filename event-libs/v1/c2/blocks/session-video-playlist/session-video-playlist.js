@@ -727,6 +727,10 @@ export default async function init(el) {
   const LIST_ID = `session-video-playlist-list-${playlistInstanceId}`;
   // eslint-disable-next-line no-console
   console.log('[pl-debug] ===== init() CALLED =====', { instanceId: playlistInstanceId, elConnected: el.isConnected, alreadyRendered: el.classList.contains('is-rendered') });
+  if (playlistInstanceId <= 3) {
+    // eslint-disable-next-line no-console
+    console.trace('[pl-debug] init() call stack');
+  }
 
   const background = readBackgroundConfig(el);
   if (background) el.style.setProperty('--vp-authored-bg', background);
