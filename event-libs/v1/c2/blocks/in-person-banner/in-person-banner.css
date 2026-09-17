@@ -32,7 +32,7 @@ body:has(.in-person-banner) main > .section:first-child:not(.rounded-corners-top
   );
 }
 
-body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
+body:has(.global-navigation):has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
   margin-top: calc(
     var(--in-person-banner-height, var(--global-height-nav, 80px)) - var(--feds-nav-total-height, 80px)
   );
