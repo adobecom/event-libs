@@ -72,11 +72,10 @@ export const ENV_MAP = {
     },
   },
 };
-// CDN fronting session-catalog only, GET-only (MWPW-206486). dev02/stage02 have no CDN.
+// CDN fronting session-catalog only, GET-only (MWPW-206486). Prod only — the non-prod CDN
+// hosts aren't reliably resolvable on every network (e.g. off VPN), so every other
+// environment (dev/local/stage, same as dev02/stage02) defaults straight to its ESP origin.
 const SESSION_CATALOG_CDN_MAP = {
-  dev: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
-  local: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
-  stage: 'https://events-platform-stage-cdn.aws125.adobeitc.com',
   prod: 'https://events-platform-prod-cdn.aws122.adobeitc.com',
 };
 

@@ -4,8 +4,9 @@ import { fetchFederalTrackIcon } from '../../../../features/icons/federal-icons.
 import { resolveTrackBadge, resolveNamedTrackBadge } from '../utils/session-filters.js';
 
 // `track` renders one named track instead of deriving the session's own primary track;
-// `hideCount` drops the "+N" for callers rendering extra tracks as their own badges.
-export function CategoryBadge({ session, size, track, hideCount }) {
+// `hideCount` drops the "+N" for callers rendering extra tracks as their own badges;
+// `iconSize` defaults to the original 20px so existing callers are unaffected.
+export function CategoryBadge({ session, size, track, hideCount, iconSize = 20 }) {
   const badge = track ? resolveNamedTrackBadge(track) : resolveTrackBadge(session);
   if (!badge) return null;
 
@@ -13,7 +14,7 @@ export function CategoryBadge({ session, size, track, hideCount }) {
   return html`
     <span class=${cls}>
       <span class="sg-category-badge__icon-color" style=${badge.color ? `--sg-badge-icon-color:${badge.color}` : ''}>
-        ${html`<${Icon} name=${badge.icon} size=${20} resolve=${fetchFederalTrackIcon} />`}
+        ${html`<${Icon} name=${badge.icon} size=${iconSize} resolve=${fetchFederalTrackIcon} />`}
       </span>
       <span class="sg-category-badge__label">${badge.label}</span>
       ${!hideCount && badge.count > 0 && html`<span class="sg-category-badge__count">+${badge.count}</span>`}

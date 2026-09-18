@@ -1,26 +1,20 @@
 @import '../../styles/tokens.css';
 @import './sessions-guide-overlays.css';
 
-.sessions-guide {
+:is(.sessions-guide, .sessions-guide-full-page) {
   font-family: var(--body-font-family);
   color: var(--s2a-color-content-default);
   background: var(--s2a-color-background-default);
   box-sizing: border-box;
 }
 
-.sessions-guide *,
-.sessions-guide *::before,
-.sessions-guide *::after {
-  box-sizing: inherit;
-}
-
-.sessions-guide .sg-app {
+:is(.sessions-guide, .sessions-guide-full-page) .sg-app {
   display: block;
   min-height: 100px;
   padding: var(--s2a-spacing-md);
 }
 
-.sessions-guide .sg-loading {
+:is(.sessions-guide, .sessions-guide-full-page) .sg-loading {
   color: var(--s2a-color-content-subtle);
   font-size: var(--s2a-font-size-sm);
 }
@@ -166,6 +160,12 @@
 .sg-portal *,
 .sg-portal *::before,
 .sg-portal *::after {
+  box-sizing: inherit;
+}
+
+:is(.sessions-guide, .sessions-guide-full-page) *,
+:is(.sessions-guide, .sessions-guide-full-page) *::before,
+:is(.sessions-guide, .sessions-guide-full-page) *::after {
   box-sizing: inherit;
 }
 
@@ -674,9 +674,14 @@
 
 /* ── Page Surface ────────────────────────────────────────── */
 
-.sessions-guide .sg-app--page {
+:is(.sessions-guide, .sessions-guide-full-page) .sg-app--page {
   display: block;
   min-height: 200px;
+
+  /* Full page runs edge-to-edge like the rest of the site; .sg-app's padding is a
+     drawer-only affordance. Top clearance now comes from .sg-full-page__header-wrap;
+     views/sections manage their own remaining inner spacing. */
+  padding: 0;
 }
 
 /* ── View layouts ────────────────────────────────────────── */
@@ -865,8 +870,7 @@
   flex-direction: column;
   align-items: stretch;
   flex-shrink: 0;
-  width: calc(100vw - 56px);
-  max-width: 300px;
+  width: 311px;
   overflow: hidden;
   transition: background 0.2s, border-color 0.2s;
 }
@@ -884,7 +888,6 @@
   height: 168px;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 15%);
 }
 
 .sg-live-card__image img {
@@ -901,7 +904,7 @@
 
 .sg-live-card__progress-row {
   position: absolute;
-  bottom: 16px;
+  bottom: 12px;
   left: 16px;
   right: 16px;
   display: flex;
@@ -957,6 +960,16 @@
   display: inline-flex;
   align-items: center;
   min-width: 0;
+}
+
+/* Figma 8463:87698, mobile 'live' card only. Fixed height keeps 1- and 2-badge cards the same size. */
+.sg-live-card__badges {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-xs);
+  height: 40px;
+  width: 100%;
+  margin-top: var(--s2a-spacing-sm);
 }
 
 .sg-live-card__body {
@@ -1050,6 +1063,17 @@
   overflow: hidden;
 }
 
+/* Mobile 'live' card: title renders first, so its usual top margin is just leading whitespace. */
+.sg-live-card--mobile-live .sg-live-card__title {
+  margin-top: 0;
+}
+
+/* Figma 8463:87698 — 311x355 total. Scoped to the modifier class so recommended/desktop keep
+   their own height. */
+.sg-live-card--mobile-live .sg-live-card__image {
+  height: 175px;
+}
+
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
 
 /* Hidden mobile through regular tablet (<1024px) — re-shown at 1024px+ below. */
@@ -1062,6 +1086,11 @@
   align-items: center;
   gap: 12px;
   margin-top: var(--s2a-spacing-lg);
+}
+
+/* Figma 8463:87698 — same 16px rhythm as the rest of this card, instead of the shared 24px. */
+.sg-live-card--mobile-live .sg-live-card__actions {
+  margin-top: var(--s2a-spacing-sm);
 }
 
 /* `live` variant only (Also Live carousel) — own margin so other row consumers are unaffected. */
@@ -1086,6 +1115,11 @@
   white-space: nowrap;
   line-height: 1.2;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+/* Figma 8463:87698 — this card's buttons are 32px, not the shared 40px. */
+.sg-live-card--mobile-live .sg-live-card__btn {
+  height: 32px;
 }
 
 .sg-live-card__btn--watch {
@@ -1121,6 +1155,11 @@
   padding: 0;
   flex-shrink: 0;
   justify-content: center;
+}
+
+/* Keeps the favorite button a circle at the shrunk height above (base rule is a fixed 40px square). */
+.sg-live-card--mobile-live .sg-live-card__btn--favorite {
+  width: 32px;
 }
 
 /* ── Time Slot Row ───────────────────────────────────────── */
@@ -1163,6 +1202,17 @@
   flex-shrink: 0;
   padding: 0;
   margin: 0;
+}
+
+/* Figma MAX-2026-Virtual-VizD-SSOT node 8463:87705 — mobile shows time + timezone on one
+   line; tablet/desktop (below) keep the stacked layout for their narrower fixed-width column. */
+@media (max-width: 767px) {
+  .sg-time-row__label {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--s2a-spacing-4);
+    white-space: nowrap;
+  }
 }
 
 /* Matches .sg-time-row__time-value's font; font-family explicit since this is a real <h3>. */
@@ -1280,10 +1330,10 @@
 /* ── Session Card ────────────────────────────────────────── */
 
 /* stylelint-disable no-descending-specificity */
-:is(.sessions-guide, .sg-portal) .sg-card,
-:is(.sessions-guide, .sg-portal) .sg-card:is(:hover, :focus-within),
-:is(.sessions-guide, .sg-portal) .sg-card.is-scheduled,
-:is(.sessions-guide, .sg-portal) .sg-card.is-favorited {
+:is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card,
+:is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card:is(:hover, :focus-within),
+:is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled,
+:is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-favorited {
   flex-direction: column;
   width: 255px;
   min-height: 0;
@@ -1299,7 +1349,7 @@
 /* stylelint-enable no-descending-specificity */
 
 /* stylelint-disable-next-line no-descending-specificity */
-:is(.sessions-guide, .sg-portal) .sg-card {
+:is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card {
   flex-shrink: 0;
   display: flex;
   cursor: pointer;
@@ -1309,7 +1359,7 @@
 }
 
 /* stylelint-disable-next-line no-descending-specificity */
-:is(.sessions-guide, .sg-portal) .sg-card:active { background: var(--s2a-color-gray-75); }
+:is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card:active { background: var(--s2a-color-gray-75); }
 
 .sg-card__body {
   flex: 1 1 auto;
@@ -1723,8 +1773,7 @@
 
   .sg-live-card {
     flex-direction: column;
-    width: calc(100vw - 56px);
-    max-width: 300px;
+    width: 311px;
     flex-shrink: 0;
     border-radius: var(--s2a-border-radius-md);
     border: none;
@@ -2094,6 +2143,17 @@
     gap: var(--s2a-spacing-md);
   }
 
+  /* Full page (Figma 8463:87660): wider side gutter than the widget's drawer, and a shorter
+     top padding (xl, not 2xl) — this frame covers desktop only, big desktop (1920) is separate. */
+  .sg-full-page__header-wrap .sg-header {
+    padding-top: var(--s2a-spacing-xl);
+  }
+
+  .sg-full-page .sg-header-title-row,
+  .sg-full-page .sg-header-controls {
+    padding: 0 156px;
+  }
+
   /* ── Date Tabs ─────────────────────────────────────────────── */
 
   .sg-date-tabs {
@@ -2266,6 +2326,12 @@
     overflow: visible;
   }
 
+  /* Wider left gutter than the widget's drawer. Right stays at the base 20px so the card
+     track still bleeds to the true edge (see .sg-carousel__track's -20px margin). */
+  .sg-full-page .sg-carousel-section {
+    padding-left: 156px;
+  }
+
   .sg-section-title {
     font-family: var(--heading-font-family);
     font-weight: var(--s2a-font-weight-adobe-clean-display-black);
@@ -2284,6 +2350,12 @@
     color: var(--s2a-color-content-default);
     margin: 0;
     padding: var(--s2a-spacing-lg) var(--s2a-spacing-20) var(--s2a-spacing-sm);
+  }
+
+  /* Full page (Figma 8463:87648): wider side gutter than the widget's drawer. */
+  .sg-full-page .sg-upcoming-title {
+    padding-left: 156px;
+    padding-right: 156px;
   }
 
   /* ── Carousel ──────────────────────────────────────────────── */
@@ -2346,6 +2418,19 @@
     max-width: 1104px;
     border: 4px solid #fff;
     border-radius: 20px;
+  }
+
+  /* Full page has more available width than the widget — a cap, not a fixed width, so it can
+     still shrink on narrower viewports in this range. */
+  .sg-full-page .sg-live-card {
+    max-width: 1156px;
+  }
+
+  /* .sg-carousel__card-wrap has no explicit width, so a % width on .sg-live-card can't resolve
+     against it (content-sized flex item). flex-basis: 100% gives it a definite size to clamp
+     against. Scoped to full page — the widget's smaller cap doesn't hit this. */
+  .sg-full-page .sg-carousel-section--live .sg-carousel__card-wrap {
+    flex: 0 0 100%;
   }
 
   .sg-live-card:is(:hover, :focus-within) {
@@ -2510,6 +2595,12 @@
     overflow-y: visible;
   }
 
+  /* Full page (Figma 8463:87648): wider left gutter than the widget's drawer, matching
+     .sg-full-page .sg-upcoming-title; right stays 0 so the carousel still runs to the edge. */
+  .sg-full-page .sg-time-row {
+    padding-left: 156px;
+  }
+
   .sg-time-row:last-child { border-bottom: none; }
 
   .sg-time-row:is(:hover, :focus-within) { background: #f6f6f6; }
@@ -2573,7 +2664,7 @@
 
   /* ── Session cards ─────────────────────────────────────────── */
 
-  :is(.sessions-guide, .sg-portal) .sg-card {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card {
     flex-direction: row;
     width: 379px;
     min-height: 124px;
@@ -2595,7 +2686,7 @@
                 border-width 0.45s ease;
   }
 
-  :is(.sessions-guide, .sg-portal) .sg-card:is(:hover, :focus-within) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card:is(:hover, :focus-within) {
     flex-direction: row;
     width: 427px;
     min-height: 150px;
@@ -2618,8 +2709,8 @@
     z-index: 2;
   }
 
-  :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled,
-  :is(.sessions-guide, .sg-portal) .sg-card.is-favorited {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled,
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-favorited {
     flex-direction: row;
     width: 427px;
     min-height: 124px;
@@ -2642,8 +2733,8 @@
   }
 
   /* Restated: the resting .is-scheduled/.is-favorited rule ties on specificity and is later. */
-  :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
-  :is(.sessions-guide, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
     background: var(--s2a-color-gray-900);
     min-height: 150px;
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -2808,11 +2899,11 @@
 
 @media (hover: none) and (min-width: 1280px) {
   /* Kill transitions so tap-triggered :hover resets are instant */
-  :is(.sessions-guide, .sg-portal) .sg-card { transition: none; }
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card { transition: none; }
 
-  :is(.sessions-guide, .sg-portal) .sg-card:is(:hover, :focus-within),
-  :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
-  :is(.sessions-guide, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card:is(:hover, :focus-within),
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
     width: 379px;
     min-height: 124px;
     background: var(--s2a-color-gray-50);
@@ -2877,18 +2968,18 @@
   background: var(--s2a-color-background-default);
 }
 
-/* tabindex="-1" is only a Back-to-top landing target, so the UA focus ring here is noise. */
-.sg-full-page:focus,
-.sg-full-page:focus-visible {
-  outline: none;
-}
-
+/* Static, not sticky — sticky glued the ~300px control cluster to the top for the whole page.
+   Still needs its own top clearance since nothing else pushes it below GNAV on load. */
 .sg-full-page__header-wrap {
   border-bottom: 1px solid var(--s2a-color-border-subtle);
   background: var(--s2a-color-background-default);
-  position: sticky;
-  top: 0;
-  z-index: 60;
+  padding-top: var(--feds-nav-total-height, 80px);
+}
+
+@media (max-width: 767px) {
+  .sg-full-page__header-wrap {
+    border-bottom: none;
+  }
 }
 
 .sg-full-page__header-wrap .sg-header {
@@ -2900,6 +2991,46 @@
 .sg-full-page__body {
   flex: 1;
   padding: var(--s2a-spacing-lg) 0;
+}
+
+@media (max-width: 767px) {
+  .sg-full-page__body {
+    padding-top: 0;
+  }
+
+  .sg-full-page .sg-header-title-row,
+  .sg-full-page .sg-header-controls {
+    padding: 0 var(--s2a-spacing-lg);
+  }
+}
+
+@media (min-width: 1280px) {
+  .sg-full-page__body {
+    padding-top: 4px;
+  }
+}
+
+/* Large desktop (Figma 8463-87634): even wider content gutter than the 1280px tier's 156px.
+   Live card stays 1156px at this size too — no override needed. */
+@media (min-width: 1920px) {
+  .sg-full-page .sg-header-title-row,
+  .sg-full-page .sg-header-controls {
+    padding: 0 160px;
+  }
+
+  /* Right stays at the base 20px — see the 1280px tier's identical comment. */
+  .sg-full-page .sg-carousel-section {
+    padding-left: 160px;
+  }
+
+  .sg-full-page .sg-upcoming-title {
+    padding-left: 160px;
+    padding-right: 160px;
+  }
+
+  .sg-full-page .sg-time-row {
+    padding-left: 160px;
+  }
 }
 
 /* ── Track section (On Demand) ───────────────────────────────── */

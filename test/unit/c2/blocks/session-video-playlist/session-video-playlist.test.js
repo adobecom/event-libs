@@ -9,10 +9,12 @@ import init, {
   resolveCurrentSessionTopics,
   resolvePlaylistTitle,
   applyExpandedHeightCap,
+  _internals,
 } from '../../../../../event-libs/v1/c2/blocks/session-video-playlist/session-video-playlist.js';
 import {
   sessions, sessionsStatus, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../event-libs/v1/utils/session-store.js';
+import BlockMediator from '../../../../../event-libs/v1/deps/block-mediator.min.js';
 
 const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
 const AUTOPLAY_STORAGE_KEY = 'session-video-playlist:play-all';
@@ -107,6 +109,19 @@ function addConfigRow(el, key, value) {
 
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
+// The playlist now renders ONLY when the player signals it has a video (it mirrors the player and
+// never renders alone). Tests that expect a render must init, then fire the player's playable
+// signal for the current session, then flush.
+const firePlayable = (sessionId = 'cur') => window.dispatchEvent(
+  new CustomEvent('session-video-player:playable', { detail: { sessionId } }),
+);
+async function initAndPlay(playlist, sessionId = 'cur') {
+  await init(playlist);
+  await flush();
+  firePlayable(sessionId);
+  await flush();
+}
+
 describe('session-video-playlist', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -118,6 +133,11 @@ describe('session-video-playlist', () => {
     pendingActions.value = new Set();
     liveStreamActiveIds.value = new Set();
     window.lana = { log: sinon.stub() };
+    // Now that the playlist renders real rows in far more tests (it's gated on the player's
+    // playable signal via initAndPlay), any stray autoplay `ended` event could call the real
+    // _internals.navigate → a full page reload that detaches the WTR frame and wipes the run.
+    // Stub the navigation seam globally; the auto-advance test reads this same stub to assert.
+    sinon.stub(_internals, 'navigate');
   });
 
   afterEach(() => {
@@ -174,6 +194,12 @@ describe('session-video-playlist', () => {
 
     it('respects minExpanded even when both constraints would squeeze smaller', () => {
       expect(computeDrawerCapPx(1000, 980, { gap: 16, minExpanded: 150 })).to.equal(150);
+    });
+
+    it('never exceeds the viewport when the title is scrolled above it (negative bottom)', () => {
+      // Scrolled down: title's getBoundingClientRect top/bottom go negative, so titleCap
+      // would balloon past the viewport — the drawer must stay within viewport - gap.
+      expect(computeDrawerCapPx(1000, -300, { gap: 16, topGap: 100 })).to.equal(900);
     });
   });
 
@@ -249,49 +275,76 @@ describe('session-video-playlist', () => {
 
     it('sorts sessions with no start time (IPOD) after scheduled ones', () => {
       const scheduled = catalogSession({ id: 'scheduled' });
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 1 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 1 });
       const eventStartMs = Date.now() - 5 * HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod, scheduled], 2, eventStartMs).map((s) => s.id))
         .to.deep.equal(['scheduled', 'ipod']);
     });
 
-    it('excludes an IPOD session with no authored DVR delay', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: null });
+    // dvrDelayHours is removed from the catalog once the on-demand asset is actually
+    // available — its absence is a ready-now signal, not "gate forever".
+    it('includes an IPOD session with no authored DVR delay once the event has started', () => {
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: null });
       const eventStartMs = Date.now() - HOUR_MS;
-      expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs)).to.deep.equal([]);
+      expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs).map((s) => s.id))
+        .to.deep.equal(['ipod']);
     });
 
     // A real 0 is not the same as "unset": it means available from the event's start, so
     // it still has to be measured against eventStartMs rather than passing unconditionally.
     it('includes an IPOD session with a 0h DVR delay once the event has started', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 0 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 0 });
       const eventStartMs = Date.now() - HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs).map((s) => s.id))
         .to.deep.equal(['ipod']);
     });
 
     it('excludes an IPOD session with a 0h DVR delay before the event starts', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 0 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 0 });
       const eventStartMs = Date.now() + HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs)).to.deep.equal([]);
     });
 
     it('excludes an IPOD session whose DVR delay has not elapsed', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 5 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 5 });
       const eventStartMs = Date.now() - HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs)).to.deep.equal([]);
     });
 
     it('includes an IPOD session once its DVR delay has elapsed', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 1 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 1 });
       const eventStartMs = Date.now() - 5 * HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs).map((s) => s.id))
         .to.deep.equal(['ipod']);
     });
 
     it('excludes an IPOD session when no event start time is known at all', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 5 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 5 });
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, null)).to.deep.equal([]);
+    });
+
+    // Its own sessionStart/sessionEnd window still gates it while running, regardless of
+    // dvrDelayHours — DVR removal only signals readiness once the session has actually ended.
+    it('excludes an IPOD session with its own schedule that is still running, even with no DVR delay', () => {
+      const ipod = catalogSession({
+        id: 'ipod',
+        startTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
+        endTimeUtc: new Date(Date.now() + HOUR_MS).toISOString(),
+        hasOnDemandFormat: true,
+        dvrDelayHours: null,
+      });
+      expect(resolveTopicPlaylist('cur', topics, [ipod], 1)).to.deep.equal([]);
+    });
+
+    it('includes an IPOD session with its own schedule once sessionEnd has passed and DVR delay is unset', () => {
+      const ipod = catalogSession({
+        id: 'ipod',
+        startTimeUtc: new Date(Date.now() - 2 * HOUR_MS).toISOString(),
+        endTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
+        hasOnDemandFormat: true,
+        dvrDelayHours: null,
+      });
+      expect(resolveTopicPlaylist('cur', topics, [ipod], 1).map((s) => s.id)).to.deep.equal(['ipod']);
     });
 
     it('excludes a scheduled session that has not ended yet', () => {
@@ -333,8 +386,7 @@ describe('session-video-playlist', () => {
         }),
       ];
 
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
 
       const renderedIds = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .map((row) => row.dataset.itemId);
@@ -365,14 +417,63 @@ describe('session-video-playlist', () => {
       expect(playlist.isConnected).to.be.false;
     });
 
-    it('removes the block when the session has not ended', async () => {
+    it('waits (does not remove or render) while the session has not ended', async () => {
+      const before = BlockMediator.get('videoLayoutDecision');
       const { playlist } = buildPage();
       setMeta('session-id', 'cur');
       setMeta('session-times', sessionTimesMeta({ endTimeMillis: Date.now() + HOUR_MS }));
 
-      await init(playlist);
+      await initAndPlay(playlist);
 
-      expect(playlist.isConnected).to.be.false;
+      // Not removed — the block stays to render once the session ends. And crucially it must NOT
+      // announce a decision of its own while merely waiting (which would strand the player behind
+      // a permanent full-width layout). BlockMediator is a module singleton with no reset, so we
+      // assert the decision is UNCHANGED from before this init rather than a fixed value.
+      expect(playlist.isConnected).to.be.true;
+      expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
+      expect(BlockMediator.get('videoLayoutDecision')).to.deep.equal(before);
+    });
+
+    it('renders ONLY once the player signals playable, not merely because the catalog is ready', async () => {
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta());
+      setMeta('custom-attributes', playlistAttribute());
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+
+      await init(playlist);
+      await flush();
+      // Catalog is ready with qualifying sessions, but the player hasn't become playable yet —
+      // the playlist mirrors the player and must NOT render on its own.
+      expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
+
+      // Only the player's playable signal renders it.
+      firePlayable();
+      await flush();
+      expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
+      expect(BlockMediator.get('videoLayoutDecision')).to.deep.equal({ hasPlaylist: true });
+    });
+
+    it('renders when the player fires session-video-player:playable, even before the session\'s own end time', async () => {
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      // End time is in the FUTURE — the old clock gate would have blocked rendering, but the
+      // player signal now drives it, so it renders regardless of the schedule.
+      setMeta('session-times', sessionTimesMeta({ endTimeMillis: Date.now() + HOUR_MS }));
+      setMeta('custom-attributes', playlistAttribute());
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+
+      await initAndPlay(playlist);
+
+      expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
     });
 
     it('removes the block when the catalog is already ready but empty', async () => {
@@ -381,7 +482,7 @@ describe('session-video-playlist', () => {
       setMeta('session-times', sessionTimesMeta());
       sessionsStatus.value = 'ready';
 
-      await init(playlist);
+      await initAndPlay(playlist);
 
       expect(playlist.isConnected).to.be.false;
     });
@@ -392,18 +493,20 @@ describe('session-video-playlist', () => {
       setMeta('session-times', sessionTimesMeta());
       sessionsStatus.value = 'error';
 
-      await init(playlist);
+      await initAndPlay(playlist);
 
       expect(playlist.isConnected).to.be.false;
     });
 
-    it('removes the block when the catalog errors AFTER init subscribed', async () => {
+    it('removes the block when the catalog errors AFTER the player signals playable', async () => {
       const { playlist } = buildPage();
       setMeta('session-id', 'cur');
       setMeta('session-times', sessionTimesMeta());
       sessionsStatus.value = 'loading';
 
-      await init(playlist);
+      await initAndPlay(playlist);
+      firePlayable();
+      await flush();
       expect(playlist.isConnected).to.be.true;
 
       sessionsStatus.value = 'error';
@@ -418,8 +521,7 @@ describe('session-video-playlist', () => {
       setMeta('session-times', sessionTimesMeta());
       sessions.value = [catalogSession()];
 
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
 
       expect(playlist.isConnected).to.be.false;
     });
@@ -431,10 +533,50 @@ describe('session-video-playlist', () => {
       setMeta('custom-attributes', playlistAttribute());
       sessions.value = [catalogSession()];
 
+      await initAndPlay(playlist);
+
+      expect(playlist.isConnected).to.be.false;
+    });
+
+    it('stays mounted and idle (does not render or remove) until the player becomes playable', async () => {
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta());
+      setMeta('custom-attributes', playlistAttribute());
+      sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
+      addConfigRow(playlist, 'minimum-sessions', '2');
+
       await init(playlist);
       await flush();
 
-      expect(playlist.isConnected).to.be.false;
+      // No playable signal yet — the session may still reach a playable phase later (e.g.
+      // DVR-buffer with no asset now → on-demand with an mpc id later), so we must NOT tear down.
+      expect(playlist.isConnected).to.be.true;
+      expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
+      // ...and while idle it stays hidden (no .is-rendered) so it never sits as an empty box.
+      expect(playlist.classList.contains('is-rendered')).to.be.false;
+
+      // A later playable signal still renders it — and reveals it.
+      firePlayable();
+      await flush();
+      expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
+      expect(playlist.classList.contains('is-rendered')).to.be.true;
+    });
+
+    it('does not render on its own without a player signal', async () => {
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta());
+      setMeta('custom-attributes', playlistAttribute());
+      sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
+      addConfigRow(playlist, 'minimum-sessions', '2');
+
+      await init(playlist);
+      await flush();
+
+      // Still mounted, but nothing rendered and no layout decision announced yet.
+      expect(playlist.isConnected).to.be.true;
+      expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
     });
 
     it('dispatches session-video-playlist:removed when it removes itself', async () => {
@@ -443,7 +585,7 @@ describe('session-video-playlist', () => {
       const onRemoved = sinon.stub();
       window.addEventListener('session-video-playlist:removed', onRemoved);
 
-      await init(playlist);
+      await initAndPlay(playlist);
       window.removeEventListener('session-video-playlist:removed', onRemoved);
 
       expect(onRemoved.called).to.be.true;
@@ -462,8 +604,7 @@ describe('session-video-playlist', () => {
       sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
       addConfigRow(playlist, 'minimum-sessions', '2');
 
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
 
       expect(videoSection.classList.contains('is-collapsing')).to.be.true;
     });
@@ -474,8 +615,7 @@ describe('session-video-playlist', () => {
       // announces hasPlaylist:false — the branch that targets the playlist container.
       sessionsStatus.value = 'ready';
 
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
 
       expect(playlistPlayer.classList.contains('is-collapsing')).to.be.true;
       expect(playlistSection.classList.contains('is-collapsing')).to.be.false;
@@ -490,8 +630,7 @@ describe('session-video-playlist', () => {
       sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
       addConfigRow(playlist, 'minimum-sessions', '2');
 
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
 
       expect(videoSection.classList.contains('is-collapsing')).to.be.false;
       expect(videoSection.isConnected).to.be.true;
@@ -511,8 +650,7 @@ describe('session-video-playlist', () => {
         catalogSession({ id: 'a', title: 'Session A' }),
         catalogSession({ id: 'b', title: 'Session B' }),
       ];
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
     });
 
     it('renders one row per qualifying session plus the current one', () => {
@@ -592,8 +730,7 @@ describe('session-video-playlist', () => {
       }));
       const { playlist: fresh } = buildPage();
       addConfigRow(fresh, 'minimum-sessions', '2');
-      await init(fresh);
-      await flush();
+      await initAndPlay(fresh);
 
       const row = [...fresh.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
@@ -623,6 +760,48 @@ describe('session-video-playlist', () => {
     });
   });
 
+  describe('hide-progress-bar', () => {
+    async function renderWithHideProgress(hideValue) {
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta());
+      setMeta('custom-attributes', playlistAttribute());
+      const { playlist } = buildPage();
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      if (hideValue != null) addConfigRow(playlist, 'hide-progress-bar', hideValue);
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+      await initAndPlay(playlist);
+      return playlist;
+    }
+
+    it('shows the progress bar and duration by default', async () => {
+      const playlist = await renderWithHideProgress(null);
+      expect(playlist.querySelector('.session-video-playlist-row-progress')).to.exist;
+      expect(playlist.querySelector('.session-video-playlist-row-duration')).to.exist;
+    });
+
+    it('omits the progress bar and duration from every row when true', async () => {
+      const playlist = await renderWithHideProgress('true');
+      expect(playlist.querySelector('.session-video-playlist-row-progress')).to.not.exist;
+      expect(playlist.querySelector('.session-video-playlist-row-progress-track')).to.not.exist;
+      expect(playlist.querySelector('.session-video-playlist-row-duration')).to.not.exist;
+      // Rows themselves still render — only the progress element is skipped.
+      expect(playlist.querySelectorAll('.session-video-playlist-row')).to.have.lengthOf(3);
+    });
+
+    it('still shows the progress bar when the value is not exactly "true"', async () => {
+      const playlist = await renderWithHideProgress('false');
+      expect(playlist.querySelector('.session-video-playlist-row-progress')).to.exist;
+    });
+
+    it('parses the value case-insensitively', async () => {
+      const playlist = await renderWithHideProgress('TRUE');
+      expect(playlist.querySelector('.session-video-playlist-row-progress')).to.not.exist;
+    });
+  });
+
   describe('show more', () => {
     async function renderWithRows(count) {
       setMeta('session-id', 'cur');
@@ -636,8 +815,7 @@ describe('session-video-playlist', () => {
         title: `Session ${i}`,
         startTimeUtc: new Date(Date.now() - (count - i) * HOUR_MS).toISOString(),
       }));
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
       return playlist;
     }
 
@@ -678,8 +856,7 @@ describe('session-video-playlist', () => {
       addConfigRow(playlist, 'maximum-sessions', '3');
       sessions.value = Array.from({ length: 8 }, (unused, i) => catalogSession({ id: `s${i}` }));
 
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
 
       expect(playlist.querySelectorAll('.session-video-playlist-row')).to.have.lengthOf(9);
     });
@@ -789,9 +966,14 @@ describe('session-video-playlist', () => {
       setMeta('custom-attributes', playlistAttribute());
       ({ playlist } = buildPage());
       addConfigRow(playlist, 'minimum-sessions', '2');
-      sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
-      await init(playlist);
-      await flush();
+      // No page URL, so this playlist never auto-advances (empty data-href → the handler
+      // returns before assign). Only the auto-advance test's own playlist navigates, so a
+      // stray ended+autoplay event can't reload the runner via this shared instance.
+      sessions.value = [
+        catalogSession({ id: 'a', sessionPageUrl: '' }),
+        catalogSession({ id: 'b', sessionPageUrl: '' }),
+      ];
+      await initAndPlay(playlist);
     });
 
     it('persists the toggle to localStorage', () => {
@@ -807,34 +989,34 @@ describe('session-video-playlist', () => {
       localStorage.setItem(AUTOPLAY_STORAGE_KEY, 'true');
       const { playlist: fresh } = buildPage();
       addConfigRow(fresh, 'minimum-sessions', '2');
-      await init(fresh);
-      await flush();
+      await initAndPlay(fresh);
 
       expect(fresh.querySelector('.session-video-playlist-autoplay-toggle').checked).to.be.true;
     });
 
-    // window.location.assign is non-configurable and cannot be stubbed in a real browser,
-    // which is exactly why the source records its resolved target on the element first —
-    // that dataset attribute is the assertable part of this behavior. The rows here point
-    // at the CURRENT url so the real assign() call is a same-document no-op rather than
-    // navigating the test runner away mid-suite.
-    it('records the next href when the current session ends and autoplay is on', async () => {
-      const selfUrl = window.location.pathname + window.location.search;
+    // Navigation is routed through the overridable `_internals.navigate` seam because
+    // window.location.assign is non-configurable and firing it for real triggers a full
+    // reload that severs the Web Test Runner reporting channel (wiping the whole file's
+    // results). Stubbing the seam lets us assert the navigation without any real reload.
+    it('records the next href and navigates when the current session ends and autoplay is on', async () => {
+      // _internals.navigate is already stubbed globally in beforeEach (to prevent real reloads).
+      const navigate = _internals.navigate;
+      const nextUrl = '/drafts/hnv/sessions/a';
       const { playlist: selfLinked } = buildPage();
       addConfigRow(selfLinked, 'minimum-sessions', '2');
       sessions.value = [
-        catalogSession({ id: 'a', sessionPageUrl: selfUrl }),
-        catalogSession({ id: 'b', sessionPageUrl: selfUrl }),
+        catalogSession({ id: 'a', sessionPageUrl: nextUrl }),
+        catalogSession({ id: 'b', sessionPageUrl: '/drafts/hnv/sessions/b' }),
       ];
-      await init(selfLinked);
-      await flush();
+      await initAndPlay(selfLinked);
 
       localStorage.setItem(AUTOPLAY_STORAGE_KEY, 'true');
       window.dispatchEvent(new CustomEvent('session-video-player:state', {
         detail: { sessionId: 'cur', state: 'ended' },
       }));
 
-      expect(selfLinked.dataset.autoAdvanceHref).to.equal(selfUrl);
+      expect(selfLinked.dataset.autoAdvanceHref).to.equal(nextUrl);
+      expect(navigate.calledWith(nextUrl)).to.equal(true);
     });
 
     it('does not advance when autoplay is off', () => {
@@ -876,8 +1058,7 @@ describe('session-video-playlist', () => {
       const { playlist } = buildPage();
       addConfigRow(playlist, 'minimum-sessions', '2');
       sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
-      await init(playlist);
-      await flush();
+      await initAndPlay(playlist);
 
       localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
         a: { secondsWatched: 75, length: 100, completed: false },
