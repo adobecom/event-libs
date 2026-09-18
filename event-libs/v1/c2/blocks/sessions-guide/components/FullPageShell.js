@@ -1,18 +1,24 @@
-import { html, useEffect, useRef, useState } from '../../../../deps/htm-preact.js';
+import { html, useEffect, useState } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { sessionsStatus } from '../../../../utils/session-store.js';
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
-import { BackToTop } from './BackToTop.js';
+
+// filterCategories: [{ id, label, slug }] (see parse-config.js). No match (stale/renamed
+// category) is dropped rather than leaking a raw attributeId into the URL.
+export function categoryIdForSlug(filterCategories, slug) {
+  return filterCategories?.find((c) => c.slug === slug)?.id || null;
+}
+
+export function categorySlugForId(filterCategories, id) {
+  return filterCategories?.find((c) => c.id === id)?.slug || null;
+}
 
 export function FullPageShell() {
   const { state, dispatch } = useSessionGuide();
-  const { activeView, activeFilters, searchQuery } = state;
+  const { activeView, activeFilters, searchQuery, guideConfig } = state;
   const [filterOpen, setFilterOpen] = useState(false);
-  // Where focus lands after a Back to top jump; tabindex="-1" below keeps it out of the tab
-  // order while still accepting programmatic focus — see the comment in BackToTop.js.
-  const rootRef = useRef(null);
 
   // On mount: read URL params and populate store
   useEffect(() => {
@@ -28,8 +34,9 @@ export function FullPageShell() {
       filterParam.split(',').forEach((pair) => {
         const colonIdx = pair.indexOf(':');
         if (colonIdx < 0) return;
-        const cat = pair.slice(0, colonIdx);
+        const slug = pair.slice(0, colonIdx);
         const val = pair.slice(colonIdx + 1);
+        const cat = categoryIdForSlug(guideConfig.filterCategories, slug);
         if (cat && val) {
           if (!filters[cat]) filters[cat] = new Set();
           filters[cat].add(val);
@@ -59,7 +66,10 @@ export function FullPageShell() {
 
     const filterPairs = [];
     Object.entries(activeFilters).forEach(([cat, valSet]) => {
-      if (valSet instanceof Set) valSet.forEach((v) => filterPairs.push(`${cat}:${v}`));
+      if (!(valSet instanceof Set)) return;
+      const slug = categorySlugForId(guideConfig.filterCategories, cat);
+      if (!slug) return;
+      valSet.forEach((v) => filterPairs.push(`${slug}:${v}`));
     });
     if (filterPairs.length > 0) {
       params.set('filter', filterPairs.join(','));
@@ -75,7 +85,7 @@ export function FullPageShell() {
   function noop() {}
 
   return html`
-    <div class="sg-full-page" ref=${rootRef} tabindex="-1">
+    <div class="sg-full-page">
       <div class="sg-full-page__header-wrap">
         <${DrawerHeader}
           onClose=${noop}
@@ -91,7 +101,6 @@ export function FullPageShell() {
         ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}
         ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
       </div>
-      ${sessionsStatus.value === 'ready' && html`<${BackToTop} fixed=${true} focusRef=${rootRef} />`}
     </div>
   `;
 }

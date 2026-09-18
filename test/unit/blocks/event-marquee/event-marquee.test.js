@@ -150,6 +150,12 @@ describe('event-marquee', () => {
   });
 
   describe('Video variant', () => {
+    // A present window.mobilerider makes the mobile-rider block's loadScript() short-circuit, so a
+    // raw mobilerider.com link never injects the real assets.mobilerider.com/player.min.js <script>
+    // (disallowed in unit tests). Same stub the mobile-rider block's own test file uses.
+    beforeEach(() => { globalThis.mobilerider = { embed: sinon.stub() }; });
+    afterEach(() => { delete globalThis.mobilerider; });
+
     it('renders the video variant when a decorated player is present', async () => {
       document.body.innerHTML = videoVariantHtml();
       const el = document.querySelector('.event-marquee');

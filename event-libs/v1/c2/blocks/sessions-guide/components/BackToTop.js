@@ -12,8 +12,8 @@ export function scrollToTop(scroller) {
   (scroller || window).scrollTo({ top: 0, behavior: scrollBehavior() });
 }
 
-// Renders at every breakpoint, mobile through desktop. scrollerRef omitted on the full-page
-// surface, where the window scrolls. focusRef needs tabindex="-1" to accept programmatic focus.
+// scrollerRef omitted falls back to the window as the scroller. focusRef needs tabindex="-1"
+// on the target element to accept programmatic focus.
 export function BackToTop({ scrollerRef, focusRef, fixed }) {
   const [visible, setVisible] = useState(false);
 
