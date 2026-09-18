@@ -30,6 +30,13 @@ function readSectionMetadata(el, key) {
 function buildCategoryBadge(track) {
   if (!track) return null;
   const entry = getTrackIcon(track) || getTrackIcon('mainstage');
+  // eslint-disable-next-line no-console
+  console.log('[MR-track] getTrackIcon lookup', {
+    track,
+    matchedEntry: getTrackIcon(track),
+    usedMainstageFallback: !getTrackIcon(track) && !!getTrackIcon('mainstage'),
+    finalEntry: entry,
+  });
   if (!entry) return null;
 
   const badge = createTag('span', { class: 'mobile-rider-info-bar-category' });
@@ -252,8 +259,18 @@ class MobileRider {
     const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: bar });
     const paintCategory = (session) => {
       const track = session?.primaryTrack || cfg['session-category'] || '';
+      // eslint-disable-next-line no-console
+      console.log('[MR-track] paintCategory', {
+        resolvedTrack: track,
+        fromSessionPrimaryTrack: session?.primaryTrack,
+        fromAuthoredSessionCategory: cfg['session-category'],
+        hasSession: !!session,
+        sessionId: session?.id,
+      });
       badgeSlot.replaceChildren();
       const badge = buildCategoryBadge(track);
+      // eslint-disable-next-line no-console
+      console.log('[MR-track] buildCategoryBadge result', { track, badgeBuilt: !!badge });
       if (badge) badgeSlot.append(badge);
       // Nothing to show — keep the slot out of layout entirely rather than leaving an empty area.
       badgeSlot.hidden = !badge;
