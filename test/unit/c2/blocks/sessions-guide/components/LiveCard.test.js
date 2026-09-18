@@ -85,6 +85,24 @@ describe('LiveCard', () => {
     liveStreamActiveIds.value = new Set();
   });
 
+  // matchesMobile() reads window.matchMedia directly (not gated behind useEffect, which is a
+  // no-op in this string-render harness), so forcing it here is enough to exercise either
+  // branch without a real resize. Shared file-wide: the ambient test-runner viewport falls
+  // inside the mobile/normal-tablet range (<1024px, LiveCard.js's MOBILE_QUERY), so any test
+  // that wants the bigger-tablet/desktop meta-row layout has to force it explicitly too, not
+  // just tests that want the mobile layout.
+  let originalMatchMedia;
+  beforeEach(() => { originalMatchMedia = window.matchMedia; });
+  afterEach(() => { window.matchMedia = originalMatchMedia; });
+
+  const forceMobile = (mobile) => {
+    window.matchMedia = (q) => ({
+      matches: q.includes('max-width: 1023px') ? mobile : !mobile,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+  };
+
   it('applies the track color to the thumbnail placeholder background', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
@@ -315,6 +333,11 @@ describe('LiveCard', () => {
   // A live session with an additional event-site track badges both tracks side by side in
   // the time's slot, and drops the "+1" that would otherwise double count the second one.
   describe('additional track badge', () => {
+    // This block exercises the bigger-tablet/desktop meta-row layout (track-extra, the +1
+    // count) — force non-mobile so the ambient test-runner viewport can't tip it into the
+    // mobile/normal-tablet badges layout instead.
+    beforeEach(() => forceMobile(false));
+
     const render = (session, props) => {
       const LiveCard = buildLiveCard(preact, makeStore());
       return LiveCard({ session, ...props });
@@ -442,24 +465,8 @@ describe('LiveCard', () => {
     });
   });
 
-  // Figma 8463:87698 (live) / 9624:73879 (recommended) — mobile only. matchesMobile() reads
-  // window.matchMedia directly (not gated behind useEffect, which is a no-op in this
-  // string-render harness), so forcing it here is enough to exercise the branch without a real
-  // resize.
+  // Figma 8463:87698 (live) / 9624:73879 (recommended) — mobile and normal tablet (<1024px).
   describe('mobile layout (title-then-badges, live and recommended variants)', () => {
-    let originalMatchMedia;
-
-    beforeEach(() => { originalMatchMedia = window.matchMedia; });
-    afterEach(() => { window.matchMedia = originalMatchMedia; });
-
-    const forceMobile = (mobile) => {
-      window.matchMedia = (q) => ({
-        matches: q.includes('max-width: 767px') ? mobile : !mobile,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      });
-    };
-
     it('renders the title before the badges block on a mobile live card', () => {
       forceMobile(true);
       const LiveCard = buildLiveCard(preact, makeStore());

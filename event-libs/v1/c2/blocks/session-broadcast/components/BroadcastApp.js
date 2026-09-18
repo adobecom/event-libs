@@ -30,7 +30,12 @@ import { AlsoLiveCarousel } from './AlsoLiveCarousel.js';
 import { UpNextCarousel } from './UpNextCarousel.js';
 
 // surface:'page' routes clicks through onCardClick/onWatchSamePage instead of LiveCard's own.
-const GUIDE_CONFIG = { userTz: detectUserTimezone(), surface: 'page', theme: 'light' };
+// liveCardMobileMaxWidth: broadcast has no separate bigger-tablet look of its own — LiveCard's
+// mobile layout (see LiveCard.js's MOBILE_QUERY) runs all the way to the 1280px desktop
+// breakpoint here, instead of session-guide's own 1024px cutoff.
+const GUIDE_CONFIG = {
+  userTz: detectUserTimezone(), surface: 'page', theme: 'light', liveCardMobileMaxWidth: 1279,
+};
 
 // Exported for tests; see the effect below for why this needs its own tick.
 export const SCHEDULE_REFRESH_MS = 5_000;

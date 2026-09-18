@@ -13,9 +13,6 @@
   box-sizing: inherit;
 }
 
-/* Tighter than sessions-guide.css's own 8px default, everywhere CategoryBadge appears here. */
-.session-broadcast .sg-category-badge { gap: var(--s2a-spacing-2xs, 4px); }
-
 .sb-sr-only {
   position: absolute;
   width: 1px;
@@ -28,10 +25,14 @@
   border: 0;
 }
 
-/* --sb-fill-height is synced to the footer's top edge by JS; a floor, not a fixed height. */
+/* --sb-fill-height is synced to the footer's top edge by JS; a floor, not a fixed height.
+   padding-top clears GNAV: same var()/fallback as sessions-guide's own .sg-full-page__header-wrap
+   — GNAV is fixed/sticky and doesn't occupy layout space, so nothing else pushes content below
+   it on load. */
 .sb-app {
   display: block;
   min-height: var(--sb-fill-height, 0);
+  padding-top: var(--feds-nav-total-height, 80px);
   background: var(--s2a-color-gray-1000, #000);
 }
 
@@ -531,24 +532,11 @@
 
 .sb-carousel-section--also-live .sg-carousel__cards { gap: var(--s2a-spacing-md); }
 
-.sb-carousel-section--also-live .sg-live-card__image {
-  height: auto;
-  aspect-ratio: 300 / 188;
-}
-
-.sb-carousel-section--also-live .sg-category-badge__label { font-size: var(--s2a-font-size-xs); }
-
-.sb-carousel-section--also-live .sg-live-card__title {
-  margin: var(--s2a-spacing-md) 0 0;
-  font-family: var(--body-font-family);
-  font-size: var(--s2a-font-size-md, 16px);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-}
-
 .sb-carousel-section--also-live .sg-live-card__btn { height: 32px; }
 
+/* Same shared button styles (padding, min-width) as sessions-guide's own watch button — only
+   the background stays black instead of #292929, to sit against this section's darker bg. */
 .sb-carousel-section--also-live .sg-live-card__btn--watch {
-  padding: 0 var(--s2a-spacing-md);
   background: #000;
 }
 
@@ -570,90 +558,9 @@
 /* width:100% gives margin-left:auto on .sg-live-card__actions-time room to push into. */
 .sb-carousel-section--also-live .sg-live-card__actions { width: 100%; }
 
-/* Resets .sg-live-card back to narrow here; sessions-guide's 1024-1279px rule would otherwise widen it. */
-@media (min-width: 1024px) and (max-width: 1279px) {
-  .sb-carousel-section--also-live .sg-live-card {
-    flex-direction: column;
-    border: none;
-    border-radius: var(--s2a-border-radius-md);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__image {
-    width: 100%;
-    border: 1px solid rgb(255 255 255 / 15%);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__progress-row {
-    left: 16px;
-    right: 16px;
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__body {
-    flex: 1;
-    width: auto;
-    padding: var(--s2a-spacing-md);
-    justify-content: flex-start;
-    gap: 0;
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__meta {
-    justify-content: space-between;
-    gap: var(--s2a-spacing-xs);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__track-row { gap: var(--s2a-spacing-xs); }
-
-  /* Not part of this card's design at this tier — hidden here, shown again for the long card below. */
-  .sb-carousel-section--also-live .sg-live-card__desc { display: none; }
-}
-
-/* Tablet-only (1024-1279px); 1280px+ keeps sessions-guide's own hover-fill treatment. */
-@media (min-width: 1024px) and (max-width: 1279px) {
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) {
-    background: #fff;
-    border-color: transparent;
-  }
-
-  /* Label inherits currentcolor from this row (not .sg-live-card__track), so it needs its own hover fix too. */
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row,
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra {
-    color: var(--s2a-color-content-default);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__track,
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track {
-    color: var(--s2a-color-content-default);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__time,
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__time {
-    color: var(--s2a-color-content-default);
-  }
-
-  /* sessions-guide flips the title white on hover; no counterpart existed here, so it leaked through. */
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__title {
-    color: var(--s2a-color-content-default);
-  }
-
-  /* Restores the base var()/currentcolor chain, which color:inherit otherwise breaks on hover. */
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color {
-    color: var(--sg-badge-icon-color, currentcolor);
-  }
-
-  /* Watch stays black here too (was #292929) — resting and hover alike. */
-  .sb-carousel-section--also-live .sg-live-card__btn--watch,
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
-    background: #000;
-    color: #fff;
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__btn--favorite,
-  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {
-    background: #fff;
-    border-color: #292929;
-    color: #292929;
-  }
-}
+/* No trailing time label in this design's actions row (Watch now + Favorite only) — same
+   pattern as sessions-guide's own mobile live card, which never renders this element at all. */
+.sb-carousel-section--also-live .sg-live-card__actions-time { display: none; }
 
 /* Switches to sessions-guide's 1104px horizontal long card; only .sg-carousel is capped/centered. */
 @media (min-width: 1280px) {
@@ -724,9 +631,6 @@
   /* Shown here, unlike the narrow card. */
   /* stylelint-disable-next-line value-no-vendor-prefix */
   .sb-carousel-section--also-live .sg-live-card__desc { display: -webkit-box; }
-
-  /* No trailing time label in this design's actions row (Watch now + Favorite only). */
-  .sb-carousel-section--also-live .sg-live-card__actions-time { display: none; }
 
   .sb-carousel-section--also-live .sg-live-card__btn { height: 40px; }
 

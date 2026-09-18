@@ -18,18 +18,21 @@ export const buildLiveCard = () => LiveCard;
 // Non-MR sessions need this manual tick; MR sessions get an equivalent refresh from the poller.
 export const PROGRESS_REFRESH_MS = 30_000;
 
-// Mirrors FilterPanel.js's own hook rather than a shared util — small, self-contained view state.
-const MOBILE_QUERY = '(max-width: 767px)';
-const matchesMobile = () => !!window.matchMedia?.(MOBILE_QUERY).matches;
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(matchesMobile);
+// Covers phone and normal tablet (<1024px) by default — bigger tablet (1024-1279px) keeps its
+// own desktop-style layout below. guideConfig.liveCardMobileMaxWidth overrides the cutoff:
+// session-broadcast sets it to 1279 since it has no separate bigger-tablet look of its own.
+// Small, self-contained view state, not a shared util.
+const DEFAULT_MOBILE_MAX_WIDTH = 1023;
+const matchesMobile = (maxWidth) => !!window.matchMedia?.(`(max-width: ${maxWidth}px)`).matches;
+function useIsMobile(maxWidth) {
+  const [isMobile, setIsMobile] = useState(() => matchesMobile(maxWidth));
   useEffect(() => {
-    const mq = window.matchMedia?.(MOBILE_QUERY);
+    const mq = window.matchMedia?.(`(max-width: ${maxWidth}px)`);
     if (!mq) return undefined;
     const onChange = (e) => setIsMobile(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
-  }, []);
+  }, [maxWidth]);
   return isMobile;
 }
 
@@ -47,7 +50,7 @@ export function LiveCard({
   const { state, dispatch } = useSessionGuide();
   const { guideConfig } = state;
   const { userTz, surface } = guideConfig;
-  const isMobile = useIsMobile();
+  const isMobile = useIsMobile(guideConfig.liveCardMobileMaxWidth ?? DEFAULT_MOBILE_MAX_WIDTH);
   // Mobile redesign — title, then a fixed-height badges block, then actions. Figma 8463:87698
   // for 'live'; 9624:73879 for 'recommended' (same structure, minus the progress bar, plus an
   // optional time row above the title).
