@@ -70,7 +70,7 @@ export function applyImplicitContactMethodsToPayload(form, payload) {
       }
     }
   } catch (e) {
-    logError('rsvp-consent', 'implicit consent read failed', e);
+    logError('rsvp-consent', `implicit consent read failed for event ${getMetadata('event-id')}`, e);
     return;
   }
 

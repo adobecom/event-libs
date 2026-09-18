@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import {
@@ -131,6 +132,27 @@ describe('rsvp-consent', () => {
       const payload = {};
       applyImplicitContactMethodsToPayload(form, payload);
       expect(payload.contactMethods).to.deep.equal(['phone']);
+    });
+
+    it('reports a read failure to lana with the eventId', () => {
+      setMetadata('event-id', 'event-123', document);
+      const cmWrapper = document.createElement('div');
+      cmWrapper.setAttribute('data-field-id', 'contactMethods');
+      const form = {
+        querySelector: (selector) => {
+          if (selector === '[data-field-id="contactMethods"]') return cmWrapper;
+          throw new Error('boom');
+        },
+      };
+
+      const lanaLogStub = sinon.stub(window.lana, 'log');
+      try {
+        applyImplicitContactMethodsToPayload(form, {});
+        expect(lanaLogStub.calledOnce).to.equal(true);
+        expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
+      } finally {
+        lanaLogStub.restore();
+      }
     });
   });
 });
