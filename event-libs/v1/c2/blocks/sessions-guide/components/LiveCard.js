@@ -18,6 +18,21 @@ export const buildLiveCard = () => LiveCard;
 // Non-MR sessions need this manual tick; MR sessions get an equivalent refresh from the poller.
 export const PROGRESS_REFRESH_MS = 30_000;
 
+// Mirrors FilterPanel.js's own hook rather than a shared util — small, self-contained view state.
+const MOBILE_QUERY = '(max-width: 767px)';
+const matchesMobile = () => !!window.matchMedia?.(MOBILE_QUERY).matches;
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(matchesMobile);
+  useEffect(() => {
+    const mq = window.matchMedia?.(MOBILE_QUERY);
+    if (!mq) return undefined;
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isMobile;
+}
+
 export function computeProgressPct(session, nowMs) {
   const startMs = Date.parse(session.startTimeUtc);
   const endMs = Date.parse(session.endTimeUtc);
@@ -32,6 +47,10 @@ export function LiveCard({
   const { state, dispatch } = useSessionGuide();
   const { guideConfig } = state;
   const { userTz, surface } = guideConfig;
+  const isMobile = useIsMobile();
+  // Mobile redesign (Figma 8463:87698) — title, then a fixed-height badges block, then actions.
+  // Scoped to the 'live' card only; 'recommended' keeps its current meta-then-title order for now.
+  const useMobileLayout = isMobile && variant !== 'recommended';
 
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
@@ -67,6 +86,7 @@ export function LiveCard({
 
   const cardClass = [
     'sg-live-card',
+    useMobileLayout ? 'sg-live-card--mobile-live' : '',
     isScheduled ? 'is-scheduled' : '',
     isFavorited ? 'is-favorited' : '',
     isPending ? 'is-pending' : '',
@@ -127,7 +147,7 @@ export function LiveCard({
       onclick=${handleWatch}
       daa-ll=${isOnDemand ? 'Watch-On-Demand' : 'Watch-Now'}
       type="button"
-    ><${IconPlay} />${isOnDemand ? 'Watch on demand' : 'Watch now'}</button>`;
+    ><${IconPlay} size=${useMobileLayout ? 14 : 20} />${isOnDemand ? 'Watch on demand' : 'Watch now'}</button>`;
   }
 
   // On demand, the whole card always navigates to the session page, regardless of surface.
@@ -138,8 +158,53 @@ export function LiveCard({
       history.pushState({}, '', setSessionParam(sessionParamValue(session)));
       return;
     }
-    onCardClick?.(session);
+    // A non-widget caller like session-broadcast has no in-widget overlay to navigate away
+    // from — onCardClick lets it supply its own "open detail" behavior instead.
+    if (onCardClick) { onCardClick(session); return; }
+    // Full page: reuse the Watch Now routing, but only if a watch destination actually exists
+    // (an in-person-only live session has none) — otherwise fall through to the session page.
+    if (sessionState === 'live' && watchHref) { handleWatch(e); return; }
+    const dest = safeUrl(session.sessionPageUrl);
+    if (dest) window.location.href = dest;
   }
+
+  // Full page (no onCardClick): the click destination differs by state (watch vs. session info
+  // page), so the accessible name says which — same distinction handleCardClick itself makes.
+  const selfNavigates = surface !== 'widget' && !onCardClick;
+  const opensWatch = sessionState === 'on-demand' || (sessionState === 'live' && !!watchHref);
+  const titleAriaLabel = selfNavigates
+    ? (opensWatch ? `Watch ${session.title} now` : `View ${session.title} details`)
+    : undefined;
+
+  const titleBlock = html`<button
+              class="sg-live-card__title sg-live-card__title-btn"
+              type="button"
+              onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
+              aria-label=${titleAriaLabel}
+              daa-ll="Session-Card-Open"
+            >${session.title}</button>`;
+
+  // Current layout: horizontal, divider-separated, used everywhere except the new mobile 'live' case below.
+  const metaBlock = html`
+    <div class="sg-live-card__meta">
+      <div class="sg-live-card__track-row">
+        ${html`<${CategoryBadge} session=${session} hideCount=${!!secondTrack} />`}
+      </div>
+      ${secondTrack && html`<span class="sg-live-card__track-extra">
+        <${CategoryBadge} track=${secondTrack} />
+      </span>`}
+      ${showTime && html`<p class="sg-live-card__time">${timeRange}</p>`}
+    </div>
+  `;
+
+  // New mobile layout (Figma 8463:87698): up to 2 badges stacked in a fixed-height block, so a
+  // 1-badge card and a 2-badge card are always the same total height.
+  const badgesBlock = html`
+    <div class="sg-live-card__badges">
+      ${html`<${CategoryBadge} session=${session} size=${'sm'} iconSize=${16} hideCount=${!!secondTrack} />`}
+      ${secondTrack && html`<${CategoryBadge} track=${secondTrack} size=${'sm'} iconSize=${16} />`}
+    </div>
+  `;
 
   return html`
     <div class=${cardClass} onclick=${handleCardClick}>
@@ -155,24 +220,9 @@ export function LiveCard({
         </div>
       </div>
       <div class="sg-live-card__body">
-        <div class="sg-live-card__meta">
-          <div class="sg-live-card__track-row">
-            ${html`<${CategoryBadge} session=${session} hideCount=${!!secondTrack} />`}
-          </div>
-          ${secondTrack && html`<span class="sg-live-card__track-extra">
-            <${CategoryBadge} track=${secondTrack} />
-          </span>`}
-          ${showTime && html`<p class="sg-live-card__time">${timeRange}</p>`}
-        </div>
-        ${(surface === 'widget' || onCardClick)
-    ? html`<button
-              class="sg-live-card__title sg-live-card__title-btn"
-              type="button"
-              onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
-              daa-ll="Session-Card-Open"
-            >${session.title}</button>`
-    : html`<p class="sg-live-card__title">${session.title}</p>`}
-        <p class="sg-live-card__desc">${session.description}</p>
+        ${useMobileLayout
+    ? html`${titleBlock}${badgesBlock}`
+    : html`${metaBlock}${titleBlock}<p class="sg-live-card__desc">${session.description}</p>`}
         <div class="sg-live-card__actions">
           ${primaryCta}
           ${schedulingEnabled && html`<button
@@ -192,7 +242,9 @@ export function LiveCard({
             disabled=${isPending}
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
-          >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>`}
+          >${isFavorited
+    ? html`<${IconHeartFilled} size=${useMobileLayout ? 16 : 20} />`
+    : html`<${IconHeartOutline} size=${useMobileLayout ? 16 : 20} />`}</button>`}
           ${variant === 'live' && showDurationBadge && durationLabel && html`<span class="sg-live-card__actions-time">${durationLabel}</span>`}
         </div>
       </div>

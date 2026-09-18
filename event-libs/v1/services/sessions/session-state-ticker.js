@@ -9,7 +9,7 @@ import { deriveSessionState, getNowMs } from '../../utils/session-state.js';
 let _timerId = null;
 let _lastStates = new Map();
 
-function computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, getNow) {
+function computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, getNow, onTick) {
   const now = getNow();
   const sessionsList = getSessions();
   const liveIds = getLiveStreamActiveIds();
@@ -21,6 +21,11 @@ function computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, ge
     _lastStates.set(s.id, state);
   });
   if (changed) onChange();
+  // Unlike onChange, fires on every tick regardless of whether the coarse
+  // upcoming/live/on-demand bucket changed — a caller (SWAN's reconcile pass) may need
+  // to notice a boundary this ticker doesn't itself track, e.g. a reminder lead time
+  // before a session's start.
+  onTick?.();
 
   const allOnDemand = sessionsList.length > 0
     && sessionsList.every((s) => deriveSessionState(s, liveIds, now) === 'on-demand');
@@ -29,13 +34,13 @@ function computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, ge
 
 // intervalMs/getNow are overridable for tests; production callers use the defaults.
 export function startSessionStateTicker(getSessions, getLiveStreamActiveIds, onChange, {
-  intervalMs = 15_000, getNow = getNowMs,
+  intervalMs = 15_000, getNow = getNowMs, onTick,
 } = {}) {
   stopSessionStateTicker();
   _lastStates = new Map();
-  computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, getNow);
+  computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, getNow, onTick);
   _timerId = setInterval(
-    () => computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, getNow),
+    () => computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, getNow, onTick),
     intervalMs,
   );
 }

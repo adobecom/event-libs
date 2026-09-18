@@ -78,6 +78,28 @@ describe('services/sessions/session-state-ticker', () => {
     expect(changeCount).to.equal(1);
   });
 
+  it('onTick fires on every tick regardless of whether the coarse state changed', async () => {
+    let changeCount = 0;
+    let tickCount = 0;
+    const session = { id: 's-1', startTimeUtc: '2026-11-10T18:00:00Z', endTimeUtc: '2026-11-10T19:00:00Z' };
+    const now = Date.parse('2026-11-10T17:00:00Z'); // stays upcoming every tick — onChange would not fire again
+
+    startSessionStateTicker(
+      () => [session],
+      () => new Set(),
+      () => { changeCount += 1; },
+      {
+        intervalMs: 30, getNow: () => now, onTick: () => { tickCount += 1; },
+      },
+    );
+    expect(tickCount).to.equal(1);
+    expect(changeCount).to.equal(1);
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(changeCount).to.equal(1); // no coarse-state transition happened
+    expect(tickCount).to.be.greaterThan(1); // but onTick still ran on every interval
+  });
+
   it('stopSessionStateTicker clears the interval', async () => {
     let changeCount = 0;
     const session = { id: 's-1', startTimeUtc: '2026-11-10T18:00:00Z', endTimeUtc: '2026-11-10T19:00:00Z' };
