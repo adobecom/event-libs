@@ -48,9 +48,10 @@ export function LiveCard({
   const { guideConfig } = state;
   const { userTz, surface } = guideConfig;
   const isMobile = useIsMobile();
-  // Mobile redesign (Figma 8463:87698) — title, then a fixed-height badges block, then actions.
-  // Scoped to the 'live' card only; 'recommended' keeps its current meta-then-title order for now.
-  const useMobileLayout = isMobile && variant !== 'recommended';
+  // Mobile redesign — title, then a fixed-height badges block, then actions. Figma 8463:87698
+  // for 'live'; 9624:73879 for 'recommended' (same structure, minus the progress bar, plus an
+  // optional time row above the title).
+  const useMobileLayout = isMobile;
 
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
@@ -83,10 +84,13 @@ export function LiveCard({
   // Meta row's second slot is shared: Recommended+upcoming shows time, others show a track badge.
   const showTime = variant === 'recommended' && sessionState === 'upcoming';
   const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
+  // Mobile's badges block has its own row, separate from the time row above the title, so a
+  // recommended+upcoming card can show both — unlike metaBlock's single shared desktop slot.
+  const badgesSecondTrack = (session.additionalTracks || [])[0];
 
   const cardClass = [
     'sg-live-card',
-    useMobileLayout ? 'sg-live-card--mobile-live' : '',
+    useMobileLayout ? 'sg-live-card--mobile' : '',
     isScheduled ? 'is-scheduled' : '',
     isFavorited ? 'is-favorited' : '',
     isPending ? 'is-pending' : '',
@@ -136,8 +140,8 @@ export function LiveCard({
         daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
         type="button"
       >${isScheduled
-          ? html`<${IconCalendarCheck} />Added to schedule`
-          : html`<${IconCalendarPlus} />Add to schedule`
+          ? html`<${IconCalendarCheck} size=${useMobileLayout ? 12 : 20} />Added to schedule`
+          : html`<${IconCalendarPlus} size=${useMobileLayout ? 12 : 20} />Add to schedule`
         }</button>`;
     }
   } else if (watchHref && watchNowEnabled) {
@@ -201,8 +205,8 @@ export function LiveCard({
   // 1-badge card and a 2-badge card are always the same total height.
   const badgesBlock = html`
     <div class="sg-live-card__badges">
-      ${html`<${CategoryBadge} session=${session} size=${'sm'} iconSize=${16} hideCount=${!!secondTrack} />`}
-      ${secondTrack && html`<${CategoryBadge} track=${secondTrack} size=${'sm'} iconSize=${16} />`}
+      ${html`<${CategoryBadge} session=${session} size=${'sm'} iconSize=${16} hideCount=${!!badgesSecondTrack} />`}
+      ${badgesSecondTrack && html`<${CategoryBadge} track=${badgesSecondTrack} size=${'sm'} iconSize=${16} />`}
     </div>
   `;
 
@@ -221,7 +225,7 @@ export function LiveCard({
       </div>
       <div class="sg-live-card__body">
         ${useMobileLayout
-    ? html`${titleBlock}${badgesBlock}`
+    ? html`${showTime && html`<p class="sg-live-card__time sg-live-card__time--mobile">${timeRange}</p>`}${titleBlock}${badgesBlock}`
     : html`${metaBlock}${titleBlock}<p class="sg-live-card__desc">${session.description}</p>`}
         <div class="sg-live-card__actions">
           ${primaryCta}

@@ -1063,15 +1063,32 @@
   overflow: hidden;
 }
 
-/* Mobile 'live' card: title renders first, so its usual top margin is just leading whitespace. */
-.sg-live-card--mobile-live .sg-live-card__title {
+/* Mobile card: title (or the time row above it) renders first, so the title's usual top margin
+   is just leading whitespace. */
+.sg-live-card--mobile .sg-live-card__title {
   margin-top: 0;
 }
 
-/* Figma 8463:87698 — 311x355 total. Scoped to the modifier class so recommended/desktop keep
-   their own height. */
-.sg-live-card--mobile-live .sg-live-card__image {
+/* Figma 8463:87698 (live) / 9624:73879 (recommended) — 311x355 total. Scoped to the modifier
+   class so desktop keeps its own height. */
+.sg-live-card--mobile .sg-live-card__image {
   height: 175px;
+}
+
+/* Recommended only: no progress row to sit above, so the time row above the title takes its
+   place instead. Own modifier, not the shared .sg-live-card__time — that one keeps the
+   divider-before-it styling used in the desktop meta row. */
+.sg-live-card__time--mobile {
+  margin: 0 0 var(--s2a-spacing-sm) 0;
+  color: var(--s2a-color-gray-700);
+  font-family: var(--body-font-family);
+  font-size: var(--s2a-font-size-xs);
+  font-weight: var(--s2a-font-weight-adobe-clean-medium);
+  line-height: var(--s2a-font-line-height-2xs);
+}
+
+.sg-live-card__time--mobile::before {
+  display: none;
 }
 
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
@@ -1089,7 +1106,7 @@
 }
 
 /* Figma 8463:87698 — same 16px rhythm as the rest of this card, instead of the shared 24px. */
-.sg-live-card--mobile-live .sg-live-card__actions {
+.sg-live-card--mobile .sg-live-card__actions {
   margin-top: var(--s2a-spacing-sm);
 }
 
@@ -1118,7 +1135,7 @@
 }
 
 /* Figma 8463:87698 — this card's buttons are 32px, not the shared 40px. */
-.sg-live-card--mobile-live .sg-live-card__btn {
+.sg-live-card--mobile .sg-live-card__btn {
   height: 32px;
 }
 
@@ -1158,7 +1175,7 @@
 }
 
 /* Keeps the favorite button a circle at the shrunk height above (base rule is a fixed 40px square). */
-.sg-live-card--mobile-live .sg-live-card__btn--favorite {
+.sg-live-card--mobile .sg-live-card__btn--favorite {
   width: 32px;
 }
 
