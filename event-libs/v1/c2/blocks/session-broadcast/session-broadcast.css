@@ -79,13 +79,19 @@
   background: var(--s2a-color-gray-900, #000);
 }
 
-/* Unconditionally dark (tokens overridden locally); grid lets title/actions swap by named area. */
+/* Unconditionally dark (tokens overridden locally); grid lets title/actions swap by named area.
+   position:relative is load-bearing: an authored Section Metadata background renders as an
+   absolutely-positioned .section-background sibling, which paints above any position:static
+   content in the same stacking context regardless of DOM order — without this, a black
+   section background completely buries this element (content still there, just invisible). */
 .sb-info {
   --s2a-color-background-default: var(--s2a-color-gray-900, #131313);
   --s2a-color-content-default: #fff;
   --s2a-color-content-subtle: rgb(255 255 255 / 64%);
   --s2a-color-border-default: #fff;
 
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-areas: "row" "actions";
   gap: var(--s2a-spacing-md);
