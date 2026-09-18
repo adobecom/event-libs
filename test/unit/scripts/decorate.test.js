@@ -11,6 +11,7 @@ import {
   areTimestampsOnSameDay,
   createSmartDateRange,
   createTemplatedDateRange,
+  shouldHideTimezoneLabel,
 } from '../../../event-libs/v1/utils/date-time-helper.js';
 
 const decorateModule = await import('../../../event-libs/v1/utils/decorate.js');
@@ -1244,8 +1245,24 @@ describe('UTC Timestamp to Local DateTime Conversion', () => {
     
     convertUtcTimestampToLocalDateTime('not-a-number');
     expect(logSpy.calledWith(sinon.match(/Invalid timestamp provided/))).to.be.true;
-    
+
     logSpy.restore();
+  });
+
+  it('should omit the timezone abbreviation when hideTimezoneLabel is true', () => {
+    const timestamp = '1759251599990';
+    const result = convertUtcTimestampToLocalDateTime(timestamp, 'en-US', null, true);
+
+    expect(result).to.be.a('string');
+    expect(result).to.not.be.empty;
+    expect(result).to.not.match(/[AP]M\s[A-Z]{2,5}$/);
+  });
+
+  it('should include the timezone abbreviation when hideTimezoneLabel is false (default)', () => {
+    const timestamp = '1759251599990';
+    const result = convertUtcTimestampToLocalDateTime(timestamp, 'en-US');
+
+    expect(result).to.match(/[AP]M\s[A-Z]{2,5}$/);
   });
 });
 
@@ -1349,6 +1366,25 @@ describe('Date Range Utilities', () => {
     it('should handle invalid timestamps gracefully', () => {
       const result = createSmartDateRange('invalid', '1759255199990', 'en-US');
       expect(result).to.equal('');
+    });
+
+    it('should omit the timezone abbreviation when hideTimezoneLabel is true', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+
+      const result = createSmartDateRange(startTimestamp, endTimestamp, 'en-US', null, true);
+
+      expect(result).to.be.a('string');
+      expect(result).to.not.match(/[AP]M\s[A-Z]{2,5}$/);
+    });
+
+    it('should include the timezone abbreviation when hideTimezoneLabel is false (default)', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+
+      const result = createSmartDateRange(startTimestamp, endTimestamp, 'en-US');
+
+      expect(result).to.match(/[AP]M\s[A-Z]{2,5}$/);
     });
   });
 
@@ -1596,6 +1632,17 @@ describe('Date Range Utilities', () => {
       expect(result).to.include(' at ');
       expect(result).to.match(/\d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M/); // Time range
     });
+
+    it('should resolve {timeZone} to an empty string when hideTimezoneLabel is true', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      const template = '{LLL} {dd} | {timeRange} {timeZone}';
+
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template, null, true);
+
+      expect(result).to.be.a('string');
+      expect(result).to.match(/\w{3} \d{2} \| \d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M\s*$/);
+    });
   });
 });
 
@@ -1617,6 +1664,94 @@ describe('Metadata Massaging', () => {
     if (endMeta) document.head.removeChild(endMeta);
     const templateMeta = document.head.querySelector('meta[name="custom-date-time-format"]');
     if (templateMeta) document.head.removeChild(templateMeta);
+    const customAttrsMeta = document.head.querySelector('meta[name="custom-attributes"]');
+    if (customAttrsMeta) document.head.removeChild(customAttrsMeta);
+  });
+
+  function setHideTimezoneLabelAttribute(value) {
+    setMetadata('custom-attributes', JSON.stringify([
+      { name: 'hide-timezone-label', values: [{ value }] },
+    ]));
+  }
+
+  describe('shouldHideTimezoneLabel', () => {
+    it('returns false when custom-attributes metadata is absent', () => {
+      expect(shouldHideTimezoneLabel()).to.be.false;
+    });
+
+    it('returns false when custom-attributes metadata is invalid JSON', () => {
+      setMetadata('custom-attributes', '{not valid json');
+      expect(shouldHideTimezoneLabel()).to.be.false;
+    });
+
+    it('returns false when there is no hide-timezone-label attribute', () => {
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'theme', values: [{ value: 'dark' }] },
+      ]));
+      expect(shouldHideTimezoneLabel()).to.be.false;
+    });
+
+    it('returns true when the hide-timezone-label attribute value is "true"', () => {
+      setHideTimezoneLabelAttribute('true');
+      expect(shouldHideTimezoneLabel()).to.be.true;
+    });
+
+    it('returns false when the hide-timezone-label attribute value is "false"', () => {
+      setHideTimezoneLabelAttribute('false');
+      expect(shouldHideTimezoneLabel()).to.be.false;
+    });
+
+    it('resolves regardless of case or whitespace', () => {
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: ' Hide-Timezone-Label ', values: [{ value: ' TRUE ' }] },
+      ]));
+      expect(shouldHideTimezoneLabel()).to.be.true;
+    });
+
+    it('still resolves via the legacy `attribute` key', () => {
+      setMetadata('custom-attributes', JSON.stringify([
+        { attribute: 'hide-timezone-label', values: [{ value: 'true' }] },
+      ]));
+      expect(shouldHideTimezoneLabel()).to.be.true;
+    });
+
+    it('returns false when the attribute is disabled in EMC', () => {
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'hide-timezone-label', enabled: false, values: [{ value: 'true' }] },
+      ]));
+      expect(shouldHideTimezoneLabel()).to.be.false;
+    });
+
+    it('resolves a boolean-typed value the same as the string equivalent', () => {
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'hide-timezone-label', values: [{ value: true }] },
+      ]));
+      expect(shouldHideTimezoneLabel()).to.be.true;
+    });
+
+    it('returns false when values is empty or missing', () => {
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'hide-timezone-label', values: [] },
+      ]));
+      expect(shouldHideTimezoneLabel()).to.be.false;
+
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'hide-timezone-label' },
+      ]));
+      expect(shouldHideTimezoneLabel()).to.be.false;
+    });
+
+    it('resolves correctly alongside a theme attribute in the same custom-attributes payload', () => {
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'theme', values: [{ value: 'dark' }] },
+        { name: 'hide-timezone-label', values: [{ value: 'true' }] },
+      ]));
+      expect(shouldHideTimezoneLabel()).to.be.true;
+
+      document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+      applyAreaTheme();
+      expect(document.querySelector('.foo').classList.contains('dark')).to.be.true;
+    });
   });
 
   it('should massage start time metadata', () => {
@@ -1711,6 +1846,50 @@ describe('Metadata Massaging', () => {
     expect(result).to.have.property('user-event-date-time-range');
     expect(result['user-event-date-time-range']).to.be.a('string');
     expect(result['user-event-date-time-range']).to.match(/\w{3} \d{2} \| \d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M \w{3}/);
+  });
+
+  it('should omit the timezone abbreviation everywhere when the hide-timezone-label custom attribute is true', () => {
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setHideTimezoneLabelAttribute('true');
+
+    const result = massageMetadata('en-US');
+
+    expect(result['user-start-date-time']).to.not.match(/[AP]M\s[A-Z]{2,5}$/);
+    expect(result['user-end-date-time']).to.not.match(/[AP]M\s[A-Z]{2,5}$/);
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.not.match(/[AP]M\s[A-Z]{2,5}$/);
+  });
+
+  it('should still show the timezone abbreviation when the hide-timezone-label custom attribute is absent', () => {
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+
+    const result = massageMetadata('en-US');
+
+    expect(result['user-start-date-time']).to.match(/[AP]M\s[A-Z]{2,5}$/);
+    expect(result['user-event-date-time-range']).to.match(/[AP]M\s[A-Z]{2,5}$/);
+  });
+
+  it('should still show the timezone abbreviation when the hide-timezone-label custom attribute is false', () => {
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setHideTimezoneLabelAttribute('false');
+
+    const result = massageMetadata('en-US');
+
+    expect(result['user-start-date-time']).to.match(/[AP]M\s[A-Z]{2,5}$/);
+  });
+
+  it('should omit the {timeZone} template token when the hide-timezone-label custom attribute is true', () => {
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('custom-date-time-format', '{LLL} {dd} | {timeRange} {timeZone}');
+    setHideTimezoneLabelAttribute('true');
+
+    const result = massageMetadata('en-US');
+
+    expect(result['user-event-date-time-range']).to.match(/\w{3} \d{2} \| \d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M\s*$/);
   });
 
   it('should use custom template with year tokens', () => {

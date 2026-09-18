@@ -289,6 +289,83 @@ describe('sessions-hub full session', () => {
   });
 });
 
+describe('sessions-hub timezone label', () => {
+  let originalFetch;
+
+  function stubFetch(handlers) {
+    window.fetch = async (url) => {
+      const u = typeof url === 'string' ? url : url.url || '';
+      for (const [pattern, handler] of handlers) {
+        if (u.includes(pattern)) {
+          return { ok: true, status: 200, json: async () => handler(u) };
+        }
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+  }
+
+  function stubDefaultFetch(eventOverrides = {}) {
+    stubFetch([
+      ['/v1/events/', () => makeEventData(eventOverrides)],
+      ['/v1/series/', () => ({ speakers: [] })],
+      ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
+      ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
+      ['chimera-api/tags', () => mockTagsData],
+      ['dictionary.json', () => ({
+        data: { total: 0, offset: 0, limit: 0, data: [] },
+        ':names': ['data'],
+        ':version': 3,
+        ':type': 'multi-sheet',
+      })],
+    ]);
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = body;
+    document.head.innerHTML = '<meta name="event-id" content="event-123">';
+    originalFetch = window.fetch;
+    DictionaryManager._clearCache();
+    dictionaryManager.resetLoadedSheetsForTests();
+    BlockMediator.set('imsProfile', { userId: 'test-user', account_type: 'type1' });
+    BlockMediator.set('rsvpData', null);
+  });
+
+  afterEach(() => {
+    window.fetch = originalFetch;
+    BlockMediator.set('imsProfile', undefined);
+    BlockMediator.set('rsvpData', undefined);
+  });
+
+  it('shows the timezone abbreviation on a session card by default', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([SESSION_NOT_FULL]);
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const card = el.querySelector(`[data-session-id="${SESSION_NOT_FULL.sessionId}"]`);
+    const timeText = card.querySelector('.sh-card-time').textContent;
+    expect(timeText).to.match(/[AP]M\s[A-Z]{2,5}$/);
+  });
+
+  it('omits the timezone abbreviation on a session card when the hide-timezone-label custom attribute is true', async () => {
+    stubDefaultFetch();
+    document.head.appendChild(Object.assign(document.createElement('meta'), {
+      name: 'custom-attributes',
+      content: JSON.stringify([{ name: 'hide-timezone-label', values: [{ value: 'true' }] }]),
+    }));
+    setSessionsMeta([SESSION_NOT_FULL]);
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const card = el.querySelector(`[data-session-id="${SESSION_NOT_FULL.sessionId}"]`);
+    const timeText = card.querySelector('.sh-card-time').textContent;
+    expect(timeText).to.match(/\d{1,2}:\d{2}\s[AP]M/);
+    expect(timeText).to.not.match(/[AP]M\s[A-Z]{2,5}$/);
+  });
+});
+
 describe('sessions-hub speaker display names', () => {
   let originalFetch;
 
