@@ -249,9 +249,6 @@ class MobileRider {
     }, '', { parent: header });
     createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'Show more session info', { parent: toggle });
     createTag('span', { class: 'mobile-rider-info-bar-chevron', 'aria-hidden': 'true' }, ICON_CHEVRON_DOWN, { parent: toggle });
-
-    // Category, description and actions live OUTSIDE the collapsible region so they are visible in
-    // the collapsed state (per Figma). The toggle only expands/collapses the description clamp.
     const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: bar });
     const paintCategory = (session) => {
       const track = session?.primaryTrack || cfg['session-category'] || '';

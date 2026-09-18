@@ -34,9 +34,6 @@
   display: none;
 }
 
-/* A grid of named areas so category, description and actions are all visible in the collapsed
-   state (per Figma), not hidden behind an expand. The toggle only expands/collapses the
-   description clamp. */
 .mobile-rider .mobile-rider-info-bar {
   box-sizing: border-box;
   display: grid;
@@ -47,8 +44,6 @@
     "description"
     "more"
     "actions";
-
-  /* Per-row spacing is set on each area's margin-bottom (Figma), not a uniform grid gap. */
   gap: 0;
   background: transparent;
   color: var(--s2a-color-content-default);
@@ -104,8 +99,6 @@
   justify-content: center;
   gap: var(--s2a-spacing-xs);
   flex-shrink: 0;
-
-  /* Figma: 32x32 tap target with 9px padding around the 14px caret. */
   width: var(--s2a-spacing-2xl, 32px);
   height: var(--s2a-spacing-2xl, 32px);
   border: none;
@@ -239,7 +232,6 @@
   line-clamp: 2;
 }
 
-/* Expanded only lifts the 2-line clamp on the description; the rest is always visible. */
 .mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-description {
   -webkit-line-clamp: unset;
   line-clamp: unset;
