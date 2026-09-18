@@ -490,7 +490,8 @@
   background: var(--s2a-color-gray-1000, #000);
 }
 
-/* top+bottom:0 (no height) matches .sb-app's real height so the gradient always ends at its edge. */
+/* top+bottom:0 (no height) matches .sb-app's real height. No darkening here — authors darken
+   the photo itself before uploading it. */
 .sb-app:has(.sb-ended)::before {
   content: '';
   position: absolute;
@@ -499,25 +500,15 @@
   left: 0;
   z-index: -1;
   width: 100%;
-  background-image:
-    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%, rgb(0 0 0 / 100%) 100%),
-    linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
-    var(--sb-app-ended-bg, none);
+  background-image: var(--sb-app-ended-bg, none);
   background-repeat: no-repeat;
   background-position: top center;
-  background-size:
-    100% 100%,
-    100% 100%,
-    cover;
+  background-size: cover;
 }
 
-/* Tablet+desktop share one darker curve — merged since height no longer differs between them. */
 @media (min-width: 768px) {
   .sb-app:has(.sb-ended)::before {
-    background-image:
-      linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 90%) 90%, rgb(0 0 0 / 100%) 100%),
-      linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
-      var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none));
+    background-image: var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none));
   }
 }
 
