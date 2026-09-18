@@ -36,14 +36,22 @@
 
 .mobile-rider .mobile-rider-info-bar {
   box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "header"
+    "category"
+    "description"
+    "more"
+    "actions";
+  gap: 0;
   background: transparent;
   color: var(--s2a-color-content-default);
   font-family: var(--body-font-family);
-  padding: var(--s2a-spacing-lg) 0;
+  padding: var(--s2a-spacing-lg) 0 var(--s2a-spacing-xl);
   border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
   overflow: hidden;
 }
-
 
 @media (min-width: 1024px) {
   .mobile-rider .mobile-rider-info-bar[style*="background"] {
@@ -57,14 +65,15 @@
 }
 
 .mobile-rider .mobile-rider-info-bar-header {
+  grid-area: header;
   display: flex;
   align-items: center;
-  gap: var(--s2a-spacing-md);
+  gap: var(--s2a-spacing-xs);
+  margin-bottom: var(--s2a-spacing-md);
 }
 
-/* Figma: "s2a/typography/heading-5" — 2-line clamp, not single-line ellipsis. */
 .mobile-rider .mobile-rider-info-bar-title {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   overflow: hidden;
@@ -75,6 +84,7 @@
   line-height: var(--s2a-typography-line-height-heading-5);
   letter-spacing: var(--s2a-font-letter-spacing-4xl);
   text-overflow: ellipsis;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -84,15 +94,18 @@
 .mobile-rider .mobile-rider-info-bar-toggle {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s2a-spacing-xs);
   flex-shrink: 0;
+  width: var(--s2a-spacing-2xl, 32px);
+  height: var(--s2a-spacing-2xl, 32px);
   border: none;
   border-radius: var(--s2a-border-radius-sm, 4px);
   background: none;
   color: inherit;
   font-family: inherit;
   font-size: var(--s2a-font-size-md);
-  padding: 0;
+  padding: 9px;
   cursor: pointer;
 }
 
@@ -123,11 +136,11 @@
 }
 
 .mobile-rider .mobile-rider-info-bar-actions {
+  grid-area: actions;
   display: flex;
   align-items: center;
   gap: var(--s2a-spacing-xs);
   flex-shrink: 0;
-  margin-top: var(--s2a-spacing-md);
 }
 
 .mobile-rider .mobile-rider-info-bar .mobile-rider-action {
@@ -139,13 +152,13 @@
   padding: 0;
   border: none;
   border-radius: var(--s2a-border-radius-round);
-  background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
+  background: transparent;
   color: inherit;
   cursor: pointer;
 }
 
-.mobile-rider .mobile-rider-info-bar .mobile-rider-action:hover {
-  background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+.mobile-rider .mobile-rider-info-bar .mobile-rider-info-bar-favorite {
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-border-default);
 }
 
 .mobile-rider .mobile-rider-info-bar .mobile-rider-action:focus-visible {
@@ -153,36 +166,23 @@
   outline-offset: 2px;
 }
 
+/* Favorited flips to a filled chip — white circle with a dark heart — matching the
+   upcoming-sessions / live-card favorite pattern, so the favorited state reads clearly on the
+   dark video surface. */
 .mobile-rider .mobile-rider-info-bar-favorite.is-favorited {
-  color: var(--s2a-color-brand-adobe-red);
+  background: var(--s2a-color-gray-25, #fff);
+  border-color: var(--s2a-color-gray-25, #fff);
+  color: var(--s2a-color-gray-1000, #000);
 }
 
-.mobile-rider .mobile-rider-info-bar-panel-wrap {
-  display: grid;
-  grid-template-rows: 0fr;
-  overflow: hidden;
-  transition: grid-template-rows 0.25s ease;
-}
-
-.mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-panel-wrap {
-  grid-template-rows: 1fr;
-}
-
-.mobile-rider .mobile-rider-info-bar-panel {
-  min-height: 0;
-  padding-top: 0;
-  transition: padding-top 0.25s ease;
-}
-
-.mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-panel {
-  padding-top: var(--s2a-spacing-md);
+.mobile-rider .mobile-rider-info-bar-category-slot {
+  grid-area: category;
 }
 
 .mobile-rider .mobile-rider-info-bar-category {
   display: inline-flex;
   align-items: center;
   gap: var(--s2a-spacing-xs);
-  margin-bottom: var(--s2a-spacing-2xs);
 }
 
 .mobile-rider .mobile-rider-info-bar-category-icon-color {
@@ -211,8 +211,9 @@
 }
 
 .mobile-rider .mobile-rider-info-bar-description {
+  grid-area: description;
   overflow: hidden;
-  margin: 0 0 var(--s2a-spacing-md);
+  margin: 0 0 var(--s2a-spacing-sm);
   color: var(--s2a-color-content-subtle);
   font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-sm, 14px);
@@ -227,8 +228,16 @@
   line-clamp: 2;
 }
 
+.mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-description {
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
 .mobile-rider .mobile-rider-info-bar-more {
+  grid-area: more;
   display: block;
+  justify-self: start;
+  margin-bottom: var(--s2a-spacing-md);
   border: none;
   background: none;
   color: inherit;
@@ -244,19 +253,14 @@
     font-size: var(--s2a-font-size-md);
   }
 
-  .mobile-rider .mobile-rider-info-bar-description {
-    -webkit-line-clamp: unset;
-    line-clamp: unset;
-  }
-
   .mobile-rider .mobile-rider-info-bar {
-    padding: var(--s2a-spacing-lg);
+    padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-xl);
   }
 }
 
 @media (min-width: 768px) and (max-width: 1024px) {
   .mobile-rider .mobile-rider-info-bar {
-    padding: var(--s2a-spacing-lg) 88px;
+    padding: var(--s2a-spacing-lg) 88px var(--s2a-spacing-xl);
   }
 }
 
@@ -293,6 +297,11 @@
   .mobile-rider .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
+  }
+
+  /* Figma: the description is constrained to roughly the left half of the bar, not full width. */
+  .mobile-rider .mobile-rider-info-bar-description {
+    max-width: 60%;
   }
 
   .mobile-rider-player:has(.mobile-rider-info-bar) .mobile-rider-container {

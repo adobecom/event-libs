@@ -978,6 +978,21 @@ describe('services/sessions/sessions-api', () => {
       expect(max25.contentCategory).to.deep.equal(['How To']);
     });
 
+    // RainFocus casing drifts across sessions (e.g. "Primary event site track"); the attribute
+    // name match is case-insensitive so the track still resolves.
+    it('matches custom-attribute names case-insensitively', () => {
+      const [session] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'lowercase-track',
+          customAttributes: [
+            ONLINE_FORMAT,
+            customAttr('Primary event site track', [selectValue('Creator', 'creator')]),
+          ],
+        }],
+      });
+      expect(session.primaryTrack).to.equal('Creator');
+    });
+
     it('leaves additionalTracks/trackOverride empty for a MAX25-shaped session with neither field', () => {
       expect(max25.additionalTracks).to.deep.equal([]);
       expect(max25.trackOverride).to.equal('');
