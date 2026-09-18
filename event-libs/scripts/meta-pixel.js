@@ -18,6 +18,7 @@
 
 import { getMetadata } from '../v1/utils/utils.js';
 import BlockMediator from '../v1/deps/block-mediator.min.js';
+import { logError } from '../v1/utils/lana-log.js';
 
 const FBEVENTS_URL = 'https://connect.facebook.net/en_US/fbevents.js';
 
@@ -41,7 +42,7 @@ function safeFbq(...args) {
       window.fbq(...args);
     }
   } catch (e) {
-    window.lana?.log(`Meta Pixel fbq call failed: ${e.message}`);
+    logError('meta-pixel', 'Meta Pixel fbq call failed', e);
   }
 }
 

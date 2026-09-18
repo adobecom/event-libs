@@ -9,6 +9,7 @@ import {
   DEFAULT_RF_API_URL, STAGE_RF_API_URL, DEFAULT_RF_PROFILE_ID,
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
+import { logError, logWarning } from './lana-log.js';
 
 // Shared, page-level state. Preact reads `.value` directly; non-Preact code uses `.subscribe()`/`.peek()`.
 export const sessions = signal([]);
@@ -66,9 +67,9 @@ async function exchangeRfAuthToken(clientId) {
   try {
     const data = await fetchAuthToken(clientId, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     rfAuthToken = data?.rfAuthToken ?? data?.token ?? data?.jwt ?? data?.authToken ?? null;
-    if (!rfAuthToken) window.lana?.log('[session-store] jwt exchange returned no recognizable token field');
+    if (!rfAuthToken) logWarning('session-store,rf-auth-token', 'jwt exchange returned no recognizable token field');
   } catch (err) {
-    window.lana?.log(`[session-store] jwt exchange failed: ${err.message}`);
+    logError('session-store,rf-auth-token', 'jwt exchange failed', err);
   }
   rfAuthTokenSettled = true;
   maybeLoadMyData();
@@ -109,7 +110,7 @@ async function loadMyData() {
       auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
     });
   } catch (err) {
-    window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
+    logError('session-store,my-data', 'myData fetch failed', err);
     // A failed fetch is still a final, non-retried answer — isRegistered must not stay undefined.
     auth.value = { ...auth.value, isRegistered: null };
   }
@@ -124,7 +125,7 @@ function maybeLoadMyData() {
   myDataAttempted = true;
   if (!rfAuthToken) {
     // Settle isRegistered to null (not undefined) so isAuthResolved() doesn't spin forever.
-    window.lana?.log('[session-store] no RF auth token — skipping myData, registration status unknown');
+    logWarning('session-store,my-data', 'no RF auth token — skipping myData, registration status unknown');
     auth.value = { ...auth.value, isRegistered: null };
     return;
   }
@@ -156,7 +157,7 @@ async function loadSessions() {
       eventServiceEnv: getEventServiceEnv()?.name,
       error: err,
     });
-    window.lana?.log(`[session-store] sessions fetch failed: ${err.message}`);
+    logError('session-store,sessions', 'sessions fetch failed', err);
     sessionsStatus.value = 'error';
   }
 }
@@ -182,7 +183,7 @@ function parseTierOneEventConfig() {
   try {
     return JSON.parse(raw);
   } catch (err) {
-    window.lana?.log(`[session-store] invalid tier-1-event-config JSON: ${err.message}`);
+    logError('session-store,tier-1-event-config', 'invalid tier-1-event-config JSON', err);
     return null;
   }
 }
@@ -194,6 +195,7 @@ export function initSessionState() {
   if (!tierOneConfig) {
     // eslint-disable-next-line no-console
     console.warn('[session-store] initialization skipped: tier-1-event-config metadata is missing or invalid');
+    logWarning('session-store,init', 'initialization skipped: tier-1-event-config metadata is missing or invalid');
     return;
   }
   initialized = true;

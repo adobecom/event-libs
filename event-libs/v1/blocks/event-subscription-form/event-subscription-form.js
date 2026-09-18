@@ -1,5 +1,6 @@
 import { createTag, getEventServiceEnv } from '../../utils/utils.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
+import { logError } from '../../utils/lana-log.js';
 
 const CONFIG = {
   ENDPOINTS: {
@@ -92,7 +93,7 @@ async function handleSubmit(e, bp) {
 
     if (!resp.successful) {
       e.target.disabled = false;
-      window.lana?.log(`Error while subscribing email :\n${JSON.stringify(resp.reason, null, 2)}`);
+      logError('event-subscription-form', 'Error while subscribing email', resp.reason);
       decorateError('Something went wrong', inputElement);
       if (submitButton) {
         submitButton.disabled = false;
@@ -103,7 +104,7 @@ async function handleSubmit(e, bp) {
     flipToBack(bp);
   } catch (err) {
     e.target.disabled = false;
-    window.lana?.log(`Exception in email subscription :\n "${err}"`);
+    logError('event-subscription-form', 'Exception in email subscription', err);
     decorateError('Internal error', inputElement);
     if (submitButton) {
       submitButton.disabled = false;

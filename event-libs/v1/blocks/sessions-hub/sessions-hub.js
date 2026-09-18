@@ -20,6 +20,7 @@ import {
   registerForSessionTime,
   unregisterFromSessionTime,
 } from '../../utils/esp-controller.js';
+import { logError } from '../../utils/lana-log.js';
 
 const getLocaleString = () => {
   const locale = getMetadata('locale') || getEventConfig().miloConfig.locale?.ietf || 'en-US';
@@ -1433,7 +1434,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     if (conflictTime) {
       const unregResp = await unregisterFromSessionTime(conflictTime.sessionTimeId);
       if (!unregResp.ok) {
-        window.lana?.log(`Error: Failed to unregister conflicting session ${conflictingSession.sessionId}`);
+        logError('sessions-hub,register', `Failed to unregister conflicting session ${conflictingSession.sessionId}`);
         conflictFinalize(false);
         return;
       }
@@ -1483,7 +1484,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     updateCTAGroup(cardEl, session, { isEventRegistered: true, isBlocked: false });
     if (conflictFinalize) conflictFinalize(true);
   } else {
-    window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
+    logError('sessions-hub,register', `Failed to register for session ${sessionId}`, resp.error);
     if (conflictFinalize) {
       conflictFinalize(false);
     } else if (btn) {
@@ -1521,7 +1522,7 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
     updated.delete(sessionId);
     BlockMediator.set('registeredSessionIds', updated);
   } else {
-    window.lana?.log(`Error: Failed to unregister from session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
+    logError('sessions-hub,unregister', `Failed to unregister from session ${sessionId}`, resp.error);
     if (badge) {
       badge.disabled = false;
       badge.removeAttribute('aria-busy');
@@ -1754,7 +1755,7 @@ async function loadBlock(el, rsvpConfig) {
   try {
     await dictionaryManager.initialize();
   } catch (err) {
-    window.lana?.log(`sessions-hub: dictionary initialize failed: ${err?.message || err}`);
+    logError('sessions-hub,init', 'Dictionary initialize failed', err);
   }
 
   const inviteOnlyBlocked = Boolean(eventData.inviteOnly && !getValidCampaignIdFromUrl());
@@ -1767,7 +1768,7 @@ async function loadBlock(el, rsvpConfig) {
   try {
     rawSessions = JSON.parse(getMetadata('sessions'));
   } catch (e) {
-    window.lana?.log(`Failed to parse sessions metadata:\n${e.message}`);
+    logError('sessions-hub,init', 'Failed to parse sessions metadata', e);
   }
   if (!rawSessions?.length) {
     el.remove();
@@ -1891,7 +1892,7 @@ export default async function init(el) {
           const path = link.dataset.modalPath || url.pathname;
           rsvpConfig = { hash: `#${cleanId}`, path };
         } catch (e) {
-          window.lana?.log(`Failed to parse RSVP form link: ${link.href}`);
+          logError('sessions-hub,init', `Failed to parse RSVP form link: ${link.href}`, e);
         }
       }
       break;

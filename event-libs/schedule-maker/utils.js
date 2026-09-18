@@ -1,4 +1,5 @@
 import { DA_ORIGIN, DA_APP_PATH } from './constants.js';
+import { logError } from '../v1/utils/lana-log.js';
 
 function isBlockComplete(block) {
   if (block.includeLiveStream && !block.liveStream?.streamId) {
@@ -220,7 +221,7 @@ class ScheduleURLUtility {
       url.hash = `schedule=${base64JsonString}`;
       return url.toString();
     } catch (error) {
-      window.lana?.log(`Error creating schedule URL: ${error}`);
+      logError('schedule-maker,utils', 'Error creating schedule URL', error);
       throw new Error('Failed to create schedule URL');
     }
   }
@@ -237,7 +238,7 @@ class ScheduleURLUtility {
       const decodedJsonString = atob(decodeURIComponent(encodedParam));
       return JSON.parse(decodedJsonString);
     } catch (error) {
-      window.lana?.log(`Error extracting schedule from URL: ${error}`);
+      logError('schedule-maker,utils', 'Error extracting schedule from URL', error);
       throw new Error('Failed to extract schedule from URL');
     }
   }
@@ -283,7 +284,7 @@ class ScheduleURLUtility {
       document.body.removeChild(textArea);
       return { copied: successful, wasReordered };
     } catch (error) {
-      window.lana?.log(`Error copying schedule to clipboard: ${error}`);
+      logError('schedule-maker,utils', 'Error copying schedule to clipboard', error);
       return { copied: false, wasReordered: false };
     }
   }

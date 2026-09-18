@@ -1,5 +1,6 @@
 import { html } from '../htm-wrapper.js';
 import { useState, useEffect } from '../../v1/deps/htm-preact.js';
+import { logError } from '../../v1/utils/lana-log.js';
 import { useSchedulesOperations, useSchedulesData } from '../context/SchedulesContext.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { convertSheetRowsToBlocks } from '../utils.js';
@@ -35,7 +36,7 @@ export default function SheetImporter() {
         const { default: XLSX } = await import('../../v1/deps/xlsx.mjs');
         setXlsx(XLSX);
       } catch (err) {
-        window.lana?.log(`Failed to load xlsx library: ${err}`);
+        logError('schedule-maker,sheet-importer', 'Failed to load xlsx library', err);
       } finally {
         setIsLoading(false);
       }
@@ -57,7 +58,7 @@ export default function SheetImporter() {
         setSheetData([]);
         setColumnMapping({ startDateTime: '', title: '', streamId: '', fragmentPath: '' });
       } catch (error) {
-        window.lana?.log(`Error reading file: ${error}`);
+        logError('schedule-maker,sheet-importer', 'Error reading file', error);
         // eslint-disable-next-line no-alert
         alert('Error reading file. Please make sure it\'s a valid Excel file.');
       }

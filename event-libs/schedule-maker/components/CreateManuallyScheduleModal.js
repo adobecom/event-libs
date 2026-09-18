@@ -1,4 +1,5 @@
 import { useState } from '../../v1/deps/htm-preact.js';
+import { logError } from '../../v1/utils/lana-log.js';
 import { html } from '../htm-wrapper.js';
 import Modal from './Modal.js';
 import { useSchedulesUI } from '../context/SchedulesContext.js';
@@ -18,7 +19,7 @@ export default function CreateManuallyScheduleModal({ isOpen, onClose, onConfirm
       await onConfirm(scheduleName.trim());
       handleClose();
     } catch (error) {
-      window.lana?.log(`Error creating schedule: ${error}`);
+      logError('schedule-maker,create-manually-schedule-modal', 'Error creating schedule', error);
     }
   };
 

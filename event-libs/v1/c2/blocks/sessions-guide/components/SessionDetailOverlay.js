@@ -22,6 +22,7 @@ import { getProduct } from '../../../../utils/tier-1-event-config.js';
 import { resolveTrackBadge, resolveNamedTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 import { scrollBehavior } from '../utils/motion.js';
+import { logError } from '../../../../utils/lana-log.js';
 
 // Collapsed list-pod lengths (Figma products 1325:141847, speakers 1325:141990).
 const COLLAPSED_PRODUCTS = 6;
@@ -134,7 +135,7 @@ export function SessionDetailOverlay({ onBack }) {
       await navigator.clipboard.writeText(shareUrl);
       showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (err) {
-      window.lana?.log(`[sessions-guide] detail share failed: ${err.message}`);
+      logError('sessions-guide', 'detail share failed', err);
     }
   }
 

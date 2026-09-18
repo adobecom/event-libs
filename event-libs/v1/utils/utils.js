@@ -1,5 +1,6 @@
 import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN, RSVP_TOKEN_PATTERN } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
+import { logError } from './lana-log.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -99,7 +100,7 @@ export function getImageSource(photo) {
         const spUrlObj = new URL(sharepointUrl);
         return spUrlObj.pathname;
       } catch (e) {
-        window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
+        logError('utils,sharepoint-url', 'Error while parsing SharePoint URL', e);
         // Fallback to imageUrl if sharepointUrl is invalid
         return imageUrl;
       }
@@ -222,7 +223,7 @@ export function createOptimizedPicture(
       url = new URL(src, window.location.href);
     }
   } catch (e) {
-    window.lana?.log(`Invalid URL in createOptimizedPicture: ${src}`);
+    logError('utils,optimized-picture', `Invalid URL in createOptimizedPicture: ${src}`, e);
     // Return a basic img element as fallback
     const img = document.createElement('img');
     img.setAttribute('src', src);
@@ -327,7 +328,7 @@ const { fetchCampaignMap, resetCampaignMapCache } = (() => {
           pending = null;
           return cache;
         } catch (e) {
-          window.lana?.log(`Error fetching campaign map:\n${e.message}`);
+          logError('utils,campaign-map', 'Error fetching campaign map', e);
           pending = null;
           return null;
         }
@@ -524,7 +525,7 @@ function parseRegularPath(path, extraData = {}) {
       currentValue = JSON.parse(currentValue);
     }
   } catch (e) {
-    window.lana?.log(`Error while parsing metadata for ${path}:\n${JSON.stringify(e, null, 2)}`);
+    logError('utils,metadata-path', `Error while parsing metadata for ${path}`, e);
     return extraData[path] || '';
   }
 
