@@ -5,6 +5,7 @@ import {
   pendingActions,
   initSessionState,
   openSessionGuideDetail,
+  getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
@@ -15,7 +16,9 @@ const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
 const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
-const EVENT_CONFIG = { title: '', showConflictModal: false, registerUrl: '/register' };
+function getEventConfig() {
+  return { title: '', showConflictModal: false, registerUrl: getEventApiConfig()?.registerUrl };
+}
 
 const ICON_CALENDAR_CHECK = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M7.86427 15.7344C7.64161 15.7344 7.43068 15.6357 7.2881 15.4648L3.54103 10.9668C3.27541 10.6484 3.31935 10.1748 3.63673 9.91015C3.95411 9.64453 4.42677 9.68652 4.69337 10.0059L7.84669 13.792L15.2861 4.32323C15.542 3.99706 16.0147 3.94139 16.3389 4.19628C16.665 4.45214 16.7217 4.92382 16.4658 5.24901L8.4541 15.4473C8.31445 15.626 8.10156 15.7314 7.875 15.7344L7.86427 15.7344Z" fill="currentColor"/></svg>';
 const ICON_CALENDAR_PLUS = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M8.64355 16.5H4.25C3.83643 16.5 3.5 16.1636 3.5 15.75V8.5H16.5V8.64355C16.5 9.05761 16.8359 9.39355 17.25 9.39355C17.6641 9.39355 18 9.05761 18 8.64355V5.25C18 4.00928 16.9907 3 15.75 3H13.75V2C13.75 1.58594 13.4141 1.25 13 1.25C12.5859 1.25 12.25 1.58594 12.25 2V3H7.75V2C7.75 1.58594 7.41406 1.25 7 1.25C6.58594 1.25 6.25 1.58594 6.25 2V3H4.25C3.00928 3 2 4.00928 2 5.25V15.75C2 16.9907 3.00928 18 4.25 18H8.64355C9.05761 18 9.39355 17.6641 9.39355 17.25C9.39355 16.8359 9.05761 16.5 8.64355 16.5ZM4.25 4.5H6.25V5C6.25 5.41406 6.58594 5.75 7 5.75C7.41406 5.75 7.75 5.41406 7.75 5V4.5H12.25V5C12.25 5.41406 12.5859 5.75 13 5.75C13.4141 5.75 13.75 5.41406 13.75 5V4.5H15.75C16.1636 4.5 16.5 4.83643 16.5 5.25V7H3.5V5.25C3.5 4.83643 3.83643 4.5 4.25 4.5Z" fill="currentColor"/><path d="M15 10.5C12.5147 10.5 10.5 12.5147 10.5 15C10.5 17.4853 12.5147 19.5 15 19.5C17.4853 19.5 19.5 17.4853 19.5 15C19.5 12.5147 17.4853 10.5 15 10.5ZM17.5 15.625H15.625V17.5C15.625 17.8452 15.3452 18.125 15 18.125C14.6548 18.125 14.375 17.8452 14.375 17.5V15.625H12.5C12.1548 15.625 11.875 15.3452 11.875 15C11.875 14.6648 12.1548 14.375 12.5 14.375H14.375V12.5C14.375 12.1548 14.6548 11.875 15 11.875C15.3452 11.875 15.625 12.1548 15.625 12.5V14.375H17.5C17.8452 14.375 18.125 14.6648 18.125 15C18.125 15.3452 17.8452 15.625 17.5 15.625Z" fill="currentColor"/></svg>';
@@ -57,16 +60,26 @@ function toIsoTimes(session) {
   };
 }
 
+// Intl always renders the meridiem as uppercase AM/PM; lowercase it while leaving
+// the timezone abbreviation (e.g. PDT/PST) untouched.
+function lowercaseMeridiem(time) {
+  return time.replace(/\b(AM|PM)\b/, (meridiem) => meridiem.toLowerCase());
+}
+
 function formatTimeRange(session) {
   const { sessionTime } = session;
   if (!sessionTime) return '';
   const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
   try {
-    const start = new Date(sessionTime.startTimeMillis).toLocaleTimeString('en-US', timeOptions);
-    const end = new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', {
-      ...timeOptions,
-      timeZoneName: 'short',
-    });
+    const start = lowercaseMeridiem(
+      new Date(sessionTime.startTimeMillis).toLocaleTimeString('en-US', timeOptions),
+    );
+    const end = lowercaseMeridiem(
+      new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', {
+        ...timeOptions,
+        timeZoneName: 'short',
+      }),
+    );
     return `${start} - ${end}`;
   } catch (error) {
     window.lana?.log(`upcoming-sessions: time format failed: ${error.message}`);
@@ -82,7 +95,8 @@ function toRfSession(session) {
   const { startTimeUtc, endTimeUtc } = toIsoTimes(session);
   return {
     id: session.sessionId,
-    rfCode: session.sessionCode,
+    rfCode: session.rfCode,
+    rfSessionId: session.rfSessionId,
     startTimeUtc,
     endTimeUtc,
     title: session.enTitle,
@@ -119,7 +133,7 @@ async function handleSchedule(e, session, isScheduled, btn) {
   e.stopPropagation();
   btn.disabled = true;
   try {
-    await toggleScheduleWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isScheduled });
+    await toggleScheduleWithFeedback(toRfSession(session), { eventConfig: getEventConfig(), isScheduled });
   } finally {
     btn.disabled = false;
   }
@@ -129,7 +143,7 @@ async function handleFavorite(e, session, isFavorited, btn) {
   e.stopPropagation();
   btn.disabled = true;
   try {
-    await toggleFavoriteWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isFavorited });
+    await toggleFavoriteWithFeedback(toRfSession(session), { eventConfig: getEventConfig(), isFavorited });
   } finally {
     btn.disabled = false;
   }
