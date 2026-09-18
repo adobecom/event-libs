@@ -10,6 +10,7 @@ import { calculateSessionTimes, buildNotificationEntry } from './swan-payload.js
 import { upsertNotification, removeNotification } from './notification-display.js';
 import { getEntry, getEntries, pruneStale } from './notification-store.js';
 import { getNowMs } from '../../utils/session-state.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 const STAGE_RANK = { reminder: 1, live: 2, 'on-demand': 3 };
 
@@ -34,7 +35,7 @@ function applyStage(session, swanConfig, now) {
   if (!Number.isFinite(timingProperties.triggerNotificationTime)
     || !Number.isFinite(timingProperties.triggerLiveBadgeTime)
     || !Number.isFinite(timingProperties.triggerOnDemandBadgeTime)) {
-    window.lana?.log(`[swan-notifications] session ${session.rfCode} has invalid start/end timestamps — skipping`);
+    logWarning('swan-notifications-feds', `session ${session.rfCode} has invalid start/end timestamps — skipping`);
     return;
   }
   const stage = desiredStage(timingProperties, now);
@@ -50,7 +51,7 @@ export function notifySessionScheduled(session) {
   try {
     applyStage(session, getSwanConfig(), getNowMs());
   } catch (err) {
-    window.lana?.log(`[swan-notifications] notifySessionScheduled failed for ${session.rfCode}: ${err.message}`);
+    logError('swan-notifications-feds', `notifySessionScheduled failed for ${session.rfCode}`, err);
   }
 }
 
@@ -59,7 +60,7 @@ export function notifySessionUnscheduled(session) {
   try {
     removeNotification(session.rfCode);
   } catch (err) {
-    window.lana?.log(`[swan-notifications] notifySessionUnscheduled failed for ${session.rfCode}: ${err.message}`);
+    logError('swan-notifications-feds', `notifySessionUnscheduled failed for ${session.rfCode}`, err);
   }
 }
 
@@ -100,6 +101,6 @@ export function reconcileSwanNotifications(getSessions, getScheduled, isSchedule
 
     pruneStale(now, swanConfig.localNotificationPersistTillDays, swanConfig.notificationExpirationDays);
   } catch (err) {
-    window.lana?.log(`[swan-notifications] reconcile failed: ${err.message}`);
+    logError('swan-notifications-feds', 'reconcile failed', err);
   }
 }

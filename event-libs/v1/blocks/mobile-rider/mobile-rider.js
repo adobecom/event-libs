@@ -1,5 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 import { createTag, getEventConfig } from '../../utils/utils.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
@@ -58,8 +59,6 @@ class MobileRider {
     this.init();
   }
 
-  log(msg) { window.lana?.log?.(`[MobileRider] ${msg}`); }
-
   #storeHas(id) {
     if (!this.store || !id) return false;
     try {
@@ -111,7 +110,7 @@ class MobileRider {
       if (this.cfg.concurrentenabled && videos.length > 1) {
         await this.#initDrawer(videos, selected.videoid);
       }
-    } catch (e) { this.log(e.message); }
+    } catch (e) { logError('mobile-rider', 'Failed to initialize', e); }
   }
 
   #setupDOM() {
@@ -174,7 +173,7 @@ class MobileRider {
         const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
 
         if (!videoInDoc || !window.mobilerider) {
-          this.log('DOM or Library not ready');
+          logWarning('mobile-rider', 'DOM or Library not ready');
           finish();
           return;
         }
@@ -191,13 +190,13 @@ class MobileRider {
           if (asl) this.#initASL(container, vid);
           this.#maybeAttachEndListener(vid);
         } catch (e) {
-          this.log(`Embed Error: ${e.message}`);
+          logError('mobile-rider', 'Embed Error', e);
         }
 
         finish();
       });
     } catch (e) {
-      this.log(`Inject Error: ${e.message}`);
+      logError('mobile-rider', 'Inject Error', e);
       finish();
     }
   }
@@ -325,7 +324,7 @@ class MobileRider {
                 try {
                   this.#maybeAttachEndListener(vid);
                 } catch (e) {
-                  this.log(`ASL end-listener error: ${e.message}`);
+                  logError('mobile-rider', 'ASL end-listener error', e);
                 }
               });
             }
@@ -378,7 +377,7 @@ class MobileRider {
         new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href
       );
       this.store = mobileRiderStore;
-    } catch (e) { this.log('Store Fail'); }
+    } catch (e) { logError('mobile-rider', 'Store fail', e); }
   }
 
   setStatus(id, live) { this.#updateStatus(id, live); }
@@ -396,7 +395,7 @@ class MobileRider {
       if (this.store.get(key) === live) return;
       this.store.set(key, live);
     } catch (e) {
-      this.log(`Status update failed: ${e.message}`);
+      logError('mobile-rider', 'Status update failed', e);
     }
   }
 }

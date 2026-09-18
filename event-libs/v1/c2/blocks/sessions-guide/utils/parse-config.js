@@ -1,4 +1,5 @@
 import { detectUserTimezone } from './time.js';
+import { logWarning } from '../../../../utils/lana-log.js';
 
 // RainFocus gives categories a UUID and a label, no slug — this is ours, for the ?filter= key.
 function slugifyCategoryLabel(label) {
@@ -27,7 +28,7 @@ export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) 
   try {
     authored = JSON.parse(el.dataset.sessionGuideConfig || '{}');
   } catch {
-    window.lana?.log(`[${logPrefix}] invalid data-session-guide-config JSON`);
+    logWarning(logPrefix, 'invalid data-session-guide-config JSON');
   }
 
   const surface = forcedSurface || authored.surface || 'widget';

@@ -7,6 +7,7 @@ import { getTrackIcon, initTierOneEventConfig } from '../../../utils/tier-1-even
 import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
+import { logError, logWarning } from '../../../utils/lana-log.js';
 
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
@@ -47,8 +48,7 @@ function buildCategoryBadge(track) {
       svg.classList.add('mobile-rider-info-bar-category-icon');
       iconColor.append(svg);
     } catch (error) {
-      iconColor.remove();
-      window.lana?.log(`[MobileRider] category icon resolution failed for "${entry.icon}": ${error.message}`);
+      logError('mobile-rider-c2', `category icon resolution failed for "${entry.icon}"`, error);
     }
   })();
 
@@ -102,7 +102,7 @@ function buildShareButton(getSession) {
       await navigator.clipboard.writeText(shareUrl);
       showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (e) {
-      window.lana?.log(`[MobileRider] share failed: ${e.message}`);
+      logError('mobile-rider-c2', 'share failed', e);
     }
   });
 
@@ -162,8 +162,6 @@ class MobileRider {
     this.init();
   }
 
-  log(msg) { window.lana?.log?.(`[MobileRider] ${msg}`); }
-
   #storeHas(id) {
     if (!this.store || !id) return false;
     try {
@@ -206,7 +204,7 @@ class MobileRider {
         initTierOneEventConfig();
         this.#initInfoBar(this.cfg, sessionId);
       }
-    } catch (e) { this.log(e.message); }
+    } catch (e) { logError('mobile-rider-c2', 'Failed to initialize', e); }
   }
 
   #setupDOM() {
@@ -366,7 +364,7 @@ class MobileRider {
         const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
 
         if (!videoInDoc || !window.mobilerider) {
-          this.log('DOM or Library not ready');
+          logWarning('mobile-rider-c2', 'DOM or Library not ready');
           finish();
           return;
         }
@@ -383,13 +381,13 @@ class MobileRider {
           if (asl) this.#initASL(container, vid);
           this.#maybeAttachEndListener(vid);
         } catch (e) {
-          this.log(`Embed Error: ${e.message}`);
+          logError('mobile-rider-c2', 'Embed Error', e);
         }
 
         finish();
       });
     } catch (e) {
-      this.log(`Inject Error: ${e.message}`);
+      logError('mobile-rider-c2', 'Inject Error', e);
       finish();
     }
   }
@@ -454,7 +452,7 @@ class MobileRider {
                 try {
                   this.#maybeAttachEndListener(vid);
                 } catch (e) {
-                  this.log(`ASL end-listener error: ${e.message}`);
+                  logError('mobile-rider-c2', 'ASL end-listener error', e);
                 }
               });
             }
@@ -492,7 +490,7 @@ class MobileRider {
         new URL('../../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href
       );
       this.store = mobileRiderStore;
-    } catch (e) { this.log('Store Fail'); }
+    } catch (e) { logError('mobile-rider-c2', 'Store fail', e); }
   }
 
   setStatus(id, live) { this.#updateStatus(id, live); }
@@ -504,7 +502,7 @@ class MobileRider {
       if (this.store.get(id) === live) return;
       this.store.set(id, live);
     } catch (e) {
-      this.log(`Status update failed: ${e.message}`);
+      logError('mobile-rider-c2', 'Status update failed', e);
     }
   }
 }

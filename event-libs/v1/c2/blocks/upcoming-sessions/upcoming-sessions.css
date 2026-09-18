@@ -110,14 +110,14 @@
 
 .upcoming-sessions.dark-card .upcoming-sessions-arrow,
 .section.dark .upcoming-sessions .upcoming-sessions-arrow {
-  border-color: #e1e1e1;
-  background: #f3f3f3;
-  color: #000;
+  border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
+  color: var(--s2a-color-gray-25, #fff);
 }
 
 .upcoming-sessions.dark-card .upcoming-sessions-arrow:hover,
 .section.dark .upcoming-sessions .upcoming-sessions-arrow:hover {
-  background: #e1e1e1;
+  background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
 @media (min-width: 1280px) {

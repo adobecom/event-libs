@@ -1,5 +1,6 @@
 import { fetchLiveStatus } from './mobile-rider.js';
 import { getEventApiConfig, deriveMrEnv } from '../../utils/session-store.js';
+import { logError } from '../../utils/lana-log.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
@@ -30,7 +31,7 @@ async function tick(g) {
     const result = { active: [...active], inactive: [...inactive] };
     listeners.forEach((entry) => entry.notify(result, ids));
   } catch (error) {
-    window.lana?.log(`poller: poll failed: ${error.message}`);
+    logError('poller', 'poll failed', error);
   } finally {
     g.inFlight = false;
     if (g.refetchNeeded) {
