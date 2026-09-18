@@ -1,6 +1,7 @@
 import {
   useState, useMemo, useCallback, html,
 } from '../../v1/deps/htm-preact.js';
+import { logError } from '../../v1/utils/lana-log.js';
 import SearchInput from '../components/SearchInput.js';
 import Tier1ConfigPicker from '../components/Tier1ConfigPicker.js';
 import EventPicker from '../components/EventPicker.js';
@@ -89,7 +90,7 @@ export default function Library() {
   const handleBrowseError = useCallback((message) => {
     setBrowseFailed(true);
     setPickerMode('manual');
-    window.lana?.log(`session-guide-configurator: EventPicker failed, falling back to ManualEventLookup. ${message}`);
+    logError('session-guide-configurator,library', 'EventPicker failed, falling back to ManualEventLookup', message);
   }, []);
 
   const confirmDelete = useCallback(async () => {

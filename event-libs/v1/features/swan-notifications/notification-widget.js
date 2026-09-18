@@ -5,6 +5,7 @@ import { FALLBACK_LOCALES } from '../../utils/constances.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getRelativeTime, createTemplatedDateRange } from '../../utils/date-time-helper.js';
 import { getNowMs } from '../../utils/session-state.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 import {
   notifications, markRead, markAllRead, dismissEntry, getEntries,
 } from './notification-store.js';
@@ -334,7 +335,7 @@ export function mountNotificationWidget() {
   // buildWidget() calls dictionaryManager.getValue() synchronously regardless of whether this
   // has resolved yet; it just falls back to the English key text until it has.
   dictionaryManager.initialize().catch((err) => {
-    window.lana?.log(`[notification-widget] dictionary failed to load, using fallback copy: ${err.message}`);
+    logError('notification-widget', 'dictionary failed to load, using fallback copy', err);
   });
 
   waitForElement(MOUNT_SELECTOR).then((mount) => {
@@ -345,7 +346,7 @@ export function mountNotificationWidget() {
       // appear. session-store.js's syncAuth() re-invokes this on every imsProfile change,
       // giving this a real retry path rather than needing its own polling loop.
       mounted = false;
-      window.lana?.log('[notification-widget] gnav notifications placeholder never appeared — bell not mounted, will retry on next call');
+      logWarning('notification-widget', 'gnav notifications placeholder never appeared — bell not mounted, will retry on next call');
       return;
     }
     buildWidget(mount);

@@ -2,6 +2,7 @@
 // external endpoint to trust or author here anymore (no ANS, no bookkeeping resource),
 // so this is now a synchronous metadata read plus a couple of hardcoded defaults.
 import { getMetadata } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
 
 const DEFAULT_UPCOMING_OFFSET_MINUTES = 5;
 const DEFAULT_NOTIFICATION_ICON_URL = '';
@@ -19,7 +20,7 @@ function parseTierOneEventConfig() {
   try {
     return JSON.parse(raw);
   } catch (err) {
-    window.lana?.log(`[swan-config] invalid tier-1-event-config JSON: ${err.message}`);
+    logError('swan-config', 'invalid tier-1-event-config JSON', err);
     return null;
   }
 }

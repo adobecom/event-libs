@@ -4,6 +4,7 @@ import {
   getSessionProducts, extractDistinctProducts,
   getSessionIsLivestreamed, getSessionIsOnline,
 } from '../v1/services/sessions/sessions-api.js';
+import { logError } from '../v1/utils/lana-log.js';
 import { DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
 export {
@@ -28,7 +29,7 @@ export async function copyTextToClipboard(text) {
     document.body.removeChild(textArea);
     return successful;
   } catch (error) {
-    window.lana?.log(`Error copying to clipboard: ${error}`);
+    logError('tier-1-event-configurator,utils', 'Error copying to clipboard', error);
     return false;
   }
 }
@@ -225,7 +226,7 @@ export async function copyLinkToClipboard(url, text) {
     }
     return await copyTextToClipboard(`${text} (${url})`);
   } catch (error) {
-    window.lana?.log(`Error copying link to clipboard: ${error}`);
+    logError('tier-1-event-configurator,utils', 'Error copying link to clipboard', error);
     return false;
   }
 }

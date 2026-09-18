@@ -182,3 +182,4 @@ export const FALLBACK_LOCALES = {
 export const LATEST_VERSION = 'v1';
 export const PHONE_FIELD_RE = /phone/i;
 export const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
+export const BACKEND_PHONE_RE = /^[+\d\s\-().]+$/;

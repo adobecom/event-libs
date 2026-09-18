@@ -1,3 +1,5 @@
+import { logError, logWarning } from '../../utils/lana-log.js';
+
 // Adobe's federal icon CDN, reimplemented here since this module also runs without Milo loaded.
 const PROD_ROOT = 'https://www.adobe.com';
 
@@ -49,12 +51,15 @@ function namespaceSvgIds(svg) {
 async function fetchSvgFrom(url) {
   try {
     const resp = await fetch(url);
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      logWarning('federal-icons', `non-ok response fetching ${url}`, resp);
+      return null;
+    }
     const svgText = await resp.text();
     const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
     return doc.querySelector('svg');
   } catch (err) {
-    window.lana?.log(`[federal-icons] failed to fetch ${url}: ${err.message}`);
+    logError('federal-icons', `failed to fetch ${url}`, err);
     return null;
   }
 }
@@ -117,11 +122,14 @@ export function fetchFederalIconList() {
     federalIconListPromise = (async () => {
       try {
         const resp = await fetch(`${resolveFederalRoot()}/federal/assets/icons/icons.json`);
-        if (!resp.ok) return [];
+        if (!resp.ok) {
+          logWarning('federal-icons', 'non-ok response fetching icons.json', resp);
+          return [];
+        }
         const { data = [] } = await resp.json();
         return data.map((entry) => entry.key).filter(Boolean);
       } catch (err) {
-        window.lana?.log(`[federal-icons] failed to fetch icons.json: ${err.message}`);
+        logError('federal-icons', 'failed to fetch icons.json', err);
         return [];
       }
     })();
