@@ -1,16 +1,16 @@
 const LANA_POLL_INTERVAL_MS = 100;
 const LANA_POLL_ATTEMPTS = 5;
 
-export default function logHydration(message) {
+export default function logHydration(message, options) {
   if (window.lana?.log) {
-    window.lana.log(message);
+    window.lana.log(message, options);
     return;
   }
 
   let logged = false;
   const tryLog = () => {
     if (logged || !window.lana?.log) return false;
-    window.lana.log(message);
+    window.lana.log(message, options);
     logged = true;
     return true;
   };

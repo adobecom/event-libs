@@ -11,6 +11,7 @@ import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { logError } from '../../../utils/lana-log.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
@@ -45,7 +46,7 @@ function buildCategoryBadge(track) {
       svg.classList.add('sg-category-badge__icon');
       iconColor.append(svg);
     } catch (error) {
-      window.lana?.log(`upcoming-sessions: icon resolution failed for "${entry.icon}": ${error.message}`);
+      logError('upcoming-sessions', `icon resolution failed for "${entry.icon}"`, error);
     }
   })();
 
@@ -82,7 +83,7 @@ function formatTimeRange(session) {
     );
     return `${start} - ${end}`;
   } catch (error) {
-    window.lana?.log(`upcoming-sessions: time format failed: ${error.message}`);
+    logError('upcoming-sessions', 'time format failed', error);
     return '';
   }
 }
@@ -357,7 +358,7 @@ async function decorate(el) {
   try {
     config = el.dataset.upcomingSessionsConfig ? JSON.parse(el.dataset.upcomingSessionsConfig) : null;
   } catch (error) {
-    window.lana?.log(`upcoming-sessions: failed to parse session payload: ${error.message}`);
+    logError('upcoming-sessions', 'failed to parse session payload', error);
     el.remove();
     return;
   }
