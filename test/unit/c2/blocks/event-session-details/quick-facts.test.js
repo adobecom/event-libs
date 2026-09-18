@@ -15,7 +15,7 @@ describe('Quick Facts', () => {
 
   it('renders a label:value row per populated attribute, in order', () => {
     setAttrs([
-      attr('Category', [{ value: 'how-to', label: 'How To' }]),
+      attr('Programming Category', [{ value: 'how-to', label: 'How To' }]),
       attr('Technical Level', [{ value: 'beginner', label: 'Beginner' }]),
       attr('Audience', [
         { value: 'educator', label: 'Educator' },
@@ -29,6 +29,17 @@ describe('Quick Facts', () => {
       .to.deep.equal(['Technical level:', 'Audience:', 'Category:']);
     expect(rows[1].querySelector('.session-quick-fact-value').textContent)
       .to.equal('Educator, Developer');
+  });
+
+  it('reads the Category row from the Programming Category attribute, not a bare Category', () => {
+    setAttrs([
+      attr('Programming Category', [{ value: 'tl', label: 'Thought Leadership' }]),
+      attr('Category', [{ value: 'wrong', label: 'Wrong' }]),
+    ]);
+    const el = renderQuickFacts();
+    const cat = [...el.querySelectorAll('.session-quick-fact')]
+      .find((r) => r.querySelector('.session-quick-fact-label').textContent === 'Category:');
+    expect(cat.querySelector('.session-quick-fact-value').textContent).to.equal('Thought Leadership');
   });
 
   it('omits Product — it has its own event-featured-products block', () => {

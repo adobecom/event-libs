@@ -52,11 +52,14 @@ describe('session-store: session-catalog fetch failure reports to lana, not cons
   });
 
   it('reports the failure to lana with the eventId and env for triage', () => {
-    expect(lanaLogStub.calledOnce).to.equal(true);
-    const [message] = lanaLogStub.firstCall.args;
-    expect(message).to.include('[session-store] sessions fetch failed');
+    // sessions-api.js logs the raw fetch failure; session-store.js logs it again with
+    // eventId/env context for triage — both calls report to lana, never to console.
+    expect(lanaLogStub.callCount).to.equal(2);
+    const [message, options] = lanaLogStub.secondCall.args;
+    expect(message).to.include('sessions fetch failed');
     expect(message).to.include('event-99');
     expect(message).to.include('network error');
+    expect(options).to.include({ tags: 'session-store,sessions', severity: 'error' });
   });
 
   it('settles sessionsStatus to error', () => {

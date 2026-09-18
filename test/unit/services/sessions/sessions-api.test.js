@@ -36,6 +36,7 @@ describe('services/sessions/sessions-api', () => {
         {
           speakerId: 'sp-2', firstName: 'Grace', lastName: 'Hopper',
           localizations: { 'en-US': { title: 'Admiral' } },
+          photo: { imageKind: 'speaker-photo', imageUrl: 'grace-hopper.jpg' },
         },
       ],
       sessionTimes: [
@@ -280,7 +281,11 @@ describe('services/sessions/sessions-api', () => {
     it('joins speakers by id, sorted by ordinal', () => {
       expect(full.speakers.map((sp) => sp.name)).to.deep.equal(['Ada Lovelace', 'Grace Hopper']);
       expect(full.speakers[0].title).to.equal('Engineer');
+    });
+
+    it('maps a speaker photo to its imageUrl, and falls back to null when absent', () => {
       expect(full.speakers[0].photo).to.be.null;
+      expect(full.speakers[1].photo).to.equal('grace-hopper.jpg');
     });
 
     // Detail-view copy (Sessions Guide VizD R1). Both text attributes are rendered
@@ -728,10 +733,11 @@ describe('services/sessions/sessions-api', () => {
       sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT, GATED] }],
     };
 
-    // Everything except the generic attributeId-keyed map, which is where it is allowed.
+    // Everything except the generic attributeId-keyed maps, which is where it is allowed.
     const withoutGenericMap = (session) => {
       const copy = { ...session };
       delete copy.customAttributeValues;
+      delete copy.customAttributeLabels;
       return copy;
     };
 
@@ -754,7 +760,8 @@ describe('services/sessions/sessions-api', () => {
     // The other half of the intent: it stays visible to authors rather than being hidden.
     it('still reaches customAttributeValues and the facet list, so an author can unmark it', () => {
       const [mapped] = mapEslPayloadToRawSessions(payload);
-      expect(mapped.customAttributeValues['gated-attr-id']).to.deep.equal(['Yes']);
+      expect(mapped.customAttributeValues['gated-attr-id']).to.deep.equal(['yes']);
+      expect(mapped.customAttributeLabels['gated-attr-id']).to.deep.equal(['Yes']);
       expect(deriveFacetableAttributes(payload.sessions).map((f) => f.attributeId))
         .to.include('gated-attr-id');
     });
@@ -1009,17 +1016,25 @@ describe('services/sessions/sessions-api', () => {
     const [session] = mapEslPayloadToRawSessions(payload);
 
     it('builds a generic attributeId-keyed map from any single/multi-select customAttribute', () => {
-      expect(session.customAttributeValues['attr-technical-level']).to.deep.equal(['Intermediate']);
-      expect(session.customAttributeValues['attr-audience']).to.deep.equal(['Designer', 'Developer']);
+      expect(session.customAttributeValues['attr-technical-level']).to.deep.equal(['intermediate']);
+      expect(session.customAttributeValues['attr-audience']).to.deep.equal(['designer', 'developer']);
     });
 
     it('covers attributes with no hand-built flat field (e.g. Region) automatically', () => {
-      expect(session.customAttributeValues['attr-region']).to.deep.equal(['AMER']);
+      expect(session.customAttributeValues['attr-region']).to.deep.equal(['amer']);
     });
 
     it('excludes disabled attributes and non-select input types', () => {
       expect(session.customAttributeValues).to.not.have.property('attr-disabled');
       expect(session.customAttributeValues).to.not.have.property('attr-free-text');
+    });
+
+    it('builds the label-keyed counterpart alongside it, for display', () => {
+      expect(session.customAttributeLabels['attr-technical-level']).to.deep.equal(['Intermediate']);
+      expect(session.customAttributeLabels['attr-audience']).to.deep.equal(['Designer', 'Developer']);
+      expect(session.customAttributeLabels['attr-region']).to.deep.equal(['AMER']);
+      expect(session.customAttributeLabels).to.not.have.property('attr-disabled');
+      expect(session.customAttributeLabels).to.not.have.property('attr-free-text');
     });
   });
 
@@ -1101,6 +1116,13 @@ describe('services/sessions/sessions-api', () => {
       expect(withMap.customAttributeValues).to.deep.equal({ 'attr-1': ['A'] });
       const [withoutMap] = normalizeSessions([{ id: 's-2' }]);
       expect(withoutMap.customAttributeValues).to.deep.equal({});
+    });
+
+    it('passes customAttributeLabels through, defaulting to {} when absent', () => {
+      const [withMap] = normalizeSessions([{ id: 's-1', customAttributeLabels: { 'attr-1': ['Label A'] } }]);
+      expect(withMap.customAttributeLabels).to.deep.equal({ 'attr-1': ['Label A'] });
+      const [withoutMap] = normalizeSessions([{ id: 's-2' }]);
+      expect(withoutMap.customAttributeLabels).to.deep.equal({});
     });
 
     // The test harness runs with Milo env "local", so the non-prod branch is what applies here.
@@ -1284,31 +1306,31 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.equal('https://events-platform-prod-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
   });
 
-  it('fetches from the stage CDN domain on stage', async () => {
+  it('falls back to the origin ESP host on stage, which has no CDN', async () => {
     setEventServiceEnvOverride('stage');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-stage-cdn.aws125.adobeitc.com');
+    expect(url).to.include('events-service-platform-stage.adobe.io');
   });
 
-  it('fetches from the dev CDN domain on dev', async () => {
+  it('falls back to the origin ESP host on dev, which has no CDN', async () => {
     setEventServiceEnvOverride('dev');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
+    expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io');
   });
 
-  it('reuses the dev CDN domain on local, same as its origin ESP alias', async () => {
+  it('falls back to the origin ESP host on local, which has no CDN', async () => {
     setEventServiceEnvOverride('local');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
+    expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io');
   });
 
-  // dev02/stage02 have no CDN — fall back to origin ESP.
+  // dev/local/stage/dev02/stage02 have no CDN — fall back to origin ESP.
   it('falls back to the origin ESP host on dev02, which has no CDN', async () => {
     setEventServiceEnvOverride('dev02');
     const fetchStub = stubEmptyCatalog();
@@ -1358,7 +1380,8 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
       }
       expect(error).to.be.an('error');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] network error fetching session catalog for event event-1: offline');
+      expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] network error fetching session catalog for event event-1');
+      expect(lanaLogStub.firstCall.args[0]).to.include('offline');
     });
   });
 });

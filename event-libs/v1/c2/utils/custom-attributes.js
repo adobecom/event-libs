@@ -16,6 +16,7 @@
  *   - multi-select         -> values[]
  */
 import { getMetadata } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
 
 /**
  * Safe-parse a JSON-valued metadata key.
@@ -27,7 +28,7 @@ export function getJsonMetadata(name, fallback = null, doc = document) {
   try {
     return JSON.parse(raw);
   } catch (e) {
-    window.lana?.log(`[custom-attributes] failed to parse metadata "${name}": ${e.message}`);
+    logError('custom-attributes', `failed to parse metadata "${name}"`, e);
     return fallback;
   }
 }

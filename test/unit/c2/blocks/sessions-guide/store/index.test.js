@@ -26,6 +26,12 @@ describe('store/buildInitialState', () => {
     expect(state.activeView).to.equal('my-sessions');
   });
 
+  it('stays on live-upcoming for the full-page surface even when already registered', () => {
+    auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: 'Daniel' };
+    const state = buildInitialState({ ...MOCK_CONFIG, surface: 'page' });
+    expect(state.activeView).to.equal('live-upcoming');
+  });
+
   it('initializes eventDays and activeDay as empty (populated later from shared session data)', () => {
     const state = buildInitialState(MOCK_CONFIG);
     expect(state.eventDays).to.deep.equal([]);

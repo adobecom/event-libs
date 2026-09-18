@@ -1,29 +1,28 @@
 import { createTag, LIBS } from '../../../utils/utils.js';
-import { getNowMs } from '../../../utils/session-state.js';
+import { getEventStartMs, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
-import { showVideoLayoutLoader, hideVideoLayoutLoader } from '../../utils/video-layout-loader.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
-  PROGRESS_STORAGE_KEY,
+  VIDEO_PLAYABLE_KEY,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   closestSectionWithStyle,
-  readJsonFromStorage,
-  writeJsonToStorage,
   getVideoProgress as readVideoProgress,
+  saveVideoProgress as saveSharedVideoProgress,
+  onElementDetached,
   parseJsonMetadata as parseSharedJsonMetadata,
-  currentSessionHasEnded,
   findEmbeddableVideos,
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
-  logError as sharedLogError,
+  watchPlaybackPhase,
+  PLAYBACK_PHASE,
+  buildSessionFromMetadata,
 } from '../../utils/video-session.js';
+import { logError, logWarning } from '../../../utils/lana-log.js';
 
 const LOG_SCOPE = 'session-video-player';
 const BLOCK_CSS_URL = new URL('./session-video-player.css', import.meta.url).href;
 const MILO_IFRAME_CSS_URL = `${LIBS}/styles/iframe.css`;
-
-const logError = (message) => sharedLogError(LOG_SCOPE, message);
 
 const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
@@ -35,6 +34,8 @@ const VIDEO_PROVIDER_ORIGINS = {
   mpc: ['https://video.tv.adobe.com'],
 
   youtube: ['https://www.youtube.com', 'https://i.ytimg.com', 'https://www.google.com'],
+
+  mobilerider: ['https://assets.mobilerider.com'],
 };
 
 function preconnectVideoProvider(provider) {
@@ -52,20 +53,20 @@ const RESUME_RESTART_THRESHOLD_SECONDS = 30;
 
 export const getVideoProgress = (sessionId) => readVideoProgress(sessionId, LOG_SCOPE);
 
-export function saveVideoProgress(sessionId, secondsWatched, length = null) {
-  if (!sessionId) return;
-  const progressBySession = readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, LOG_SCOPE);
-  const resolvedLength = length ?? progressBySession[sessionId]?.length ?? null;
-  progressBySession[sessionId] = {
-    secondsWatched,
-    length: resolvedLength,
-    completed: Boolean(resolvedLength && secondsWatched >= resolvedLength),
-  };
-  writeJsonToStorage(PROGRESS_STORAGE_KEY, progressBySession, LOG_SCOPE);
-}
+export const saveVideoProgress = (sessionId, secondsWatched, length = null) => saveSharedVideoProgress(sessionId, secondsWatched, length, LOG_SCOPE);
 
 function pickEmbeddableVideo(sessionTimes) {
-  return findEmbeddableVideos(sessionTimes)[0] || null;
+  return findEmbeddableVideos(sessionTimes).find((video) => video.kind === 'onDemand') || null;
+}
+
+function buildVideoFromCatalog(session) {
+  if (session?.mpcId) {
+    return { provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/${session.mpcId}?autoplay=true` };
+  }
+  if (session?.youTubeId) {
+    return { provider: 'youtube', url: session.youTubeId };
+  }
+  return null;
 }
 
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
@@ -131,7 +132,7 @@ export function resumeMpcVideo(iframe, progress) {
     }, ADOBE_TV_ORIGIN);
   } catch (error) {
 
-    logError(`could not resume mpc playback: ${error.message}`);
+    logError(LOG_SCOPE, 'could not resume mpc playback', error);
   }
 }
 
@@ -165,7 +166,7 @@ async function fetchMpcVideoDuration(mpcVideoId) {
       mpcDurationByVideoId.set(mpcVideoId, seconds);
       return seconds;
     } catch (error) {
-      logError(`could not fetch mpc video duration for "${mpcVideoId}": ${error.message}`);
+      logError(LOG_SCOPE, `could not fetch mpc video duration for "${mpcVideoId}"`, error);
       return null;
     } finally {
       inflightDurationRequests.delete(mpcVideoId);
@@ -194,31 +195,7 @@ function ensureMpcLength(sessionId, mpcVideoId, currentTime, length) {
       saveVideoProgress(sessionId, latest?.secondsWatched ?? currentTime, fetchedLength);
       notifyProgressChanged(sessionId);
     })
-    .catch((error) => logError(`could not backfill mpc duration: ${error.message}`));
-}
-
-const detachWatchers = new Set();
-let detachObserver = null;
-
-function onDetached(element, teardown) {
-  const watcher = { element, teardown };
-  detachWatchers.add(watcher);
-
-  if (!detachObserver) {
-    detachObserver = new MutationObserver(() => {
-      detachWatchers.forEach((w) => {
-        if (w.element.isConnected) return;
-        detachWatchers.delete(w);
-        w.teardown();
-      });
-      if (detachWatchers.size === 0) {
-        detachObserver.disconnect();
-        detachObserver = null;
-      }
-    });
-    detachObserver.observe(document.body, { childList: true, subtree: true });
-  }
-  return watcher;
+    .catch((error) => logError(LOG_SCOPE, 'could not backfill mpc duration', error));
 }
 
 function watchMpcPlayback(sessionId, iframe) {
@@ -279,12 +256,12 @@ function watchMpcPlayback(sessionId, iframe) {
       });
     } catch (error) {
 
-      logError(`could not handle mpc "${event.data.state}" message: ${error.message}`);
+      logError(LOG_SCOPE, `could not handle mpc "${event.data.state}" message`, error);
     }
   };
 
   window.addEventListener('message', handleMessage);
-  onDetached(iframe, () => window.removeEventListener('message', handleMessage));
+  onElementDetached(iframe, () => window.removeEventListener('message', handleMessage));
 }
 
 const YOUTUBE_IFRAME_API_URL = 'https://www.youtube.com/iframe_api';
@@ -333,7 +310,7 @@ function resumeYouTubeVideo(player, sessionId) {
   try {
     player.seekTo(saved.secondsWatched, true);
   } catch (error) {
-    logError(`could not resume youtube playback: ${error.message}`);
+    logError(LOG_SCOPE, 'could not resume youtube playback', error);
   }
 }
 
@@ -342,7 +319,7 @@ async function watchYouTubePlayback(sessionId, iframe) {
     await ensureYouTubeIframeApi();
   } catch (error) {
 
-    logError(`youtube playback tracking unavailable: ${error.message}`);
+    logError(LOG_SCOPE, 'youtube playback tracking unavailable', error);
     return;
   }
 
@@ -363,7 +340,7 @@ async function watchYouTubePlayback(sessionId, iframe) {
     notifyProgressChanged(sessionId);
   };
 
-  onDetached(iframe, stopProgressPolling);
+  onElementDetached(iframe, stopProgressPolling);
 
   const handleStateChange = (event) => {
     const { PlayerState } = window.YT;
@@ -408,24 +385,45 @@ async function watchYouTubePlayback(sessionId, iframe) {
           }
         },
         onStateChange: handleStateChange,
-        onError: (event) => logError(`youtube player reported error code ${event.data}`),
+        onError: (event) => logError(LOG_SCOPE, `youtube player reported error code ${event.data}`),
       },
     });
   } catch (error) {
     stopProgressPolling();
-    logError(`could not attach youtube player: ${error.message}`);
+    logError(LOG_SCOPE, 'could not attach youtube player', error);
   }
 }
 
+async function loadMobileRiderPlayer(el, video) {
+  const { default: initMobileRider } = await import('../mobile-rider/mobile-rider.js');
+  el.querySelector('.milo-video')?.remove();
+  const rider = createTag('div', { class: 'mobile-rider' }, '', { parent: el });
+  rider.dataset.extractedVideoId = video.videoId;
+  if (video.skinId) rider.dataset.extractedSkinId = video.skinId;
+  rider.dataset.extractedAutoplay = 'true';
+  initMobileRider(rider);
+  el.dataset.embedded = 'true';
+}
+
 function loadVideoPlayer(el, sessionId, video) {
+  if (video.provider === 'mobilerider') {
+    loadMobileRiderPlayer(el, video).catch((error) => {
+      logError(LOG_SCOPE, 'could not load MobileRider DVR player', error);
+    });
+    return;
+  }
+
   const builtContainer = buildMiloVideo(video);
   const iframe = builtContainer.firstElementChild;
+
+  // A prior phase may have mounted the MobileRider DVR player; always clear it before mounting the
+  // iframe so a DVR_BUFFER → ON_DEMAND swap replaces the old player rather than stacking beside it.
+  el.querySelector('.mobile-rider')?.remove();
 
   const authoredMiloVideo = el.querySelector('.milo-video');
   if (authoredMiloVideo) {
     authoredMiloVideo.replaceChildren(iframe);
   } else {
-    el.querySelector('.mobile-rider')?.remove();
     el.append(builtContainer);
   }
 
@@ -434,8 +432,6 @@ function loadVideoPlayer(el, sessionId, video) {
 
   el.dataset.embedded = 'true';
 }
-
-const DECISION_FALLBACK_MS = 4000;
 
 function isInsidePlaylistContainer(el) {
 
@@ -453,79 +449,100 @@ function awaitEmbedDecision(el) {
   }
 
   return new Promise((resolve) => {
-    let settled = false;
-    let unsubscribe = () => {};
-
-    const settle = (hasPlaylist) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(fallbackTimer);
-      unsubscribe();
-      resolve(isWinningInstance(el, hasPlaylist));
-    };
-
-    unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
-
+    const unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
       if (newValue == null) return;
-      settle(Boolean(newValue.hasPlaylist));
+      unsubscribe();
+      resolve(isWinningInstance(el, Boolean(newValue.hasPlaylist)));
     });
-
-    const fallbackTimer = setTimeout(() => settle(false), DECISION_FALLBACK_MS);
   });
 }
 
-function resolveRenderContext(el) {
-  const config = readAuthoredConfig(el);
+function resolveVideoForPhase(phase, sessionTimes, session) {
+  if (phase === PLAYBACK_PHASE.ON_DEMAND) {
+    return pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
+  }
+  if (phase === PLAYBACK_PHASE.DVR_BUFFER) {
+    if (!session?.mrDvrVideoId) return null;
+    return { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
+  }
+  return null;
+}
 
+const PLAYABLE_PHASES = [PLAYBACK_PHASE.DVR_BUFFER, PLAYBACK_PHASE.ON_DEMAND];
+
+function buildRenderModel(el) {
+  const config = readAuthoredConfig(el);
   const sessionId = resolveSessionId(config);
   if (!sessionId) {
-    logError('no session-id (page metadata or authored) — nothing to render');
+    logWarning(LOG_SCOPE, 'no session-id (page metadata or authored) — nothing to render');
     return null;
   }
 
-  
   const sessionTimes = parseJsonMetadata('session-times');
+  const session = buildSessionFromMetadata(sessionTimes);
 
-  if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
-    logError('current session has not ended yet — nothing to render');
-    return null;
-  }
-  
-  const currentVideo = pickEmbeddableVideo(sessionTimes);
-  if (!currentVideo) {
-    logError('no embeddable video in session-times — nothing to render');
-    return null;
-  }
+  initTierOneEventConfig();
 
-  return { sessionId, currentVideo };
+  return { sessionId, sessionTimes, session };
+}
+
+function loadWhenDecided(el, sessionId, video) {
+  preconnectVideoProvider(video.provider);
+
+  (async () => {
+    try {
+      const isWinner = await awaitEmbedDecision(el);
+      if (!isWinner) return;
+      loadVideoPlayer(el, sessionId, video);
+    } catch (error) {
+      logError(LOG_SCOPE, 'could not resolve the video layout decision', error);
+    }
+  })();
 }
 
 export default async function init(el) {
   ensureStylesheet('session-video-player-css', BLOCK_CSS_URL);
 
-  const context = resolveRenderContext(el);
-  if (!context) {
+  const model = buildRenderModel(el);
+  if (!model) {
     el.remove();
     return;
   }
-  const { sessionId, currentVideo } = context;
+  const { sessionId, session, sessionTimes } = model;
 
-  preconnectVideoProvider(currentVideo.provider);
+  let embeddedPhase = null;
 
-  if (!isInsidePlaylistContainer(el)) {
-    showVideoLayoutLoader(el);
-  }
+  const onPhase = (phase) => {
+    if (!el.isConnected) return;
+    const video = PLAYABLE_PHASES.includes(phase)
+      ? resolveVideoForPhase(phase, sessionTimes, session)
+      : null;
 
-  (async () => {
-    try {
-      const isWinner = await awaitEmbedDecision(el);
-      hideVideoLayoutLoader();
-      if (!isWinner) return;
-      loadVideoPlayer(el, sessionId, currentVideo);
-    } catch (error) {
-
-      hideVideoLayoutLoader();
-      logError(`could not resolve the video layout decision: ${error.message}`);
+    if (video && phase === embeddedPhase) {
+      return;
     }
-  })();
+
+    if (video) {
+      const isFirstEmbed = embeddedPhase === null;
+      embeddedPhase = phase;
+      if (isFirstEmbed) {
+        BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId });
+        window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
+        loadWhenDecided(el, sessionId, video);
+      } else if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
+        preconnectVideoProvider(video.provider);
+        loadVideoPlayer(el, sessionId, video);
+      }
+      return;
+    }
+
+    if (embeddedPhase === null && PLAYABLE_PHASES.includes(phase)) {
+      logWarning(LOG_SCOPE, `session is in "${phase}" phase with no embeddable video — removing`);
+      el.remove();
+    }
+  };
+
+  const stopWatching = watchPlaybackPhase(session, onPhase, { eventStartMs: getEventStartMs() });
+  onElementDetached(el, stopWatching);
 }
+

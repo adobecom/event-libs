@@ -1,6 +1,7 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
 import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 // Catalog URLs always carry prod's host; on non-prod pages point them at the current origin instead.
 export function sessionPageUrlForEnv(
@@ -80,6 +81,7 @@ export function normalizeSessions(rawSessions) {
     isKeynote: Boolean(s.isKeynote),
     thumbnailUrl: s.thumbnailUrl ?? null,
     customAttributeValues: s.customAttributeValues || {},
+    customAttributeLabels: s.customAttributeLabels || {},
     ...(s.legalDisclaimer ? { legalDisclaimer: s.legalDisclaimer } : {}),
   }));
 }
@@ -242,14 +244,17 @@ export function extractCustomAttributeSlugs(session, name) {
 }
 
 // attributeId-keyed, so newly authored filter categories resolve with no per-field mapping.
-function buildCustomAttributeValueMap(session) {
-  const map = {};
+// `values` is RF's own slug (the filter identity); `labels` is the human display string.
+function buildCustomAttributeMaps(session) {
+  const values = {};
+  const labels = {};
   (session.customAttributes || []).forEach((attr) => {
     if (attr.enabled === false) return;
     if (!['single-select', 'multi-select'].includes(attr.inputType)) return;
-    map[attr.attributeId] = (attr.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
+    values[attr.attributeId] = (attr.values || []).map((v) => v?.value ?? v?.label).filter(Boolean);
+    labels[attr.attributeId] = (attr.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
   });
-  return map;
+  return { values, labels };
 }
 
 // Missing field is treated as visible (fail open).
@@ -290,7 +295,7 @@ export function reportDroppedSessions(
     .map(([session, reason]) => `${describeRawSession(session)} — ${reason}`)
     .join('; ');
   const rest = dropped.length - DROP_LOG_LIMIT;
-  window.lana?.log(`[sessions-api] dropped ${dropped.length} session(s): ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
+  logWarning('sessions-api', `dropped ${dropped.length} session(s): ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
 
   if (isProd) return;
   // eslint-disable-next-line no-console
@@ -352,12 +357,13 @@ export function mapEslPayloadToRawSessions(payload) {
       .map((sp) => ({
         name: `${sp.firstName || ''} ${sp.lastName || ''}`.trim(),
         title: sp.localizations?.['en-US']?.title || '',
-        photo: null,
+        photo: sp.photo?.imageUrl ?? null,
       }));
 
     const isLivestreamed = getSessionIsLivestreamed(session);
     const type = extractCustomAttributeValue(session, ['Type', 'Session Type']);
     const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
+    const { values: customAttributeValues, labels: customAttributeLabels } = buildCustomAttributeMaps(session);
 
     return {
       id: session.sessionId,
@@ -391,7 +397,7 @@ export function mapEslPayloadToRawSessions(payload) {
       youTubeId: extractCustomAttributeValue(session, 'YouTube ID'),
       mrStreamId: extractCustomAttributeValue(session, 'Mobilerider Video ID (Livestream)'),
       mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
-      mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
+      mrSkinId: extractCustomAttributeValue(session, ['SkinID', 'Skin ID']),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
       playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
       playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),
@@ -401,7 +407,8 @@ export function mapEslPayloadToRawSessions(payload) {
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       legalDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
-      customAttributeValues: buildCustomAttributeValueMap(session),
+      customAttributeValues,
+      customAttributeLabels,
     };
   });
 
@@ -416,11 +423,11 @@ async function fetchEslSessions(eventId) {
   try {
     res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, options);
   } catch (err) {
-    window.lana?.log(`[sessions-api] network error fetching session catalog for event ${eventId}: ${err.message}`);
+    logError('sessions-api', `network error fetching session catalog for event ${eventId}`, err);
     throw err;
   }
   if (!res.ok) {
-    window.lana?.log(`[sessions-api] session catalog fetch failed for event ${eventId}: ${res.status}`);
+    logError('sessions-api', `session catalog fetch failed for event ${eventId}`, res);
     throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
   }
   const payload = await res.json();

@@ -5,6 +5,14 @@
   width: 100%;
 }
 
+body:has(.in-person-banner) main > .section:first-child:not(.rounded-corners-top):not(.rounded-corners) {
+  border-radius: var(--s2a-border-radius-lg) var(--s2a-border-radius-lg) 0 0;
+  overflow: clip;
+  z-index: 3;
+  margin-top: calc(-1 * var(--s2a-border-radius-lg));
+  margin-bottom: initial;
+}
+
 .in-person-banner.in-person-banner-nav-overlay {
   position: fixed;
   top: 0;
@@ -19,12 +27,12 @@
 }
 
 .in-person-banner.in-person-banner-nav-overlay ~ header.global-navigation {
-  transform: translateY(calc(
+  top: calc(
     var(--in-person-banner-height, var(--global-height-nav, 80px)) - var(--in-person-banner-scroll-progress, 0px)
-  ));
+  );
 }
 
-body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
+body:has(.global-navigation):has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
   margin-top: calc(
     var(--in-person-banner-height, var(--global-height-nav, 80px)) - var(--feds-nav-total-height, 80px)
   );
@@ -76,49 +84,6 @@ body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
   text-underline-position: from-font;
 }
 
-.in-person-banner-close {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: var(--s2a-border-radius-round);
-  background: none;
-  color: inherit;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.in-person-banner-close:hover {
-  background-color: var(--s2a-color-transparent-black-08);
-}
-
-.in-person-banner[data-theme="dark"] .in-person-banner-close:hover {
-  background-color: var(--s2a-color-transparent-white-16);
-}
-
-.in-person-banner-close svg {
-  width: 16px;
-  height: 16px;
-}
-
-@media (min-width: 768px) and (max-width: 1023px) {
-  .in-person-banner-copy {
-    padding-right: 32px;
-  }
-
-  .in-person-banner-close {
-    position: absolute;
-    right: 16px;
-    bottom: 16px;
-    width: 16px;
-    height: 16px;
-  }
-}
-
 @media (max-width: 767px) {
   .in-person-banner-inner {
     align-items: flex-start;
@@ -128,14 +93,5 @@ body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
 
   .in-person-banner-copy {
     margin: 0;
-    padding-right: 32px;
-  }
-  
-  .in-person-banner-close {
-    position: absolute;
-    top: 18px;
-    right: 16px;
-    width: 16px;
-    height: 16px;
   }
 }

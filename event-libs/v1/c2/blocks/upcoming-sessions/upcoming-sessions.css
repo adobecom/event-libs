@@ -110,14 +110,14 @@
 
 .upcoming-sessions.dark-card .upcoming-sessions-arrow,
 .section.dark .upcoming-sessions .upcoming-sessions-arrow {
-  border-color: #e1e1e1;
-  background: #f3f3f3;
-  color: #000;
+  border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
+  color: var(--s2a-color-gray-25, #fff);
 }
 
 .upcoming-sessions.dark-card .upcoming-sessions-arrow:hover,
 .section.dark .upcoming-sessions .upcoming-sessions-arrow:hover {
-  background: #e1e1e1;
+  background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
 @media (min-width: 1280px) {
@@ -149,13 +149,14 @@
   position: relative;
   overflow: hidden;
   width: 255px;
-  height: 152px;
+  min-height: 152px;
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
   cursor: pointer;
   transition: background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+              width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              min-height 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .upcoming-sessions .sg-card:focus-visible {
@@ -170,7 +171,8 @@
 .upcoming-sessions .sg-card:hover {
   background: var(--s2a-color-gray-900, #131313);
   box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
-  transform: scale(1.05);
+  width: 268px;
+  min-height: 160px;
   z-index: 2;
 }
 
@@ -279,6 +281,18 @@
   pointer-events: none;
 }
 
+.upcoming-sessions .sg-card.is-scheduled .sg-card__btn--schedule {
+  background: #fff;
+  border-color: #e9e9e9;
+  color: #000;
+}
+
+.upcoming-sessions .sg-card.is-favorited .sg-card__btn--favorite {
+  background: #fff;
+  border-color: #e9e9e9;
+  color: #000;
+}
+
 .upcoming-sessions .sg-card:hover .sg-card__actions::after {
   color: rgb(255 255 255 / 50%);
 }
@@ -320,15 +334,23 @@
 @media (min-width: 1280px) {
   .upcoming-sessions .sg-card {
     flex-direction: row;
-    align-items: stretch;
+    align-items: flex-start;
     width: 375px;
-    height: 108px;
+    min-height: 128px;
     padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-md, 16px);
+    gap: var(--s2a-spacing-lg, 24px);
+  }
+
+  .upcoming-sessions .sg-card:is(:hover, :focus-within),
+  .upcoming-sessions .sg-card.is-scheduled,
+  .upcoming-sessions .sg-card.is-favorited {
+    width: 431px;
+    min-height: 134px;
   }
 
   .upcoming-sessions .sg-card__body {
     width: auto;
+    gap: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions .sg-card__badge-row {
@@ -368,39 +390,42 @@
 
   .upcoming-sessions .sg-card__actions {
     flex-direction: column;
-    width: var(--s2a-spacing-2xl, 48px);
+    width: 0;
     margin-top: 0;
-    opacity: 1;
-    pointer-events: auto;
+    opacity: 0;
+    pointer-events: none;
     align-items: center;
     justify-content: flex-start;
+    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+  }
+
+  /* stylelint-disable-next-line no-descending-specificity */
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__actions,
+  .upcoming-sessions .sg-card.is-scheduled .sg-card__actions,
+  .upcoming-sessions .sg-card.is-favorited .sg-card__actions {
+    width: var(--s2a-spacing-2xl, 48px);
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .upcoming-sessions .sg-card__actions::after {
     display: none;
   }
 
+  /* stylelint-disable no-descending-specificity */
   .upcoming-sessions.dark-card .sg-card,
   .upcoming-sessions.dark-card .sg-card.is-scheduled,
   .upcoming-sessions.dark-card .sg-card.is-favorited {
-    width: 431px;
-    height: 128px;
-    align-items: flex-start;
-    padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-lg, 24px);
     background: rgb(10 10 10 / 35%);
     border: 1px solid #505050;
     backdrop-filter: none;
-  }
-
-  .upcoming-sessions.dark-card .sg-card__body {
-    gap: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions.dark-card .sg-card:hover {
     background: #292929;
     backdrop-filter: none;
   }
+  /* stylelint-enable no-descending-specificity */
 
   /* stylelint-disable no-descending-specificity */
   .upcoming-sessions.dark-card .sg-card__time,

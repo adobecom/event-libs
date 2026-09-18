@@ -1,4 +1,5 @@
 import { createContext, useState, useContext, useEffect } from '../../v1/deps/htm-preact.js';
+import { logError } from '../../v1/utils/lana-log.js';
 import { html } from '../htm-wrapper.js';
 import { setDaToken, setDaFetch } from '../scripts/da-controller.js';
 
@@ -22,7 +23,7 @@ const DAProvider = ({ children }) => {
         setDaToken(sdkToken);
         if (actions?.daFetch) setDaFetch(actions.daFetch);
       } catch (err) {
-        window.lana?.log(`DA SDK init error: ${err}`);
+        logError('schedule-maker,da-context', 'DA SDK init error', err);
         setError('Failed to initialize DA SDK. Please reload the page.');
       } finally {
         setIsLoading(false);

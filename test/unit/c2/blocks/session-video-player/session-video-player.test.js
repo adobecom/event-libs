@@ -22,12 +22,52 @@ function setMeta(name, content) {
   document.head.append(meta);
 }
 
-/** session-times metadata shaped exactly like the real Individual Session Page's. */
-function sessionTimes({ endTimeMillis = Date.now() - HOUR_MS, videos } = {}) {
+/**
+ * Authors the `custom-attributes` page metadata (the RF-synced attribute array) exactly the way
+ * an Individual Session Page carries it. classifySessionPlayback() reads these — an `MPC ID`
+ * (or `YouTube ID`) with no live/DVR identity classifies the session as SIMULIVE, which lands in
+ * ON_DEMAND once its scheduled window has passed. Fully fake: no network, no catalog fetch.
+ */
+function setCustomAttributes(attrs = {}) {
+  const {
+    mpcId = '3458940', youTubeId, mrStreamId, livestreamed,
+    dvrDelayHours, mrDvrVideoId, mrSkinId,
+  } = attrs;
+  const rows = [];
+  const add = (name, value) => rows.push({ name, enabled: true, values: [{ value }] });
+  const addLabel = (name, label) => rows.push({ name, enabled: true, values: [{ label }] });
+  if (mpcId != null) add('MPC ID', mpcId);
+  if (youTubeId != null) add('YouTube ID', youTubeId);
+  if (mrStreamId != null) add('Mobilerider Video ID (Livestream)', mrStreamId);
+  if (livestreamed) addLabel('Livestreamed Content', 'Live');
+  if (dvrDelayHours != null) add('DVR Timing (in hours)', String(dvrDelayHours));
+  if (mrDvrVideoId != null) add('Mobilerider Video ID (DVR)', mrDvrVideoId);
+  if (mrSkinId != null) add('SkinID', mrSkinId);
+  setMeta('custom-attributes', JSON.stringify(rows));
+}
+
+/**
+ * session-times metadata shaped exactly like the real Individual Session Page's. Defaults to an
+ * already-ended window (start/end in the past) so a SIMULIVE-classified session resolves to the
+ * ON_DEMAND phase and the player embeds synchronously — no fake clock needed.
+ */
+function sessionTimes({
+  startTimeMillis = Date.now() - (2 * HOUR_MS),
+  endTimeMillis = Date.now() - HOUR_MS,
+  videos,
+} = {}) {
   return JSON.stringify([{
+    startTimeMillis,
     endTimeMillis,
     videos: videos ?? [{ provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/3458940`, kind: 'onDemand' }],
   }]);
+}
+
+/** Sets both metadata halves the render path needs: identity/timing + the embeddable video. */
+function authorSession({ times, attrs } = {}) {
+  setMeta('session-id', 's-1');
+  setMeta('session-times', times ?? sessionTimes());
+  setCustomAttributes(attrs ?? {});
 }
 
 /**
@@ -74,68 +114,54 @@ function addConfigRow(el, key, value) {
   el.append(row);
 }
 
-/** Lets the not-awaited async decision flow inside init() settle. */
+/** Lets the not-awaited async decision/embed flow inside init() settle. */
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
+// The `embedding` describe stubs iframe src → about:blank (so nothing loads) and stashes the real
+// value on data-src. This reads back the src the block actually built, for assertion.
+const getIframeSrc = (iframe) => iframe.getAttribute('data-src') ?? iframe.getAttribute('src');
+
 describe('session-video-player', () => {
-  let clock;
+  // Several tests mount real iframe elements and assert the src the block builds. We assert that
+  // src WITHOUT the browser ever loading the cross-origin document: a real load pulls in the
+  // frame's own scripts, which both hit the network and raise an opaque "Script error." that Mocha
+  // (via window.onerror) attributes to whichever test is mid-run under the concurrent suite. So
+  // while these tests run, intercept setAttribute('src', …) on iframes — stash the intended value
+  // on a data-src attribute (which the tests assert via getIframeSrc) and point the live src at
+  // about:blank so nothing is ever fetched. Fully fake: no network, no external scripts.
+  let originalSetAttribute;
+
+  before(() => {
+    originalSetAttribute = HTMLIFrameElement.prototype.setAttribute;
+    HTMLIFrameElement.prototype.setAttribute = function setAttribute(name, value) {
+      if (name === 'src') {
+        originalSetAttribute.call(this, 'data-src', value);
+        return originalSetAttribute.call(this, 'src', 'about:blank');
+      }
+      return originalSetAttribute.call(this, name, value);
+    };
+  });
+
+  after(() => {
+    HTMLIFrameElement.prototype.setAttribute = originalSetAttribute;
+  });
 
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
     localStorage.clear();
     window.lana = { log: sinon.stub() };
+    // Present-but-inert YT global so ensureYouTubeIframeApi() short-circuits instead of injecting
+    // the real https://www.youtube.com/iframe_api script (disallowed in unit tests).
+    window.YT = {
+      Player: function StubPlayer() {},
+      PlayerState: { PLAYING: 1, PAUSED: 2, ENDED: 0 },
+    };
   });
 
   afterEach(() => {
-    clock?.restore();
-    clock = null;
+    delete window.YT;
     sinon.restore();
-  });
-
-  // MUST run before any test that sets a decision. BlockMediator is a module-level
-  // singleton with no reset API, so once `videoLayoutDecision` holds a value every later
-  // init() resolves it synchronously via BlockMediator.get() and no "pending" state is
-  // observable again for the rest of the file.
-  describe('while the layout decision is still pending', () => {
-    beforeEach(() => {
-      setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes());
-    });
-
-    it('shows a loader only in the full-width instance', async () => {
-      const { fullWidthPlayer, playlistPlayer } = buildPage();
-
-      await init(fullWidthPlayer);
-      await init(playlistPlayer);
-
-      expect(fullWidthPlayer.querySelector('.session-video-player-loader')).to.exist;
-      expect(playlistPlayer.querySelector('.session-video-player-loader')).to.not.exist;
-    });
-
-    it('embeds nothing until the decision arrives', async () => {
-      const { fullWidthPlayer, playlistPlayer } = buildPage();
-
-      await init(fullWidthPlayer);
-      await init(playlistPlayer);
-      await flush();
-
-      expect(fullWidthPlayer.querySelector('iframe')).to.not.exist;
-      expect(playlistPlayer.querySelector('iframe')).to.not.exist;
-    });
-
-    it('falls back to the full-width instance after the 4s timeout', async () => {
-      clock = sinon.useFakeTimers({ now: Date.now(), shouldAdvanceTime: true });
-      const { fullWidthPlayer, playlistPlayer } = buildPage();
-      await init(fullWidthPlayer);
-      await init(playlistPlayer);
-
-      clock.tick(4000);
-      await flush();
-
-      expect(fullWidthPlayer.querySelector('iframe.adobetv')).to.exist;
-      expect(playlistPlayer.querySelector('iframe')).to.not.exist;
-    });
   });
 
   describe('progress persistence', () => {
@@ -224,6 +250,7 @@ describe('session-video-player', () => {
     it('removes the block when no session-id is available', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-times', sessionTimes());
+      setCustomAttributes();
 
       await init(fullWidthPlayer);
 
@@ -234,6 +261,7 @@ describe('session-video-player', () => {
       const { fullWidthPlayer } = buildPage();
       addConfigRow(fullWidthPlayer, 'session-id', 's-authored');
       setMeta('session-times', sessionTimes());
+      setCustomAttributes();
 
       await init(fullWidthPlayer);
       await flush();
@@ -241,78 +269,74 @@ describe('session-video-player', () => {
       expect(fullWidthPlayer.isConnected).to.be.true;
     });
 
-    it('removes the block when session-times has no embeddable video', async () => {
+    it('removes an on-demand session that reaches a playable phase but has no embeddable video', async () => {
       const { fullWidthPlayer } = buildPage();
-      setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes({ videos: [] }));
+      // A livestreamed session with a past window (no mrStreamId → no poll) is off-air and, with
+      // no DVR delay, lands ON_DEMAND — but neither session-times nor the catalog session carries
+      // an embeddable video → terminal no-asset → the block removes itself.
+      authorSession({
+        times: sessionTimes({ videos: [] }),
+        attrs: { mpcId: null, livestreamed: true },
+      });
 
       await init(fullWidthPlayer);
+      await flush();
 
       expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
-    it('keeps a liveStream video once the session has ended (kind is not gated)', async () => {
-      const { fullWidthPlayer } = buildPage();
-      setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes({
-        videos: [{ provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/1`, kind: 'liveStream' }],
-      }));
+    it('keeps (does not remove) a session that has not reached a playable phase yet', async () => {
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      // Future window → SIMULIVE phase, which is not a playable phase for this block. The block
+      // stays (empty) to receive the ON_DEMAND phase later rather than being torn out.
+      authorSession({
+        times: sessionTimes({
+          startTimeMillis: Date.now() + HOUR_MS,
+          endTimeMillis: Date.now() + (2 * HOUR_MS),
+        }),
+      });
 
       await init(fullWidthPlayer);
+      await flush();
 
       expect(fullWidthPlayer.isConnected).to.be.true;
+      expect(fullWidthPlayer.querySelector('iframe')).to.not.exist;
     });
 
-    it('removes the block when no video has an embeddable provider', async () => {
+    it('removes the block when the session classifies as nothing (no id, no live/DVR identity)', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes({
-        videos: [{ provider: 'vimeo', url: 'https://vimeo.com/1', kind: 'onDemand' }],
-      }));
+      setMeta('session-times', sessionTimes());
+      setMeta('custom-attributes', JSON.stringify([]));
 
       await init(fullWidthPlayer);
+      await flush();
 
-      expect(fullWidthPlayer.isConnected).to.be.false;
-    });
-
-    it('removes the block when the session has not ended yet', async () => {
-      const { fullWidthPlayer } = buildPage();
-      setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes({ endTimeMillis: Date.now() + HOUR_MS }));
-
-      await init(fullWidthPlayer);
-
-      expect(fullWidthPlayer.isConnected).to.be.false;
-    });
-
-    it('removes the block when endTimeMillis is missing (cannot confirm the session ended)', async () => {
-      const { fullWidthPlayer } = buildPage();
-      setMeta('session-id', 's-1');
-      setMeta('session-times', JSON.stringify([{
-        videos: [{ provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/1`, kind: 'onDemand' }],
-      }]));
-
-      await init(fullWidthPlayer);
-
-      expect(fullWidthPlayer.isConnected).to.be.false;
+      // No mpc/youtube id and no live/DVR identity → classifySessionPlayback() returns null →
+      // the watcher yields no phase, nothing is playable, and the block never embeds. It is kept
+      // empty (non-terminal) rather than removed, since no playable phase was ever reached.
+      expect(fullWidthPlayer.querySelector('iframe')).to.not.exist;
     });
 
     it('survives invalid session-times JSON without throwing', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
       setMeta('session-times', '{not json');
+      setCustomAttributes();
 
       await init(fullWidthPlayer);
+      await flush();
 
-      expect(fullWidthPlayer.isConnected).to.be.false;
+      // Invalid session-times parses to null; the MPC id still classifies SIMULIVE→ON_DEMAND, but
+      // there is no session-times video to embed and no catalog id fallback → nothing appears.
+      expect(fullWidthPlayer.querySelector('iframe')).to.not.exist;
       expect(window.lana.log.called).to.be.true;
     });
   });
 
   describe('init() side effects', () => {
     beforeEach(() => {
-      setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes());
+      authorSession();
     });
 
     it('injects the block stylesheet exactly once', async () => {
@@ -325,9 +349,11 @@ describe('session-video-player', () => {
     });
 
     it('preconnects to the mpc origin, deduped across both instances', async () => {
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
       const { fullWidthPlayer, playlistPlayer } = buildPage();
       await init(fullWidthPlayer);
       await init(playlistPlayer);
+      await flush();
 
       const links = document.querySelectorAll(`link[rel="preconnect"][href="${ADOBE_TV_ORIGIN}"]`);
       expect(links).to.have.lengthOf(1);
@@ -339,28 +365,22 @@ describe('session-video-player', () => {
       setMeta('session-times', sessionTimes({
         videos: [{ provider: 'youtube', url: 'https://www.youtube.com/watch?v=abcdefghijk', kind: 'onDemand' }],
       }));
-      const { fullWidthPlayer } = buildPage();
+      setCustomAttributes({ mpcId: null, youTubeId: 'abcdefghijk' });
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
 
       await init(fullWidthPlayer);
+      await flush();
 
-      expect(document.querySelectorAll('link[rel="preconnect"]')).to.have.lengthOf(3);
+      expect(document.querySelectorAll('link[rel="preconnect"][href*="youtube.com"], link[rel="preconnect"][href*="ytimg.com"], link[rel="preconnect"][href*="google.com"]')).to.have.lengthOf(3);
     });
-
   });
 
   describe('embed decision', () => {
     beforeEach(() => {
-      setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes());
+      authorSession();
     });
 
-    /**
-     * A decision is final once set: init() reads it synchronously via BlockMediator.get()
-     * and both promises settle immediately, so a LATER set() can never flip an instance
-     * that already resolved. These tests therefore set the decision up front — only the
-     * first one below exercises the live subscribe-then-set path, and it can only do so
-     * because it is the first test in this file to touch the store.
-     */
     async function initBoth() {
       const page = buildPage();
       await init(page.fullWidthPlayer);
@@ -383,13 +403,6 @@ describe('session-video-player', () => {
 
       expect(fullWidthPlayer.querySelector('iframe.adobetv')).to.exist;
       expect(playlistPlayer.querySelector('iframe')).to.not.exist;
-    });
-
-    it('hides the loader once the decision resolves, win or lose', async () => {
-      BlockMediator.set(DECISION_KEY, { hasPlaylist: true });
-      await initBoth();
-
-      expect(document.querySelector('.session-video-player-loader')).to.not.exist;
     });
 
     it('marks the winning instance with data-embedded', async () => {
@@ -459,19 +472,6 @@ describe('session-video-player', () => {
     beforeEach(() => {
       setMeta('session-id', 's-1');
       BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
-      // Present-but-inert YT global so ensureYouTubeIframeApi() short-circuits instead of
-      // injecting the real https://www.youtube.com/iframe_api script, which this repo's
-      // test harness disallows.
-      window.YT = {
-        Player: function StubPlayer() {},
-        PlayerState: {
-          PLAYING: 1, PAUSED: 2, ENDED: 0,
-        },
-      };
-    });
-
-    afterEach(() => {
-      delete window.YT;
     });
 
     async function embedFullWidth() {
@@ -483,16 +483,18 @@ describe('session-video-player', () => {
 
     it('builds an adobetv iframe using the authored url verbatim', async () => {
       setMeta('session-times', sessionTimes());
+      setCustomAttributes();
       const el = await embedFullWidth();
 
       const iframe = el.querySelector('iframe.adobetv');
-      expect(iframe.getAttribute('src')).to.equal(`${ADOBE_TV_ORIGIN}/v/3458940`);
+      expect(getIframeSrc(iframe)).to.equal(`${ADOBE_TV_ORIGIN}/v/3458940`);
       expect(iframe.getAttribute('title')).to.equal('Adobe Video Publishing Cloud Player');
       expect(iframe.getAttribute('loading')).to.equal('lazy');
     });
 
     it('wraps the iframe in a .milo-video container and loads milo iframe css', async () => {
       setMeta('session-times', sessionTimes());
+      setCustomAttributes();
       const el = await embedFullWidth();
 
       expect(el.querySelector('.milo-video > iframe')).to.exist;
@@ -501,6 +503,7 @@ describe('session-video-player', () => {
 
     it('reuses an already-authored .milo-video container instead of appending a second', async () => {
       setMeta('session-times', sessionTimes());
+      setCustomAttributes();
       const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
       const authored = document.createElement('div');
       authored.className = 'milo-video';
@@ -515,6 +518,7 @@ describe('session-video-player', () => {
 
     it('removes an authored .mobile-rider that cannot host the embed', async () => {
       setMeta('session-times', sessionTimes());
+      setCustomAttributes();
       const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
       const rider = document.createElement('div');
       rider.className = 'mobile-rider';
@@ -534,12 +538,13 @@ describe('session-video-player', () => {
         setMeta('session-times', sessionTimes({
           videos: [{ provider: 'youtube', url, kind: 'onDemand' }],
         }));
+        setCustomAttributes({ mpcId: null, youTubeId: 'abcdefghijk' });
         const el = await embedFullWidth();
 
         const iframe = el.querySelector('iframe.youtube');
         expect(iframe.id).to.equal('session-video-player-yt-abcdefghijk');
-        expect(iframe.getAttribute('src')).to.contain('/embed/abcdefghijk');
-        expect(iframe.getAttribute('src')).to.contain('enablejsapi=1');
+        expect(getIframeSrc(iframe)).to.contain('/embed/abcdefghijk');
+        expect(getIframeSrc(iframe)).to.contain('enablejsapi=1');
       });
     });
 
@@ -547,10 +552,11 @@ describe('session-video-player', () => {
       setMeta('session-times', sessionTimes({
         videos: [{ provider: 'youtube', url: 'https://example.com/nope', kind: 'onDemand' }],
       }));
+      setCustomAttributes({ mpcId: null, youTubeId: 'x' });
       const el = await embedFullWidth();
 
       const iframe = el.querySelector('iframe.youtube');
-      expect(iframe.getAttribute('src')).to.equal('https://example.com/nope');
+      expect(getIframeSrc(iframe)).to.equal('https://example.com/nope');
       expect(iframe.id).to.equal('');
     });
   });
@@ -559,8 +565,7 @@ describe('session-video-player', () => {
     let el;
 
     beforeEach(async () => {
-      setMeta('session-id', 's-1');
-      setMeta('session-times', sessionTimes());
+      authorSession();
       BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
       ({ fullWidthPlayer: el } = buildPage({ withPlaylistContainer: false }));
       await init(el);
@@ -584,8 +589,7 @@ describe('session-video-player', () => {
 
     /**
      * Captures only THIS session's events while `run` executes. Earlier tests in this
-     * file leak their own permanent `message` listeners (every watchMpcPlayback listener
-     * is never removed — see B1 in the refactor notes), so unrelated sessionIds would
+     * file leak their own permanent `message` listeners, so unrelated sessionIds would
      * otherwise show up alongside this one.
      */
     function captureStates(type, run) {

@@ -1,3 +1,5 @@
+import { logError, logWarning } from '../../utils/lana-log.js';
+
 // RainFocus schedule/favorites API, ported from northstar. Endpoint and profile id come from
 // tier-1-event-config, falling back to the defaults below. clientId is only sent by
 // fetchAuthToken. Several exports are unused, ported for parity, with unconfirmed shapes.
@@ -48,11 +50,11 @@ async function rawFetch(rfApiUrl, endpoint, params) {
   try {
     resp = await fetch(url);
   } catch (err) {
-    window.lana?.log(`[rainfocus] network error calling ${endpoint}: ${err.message}`);
+    logError('rainfocus', `network error calling ${endpoint}`, err);
     throw err;
   }
   if (!resp.ok) {
-    window.lana?.log(`[rainfocus] ${endpoint} request failed with status ${resp.status}`);
+    logWarning('rainfocus', `${endpoint} request failed`, resp);
     throw new Error(`RainFocus API request failed with status ${resp.status}`);
   }
   return resp.json();

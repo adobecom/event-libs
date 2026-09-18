@@ -228,7 +228,8 @@ describe('services/sessions/rainfocus', () => {
       }
       expect(error).to.be.an('error');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('[rainfocus] network error calling myData: offline');
+      expect(lanaLogStub.firstCall.args[0]).to.include('[rainfocus] network error calling myData');
+      expect(lanaLogStub.firstCall.args[0]).to.include('offline');
     });
   });
 });

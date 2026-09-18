@@ -1,5 +1,5 @@
 import {
-  setDaToken, setDaFetch, readSheet, mutateSheet, parseRowConfig, listFolder, uploadMedia, getContentUrl,
+  setDaToken, setDaFetch, mutateSheet, parseRowConfig, listFolder, uploadMedia, getContentUrl,
   getAemLiveUrl, uploadAndPublishMedia,
 } from '../../v1/utils/da-sheet-controller.js';
 import { CONFIGS_SHEET_PATH, CONFIG_TYPES } from '../constants.js';
@@ -28,11 +28,33 @@ function rowConfigType(row) {
   return row.configType || CONFIG_TYPES.GLOBAL;
 }
 
-// Global rows have no configId (identity is eventId+configType); Homepage
-// rows always do (identity is configId alone, stamped by ConfigsContext's
-// startNewConfig/startDuplicateConfig).
+// Every config row is identified by a unique configId. New rows get one from
+// ConfigsContext; this repairs any sheet that doesn't yet satisfy that by
+// assigning a fresh id to each row that is missing one, carries a `legacy:*`
+// sentinel from an earlier build, or duplicates another row's id within the
+// sheet. Unique ids are what keep same-event configs independent — a shared id
+// makes a single save or delete hit every sibling at once.
+function assignUniqueConfigIds(rows) {
+  const seen = new Set();
+  let changed = false;
+  const next = rows.map((row) => {
+    const id = row.configId;
+    if (id && !String(id).startsWith('legacy:') && !seen.has(id)) {
+      seen.add(id);
+      return row;
+    }
+    const fresh = crypto.randomUUID();
+    seen.add(fresh);
+    changed = true;
+    return { ...row, configId: fresh };
+  });
+  return { rows: next, changed };
+}
+
+// configId is authoritative on either side; eventId+configType is only a
+// last-resort fallback for a row that somehow still lacks one.
 function rowMatches(row, target) {
-  if (target.configId) return row.configId === target.configId;
+  if (row.configId || target.configId) return row.configId === target.configId;
   return row.eventId === target.eventId && rowConfigType(row) === rowConfigType(target);
 }
 
@@ -69,12 +91,25 @@ function parseAndMigrateRows(rawRows) {
     }));
 }
 
+// Reads a sheet and, when a row needs a unique configId (see
+// assignUniqueConfigIds), persists the repaired rows before returning them — a
+// one-time migration that makes every row independently addressable so later
+// saves/deletes touch exactly one row. Idempotent: a sheet whose ids are
+// already unique is read without a write.
+async function readAndRepairSheet(org, repo, sheetName) {
+  return mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {
+    const { rows: next, changed } = assignUniqueConfigIds(rows);
+    if (!changed) return { rows, result: rows, skip: true };
+    return { rows: next, result: next };
+  }, sheetName, ALL_SHEET_NAMES);
+}
+
 export async function getConfigs(org, repo) {
-  const [globalResult, homepageResult] = await Promise.all([
-    readSheet(org, repo, CONFIGS_SHEET_PATH, GLOBAL_SHEET_NAME),
-    readSheet(org, repo, CONFIGS_SHEET_PATH, HOMEPAGE_SHEET_NAME),
-  ]);
+  // Sequential, not parallel: both sheets live in one file, so two concurrent
+  // read-modify-writes would race on its ETag.
+  const globalResult = await readAndRepairSheet(org, repo, GLOBAL_SHEET_NAME);
   if (!globalResult.ok && globalResult.status !== 404) return globalResult;
+  const homepageResult = await readAndRepairSheet(org, repo, HOMEPAGE_SHEET_NAME);
   if (!homepageResult.ok && homepageResult.status !== 404) return homepageResult;
 
   const globalRows = globalResult.ok ? parseAndMigrateRows(globalResult.data) : [];
@@ -82,17 +117,11 @@ export async function getConfigs(org, repo) {
   return { ok: true, data: [...globalRows, ...homepageRows] };
 }
 
-// Upsert-by-identity (rowMatches: configId for Homepage rows, Event-ID+config
-// type for Global rows): replaces the existing row matching that identity, or
-// appends a new one — a single write path rather than separate create/update
-// calls. For Global this means re-picking an already-configured event can
-// never create a duplicate row; for Homepage, each row's own configId keeps
-// it independent even when another row shares the same event+type. The same
-// event can carry a Global row and separate Homepage rows side by side, since
-// they're keyed independently and stored in separate sheets of the same
-// file — a Homepage save never rewrites the Global sheet's rows, only leaves
-// them untouched (and vice versa), via da-sheet-controller.js's otherSheets
-// round-tripping.
+// Upsert by configId: replace the row with that id, else prepend. Every row
+// carries a unique configId (getConfigs repairs any that don't), so multiple
+// configs per event coexist and a save touches exactly one row. Global and
+// Homepage live in separate sheets of the same file, round-tripped untouched
+// by da-sheet-controller.js's otherSheets handling.
 export async function upsertConfig(org, repo, {
   eventId, backendEventTitle, eventServiceEnv, configType, configId, config,
 }) {
@@ -103,10 +132,8 @@ export async function upsertConfig(org, repo, {
     backendEventTitle,
     updated,
   };
-  // eventServiceEnv/configType/configId are row-level only, not stamped into
-  // config — they're authoring-time detail (which ESP tier this came from,
-  // which surface/row this targets), irrelevant to the page that eventually
-  // consumes the pasted Config.
+  // Row-level fields (env/configType/configId) aren't stamped into config —
+  // they're authoring detail, irrelevant to the consuming page.
   const newRow = {
     eventId, backendEventTitle, eventServiceEnv, configType, configId, config: stampedConfig, updated,
   };

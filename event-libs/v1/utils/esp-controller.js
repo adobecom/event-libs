@@ -7,6 +7,7 @@ import {
 } from './data-utils.js';
 import { ENV_MAP, sessionCatalogHost } from './constances.js';
 import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
+import { logError, logWarning } from './lana-log.js';
 
 export const getCaasTags = (() => {
   let cache;
@@ -31,7 +32,7 @@ export const getCaasTags = (() => {
           return data;
         })
         .catch((err) => {
-          window.lana?.log(`Failed to load products map JSON. Error: ${err}`);
+          logError('esp-controller,get-caas-tags', 'Failed to load products map JSON', err);
           throw err;
         });
     }
@@ -99,15 +100,15 @@ export async function getEvent(eventId) {
 
     if (!response.ok) {
       if (response.status === 404) {
-        window.lana?.log(`Event ${eventId} not found on "${eventServiceEnv.name}" ESP env. Verify the event exists in this environment or switch using ?espenv=<env>.`);
+        logWarning('esp-controller,get-event', `Event ${eventId} not found on "${eventServiceEnv.name}" ESP env. Verify the event exists in this environment or switch using ?espenv=<env>.`);
       }
-      window.lana?.log(`Error: Failed to get details for event ${eventId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-event', `Failed to get details for event ${eventId}`, response);
       return { ok: response.ok, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get details for event ${eventId}:${JSON.stringify(error)}`);
+    logError('esp-controller,get-event', `Failed to get details for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -125,13 +126,13 @@ export async function getEspEvent(eventId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get ESP event ${eventId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-esp-event', `Failed to get ESP event ${eventId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get ESP event ${eventId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-esp-event', `Failed to get ESP event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -159,13 +160,13 @@ export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to list events. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,list-events', 'Failed to list events', response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data: { events: data.events || [], nextPageToken: data.nextPageToken || null } };
   } catch (error) {
-    window.lana?.log(`Error: Failed to list events. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,list-events', 'Failed to list events', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -232,13 +233,13 @@ export async function getEventSessionCatalog(eventId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get session catalog for event ${eventId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-session-catalog', `Failed to get session catalog for event ${eventId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data: { sessions: data.sessions || [], sessionTimes: data.sessionTimes || [] } };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get session catalog for event ${eventId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-session-catalog', `Failed to get session catalog for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -252,12 +253,12 @@ export async function getEventAttendee(eventId) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/me`, options);
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get attendee for event ${eventId}:${JSON.stringify(response)}`);
+      logError('esp-controller,get-event-attendee', `Failed to get attendee for event ${eventId}`, response);
       let textResp;
       try {
         textResp = await response.text();
       } catch (e) {
-        window.lana?.log(`Error: Failed to parse response text:${JSON.stringify(e)}`);
+        logError('esp-controller,get-event-attendee', 'Failed to parse response text', e);
       }
 
       return {
@@ -269,7 +270,7 @@ export async function getEventAttendee(eventId) {
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get attendee for event ${eventId}. E:${JSON.stringify(error)}`);
+    logError('esp-controller,get-event-attendee', `Failed to get attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -283,12 +284,12 @@ export async function getAttendee() {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get attendee details. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-attendee', 'Failed to get attendee details', response);
       let textResp;
       try {
         textResp = await response.text();
       } catch (e) {
-        window.lana?.log(`Error: Failed to parse response text:${JSON.stringify(e)}`);
+        logError('esp-controller,get-attendee', 'Failed to parse response text', e);
       }
 
       return {
@@ -300,7 +301,7 @@ export async function getAttendee() {
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get attendee. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-attendee', 'Failed to get attendee', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -325,13 +326,13 @@ export async function createAttendee(attendeeData, rsvpToken = null) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to create attendee. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,create-attendee', 'Failed to create attendee', response);
       return { ok: response.ok, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to create attendee. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,create-attendee', 'Failed to create attendee', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -351,13 +352,13 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to add attendee for event ${eventId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,add-attendee-to-event', `Failed to add attendee for event ${eventId}`, response);
       return { ok: response.ok, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to add attendee for event ${eventId}:${JSON.stringify(error)}`);
+    logError('esp-controller,add-attendee-to-event', `Failed to add attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -375,13 +376,13 @@ export async function updateAttendee(attendeeData) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to update attendee. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,update-attendee', 'Failed to update attendee', response);
       return { ok: response.ok, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to update attendee:${JSON.stringify(error)}`);
+    logError('esp-controller,update-attendee', 'Failed to update attendee', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -402,12 +403,12 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     }
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to delete attendee for event ${eventId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,delete-attendee', `Failed to delete attendee for event ${eventId}`, response);
       let textResp;
       try {
         textResp = await response.text();
       } catch (e) {
-        window.lana?.log(`Error: Failed to parse response text:${JSON.stringify(e)}`);
+        logError('esp-controller,delete-attendee', 'Failed to parse response text', e);
       }
 
       return {
@@ -420,7 +421,7 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     if (response.status === 204) return { ok: true, data: { status: 204, attendeeDeleted: true } };
     return { ok: true, data: await response.json() };
   } catch (error) {
-    window.lana?.log(`Error: Failed to delete attendee for event ${eventId}:${JSON.stringify(error)}`);
+    logError('esp-controller,delete-attendee', `Failed to delete attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -438,13 +439,13 @@ export async function getCampaign(eventId, campaignId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get campaign ${campaignId} for event ${eventId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-campaign', `Failed to get campaign ${campaignId} for event ${eventId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get campaign ${campaignId} for event ${eventId}:${JSON.stringify(error)}`);
+    logError('esp-controller,get-campaign', `Failed to get campaign ${campaignId} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -464,13 +465,13 @@ export async function validateRsvpToken(eventId, token) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to validate RSVP token. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,validate-rsvp-token', 'Failed to validate RSVP token', response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to validate RSVP token:${JSON.stringify(error)}`);
+    logError('esp-controller,validate-rsvp-token', 'Failed to validate RSVP token', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -490,7 +491,7 @@ export async function getSessions(eventId) {
       const data = await response.json();
 
       if (!response.ok) {
-        window.lana?.log(`Error: Failed to get sessions for event ${eventId}. Status:${JSON.stringify(response)}`);
+        logError('esp-controller,get-sessions', `Failed to get sessions for event ${eventId}`, response);
         return { ok: false, status: response.status, error: data };
       }
 
@@ -500,7 +501,7 @@ export async function getSessions(eventId) {
 
     return { ok: true, data: allSessions };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get sessions for event ${eventId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-sessions', `Failed to get sessions for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -515,13 +516,13 @@ export async function getSessionTimes(sessionId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get session times for session ${sessionId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-session-times', `Failed to get session times for session ${sessionId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data: data.sessionTimes || [] };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get session times for session ${sessionId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-session-times', `Failed to get session times for session ${sessionId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -536,13 +537,13 @@ export async function getSessionSpeakers(sessionId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get speakers for session ${sessionId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-session-speakers', `Failed to get speakers for session ${sessionId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data: data.speakers || [] };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get speakers for session ${sessionId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-session-speakers', `Failed to get speakers for session ${sessionId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -557,13 +558,13 @@ export async function getAllSeriesSpeakers(seriesId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get speakers for series ${seriesId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-series-speakers', `Failed to get speakers for series ${seriesId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data: data.speakers || [] };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get speakers for series ${seriesId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-series-speakers', `Failed to get speakers for series ${seriesId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -578,13 +579,13 @@ export async function getVenueLocation(venueId, locationId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get location ${locationId} for venue ${venueId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-venue-location', `Failed to get location ${locationId} for venue ${venueId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get location ${locationId} for venue ${venueId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-venue-location', `Failed to get location ${locationId} for venue ${venueId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -599,13 +600,13 @@ export async function getMyEventSessions(eventId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get my sessions for event ${eventId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-my-event-sessions', `Failed to get my sessions for event ${eventId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get my sessions for event ${eventId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-my-event-sessions', `Failed to get my sessions for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -620,13 +621,13 @@ export async function getSessionTimeAttendee(sessionTimeId) {
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get attendee for session time ${sessionTimeId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-session-time-attendee', `Failed to get attendee for session time ${sessionTimeId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get attendee for session time ${sessionTimeId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,get-session-time-attendee', `Failed to get attendee for session time ${sessionTimeId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -649,13 +650,13 @@ export async function registerForSessionTime(sessionTimeId, attendeeId, registra
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to register for session time ${sessionTimeId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to register for session time ${sessionTimeId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -674,14 +675,14 @@ export async function unregisterFromSessionTime(sessionTimeId) {
     );
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to unregister from session time ${sessionTimeId}. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, response);
       return { ok: false, status: response.status };
     }
 
     if (response.status === 204) return { ok: true };
     return { ok: true, data: await response.json() };
   } catch (error) {
-    window.lana?.log(`Error: Failed to unregister from session time ${sessionTimeId}. Error:${JSON.stringify(error)}`);
+    logError('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -764,13 +765,13 @@ export async function indexPathToSchedule(scheduleId, pagePath) {
     const response = await fetch(`${serviceApiEndpoints.esp}/v1/page-schedules/${scheduleId}/page-paths`, options);
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to index path to schedule. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,index-path-to-schedule', 'Failed to index path to schedule', response);
       return { ok: false, status: response.status, error: response.status };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    window.lana?.log(`Error: Failed to index path to schedule:${JSON.stringify(error)}`);
+    logError('esp-controller,index-path-to-schedule', 'Failed to index path to schedule', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -784,13 +785,13 @@ export async function getSchedulePagePaths(scheduleId) {
     const response = await fetch(`${serviceApiEndpoints.esp}/v1/page-schedules/${scheduleId}/page-paths`, options);
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to get schedule page paths. Status:${JSON.stringify(response)}`);
+      logError('esp-controller,get-schedule-page-paths', 'Failed to get schedule page paths', response);
       return { ok: false, status: response.status, error: response.status };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    window.lana?.log(`Error: Failed to get schedule page paths:${JSON.stringify(error)}`);
+    logError('esp-controller,get-schedule-page-paths', 'Failed to get schedule page paths', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }

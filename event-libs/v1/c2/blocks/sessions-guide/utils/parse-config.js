@@ -1,11 +1,25 @@
 import { detectUserTimezone } from './time.js';
+import { logWarning } from '../../../../utils/lana-log.js';
 
-// Authored { attributeId, displayName, enabled } -> FilterPanel's { id, label }. `id` is the
-// attributeId getFilterValue() resolves against customAttributeValues. Order is display order.
+// RainFocus gives categories a UUID and a label, no slug — this is ours, for the ?filter= key.
+function slugifyCategoryLabel(label) {
+  return label ? label.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
+}
+
+// Authored { attributeId, displayName, enabled } -> FilterPanel's { id, label, slug }. Two
+// categories slugifying to the same value get -2/-3/... suffixes in authoring order.
 function mapAuthoredFilterCategories(authoredCategories) {
-  return authoredCategories
+  const categories = authoredCategories
     .filter((c) => c.enabled !== false)
     .map((c) => ({ id: c.attributeId, label: c.displayName || c.label }));
+
+  const seen = new Map();
+  return categories.map((c) => {
+    const base = slugifyCategoryLabel(c.label) || c.id;
+    const count = (seen.get(base) || 0) + 1;
+    seen.set(base, count);
+    return { ...c, slug: count === 1 ? base : `${base}-${count}` };
+  });
 }
 
 // Config comes solely from the data-session-guide-config attribute decorate.js sets.
@@ -14,7 +28,7 @@ export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) 
   try {
     authored = JSON.parse(el.dataset.sessionGuideConfig || '{}');
   } catch {
-    window.lana?.log(`[${logPrefix}] invalid data-session-guide-config JSON`);
+    logWarning(logPrefix, 'invalid data-session-guide-config JSON');
   }
 
   const surface = forcedSurface || authored.surface || 'widget';

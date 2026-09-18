@@ -3,6 +3,7 @@ import { getAttrValues } from '../../utils/custom-attributes.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
 import { getProduct, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { fetchFederalProductIcon } from '../../../features/icons/federal-icons.js';
+import { logError } from '../../../utils/lana-log.js';
 
 const VISIBLE_LIMIT = 6;
 let instances = 0;
@@ -10,17 +11,20 @@ const ARROW_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="1
 const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 async function paintProductIcon(slot, iconName) {
-  if (!iconName) return;
   try {
     const svg = await fetchFederalProductIcon(iconName);
-    if (!svg) return;
+    if (!svg) {
+      slot.remove();
+      return;
+    }
     svg.setAttribute('width', '24');
     svg.setAttribute('height', '24');
     svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('focusable', 'false');
     slot.replaceChildren(svg);
   } catch (err) {
-    window.lana?.log(`[featured-products] icon "${iconName}" failed to resolve: ${err.message}`);
+    slot.remove();
+    logError('event-featured-products', `icon "${iconName}" failed to resolve`, err);
   }
 }
 
@@ -61,9 +65,12 @@ export default async function init(el) {
       })
       : createTag('span', { class: 'featured-product-tile' });
 
-    const iconSlot = createTag('span', { class: 'featured-product-icon' });
-    if (cfg?.icon) paintProductIcon(iconSlot, cfg.icon);
-    tile.append(iconSlot, createTag('span', { class: 'featured-product-name' }, name));
+    if (cfg?.icon) {
+      const iconSlot = createTag('span', { class: 'featured-product-icon' });
+      tile.append(iconSlot);
+      paintProductIcon(iconSlot, cfg.icon);
+    }
+    tile.append(createTag('span', { class: 'featured-product-name' }, name));
     if (cfg?.pageUrl) {
       const arrow = createTag('span', { class: 'featured-product-arrow' });
       arrow.innerHTML = ARROW_ICON;

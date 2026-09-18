@@ -1,4 +1,5 @@
 import { DA_ADMIN_ORIGIN, DA_ORIGIN, DA_APP_PATH, ENABLE_LEGACY_LINK_MIGRATION } from '../constants.js';
+import { logError } from '../../v1/utils/lana-log.js';
 
 let daToken = null;
 let sdkDaFetch = null;
@@ -81,12 +82,12 @@ async function daFetch(path, options = {}) {
   try {
     resp = await doFetch(url, options);
   } catch (err) {
-    window.lana?.log(`DA fetch network error: ${err} — ${url}`);
+    logError('schedule-maker,da-controller', `DA fetch network error — ${url}`, err);
     return { ok: false, status: 0, error: 'Network error' };
   }
   if (!resp.ok) {
     const error = await resp.text().catch(() => resp.statusText);
-    window.lana?.log(`DA fetch error ${resp.status}: ${url} — ${error}`);
+    logError('schedule-maker,da-controller', `DA fetch error ${resp.status}: ${url}`, error);
     return { ok: false, status: resp.status, error };
   }
   const etag = resp.headers.get('ETag');

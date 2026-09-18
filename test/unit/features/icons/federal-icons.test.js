@@ -213,7 +213,8 @@ describe('federal-icons — non-ok HTTP responses are reported to lana', () => {
     const svg = await fetchFederalIcon('non-ok-icon');
     expect(svg).to.equal(null);
     expect(lanaLogStub.calledOnce).to.equal(true);
-    expect(lanaLogStub.firstCall.args[0]).to.include('non-ok-icon.svg: 500');
+    expect(lanaLogStub.firstCall.args[0]).to.include('non-ok-icon.svg');
+    expect(lanaLogStub.firstCall.args[0]).to.include('500');
   });
 
   it('logs a non-ok icons.json response instead of failing silently', async () => {
@@ -221,6 +222,7 @@ describe('federal-icons — non-ok HTTP responses are reported to lana', () => {
     const names = await freshFetchFederalIconList();
     expect(names).to.deep.equal([]);
     expect(lanaLogStub.calledOnce).to.equal(true);
-    expect(lanaLogStub.firstCall.args[0]).to.include('icons.json: 500');
+    expect(lanaLogStub.firstCall.args[0]).to.include('icons.json');
+    expect(lanaLogStub.firstCall.args[0]).to.include('500');
   });
 });

@@ -28,6 +28,7 @@ import {
   shouldForceGuestSignIn,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
+import { logWarning, logError } from './lana-log.js';
 import { hydrateBlocks } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
 import { initTierOneEventConfig } from './tier-1-event-config.js';
@@ -235,7 +236,7 @@ export async function updateRSVPButtonState(rsvpBtn) {
 
 export function signIn(options) {
   if (typeof window.adobeIMS?.signIn !== 'function') {
-    window.lana?.log('IMS signIn method not available', { tags: 'errorType=warn,module=gnav' });
+    logWarning('decorate,ims-auth', 'IMS signIn method not available');
     return;
   }
 
@@ -313,7 +314,7 @@ export async function validatePageAndRedirect(miloLibs) {
 
   if (organicHitUnpublishedOnProd || invalidStagePage) {
     await loadLana({ clientId: 'events-milo' });
-    await window.lana?.log(`Error: 404 page hit on ${envName}: ${window.location.href}`);
+    await logError('decorate,page-validation', `404 page hit on ${envName}: ${window.location.href}`);
 
     window.location.replace(error404Location);
     return;
@@ -419,7 +420,7 @@ async function initRSVPHandler(link) {
     regHashCallbacks[regCallbackKey](link);
     return true;
   } catch (e) {
-    window.lana?.log(`Error while attempting to process RSVP link ${link.href}:\n${JSON.stringify(e, null, 2)}`);
+    logError('decorate,rsvp-link', `Error while attempting to process RSVP link ${link.href}`, e);
     return false;
   }
 }
@@ -435,7 +436,7 @@ function processSPTemplateLinks(parent) {
         const seriesMetadata = JSON.parse(getMetadata('series'));
         templateId = seriesMetadata?.templateId;
       } catch (e) {
-        window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
+        logError('decorate,template-id', 'Failed to parse series metadata. Attempt to fallback on event tempate ID attribute', e);
       }
 
       if (!templateId && getMetadata('template-id')) {
@@ -445,10 +446,10 @@ function processSPTemplateLinks(parent) {
       if (templateId) {
         a.href = templateId;
       } else {
-        window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
+        logWarning('decorate,template-id', `Failed to find template ID for event ${getMetadata('event-id')}`);
       }
     } catch (e) {
-      window.lana?.log(`Error while attempting to replace SP template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+      logError('decorate,template-id', `Error while attempting to replace SP template link ${a.href}`, e);
     }
   });
 }
@@ -484,7 +485,7 @@ function processDATemplateLinks(parent) {
         a.remove();
       }
     } catch (e) {
-      window.lana?.log(`Error while attempting to replace DA template link ${a.href}:${JSON.stringify(e, null, 2)}`);
+      logError('decorate,template-id', `Error while attempting to replace DA template link ${a.href}`, e);
     }
   });
 }
@@ -493,9 +494,9 @@ function processHashtagLinks(parent) {
   const links = parent.querySelectorAll('a[href*="#"]');
 
   links.forEach((a) => {
-    const url = new URL(a.href);
-    const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
     try {
+      const url = new URL(a.href);
+      const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
       if (cmsType === 'SP') {
         processTemplateInLinkText(a);
 
@@ -521,7 +522,7 @@ function processHashtagLinks(parent) {
         initRSVPHandler(a);
       }
     } catch (e) {
-      window.lana?.log(`Error while attempting to replace link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+      logError('decorate,hashtag-link', `Error while attempting to replace link ${a.href}`, e);
     }
   });
 
@@ -534,7 +535,7 @@ function processHashtagLinks(parent) {
 function warnIfEventIdMismatch(label, config) {
   const pageEventId = getMetadata('event-id');
   if (config.eventId && pageEventId && config.eventId !== pageEventId) {
-    window.lana?.log(`[${label}] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+    logWarning('decorate,auto-block', `[${label}] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
   }
 }
 
@@ -675,7 +676,7 @@ export function processAutoBlockLinks(parent) {
       const blockEl = prebuildAutoBlock(blockName, link);
       if (!blockEl) return;
       link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
-    })).catch((e) => window.lana?.log(`[${blockName}] autoblock init failed: ${e.message}`));
+    })).catch((e) => logError('decorate,auto-block', `${blockName} autoblock init failed`, e));
   });
 }
 
@@ -686,7 +687,7 @@ export function updatePictureElement(imageUrl, parentPic, altText) {
     try {
       imgUrlObj = new URL(imageUrl);
     } catch (e) {
-      window.lana?.log(`Error while parsing absolute sharepoint URL:\n${JSON.stringify(e, null, 2)}`);
+      logError('decorate,image-source', 'Error while parsing absolute sharepoint URL', e);
     }
   }
 
@@ -696,7 +697,7 @@ export function updatePictureElement(imageUrl, parentPic, altText) {
     try {
       el.srcset = el.srcset.replace(/.*\?/, `${imgUrl}?`);
     } catch (e) {
-      window.lana?.log(`Failed to convert optimized picture source from ${el} with dynamic data:\n${JSON.stringify(e, null, 2)}`);
+      logError('decorate,image-source', `Failed to convert optimized picture source from ${el} with dynamic data`, e);
     }
   });
 
@@ -709,7 +710,7 @@ export function updatePictureElement(imageUrl, parentPic, altText) {
       el.src = el.src.replace(/.*\?/, `${imgUrl}?`);
       el.alt = altText || '';
     } catch (e) {
-      window.lana?.log(`Failed to convert optimized img from ${el} with dynamic data:\n${JSON.stringify(e, null, 2)}`);
+      logError('decorate,image-source', `Failed to convert optimized img from ${el} with dynamic data`, e);
     }
     el.addEventListener('load', onImgLoad);
   });
@@ -742,7 +743,7 @@ function updateImgTag(child, matchCallback, parentElement) {
       parentElement.remove();
     }
   } catch (e) {
-    window.lana?.log(`Error while attempting to update image:\n${JSON.stringify(e, null, 2)}`);
+    logError('decorate,image-source', 'Error while attempting to update image', e);
   }
 }
 
@@ -893,11 +894,11 @@ export async function getNonProdData(env) {
 
     if (pageData) return pageData;
 
-    window.lana?.log('Failed to find non-prod metadata for current page');
+    logWarning('decorate,non-prod-metadata', 'Failed to find non-prod metadata for current page');
     return null;
   }
 
-  window.lana?.log(`Failed to fetch non-prod metadata:\n${JSON.stringify(resp, null, 2)}`);
+  logError('decorate,non-prod-metadata', 'Failed to fetch non-prod metadata', resp);
   return null;
 }
 
@@ -908,7 +909,7 @@ function decorateProfileCardsZPattern(parent) {
   try {
     speakerData = JSON.parse(getMetadata('speakers'));
   } catch (e) {
-    window.lana?.log(`Failed to parse speakers metadata:\n${JSON.stringify(e, null, 2)}`);
+    logError('decorate,speaker-metadata', 'Failed to parse speakers metadata', e);
     return;
   }
 
@@ -960,7 +961,7 @@ function updateExtraMetaTags(parent) {
   try {
     photos = JSON.parse(getMetadata('photos'));
   } catch (e) {
-    window.lana?.log(`Failed to parse photos metadata for extra metadata tags generation:\n${JSON.stringify(e, null, 2)}`);
+    logError('decorate,photo-metadata', 'Failed to parse photos metadata for extra metadata tags generation', e);
   }
 
   if (title) {
@@ -983,7 +984,7 @@ function updateExtraMetaTags(parent) {
         try {
           sharepointUrl = new URL(sharepointUrl).pathname;
         } catch (e) {
-          window.lana?.log(`Error while parsing SharePoint URL for extra metadata tags generation:\n${JSON.stringify(e, null, 2)}`);
+          logError('decorate,photo-metadata', 'Error while parsing SharePoint URL for extra metadata tags generation', e);
         }
       }
 
@@ -1028,7 +1029,7 @@ function parsePhotosData(area) {
       output[photo.imageKind] = photo;
     });
   } catch (e) {
-    window.lana?.log(`Failed to parse photos metadata:\n${JSON.stringify(e, null, 2)}`);
+    logError('decorate,photo-metadata', 'Failed to parse photos metadata', e);
   }
 
   return output;
@@ -1231,7 +1232,7 @@ export function decorateEvent(parent) {
   const { cmsType } = getEventConfig();
 
   if (!parent) {
-    window.lana?.log('Error:page server block cannot find its parent element');
+    logWarning('decorate,event-init', 'Page server block cannot find its parent element');
     return;
   }
 
