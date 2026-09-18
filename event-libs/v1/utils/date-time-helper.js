@@ -1,4 +1,5 @@
 import { getMetadata } from "./utils.js";
+import { logError, logWarning } from './lana-log.js';
 
 export const LOCALE_FORMATTERS = {
   'fr-FR': (h, m) => (m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`),
@@ -54,7 +55,7 @@ export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US', 
   const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
 
   if (Number.isNaN(timestampNum)) {
-    window.lana?.log(`Invalid timestamp provided: ${timestamp}`);
+    logWarning('date-time-helper', `Invalid timestamp provided: ${timestamp}`);
     return '';
   }
 
@@ -63,7 +64,7 @@ export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US', 
 
     // Check if date is valid
     if (Number.isNaN(date.getTime())) {
-      window.lana?.log(`Invalid date created from timestamp: ${timestampNum}`);
+      logWarning('date-time-helper', `Invalid date created from timestamp: ${timestampNum}`);
       return '';
     }
 
@@ -82,7 +83,7 @@ export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US', 
 
     return date.toLocaleString(locale, options);
   } catch (error) {
-    window.lana?.log(`Error converting timestamp to local date time: ${JSON.stringify(error)}`);
+    logError('date-time-helper,convert-utc-timestamp', 'Error converting timestamp to local date time', error);
     return '';
   }
 }
@@ -112,7 +113,7 @@ export function areTimestampsOnSameDay(startTimestamp, endTimestamp, timezone = 
     const toDateStr = (ts) => new Date(ts).toLocaleDateString('en-CA', opts);
     return toDateStr(startNum) === toDateStr(endNum);
   } catch (error) {
-    window.lana?.log(`Error comparing timestamps: ${JSON.stringify(error)}`);
+    logError('date-time-helper,compare-timestamps', 'Error comparing timestamps', error);
     return false;
   }
 }
@@ -277,7 +278,7 @@ export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, t
       .replace('{timeRange}', getTimeInterval(startNum, endNum, locale, timezone))
       .replace('{timeZone}', getLocalTimeZone(startNum, locale, timezone));
   } catch (error) {
-    window.lana?.log(`Error creating templated date range: ${JSON.stringify(error)}`);
+    logError('date-time-helper,templated-date-range', 'Error creating templated date range', error);
     return '';
   }
 }
@@ -306,7 +307,7 @@ function getDateOnly(timestamp, locale, timezone = null) {
 
     return date.toLocaleDateString(locale, options);
   } catch (error) {
-    window.lana?.log(`Error getting date only: ${JSON.stringify(error)}`);
+    logError('date-time-helper,date-only', 'Error getting date only', error);
     return '';
   }
 }
@@ -344,7 +345,7 @@ function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = nu
     if (timezone) options.timeZone = timezone;
     return date.toLocaleTimeString(locale, options);
   } catch (error) {
-    window.lana?.log(`Error getting time only: ${JSON.stringify(error)}`);
+    logError('date-time-helper,time-only', 'Error getting time only', error);
     return '';
   }
 }
@@ -406,7 +407,7 @@ export function getRelativeTime(pastMs, locale = 'en-US', nowMs = Date.now()) {
     const [unit, unitMs] = RELATIVE_TIME_UNIT_MS.find(([, ms]) => diffMs >= ms) || RELATIVE_TIME_UNIT_MS[RELATIVE_TIME_UNIT_MS.length - 1];
     return rtf.format(-Math.round(diffMs / unitMs), unit);
   } catch (error) {
-    window.lana?.log(`Error formatting relative time: ${JSON.stringify(error)}`);
+    logError('date-time-helper,relative-time', 'Error formatting relative time', error);
     return '';
   }
 }
@@ -491,7 +492,7 @@ export function massageMetadata(userLocale = 'en-US') {
         massagedData[rule.outputKey] = transformedValue;
       }
     } catch (error) {
-      window.lana?.log(`Error processing rule ${metadataKey}: ${error.message}`);
+      logError('date-time-helper,massage-metadata', `Error processing rule ${metadataKey}`, error);
     }
   });
 

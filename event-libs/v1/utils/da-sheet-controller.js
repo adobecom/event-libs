@@ -6,6 +6,8 @@
 // concerns (row key, upsert/delete semantics, schema migration) stay in each app's own
 // scripts/da-controller.js, built on top of these primitives.
 
+import { logError } from './lana-log.js';
+
 const DA_ADMIN_ORIGIN = 'https://admin.da.live';
 const CONTENT_DA_ORIGIN = 'https://content.da.live';
 const ADMIN_HLX_ORIGIN = 'https://admin.hlx.page';
@@ -54,12 +56,12 @@ async function daFetch(path, options = {}) {
   try {
     resp = await doFetch(url, options);
   } catch (err) {
-    window.lana?.log(`DA fetch network error: ${err} — ${url}`);
+    logError('da-sheet-controller,fetch', `DA fetch network error — ${url}`, err);
     return { ok: false, status: 0, error: 'Network error' };
   }
   if (!resp.ok) {
     const error = await resp.text().catch(() => resp.statusText);
-    window.lana?.log(`DA fetch error ${resp.status}: ${url} — ${error}`);
+    logError('da-sheet-controller,fetch', `DA fetch error ${resp.status}: ${url}`, error);
     return { ok: false, status: resp.status, error };
   }
   const etag = resp.headers.get('ETag');
@@ -78,7 +80,7 @@ export function parseRowConfig(row, logPrefix) {
   try {
     return JSON.parse(row.config);
   } catch (error) {
-    window.lana?.log(`${logPrefix}: malformed config JSON for row, defaulting to {}. ${error}`);
+    logError('da-sheet-controller,parse-row-config', `${logPrefix}: malformed config JSON for row, defaulting to {}`, error);
     return {};
   }
 }
@@ -160,7 +162,7 @@ export async function writeSheet(org, repo, path, rows, {
   try {
     resp = await doFetch(url, { method: 'POST', headers, body: formData });
   } catch (err) {
-    window.lana?.log(`DA writeSheet network error: ${err} — ${url}`);
+    logError('da-sheet-controller,write-sheet', `DA writeSheet network error — ${url}`, err);
     return { ok: false, status: 0, error: 'Network error' };
   }
   if (resp.status === 412) {
@@ -291,12 +293,12 @@ export async function uploadMedia(org, repo, path, file) {
   try {
     resp = await doFetch(url, { method: 'POST', headers, body: formData });
   } catch (err) {
-    window.lana?.log(`DA uploadMedia network error: ${err} — ${url}`);
+    logError('da-sheet-controller,upload-media', `DA uploadMedia network error — ${url}`, err);
     return { ok: false, status: 0, error: 'Network error' };
   }
   if (!resp.ok) {
     const error = await resp.text().catch(() => resp.statusText);
-    window.lana?.log(`DA uploadMedia error ${resp.status}: ${url} — ${error}`);
+    logError('da-sheet-controller,upload-media', `DA uploadMedia error ${resp.status}: ${url}`, error);
     return { ok: false, status: resp.status, error };
   }
   return { ok: true, status: resp.status, url: `${CONTENT_DA_ORIGIN}/${org}/${repo}${filePath}`, filePath };
@@ -313,12 +315,12 @@ async function hlxAction(action, org, repo, path, branch) {
   try {
     resp = await doFetch(url, { method: 'POST', headers });
   } catch (err) {
-    window.lana?.log(`DA ${action} network error: ${err} — ${url}`);
+    logError('da-sheet-controller,hlx-action', `DA ${action} network error — ${url}`, err);
     return { ok: false, status: 0, error: 'Network error' };
   }
   if (!resp.ok) {
     const error = await resp.text().catch(() => resp.statusText);
-    window.lana?.log(`DA ${action} error ${resp.status}: ${url} — ${error}`);
+    logError('da-sheet-controller,hlx-action', `DA ${action} error ${resp.status}: ${url}`, error);
     return { ok: false, status: resp.status, error };
   }
   return { ok: true, status: resp.status };

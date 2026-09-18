@@ -1,6 +1,7 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
 import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
+import { logWarning } from '../../utils/lana-log.js';
 
 // Catalog URLs always carry prod's host; on non-prod pages point them at the current origin instead.
 export function sessionPageUrlForEnv(
@@ -294,7 +295,7 @@ export function reportDroppedSessions(
     .map(([session, reason]) => `${describeRawSession(session)} — ${reason}`)
     .join('; ');
   const rest = dropped.length - DROP_LOG_LIMIT;
-  window.lana?.log(`[sessions-api] dropped ${dropped.length} session(s): ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
+  logWarning('sessions-api', `dropped ${dropped.length} session(s): ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
 
   if (isProd) return;
   // eslint-disable-next-line no-console
