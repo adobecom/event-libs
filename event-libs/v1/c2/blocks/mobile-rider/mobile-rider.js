@@ -276,13 +276,16 @@ class MobileRider {
       bar.classList.toggle('is-expanded', !expanded);
     });
 
-    const viewAllDetailsLabel = cfg['view-all-details-label'] || 'View all details';
-    const more = createTag('button', {
-      type: 'button',
-      class: 'mobile-rider-info-bar-more',
-      'daa-ll': 'View-All-Details',
-    }, viewAllDetailsLabel, { parent: bar });
-    more.addEventListener('click', () => openSessionGuideDetail(sessionId));
+    // Only render "View all details" when an author has provided the label; unauthored → no button.
+    const viewAllDetailsLabel = cfg['view-all-details-label'];
+    if (viewAllDetailsLabel) {
+      const more = createTag('button', {
+        type: 'button',
+        class: 'mobile-rider-info-bar-more',
+        'daa-ll': 'View-All-Details',
+      }, viewAllDetailsLabel, { parent: bar });
+      more.addEventListener('click', () => openSessionGuideDetail(sessionId));
+    }
 
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: bar });
 
