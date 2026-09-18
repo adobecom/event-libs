@@ -1,9 +1,16 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { readFile } from '@web/test-runner-commands';
-import init from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
+import init, {
+  getLocaleString,
+  getCaasLocaleKey,
+  resolveTagWithGroup,
+  resolveTagObjects,
+} from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
 import { DictionaryManager, dictionaryManager } from '../../../../event-libs/v1/utils/dictionary-manager.js';
+import { setEventConfig, updateEventConfig } from '../../../../event-libs/v1/utils/utils.js';
+import { eventConfig } from '../../scripts/mocks/event-config.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 
@@ -387,5 +394,60 @@ describe('sessions-hub speaker display names', () => {
     const btn = el.querySelector('.sh-avatar-btn[data-speaker-id="sp-3"]');
     expect(btn.getAttribute('aria-label')).to.equal('Jane Doe');
     expect(btn.querySelector('.sh-avatar-initials').textContent).to.equal('JD');
+  });
+});
+
+describe('sessions-hub locale helpers — regression for TypeError on missing miloConfig', () => {
+  afterEach(() => {
+    setEventConfig(eventConfig, eventConfig.miloConfig);
+  });
+
+  it('getCaasLocaleKey falls back to en instead of throwing when miloConfig is null', () => {
+    updateEventConfig({}, null);
+    expect(() => getCaasLocaleKey()).to.not.throw();
+    expect(getCaasLocaleKey()).to.equal('en');
+  });
+
+  it('getLocaleString falls back to en-US instead of throwing when miloConfig is null', () => {
+    updateEventConfig({}, null);
+    expect(() => getLocaleString()).to.not.throw();
+    expect(getLocaleString()).to.equal('en-US');
+  });
+});
+
+describe('resolveTagWithGroup / resolveTagObjects — localeKey threading', () => {
+  const tagsData = {
+    namespaces: {
+      caas: {
+        tags: {
+          type: {
+            title: 'Type',
+            tags: {
+              workshop: { title: 'Workshop', 'title.fr': 'Atelier' },
+            },
+          },
+        },
+      },
+    },
+  };
+
+  it('uses the provided localeKey to prefer the localized title', () => {
+    expect(resolveTagWithGroup('caas:type/workshop', tagsData, 'fr'))
+      .to.deep.equal({ label: 'Atelier', group: 'Type' });
+  });
+
+  it('falls back to the default title when localeKey has no match', () => {
+    expect(resolveTagWithGroup('caas:type/workshop', tagsData, 'de'))
+      .to.deep.equal({ label: 'Workshop', group: 'Type' });
+  });
+
+  it('defaults localeKey to "en" when not provided', () => {
+    expect(resolveTagWithGroup('caas:type/workshop', tagsData))
+      .to.deep.equal({ label: 'Workshop', group: 'Type' });
+  });
+
+  it('resolveTagObjects threads localeKey through to resolveTagWithGroup', () => {
+    expect(resolveTagObjects('caas:type/workshop', tagsData, 'fr'))
+      .to.deep.equal([{ label: 'Atelier', group: 'Type' }]);
   });
 });
