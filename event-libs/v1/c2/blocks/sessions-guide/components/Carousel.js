@@ -64,9 +64,13 @@ export function Carousel({
   const sessionCount = sessions?.length || 0;
   const maxOffset = Math.max(0, sessionCount - visibleCountRef.current);
 
-  // Re-clamps offset when the list shrinks under an already-paged-forward carousel (e.g.
-  // several live sessions ending in the same tick), so translateX can't overshoot content.
+  // Re-measures when the list goes from empty to populated: sessions load asynchronously, so
+  // the mount effect above often fires while there's no strip yet (measure() no-ops) and
+  // visibleCountRef.current is stuck at its useRef(1) default once real cards do render. Also
+  // re-clamps offset when the list shrinks under an already-paged-forward carousel (e.g. several
+  // live sessions ending in the same tick), so translateX can't overshoot content.
   useEffect(() => {
+    measure();
     refreshEdges();
     clampOffset();
   }, [sessionCount]);
