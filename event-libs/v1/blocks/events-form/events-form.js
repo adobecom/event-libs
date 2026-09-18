@@ -1190,7 +1190,7 @@ export async function initFormBasedOnRSVPData(bp) {
 
   if (profile.account_type !== 'guest') {
     let existingAttendeeData = {};
-    const attendeeResp = await getAttendee();
+    const attendeeResp = await getAttendee(getMetadata('event-id'));
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
     if (syncUIWithRSVPStatus()) return;
     personalizeForm(block, { existingAttendeeData, profile });

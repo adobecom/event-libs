@@ -275,7 +275,7 @@ export async function getEventAttendee(eventId) {
   }
 }
 
-export async function getAttendee() {
+export async function getAttendee(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
@@ -284,12 +284,12 @@ export async function getAttendee() {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
-      logError('esp-controller,get-attendee', 'Failed to get attendee details', response);
+      logError('esp-controller,get-attendee', `Failed to get attendee details for event ${eventId}`, response);
       let textResp;
       try {
         textResp = await response.text();
       } catch (e) {
-        logError('esp-controller,get-attendee', 'Failed to parse response text', e);
+        logError('esp-controller,get-attendee', `Failed to parse response text for event ${eventId}`, e);
       }
 
       return {
@@ -301,12 +301,12 @@ export async function getAttendee() {
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,get-attendee', 'Failed to get attendee', error);
+    logError('esp-controller,get-attendee', `Failed to get attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
 
-export async function createAttendee(attendeeData, rsvpToken = null) {
+export async function createAttendee(eventId, attendeeData, rsvpToken = null) {
   if (!attendeeData) return false;
 
   const eventServiceEnv = getEventServiceEnv();
@@ -326,13 +326,13 @@ export async function createAttendee(attendeeData, rsvpToken = null) {
     const data = await response.json();
 
     if (!response.ok) {
-      logError('esp-controller,create-attendee', 'Failed to create attendee', response);
+      logError('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
       return { ok: response.ok, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    logError('esp-controller,create-attendee', 'Failed to create attendee', error);
+    logError('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -352,18 +352,18 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
     const data = await response.json();
 
     if (!response.ok) {
-      logError('esp-controller,add-attendee-to-event', `Failed to add attendee for event ${eventId}`, response);
+      logError('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
       return { ok: response.ok, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    logError('esp-controller,add-attendee-to-event', `Failed to add attendee for event ${eventId}`, error);
+    logError('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
 
-export async function updateAttendee(attendeeData) {
+export async function updateAttendee(eventId, attendeeData) {
   if (!attendeeData) return false;
 
   const eventServiceEnv = getEventServiceEnv();
@@ -376,13 +376,13 @@ export async function updateAttendee(attendeeData) {
     const data = await response.json();
 
     if (!response.ok) {
-      logError('esp-controller,update-attendee', 'Failed to update attendee', response);
+      logError('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
       return { ok: response.ok, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    logError('esp-controller,update-attendee', 'Failed to update attendee', error);
+    logError('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -403,12 +403,12 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     }
 
     if (!response.ok) {
-      logError('esp-controller,delete-attendee', `Failed to delete attendee for event ${eventId}`, response);
+      logError('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, response);
       let textResp;
       try {
         textResp = await response.text();
       } catch (e) {
-        logError('esp-controller,delete-attendee', 'Failed to parse response text', e);
+        logError('esp-controller,delete-attendee', `Failed to parse response text for attendee ${attendeeId ?? 'me'} on event ${eventId}`, e);
       }
 
       return {
@@ -421,7 +421,7 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     if (response.status === 204) return { ok: true, data: { status: 204, attendeeDeleted: true } };
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,delete-attendee', `Failed to delete attendee for event ${eventId}`, error);
+    logError('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -465,13 +465,13 @@ export async function validateRsvpToken(eventId, token) {
     const data = await response.json();
 
     if (!response.ok) {
-      logError('esp-controller,validate-rsvp-token', 'Failed to validate RSVP token', response);
+      logError('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    logError('esp-controller,validate-rsvp-token', 'Failed to validate RSVP token', error);
+    logError('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -689,70 +689,75 @@ export async function unregisterFromSessionTime(sessionTimeId) {
 
 // compound helper functions
 export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToken = null) {
-  const profile = BlockMediator.get('imsProfile');
-  const eventObj = await getEvent(eventId);
+  try {
+    const profile = BlockMediator.get('imsProfile');
+    const eventObj = await getEvent(eventId);
 
-  if (!eventObj.ok) return { ok: false, error: 'Failed to get event' };
+    if (!eventObj.ok) return { ok: false, error: 'Failed to get event' };
 
-  let attendee;
-  let registrationStatus = 'registered';
+    let attendee;
+    let registrationStatus = 'registered';
 
-  if (profile.account_type === 'guest') {
-    // Use BaseAttendee filter for creating new attendee. A guest arriving via an rsvp
-    // token still forwards whatever IMS token exists alongside it — see createAttendee
-    // for why (Cluster Gateway requires one either way; the backend, not us, decides
-    // which credential's identity the registration actually uses).
-    const filteredPayload = getBaseAttendeePayload(attendeeData);
-    attendee = await createAttendee(filteredPayload, rsvpToken);
-  } else {
-    const attendeeResp = await getAttendee();
-
-    if (!attendeeResp.ok && attendeeResp.status === 404) {
-      // Use BaseAttendee filter for creating new attendee
+    if (profile.account_type === 'guest') {
+      // Use BaseAttendee filter for creating new attendee. A guest arriving via an rsvp
+      // token still forwards whatever IMS token exists alongside it — see createAttendee
+      // for why (Cluster Gateway requires one either way; the backend, not us, decides
+      // which credential's identity the registration actually uses).
       const filteredPayload = getBaseAttendeePayload(attendeeData);
-      attendee = await createAttendee(filteredPayload);
-    } else if (attendeeResp.data?.attendeeId) {
-      // Use BaseAttendee filter for updating existing attendee
-      const payload = { ...attendeeResp.data, ...attendeeData };
-      const filteredPayload = getBaseAttendeePayload(payload);
-      attendee = await updateAttendee(filteredPayload);
-    }
-  }
+      attendee = await createAttendee(eventId, filteredPayload, rsvpToken);
+    } else {
+      const attendeeResp = await getAttendee(eventId);
 
-  // Preserve the upstream status (e.g. 401/404/409/410 for a guest whose rsvp
-  // token went stale between page load and submit) so callers can show the
-  // specific error copy instead of a generic failure message.
-  if (!attendee?.ok) return { ok: false, status: attendee?.status, error: attendee?.error || 'Failed to create or update attendee' };
-
-  const newAttendeeData = attendee.data;
-
-  if (eventObj.data.isFull) registrationStatus = 'waitlisted';
-
-  if (attendeeData.campaignId && registrationStatus !== 'waitlisted') {
-    const campaign = await getCampaign(eventId, attendeeData.campaignId);
-    if (campaign.ok && campaign.data.attendeeLimit != null) {
-      const { attendeeLimit, attendeeCount, waitlistAttendeeCount } = campaign.data;
-      if (attendeeLimit === attendeeCount
-        || (attendeeLimit > attendeeCount && waitlistAttendeeCount > 0)) {
-        registrationStatus = 'waitlisted';
+      if (!attendeeResp.ok && attendeeResp.status === 404) {
+        // Use BaseAttendee filter for creating new attendee
+        const filteredPayload = getBaseAttendeePayload(attendeeData);
+        attendee = await createAttendee(eventId, filteredPayload);
+      } else if (attendeeResp.data?.attendeeId) {
+        // Use BaseAttendee filter for updating existing attendee
+        const payload = { ...attendeeResp.data, ...attendeeData };
+        const filteredPayload = getBaseAttendeePayload(payload);
+        attendee = await updateAttendee(eventId, filteredPayload);
       }
     }
+
+    // Preserve the upstream status (e.g. 401/404/409/410 for a guest whose rsvp
+    // token went stale between page load and submit) so callers can show the
+    // specific error copy instead of a generic failure message.
+    if (!attendee?.ok) return { ok: false, status: attendee?.status, error: attendee?.error || 'Failed to create or update attendee' };
+
+    const newAttendeeData = attendee.data;
+
+    if (eventObj.data.isFull) registrationStatus = 'waitlisted';
+
+    if (attendeeData.campaignId && registrationStatus !== 'waitlisted') {
+      const campaign = await getCampaign(eventId, attendeeData.campaignId);
+      if (campaign.ok && campaign.data.attendeeLimit != null) {
+        const { attendeeLimit, attendeeCount, waitlistAttendeeCount } = campaign.data;
+        if (attendeeLimit === attendeeCount
+          || (attendeeLimit > attendeeCount && waitlistAttendeeCount > 0)) {
+          registrationStatus = 'waitlisted';
+        }
+      }
+    }
+
+    // Use EventAttendee filter for adding attendee to event; forward any
+    // custom fields the RSVP form submitted that neither filter recognizes.
+    const eventAttendeePayload = {
+      ...getEventAttendeePayload({
+        ...newAttendeeData,
+        ...attendeeData,
+        registrationStatus,
+      }),
+      ...getUnrecognizedAttendeeFields(attendeeData),
+    };
+
+    // For a guest, this call both registers and consumes the rsvp token
+    // server-side in one step.
+    return await addAttendeeToEvent(eventId, eventAttendeePayload, rsvpToken);
+  } catch (error) {
+    logError('esp-controller,get-and-create-and-add-attendee', `Unexpected error submitting RSVP for event ${eventId} (campaignId=${attendeeData?.campaignId ?? 'none'})`, error);
+    return { ok: false, status: 'Unexpected Error', error: error.message };
   }
-
-  // Use EventAttendee filter for adding attendee to event; forward any
-  // custom fields the RSVP form submitted that neither filter recognizes.
-  const eventAttendeePayload = {
-    ...getEventAttendeePayload({
-      ...newAttendeeData,
-      ...attendeeData,
-      registrationStatus,
-    }),
-    ...getUnrecognizedAttendeeFields(attendeeData),
-  };
-
-  // For a guest, this call both registers and consumes the rsvp token
-  // server-side in one step.
-  return addAttendeeToEvent(eventId, eventAttendeePayload, rsvpToken);
 }
 
 export async function indexPathToSchedule(scheduleId, pagePath) {

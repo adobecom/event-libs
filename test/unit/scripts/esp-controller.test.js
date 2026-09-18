@@ -198,14 +198,14 @@ describe('Adobe Event Service API', () => {
     it('should create an attendee and receive complete attendee data', async () => {
       sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      const rsvpData = await api.createAttendee({ name: 'John Doe' });
+      const rsvpData = await api.createAttendee('123', { name: 'John Doe' });
       expect(rsvpData.data).to.be.an('object');
     });
 
     it('should return an error if attendee creation fails', async () => {
       sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: false });
 
-      const error = await api.createAttendee({ name: 'John Doe' });
+      const error = await api.createAttendee('123', { name: 'John Doe' });
       expect(error).to.be.an('object');
       expect(error.ok).to.be.false;
     });
@@ -214,7 +214,7 @@ describe('Adobe Event Service API', () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      await api.createAttendee({ name: 'John Doe' }, 'tok-1');
+      await api.createAttendee('123', { name: 'John Doe' }, 'tok-1');
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
@@ -225,7 +225,7 @@ describe('Adobe Event Service API', () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      await api.createAttendee({ name: 'John Doe' }, 'tok-1');
+      await api.createAttendee('123', { name: 'John Doe' }, 'tok-1');
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
@@ -236,7 +236,7 @@ describe('Adobe Event Service API', () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      await api.createAttendee({ name: 'John Doe' });
+      await api.createAttendee('123', { name: 'John Doe' });
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
@@ -249,7 +249,7 @@ describe('Adobe Event Service API', () => {
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
       try {
-        const attendeePromise = api.createAttendee({ name: 'John Doe' }, 'tok-1');
+        const attendeePromise = api.createAttendee('123', { name: 'John Doe' }, 'tok-1');
         await clock.tickAsync(10000);
         await attendeePromise;
 
