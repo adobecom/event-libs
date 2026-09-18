@@ -72,8 +72,6 @@
   margin-bottom: var(--s2a-spacing-md);
 }
 
-/* Figma: "s2a/typography/heading-5" — 2-line clamp, not single-line ellipsis. The caret sits
-   directly after the title, so the title only takes the width it needs (flex: 0 1 auto). */
 .mobile-rider .mobile-rider-info-bar-title {
   flex: 0 1 auto;
   min-width: 0;
@@ -159,8 +157,6 @@
   cursor: pointer;
 }
 
-/* Figma: only the favorite chip carries a circular outline; share is a bare icon. Selector
-   matches .mobile-rider-action's specificity (3 classes) so it wins over its `border: none`. */
 .mobile-rider .mobile-rider-info-bar .mobile-rider-info-bar-favorite {
   border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-border-default);
 }
