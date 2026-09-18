@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import init from '../../../../../event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js';
+import init, { formatSessionDateTime } from '../../../../../event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js';
 
 function entry(overrides = {}) {
   return {
@@ -8,6 +8,10 @@ function entry(overrides = {}) {
     track: 'Video',
     url: 'https://example.com/sessions/s-001',
     imageUrl: 'https://example.com/image.jpg',
+    sessionTime: {
+      startTimeMillis: Date.parse('2026-11-11T18:00:00.000Z'),
+      endTimeMillis: Date.parse('2026-11-11T19:00:00.000Z'),
+    },
     ...overrides,
   };
 }
@@ -28,15 +32,15 @@ describe('featured-sessions', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders a card per entry with an image, media-wide', async () => {
+  it('renders a card per entry with an image, media-square', async () => {
     const el = buildBlock({ entries: [entry()] });
     await init(el);
 
     const cards = el.querySelectorAll('.event-card');
     expect(cards.length).to.equal(1);
-    expect(cards[0].classList.contains('media-wide')).to.equal(true);
+    expect(cards[0].classList.contains('media-square')).to.equal(true);
     expect(cards[0].querySelector('.card-title').textContent).to.equal('Intro to Adobe Express');
-    expect(cards[0].querySelector('.card-description').textContent).to.equal('Video');
+    expect(cards[0].querySelector('.card-description').textContent).to.equal(formatSessionDateTime(entry().sessionTime));
     expect(cards[0].querySelector('.card-cta').textContent).to.equal('Learn more');
     expect(cards[0].querySelector('.card-media picture')).to.exist;
   });
@@ -258,10 +262,45 @@ describe('featured-sessions', () => {
     it('treats an entry with no sessionTime as "prior"', async () => {
       const el = buildBlock({
         cta: { prior: 'Coming soon', during: 'Live now', after: 'Catch the replay' },
-        entries: [entry()],
+        entries: [entry({ sessionTime: undefined })],
       });
       await init(el);
       expect(el.querySelector('.card-cta').textContent).to.equal('Coming soon');
+    });
+  });
+
+  describe('formatSessionDateTime', () => {
+    it('formats "Month Day, start–endam/pm TZ" — meridiem collapsed onto the end time when start/end share it', () => {
+      const sessionTime = {
+        startTimeMillis: Date.parse('2026-11-11T18:00:00.000Z'),
+        endTimeMillis: Date.parse('2026-11-11T19:00:00.000Z'),
+      };
+      const start = new Date(sessionTime.startTimeMillis);
+      const end = new Date(sessionTime.endTimeMillis);
+      const dateStr = start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+      const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+      const startParts = new Intl.DateTimeFormat('en-US', timeOptions).formatToParts(start);
+      const endParts = new Intl.DateTimeFormat('en-US', { ...timeOptions, timeZoneName: 'short' }).formatToParts(end);
+      const digits = (parts) => parts
+        .filter((p) => p.type !== 'dayPeriod' && p.type !== 'timeZoneName' && !(p.type === 'literal' && p.value.trim() === ''))
+        .map((p) => p.value).join('');
+      const meridiem = (parts) => parts.find((p) => p.type === 'dayPeriod')?.value.toLowerCase() || '';
+      const startMeridiem = meridiem(startParts);
+      const endMeridiem = meridiem(endParts);
+      const expectedStart = digits(startParts) + (startMeridiem === endMeridiem ? '' : startMeridiem);
+      const expectedEnd = digits(endParts) + endMeridiem;
+      const tz = endParts.find((p) => p.type === 'timeZoneName')?.value || '';
+      const expected = `${dateStr}, ${expectedStart}–${expectedEnd}${tz ? ` ${tz}` : ''}`;
+
+      const result = formatSessionDateTime(sessionTime);
+      expect(result).to.equal(expected);
+      expect(result).to.match(/^[A-Za-z]+ \d{1,2}, .+–.+[ap]m .+$/);
+    });
+
+    it('returns an empty string when sessionTime is missing or incomplete', () => {
+      expect(formatSessionDateTime(undefined)).to.equal('');
+      expect(formatSessionDateTime({})).to.equal('');
+      expect(formatSessionDateTime({ startTimeMillis: Date.now() })).to.equal('');
     });
   });
 });

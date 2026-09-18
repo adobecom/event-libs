@@ -1,4 +1,5 @@
 import { getMetadata } from './utils.js';
+import { logError, logWarning } from './lana-log.js';
 
 // Reads the `tier-1-event-config` metadata once during decorateEvent, before any block's
 // init(), so every block on the page can read it.
@@ -21,13 +22,13 @@ export function initTierOneEventConfig() {
   try {
     tierOneEventConfig = JSON.parse(raw);
   } catch (err) {
-    window.lana?.log(`[tier-1-event-config] invalid tier-1-event-config JSON: ${err.message}`);
+    logError('tier-1-event-config', 'invalid tier-1-event-config JSON', err);
     return;
   }
   // Catches an author pasting the wrong event's Config. Silent if either side is missing.
   const pageEventId = getMetadata('event-id');
   if (tierOneEventConfig.eventId && pageEventId && tierOneEventConfig.eventId !== pageEventId) {
-    window.lana?.log(`[tier-1-event-config] eventId mismatch: config authored for ${tierOneEventConfig.eventId}, page is ${pageEventId}`);
+    logWarning('tier-1-event-config', `eventId mismatch: config authored for ${tierOneEventConfig.eventId}, page is ${pageEventId}`);
   }
 }
 

@@ -275,7 +275,7 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-card__title').textContent).to.equal('Intro to Adobe Express');
     });
 
-    it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone', () => {
+    it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone, with a lowercase am/pm', () => {
       const startMillis = Date.parse('2026-08-12T17:00:00.000Z');
       const card = buildCard(session({
         sessionTime: {
@@ -286,9 +286,14 @@ describe('upcoming-sessions', () => {
       }));
       const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
       const endMillis = startMillis + 60 * 60_000;
-      const start = new Date(startMillis).toLocaleTimeString('en-US', timeOptions);
-      const end = new Date(endMillis).toLocaleTimeString('en-US', { ...timeOptions, timeZoneName: 'short' });
+      const lowercaseMeridiem = (time) => time.replace(/\b(AM|PM)\b/, (m) => m.toLowerCase());
+      const start = lowercaseMeridiem(new Date(startMillis).toLocaleTimeString('en-US', timeOptions));
+      const end = lowercaseMeridiem(
+        new Date(endMillis).toLocaleTimeString('en-US', { ...timeOptions, timeZoneName: 'short' }),
+      );
       expect(card.querySelector('.sg-card__time').textContent).to.equal(`${start} - ${end}`);
+      expect(card.querySelector('.sg-card__time').textContent).to.match(/\b(am|pm)\b/);
+      expect(card.querySelector('.sg-card__time').textContent).to.not.match(/\b(AM|PM)\b/);
     });
 
     it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {

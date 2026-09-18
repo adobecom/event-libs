@@ -234,3 +234,183 @@ body:has(header.local-nav) .section.bento.stack-mobile {
 
   .section.bento.stack-mobile > .explore-card .explore-card-content::after { content: none; }
 }
+
+/*
+ * Below: section-metadata deltas between Milo main and the ace1209 site-redesign
+ * branch. Only pages that opt into override-milo-ace1209 load this file, so these
+ * rules layer on top of Milo main's section-metadata.css (already loaded by Milo)
+ * to bring rounded-corners/bento/scrim behavior in line with ace1209.
+ */
+
+.section-background {
+  inset: -1px 0;
+}
+
+.section.rounded-corners,
+.section.rounded-corners-top,
+.section.rounded-corners-bottom {
+  border-radius: var(--s2a-border-radius-22);
+  margin-block: calc(-1 * var(--s2a-border-radius-22));
+}
+
+.section.rounded-corners-top {
+  border-radius: var(--s2a-border-radius-22) var(--s2a-border-radius-22) 0 0;
+  margin-block: calc(-1 * var(--s2a-border-radius-22)) auto;
+}
+
+.section.rounded-corners-bottom {
+  border-radius: 0 0 var(--s2a-border-radius-22) var(--s2a-border-radius-22);
+  margin-block: auto calc(-1 * var(--s2a-border-radius-22));
+}
+
+.section.rounded-corners + .section,
+.section.rounded-corners-bottom + .section {
+  grid-template-rows: auto;
+}
+
+.section:has(+ .section.rounded-corners)::after,
+.section:has(+ .section.rounded-corners-top)::after,
+.section.rounded-corners + .section::before,
+.section.rounded-corners-bottom + .section::before {
+  content: '';
+  display: block;
+  grid-column: 1 / -1;
+  width: 100%;
+  height: var(--s2a-border-radius-22);
+}
+
+.section.rounded-corners:has(+ .section[class*='rounded-corners']),
+.section.rounded-corners-bottom:has(+ .section[class*='rounded-corners']) {
+  z-index: 4;
+}
+
+.section.rounded-corners:has(~ .section.parallax-garage-door-reveal):not(.parallax-move-up-fast),
+.section.rounded-corners-bottom:has(~ .section.parallax-garage-door-reveal):not(.parallax-move-up-fast) {
+  z-index: 3;
+}
+
+.section.rounded-corners:has(+ .section[class*='rounded-corners']):has(~ .section.parallax-garage-door-reveal):not(.parallax-move-up-fast),
+.section.rounded-corners-bottom:has(+ .section[class*='rounded-corners']):has(~ .section.parallax-garage-door-reveal):not(.parallax-move-up-fast) {
+  z-index: 4;
+}
+
+.section.bento .explore-card-content {
+  z-index: 2;
+}
+
+.section.bento .explore-card-content .icon {
+  position: absolute;
+  inset: var(--s2a-spacing-lg);
+  z-index: 1;
+  text-align: start;
+}
+
+.section.bento .explore-card-content [class*='heading-'],
+.section.bento .explore-card-content [class*='body-'] {
+  padding-inline: var(--s2a-spacing-lg);
+}
+
+.section.bento .explore-card-content .content-aux {
+  aspect-ratio: 1 / 1.1;
+}
+
+.section.bento .grid-full-width .explore-card-content .content-aux {
+  aspect-ratio: 1 / 1.1;
+}
+
+.section.bento .explore-card-content .standalone-link {
+  margin-top: var(--s2a-spacing-xs);
+}
+
+.section.bento .dark .explore-card-content [class*='body-'] {
+  color: var(--s2a-color-content-body-subtle);
+}
+
+.section.bento .body-color-solid .explore-card-content [class*='body-'],
+.section.bento .body-color-solid.dark .explore-card-content [class*='body-'] {
+  color: inherit;
+}
+
+.section.bento .explore-card.dark,
+.section.bento .explore-card.light {
+  background-color: transparent;
+}
+
+.section.bento .explore-card-link-container {
+  z-index: 2;
+}
+
+.section.bento .scrim .explore-card-content::before {
+  content: none;
+}
+
+.section.bento .scrim .explore-card-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255 255 255 / 0%) 60.93%, rgba(255 255 255 / 59%) 90%);
+  z-index: 1;
+}
+
+.section.bento .scrim.dark .explore-card-content::before {
+  content: none;
+}
+
+.section.bento .scrim.dark .explore-card-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0 0 0 / 0%) 60.93%, rgba(0 0 0 / 59%) 90%);
+  z-index: 1;
+}
+
+.section.bento .explore-card-link-container:hover + .explore-card-background,
+.section.bento .explore-card-link-container:hover .explore-card-foreground {
+  filter: none;
+  transform: none;
+}
+
+.section.bento .explore-card-link-container:hover + .explore-card-background :is(img, video),
+.section.bento .explore-card-link-container:hover .explore-card-foreground :is(img, video) {
+  filter: brightness(0.98);
+  transform: scale(1.015);
+  will-change: transform;
+}
+
+@media (width >= 768px) {
+  .section.bento .grid-full-width .explore-card-content .content-aux {
+    aspect-ratio: 4 / 1.65;
+  }
+}
+
+@media (width >= 1280px) {
+  .section.rounded-corners,
+  .section.rounded-corners-top,
+  .section.rounded-corners-bottom {
+    border-radius: var(--s2a-border-radius-22);
+    margin-block: calc(-1 * var(--s2a-border-radius-22));
+  }
+
+  .section.rounded-corners-top {
+    border-radius: var(--s2a-border-radius-22) var(--s2a-border-radius-22) 0 0;
+    margin-block: calc(-1 * var(--s2a-border-radius-22)) auto;
+  }
+
+  .section:has(+ .section.rounded-corners)::after,
+  .section:has(+ .section.rounded-corners-top)::after,
+  .section.rounded-corners + .section::before,
+  .section.rounded-corners-bottom + .section::before {
+    height: var(--s2a-border-radius-22);
+  }
+
+  .section.rounded-corners-bottom {
+    border-radius: 0 0 var(--s2a-border-radius-22) var(--s2a-border-radius-22);
+    margin-block: auto calc(-1 * var(--s2a-border-radius-22));
+  }
+}
+
+@media (width >= 1440px) {
+  .section.bento .explore-card-content .icon {
+    inset: var(--s2a-spacing-xl);
+  }
+}

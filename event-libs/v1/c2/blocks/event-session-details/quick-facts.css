@@ -6,19 +6,19 @@
 }
 
 .session-quick-fact {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2a-spacing-4, 4px);
   color: var(--s2a-color-gray-1000, #000);
   font-size: var(--s2a-font-size-16, 1rem);
   line-height: 1.5;
 }
 
 .session-quick-fact-label {
+  display: inline;
   margin: 0;
+  margin-right: var(--s2a-spacing-4, 4px);
   font-weight: 700;
 }
 
 .session-quick-fact-value {
+  display: inline;
   margin: 0;
 }

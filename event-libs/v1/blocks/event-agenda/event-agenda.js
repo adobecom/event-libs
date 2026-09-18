@@ -1,5 +1,6 @@
 import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
 import { LOCALE_FORMATTERS, applyLocaleFormat } from '../../utils/date-time-helper.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 const TIME_FORMAT_OPTIONS = {
   hour: 'numeric',
@@ -38,13 +39,13 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
     const [hours, minutes, seconds = 0] = time.split(':').map(Number);
     
     if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-      window.lana?.log(`Invalid time format: ${time}`);
+      logWarning('event-agenda', `Invalid time format: ${time}`);
       return '';
     }
 
     const eventDate = parseEventDate(eventDateMillis);
     if (Number.isNaN(eventDate.getTime())) {
-      window.lana?.log(`Invalid event date: ${eventDateMillis}`);
+      logWarning('event-agenda', `Invalid event date: ${eventDateMillis}`);
       return '';
     }
     
@@ -87,7 +88,7 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
     if (TIME_FORMAT_OPTIONS.hour12 && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](hours, minutes);
     return guess.toLocaleTimeString(locale, { ...TIME_FORMAT_OPTIONS, timeZone: eventTimezone });
   } catch (error) {
-    window.lana?.log(`Error converting event time: ${error.message}`);
+    logError('event-agenda', 'Error converting event time', error);
     return '';
   }
 }
@@ -142,7 +143,7 @@ export default async function init(el) {
     try {
       venueImage = JSON.parse(getMetadata('photos')).find((p) => p.imageKind === 'venue-image');
     } catch (error) {
-      window.lana?.log(`Failed to parse venue image metadata:\n${JSON.stringify(error, null, 2)}`);
+      logError('event-agenda', 'Failed to parse venue image metadata', error);
     }
   }
 
@@ -156,7 +157,7 @@ export default async function init(el) {
   try {
     agendaArray = JSON.parse(agendaMeta);
   } catch (error) {
-    window.lana?.log(`Failed to parse agenda metadata:\n${JSON.stringify(error, null, 2)}`);
+    logError('event-agenda', 'Failed to parse agenda metadata', error);
     el.remove();
     return;
   }

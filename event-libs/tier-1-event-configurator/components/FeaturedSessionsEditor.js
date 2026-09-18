@@ -1,7 +1,8 @@
 import {
   useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
-import { getSessionPrimaryTrack, formatSessionTime } from '../utils.js';
+import { getSessionPrimaryTrack } from '../utils.js';
+import { formatSessionDateTime } from '../../v1/c2/blocks/featured-sessions/featured-sessions.js';
 import { WATCH_DESTINATION_OPTIONS } from '../constants.js';
 import SearchInput from './SearchInput.js';
 import ImagePickerModal from './ImagePickerModal.js';
@@ -107,7 +108,7 @@ export default function FeaturedSessionsEditor({
 
   const getSessionMeta = useCallback((session) => {
     const track = getSessionPrimaryTrack(session) || '—';
-    const time = formatSessionTime(earliestTimeBySessionId.get(session.sessionId));
+    const time = formatSessionDateTime(earliestTimeBySessionId.get(session.sessionId));
     return time ? `${track} · ${time}` : track;
   }, [earliestTimeBySessionId]);
 

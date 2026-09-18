@@ -1,6 +1,7 @@
 import {
   useState, useEffect, useMemo, useCallback, html,
 } from '../../v1/deps/htm-preact.js';
+import { logError } from '../../v1/utils/lana-log.js';
 import SearchInput from '../components/SearchInput.js';
 import EventPicker from '../components/EventPicker.js';
 import ManualEventLookup from '../components/ManualEventLookup.js';
@@ -206,7 +207,7 @@ export default function Library() {
 
   const handleBrowseError = useCallback((message) => {
     setBrowseFailed(true);
-    window.lana?.log(`tier-1-event-configurator: EventPicker failed, falling back to ManualEventLookup. ${message}`);
+    logError('tier-1-event-configurator,library', 'EventPicker failed, falling back to ManualEventLookup', message);
   }, []);
 
   const handleCopyHomepageLink = useCallback(async (row) => {

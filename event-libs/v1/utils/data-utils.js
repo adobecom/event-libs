@@ -1,4 +1,5 @@
 import { BACKEND_PHONE_RE } from './constances.js';
+import { logWarning } from './lana-log.js';
 
 /**
  * @typedef {Object} EventAttendeeDataFilter
@@ -76,7 +77,7 @@ function coerceBoolean(key, value) {
   if (Array.isArray(value)) {
     if (value.length === 0) return undefined;
     if (value.length === 1) return coerceBoolean(key, value[0]);
-    window.lana?.log(`Unexpected boolean field shape for ${key}`);
+    logWarning('data-utils', `Unexpected boolean field shape for ${key}`);
     return undefined;
   }
   if (typeof value === 'string') {
