@@ -53,7 +53,7 @@ export function formatDateTime(ms) {
   const date = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(ms);
   const time = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short',
-  }).format(ms);
+  }).format(ms).replace(/\s(AM|PM)\b/, (_match, meridiem) => meridiem.toLowerCase());
   return `${date}, ${time}`;
 }
 
