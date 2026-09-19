@@ -167,12 +167,22 @@ describe('session-state-view', () => {
   describe('formatDateTime', () => {
     // Nov 12, 2026 21:15 UTC — well clear of the Nov 1, 2026 US DST-end transition, so
     // America/New_York (EST) and America/Chicago (CST) are both in stable standard time,
-    // exactly 1 hour apart: 'Nov 12, 4:15 PM EST' vs 'Nov 12, 3:15 PM CST'.
+    // exactly 1 hour apart: 'Nov 12, 4:15pm EST' vs 'Nov 12, 3:15pm CST'.
     const ms = 1794518100000;
 
     it('formats short month + time + tz abbreviation in the viewer\'s local timezone', () => {
       const result = withViewerTimezone('America/New_York', () => formatDateTime(ms));
-      expect(result).to.equal('Nov 12, 4:15 PM EST');
+      expect(result).to.equal('Nov 12, 4:15pm EST');
+    });
+
+    // MWPW-206791: am/pm must render lowercase with no space before it, while the tz
+    // abbreviation stays uppercase.
+    it('lowercases am/pm with no leading space but keeps the tz abbreviation uppercase', () => {
+      const result = withViewerTimezone('America/New_York', () => formatDateTime(ms));
+      expect(result).to.include('4:15pm');
+      expect(result).to.not.include('PM');
+      expect(result).to.not.include(' pm');
+      expect(result).to.include(' EST');
     });
 
     // Regression guard for MWPW-206824: the session's authored venue timezone must not
@@ -201,8 +211,8 @@ describe('session-state-view', () => {
     it('upcoming renders the date/time in the viewer\'s local timezone, not the authored venue timezone', () => {
       const el = withViewerTimezone('America/New_York', () => renderStatus('upcoming', times));
       expect(el.classList.contains('session-status--upcoming')).to.be.true;
-      expect(el.textContent).to.equal('Nov 12, 4:15 PM EST');
-      expect(el.textContent).to.not.equal('Nov 12, 3:15 PM CST');
+      expect(el.textContent).to.equal('Nov 12, 4:15pm EST');
+      expect(el.textContent).to.not.equal('Nov 12, 3:15pm CST');
     });
 
     it('live renders a dot + Live', () => {
