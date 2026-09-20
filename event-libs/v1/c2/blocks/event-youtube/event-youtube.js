@@ -1,4 +1,5 @@
 import { createTag, readBlockConfig } from '../../../utils/utils.js';
+import { logError } from '../../../utils/lana-log.js';
 
 const CONFIG = {
   PRELOAD_DOMAINS: [
@@ -52,7 +53,7 @@ export class YouTubeChat {
       block.textContent = '';
       block.append(this.buildStream());
     } catch (err) {
-      window.lana?.log(`Event YouTube Block: ${err.message}`);
+      logError('event-youtube', 'failed to initialize', err);
       block.remove();
     }
   }

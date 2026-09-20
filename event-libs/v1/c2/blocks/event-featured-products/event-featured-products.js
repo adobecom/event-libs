@@ -3,6 +3,7 @@ import { getAttrValues } from '../../utils/custom-attributes.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
 import { getProduct, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { fetchFederalProductIcon } from '../../../features/icons/federal-icons.js';
+import { logError } from '../../../utils/lana-log.js';
 
 const VISIBLE_LIMIT = 6;
 let instances = 0;
@@ -23,7 +24,7 @@ async function paintProductIcon(slot, iconName) {
     slot.replaceChildren(svg);
   } catch (err) {
     slot.remove();
-    window.lana?.log(`[featured-products] icon "${iconName}" failed to resolve: ${err.message}`);
+    logError('event-featured-products', `icon "${iconName}" failed to resolve`, err);
   }
 }
 

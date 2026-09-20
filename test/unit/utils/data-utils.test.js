@@ -4,6 +4,7 @@ import {
   getBaseAttendeePayload,
   getEventAttendeePayload,
   getUnrecognizedAttendeeFields,
+  sanitizeLegacyPhoneFields,
 } from '../../../event-libs/v1/utils/data-utils.js';
 
 describe('data-utils', () => {
@@ -101,6 +102,77 @@ describe('data-utils', () => {
     it('returns argument unchanged when falsy', () => {
       expect(getBaseAttendeePayload(null)).to.equal(null);
       expect(getBaseAttendeePayload(undefined)).to.equal(undefined);
+    });
+  });
+
+  describe('sanitizeLegacyPhoneFields', () => {
+    it('drops an existing phone field with a legacy invalid value when the form does not submit it', () => {
+      const out = sanitizeLegacyPhoneFields(
+        { attendeeId: 'att-1', businessPhone: 'None' },
+        { firstName: 'Ada' },
+      );
+      expect(out).to.not.have.property('businessPhone');
+      expect(out.attendeeId).to.equal('att-1');
+    });
+
+    it('keeps an existing phone field with a legacy invalid value when the form does submit that same field', () => {
+      const out = sanitizeLegacyPhoneFields(
+        { businessPhone: 'None' },
+        { businessPhone: '+1 555 123 4567' },
+      );
+      expect(out.businessPhone).to.equal('None');
+    });
+
+    it('keeps an existing phone field whose value already matches the backend pattern', () => {
+      const out = sanitizeLegacyPhoneFields(
+        { mobilePhone: '+1 (555) 123-4567' },
+        {},
+      );
+      expect(out.mobilePhone).to.equal('+1 (555) 123-4567');
+    });
+
+    it('leaves non-phone fields untouched regardless of value', () => {
+      const out = sanitizeLegacyPhoneFields(
+        { companyName: 'N/A' },
+        {},
+      );
+      expect(out.companyName).to.equal('N/A');
+    });
+
+    it('does not treat phoneticFirstName/phoneticLastName as phone fields', () => {
+      const out = sanitizeLegacyPhoneFields(
+        { phoneticFirstName: 'Jon', phoneticLastName: 'Sno' },
+        {},
+      );
+      expect(out.phoneticFirstName).to.equal('Jon');
+      expect(out.phoneticLastName).to.equal('Sno');
+    });
+
+    it('drops multiple stale invalid phone fields at once when neither is submitted', () => {
+      const out = sanitizeLegacyPhoneFields(
+        { mobilePhone: 'None', businessPhone: 'N/A' },
+        { firstName: 'Ada' },
+      );
+      expect(out).to.not.have.property('mobilePhone');
+      expect(out).to.not.have.property('businessPhone');
+    });
+
+    it('does not strip a non-string legacy phone value', () => {
+      const out = sanitizeLegacyPhoneFields(
+        { mobilePhone: null },
+        {},
+      );
+      expect(out).to.have.property('mobilePhone', null);
+    });
+
+    it('returns argument unchanged when falsy', () => {
+      expect(sanitizeLegacyPhoneFields(null, {})).to.equal(null);
+      expect(sanitizeLegacyPhoneFields(undefined, {})).to.equal(undefined);
+    });
+
+    it('treats a missing newData as "not submitted" for every existing field', () => {
+      const out = sanitizeLegacyPhoneFields({ businessPhone: 'None' }, undefined);
+      expect(out).to.not.have.property('businessPhone');
     });
   });
 

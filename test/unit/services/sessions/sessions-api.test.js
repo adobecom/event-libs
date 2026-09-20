@@ -978,6 +978,21 @@ describe('services/sessions/sessions-api', () => {
       expect(max25.contentCategory).to.deep.equal(['How To']);
     });
 
+    // RainFocus casing drifts across sessions (e.g. "Primary event site track"); the attribute
+    // name match is case-insensitive so the track still resolves.
+    it('matches custom-attribute names case-insensitively', () => {
+      const [session] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'lowercase-track',
+          customAttributes: [
+            ONLINE_FORMAT,
+            customAttr('Primary event site track', [selectValue('Creator', 'creator')]),
+          ],
+        }],
+      });
+      expect(session.primaryTrack).to.equal('Creator');
+    });
+
     it('leaves additionalTracks/trackOverride empty for a MAX25-shaped session with neither field', () => {
       expect(max25.additionalTracks).to.deep.equal([]);
       expect(max25.trackOverride).to.equal('');
@@ -1306,31 +1321,31 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.equal('https://events-platform-prod-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
   });
 
-  it('fetches from the stage CDN domain on stage', async () => {
+  it('falls back to the origin ESP host on stage, which has no CDN', async () => {
     setEventServiceEnvOverride('stage');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-stage-cdn.aws125.adobeitc.com');
+    expect(url).to.include('events-service-platform-stage.adobe.io');
   });
 
-  it('fetches from the dev CDN domain on dev', async () => {
+  it('falls back to the origin ESP host on dev, which has no CDN', async () => {
     setEventServiceEnvOverride('dev');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
+    expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io');
   });
 
-  it('reuses the dev CDN domain on local, same as its origin ESP alias', async () => {
+  it('falls back to the origin ESP host on local, which has no CDN', async () => {
     setEventServiceEnvOverride('local');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
+    expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io');
   });
 
-  // dev02/stage02 have no CDN — fall back to origin ESP.
+  // dev/local/stage/dev02/stage02 have no CDN — fall back to origin ESP.
   it('falls back to the origin ESP host on dev02, which has no CDN', async () => {
     setEventServiceEnvOverride('dev02');
     const fetchStub = stubEmptyCatalog();
@@ -1345,5 +1360,43 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
     expect(url).to.include('wcms-events-service-platform-deploy-ethos105-stage-9a5fdc.stage.cloud.adobe.io');
+  });
+
+  describe('fetchEslSessions failures are reported to lana', () => {
+    let lanaLogStub;
+
+    beforeEach(() => {
+      setEventServiceEnvOverride('prod');
+      lanaLogStub = sandbox.stub(window.lana, 'log');
+    });
+
+    it('logs a non-ok response before throwing', async () => {
+      sandbox.stub(window, 'fetch').resolves({ ok: false, status: 503 });
+      let error;
+      try {
+        await fetchSessions('event-1');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api]');
+      expect(lanaLogStub.firstCall.args[0]).to.include('event-1');
+      expect(lanaLogStub.firstCall.args[0]).to.include('503');
+    });
+
+    it('logs a network error before rethrowing', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('offline'));
+      let error;
+      try {
+        await fetchSessions('event-1');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] network error fetching session catalog for event event-1');
+      expect(lanaLogStub.firstCall.args[0]).to.include('offline');
+    });
   });
 });

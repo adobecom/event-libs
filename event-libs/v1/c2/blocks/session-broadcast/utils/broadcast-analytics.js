@@ -1,5 +1,6 @@
 import { LIBS, getEventConfig } from '../../../../utils/utils.js';
 import { openSessionGuideDetail } from '../../../../utils/session-store.js';
+import { logError } from '../../../../utils/lana-log.js';
 
 // sendAnalytics takes a real Event, not a payload — any dimension travels in the event name.
 let sendAnalyticsPromise;
@@ -16,7 +17,7 @@ export async function trackBroadcastEvent(name) {
     const sendAnalytics = await loadSendAnalytics();
     sendAnalytics(new Event(name));
   } catch (err) {
-    window.lana?.log(`session-broadcast analytics: ${err.message}`, { tags: 'session-broadcast' });
+    logError('session-broadcast', 'analytics failed', err);
   }
 }
 

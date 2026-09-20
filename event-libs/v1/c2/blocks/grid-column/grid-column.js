@@ -1,4 +1,5 @@
 import { LIBS } from '../../../utils/utils.js';
+import { logWarning } from '../../../utils/lana-log.js';
 
 export default async function init(el) {
   const link = el.querySelector('a');
@@ -7,10 +8,7 @@ export default async function init(el) {
   // other links (e.g. a rendered playlist's session-row links); loading one of those as a
   // fragment re-decorates the area and, because the block re-renders its rows, loops indefinitely.
   if (!link.href.includes('/fragments/')) {
-    window.lana?.log(`grid-column: link is missing the required /fragments/ path segment - ${link.href}`, {
-      tags: 'grid-column',
-      severity: 'warn',
-    });
+    logWarning('grid-column-c2', `link is missing the required /fragments/ path segment - ${link.href}`);
     return;
   }
   const { default: loadFragment } = await import(`${LIBS}/blocks/fragment/fragment.js`);

@@ -19,14 +19,11 @@ import {
   PLAYBACK_PHASE,
   buildSessionFromMetadata,
 } from '../../utils/video-session.js';
+import { logError, logWarning } from '../../../utils/lana-log.js';
 
 const LOG_SCOPE = 'session-video-player';
 const BLOCK_CSS_URL = new URL('./session-video-player.css', import.meta.url).href;
 const MILO_IFRAME_CSS_URL = `${LIBS}/styles/iframe.css`;
-
-function logError(message) {
-  window.lana?.log(`[${LOG_SCOPE}] ${message}`);
-}
 
 const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
@@ -136,7 +133,7 @@ export function resumeMpcVideo(iframe, progress) {
     }, ADOBE_TV_ORIGIN);
   } catch (error) {
 
-    logError(`could not resume mpc playback: ${error.message}`);
+    logError(LOG_SCOPE, 'could not resume mpc playback', error);
   }
 }
 
@@ -170,7 +167,7 @@ async function fetchMpcVideoDuration(mpcVideoId) {
       mpcDurationByVideoId.set(mpcVideoId, seconds);
       return seconds;
     } catch (error) {
-      logError(`could not fetch mpc video duration for "${mpcVideoId}": ${error.message}`);
+      logError(LOG_SCOPE, `could not fetch mpc video duration for "${mpcVideoId}"`, error);
       return null;
     } finally {
       inflightDurationRequests.delete(mpcVideoId);
@@ -199,7 +196,7 @@ function ensureMpcLength(sessionId, mpcVideoId, currentTime, length) {
       saveVideoProgress(sessionId, latest?.secondsWatched ?? currentTime, fetchedLength);
       notifyProgressChanged(sessionId);
     })
-    .catch((error) => logError(`could not backfill mpc duration: ${error.message}`));
+    .catch((error) => logError(LOG_SCOPE, 'could not backfill mpc duration', error));
 }
 
 function watchMpcPlayback(sessionId, iframe) {
@@ -260,7 +257,7 @@ function watchMpcPlayback(sessionId, iframe) {
       });
     } catch (error) {
 
-      logError(`could not handle mpc "${event.data.state}" message: ${error.message}`);
+      logError(LOG_SCOPE, `could not handle mpc "${event.data.state}" message`, error);
     }
   };
 
@@ -314,7 +311,7 @@ function resumeYouTubeVideo(player, sessionId) {
   try {
     player.seekTo(saved.secondsWatched, true);
   } catch (error) {
-    logError(`could not resume youtube playback: ${error.message}`);
+    logError(LOG_SCOPE, 'could not resume youtube playback', error);
   }
 }
 
@@ -323,7 +320,7 @@ async function watchYouTubePlayback(sessionId, iframe) {
     await ensureYouTubeIframeApi();
   } catch (error) {
 
-    logError(`youtube playback tracking unavailable: ${error.message}`);
+    logError(LOG_SCOPE, 'youtube playback tracking unavailable', error);
     return;
   }
 
@@ -389,12 +386,12 @@ async function watchYouTubePlayback(sessionId, iframe) {
           }
         },
         onStateChange: handleStateChange,
-        onError: (event) => logError(`youtube player reported error code ${event.data}`),
+        onError: (event) => logError(LOG_SCOPE, `youtube player reported error code ${event.data}`),
       },
     });
   } catch (error) {
     stopProgressPolling();
-    logError(`could not attach youtube player: ${error.message}`);
+    logError(LOG_SCOPE, 'could not attach youtube player', error);
   }
 }
 
@@ -412,7 +409,7 @@ async function loadMobileRiderPlayer(el, video) {
 function loadVideoPlayer(el, sessionId, video) {
   if (video.provider === 'mobilerider') {
     loadMobileRiderPlayer(el, video).catch((error) => {
-      logError(`could not load MobileRider DVR player: ${error.message}`);
+      logError(LOG_SCOPE, 'could not load MobileRider DVR player', error);
     });
     return;
   }
@@ -508,7 +505,7 @@ function buildRenderModel(el) {
   const config = readAuthoredConfig(el);
   const sessionId = resolveSessionId(config);
   if (!sessionId) {
-    logError('no session-id (page metadata or authored) — nothing to render');
+    logWarning(LOG_SCOPE, 'no session-id (page metadata or authored) — nothing to render');
     return null;
   }
 
@@ -535,7 +532,7 @@ function loadWhenDecided(el, sessionId, video) {
       }
       loadVideoPlayer(el, sessionId, video);
     } catch (error) {
-      logError(`could not resolve the video layout decision: ${error.message}`);
+      logError(LOG_SCOPE, 'could not resolve the video layout decision', error);
     }
   })();
 }
@@ -586,7 +583,7 @@ export default async function init(el) {
     }
 
     if (embeddedPhase === null && PLAYABLE_PHASES.includes(phase)) {
-      logError(`session is in "${phase}" phase with no embeddable video — removing`);
+      logWarning(LOG_SCOPE, `session is in "${phase}" phase with no embeddable video — removing`);
       el.remove();
     }
   };

@@ -7,6 +7,7 @@ import { getTrackIcon, initTierOneEventConfig } from '../../../utils/tier-1-even
 import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
+import { logError, logWarning } from '../../../utils/lana-log.js';
 
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
@@ -42,11 +43,12 @@ function buildCategoryBadge(track) {
   (async () => {
     try {
       const svg = await fetchFederalTrackIcon(entry.icon);
-      if (!svg) return;
+      // No icon resolved — drop the empty color span so there's no blank slot before the label.
+      if (!svg) { iconColor.remove(); return; }
       svg.classList.add('mobile-rider-info-bar-category-icon');
       iconColor.append(svg);
     } catch (error) {
-      window.lana?.log(`[MobileRider] category icon resolution failed for "${entry.icon}": ${error.message}`);
+      logError('mobile-rider-c2', `category icon resolution failed for "${entry.icon}"`, error);
     }
   })();
 
@@ -100,7 +102,7 @@ function buildShareButton(getSession) {
       await navigator.clipboard.writeText(shareUrl);
       showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (e) {
-      window.lana?.log(`[MobileRider] share failed: ${e.message}`);
+      logError('mobile-rider-c2', 'share failed', e);
     }
   });
 
@@ -160,8 +162,6 @@ class MobileRider {
     this.init();
   }
 
-  log(msg) { window.lana?.log?.(`[MobileRider] ${msg}`); }
-
   #storeHas(id) {
     if (!this.store || !id) return false;
     try {
@@ -204,7 +204,7 @@ class MobileRider {
         initTierOneEventConfig();
         this.#initInfoBar(this.cfg, sessionId);
       }
-    } catch (e) { this.log(e.message); }
+    } catch (e) { logError('mobile-rider-c2', 'Failed to initialize', e); }
   }
 
   #setupDOM() {
@@ -231,6 +231,7 @@ class MobileRider {
       role: 'region',
       'aria-label': 'Session info',
     }, '', { parent: this.root });
+    // Header row: title with the caret immediately after it (not pushed to the far edge).
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
     const titleEl = createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
     const paintTitle = (session) => {
@@ -246,6 +247,24 @@ class MobileRider {
     }, '', { parent: header });
     createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'Show more session info', { parent: toggle });
     createTag('span', { class: 'mobile-rider-info-bar-chevron', 'aria-hidden': 'true' }, ICON_CHEVRON_DOWN, { parent: toggle });
+    const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: bar });
+    const paintCategory = (session) => {
+      const track = session?.primaryTrack || cfg['session-category'] || '';
+      badgeSlot.replaceChildren();
+      const badge = buildCategoryBadge(track);
+      if (badge) badgeSlot.append(badge);
+      // Nothing to show — keep the slot out of layout entirely rather than leaving an empty area.
+      badgeSlot.hidden = !badge;
+    };
+    paintCategory(null);
+
+    const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description', id: panelId }, cfg['session-description'] || '', { parent: bar });
+    const paintDescription = (session) => {
+      const text = session?.description || cfg['session-description'] || '';
+      descriptionEl.textContent = text;
+      descriptionEl.classList.toggle('is-hidden', !text);
+    };
+    paintDescription(null);
 
     const toggleLabel = toggle.querySelector('.mobile-rider-info-bar-toggle-label');
     toggle.addEventListener('click', () => {
@@ -255,36 +274,18 @@ class MobileRider {
       bar.classList.toggle('is-expanded', !expanded);
     });
 
-    const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
-    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel', id: panelId }, '', { parent: panelWrap });
-    const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: panel });
-    const paintCategory = (session) => {
-      const track = session?.primaryTrack || cfg['session-category'] || '';
-      badgeSlot.replaceChildren();
-      const badge = buildCategoryBadge(track);
-      if (badge) badgeSlot.append(badge);
-    };
-    paintCategory(null);
-
-    const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'] || '', { parent: panel });
-    const paintDescription = (session) => {
-      const text = session?.description || cfg['session-description'] || '';
-      descriptionEl.textContent = text;
-      descriptionEl.classList.toggle('is-hidden', !text);
-    };
-    paintDescription(null);
-
+    // Only render "View all details" when an author has provided the label; unauthored → no button.
     const viewAllDetailsLabel = cfg['view-all-details-label'];
     if (viewAllDetailsLabel) {
       const more = createTag('button', {
         type: 'button',
         class: 'mobile-rider-info-bar-more',
         'daa-ll': 'View-All-Details',
-      }, viewAllDetailsLabel, { parent: panel });
+      }, viewAllDetailsLabel, { parent: bar });
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
     }
 
-    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
+    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: bar });
 
     initSessionState();
     // Share button is built only once the session resolves - safeUrl(undefined) would no-op.
@@ -363,7 +364,7 @@ class MobileRider {
         const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
 
         if (!videoInDoc || !window.mobilerider) {
-          this.log('DOM or Library not ready');
+          logWarning('mobile-rider-c2', 'DOM or Library not ready');
           finish();
           return;
         }
@@ -380,13 +381,13 @@ class MobileRider {
           if (asl) this.#initASL(container, vid);
           this.#maybeAttachEndListener(vid);
         } catch (e) {
-          this.log(`Embed Error: ${e.message}`);
+          logError('mobile-rider-c2', 'Embed Error', e);
         }
 
         finish();
       });
     } catch (e) {
-      this.log(`Inject Error: ${e.message}`);
+      logError('mobile-rider-c2', 'Inject Error', e);
       finish();
     }
   }
@@ -451,7 +452,7 @@ class MobileRider {
                 try {
                   this.#maybeAttachEndListener(vid);
                 } catch (e) {
-                  this.log(`ASL end-listener error: ${e.message}`);
+                  logError('mobile-rider-c2', 'ASL end-listener error', e);
                 }
               });
             }
@@ -489,7 +490,7 @@ class MobileRider {
         new URL('../../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href
       );
       this.store = mobileRiderStore;
-    } catch (e) { this.log('Store Fail'); }
+    } catch (e) { logError('mobile-rider-c2', 'Store fail', e); }
   }
 
   setStatus(id, live) { this.#updateStatus(id, live); }
@@ -501,7 +502,7 @@ class MobileRider {
       if (this.store.get(id) === live) return;
       this.store.set(id, live);
     } catch (e) {
-      this.log(`Status update failed: ${e.message}`);
+      logError('mobile-rider-c2', 'Status update failed', e);
     }
   }
 }

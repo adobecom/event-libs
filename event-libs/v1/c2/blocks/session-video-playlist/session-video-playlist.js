@@ -21,12 +21,9 @@ import {
   getPlaybackPhase,
   PLAYBACK_PHASE,
 } from '../../utils/video-session.js';
+import { logError, logWarning } from '../../../utils/lana-log.js';
 
 const LOG_SCOPE = 'session-video-playlist';
-
-function logError(message) {
-  window.lana?.log(`[${LOG_SCOPE}] ${message}`);
-}
 
 const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
@@ -55,7 +52,7 @@ function getShouldAutoPlay() {
   try {
     return localStorage.getItem(AUTOPLAY_STORAGE_KEY) === 'true';
   } catch (error) {
-    logError(`could not read play-all preference: ${error.message}`);
+    logError(LOG_SCOPE, 'could not read play-all preference', error);
     return false;
   }
 }
@@ -64,7 +61,7 @@ function setShouldAutoPlay(value) {
   try {
     localStorage.setItem(AUTOPLAY_STORAGE_KEY, String(value));
   } catch (error) {
-    logError(`could not persist play-all preference: ${error.message}`);
+    logError(LOG_SCOPE, 'could not persist play-all preference', error);
   }
 }
 
@@ -635,13 +632,13 @@ function resolveRenderContext(el) {
 
   const sessionId = resolveSessionId(config);
   if (!sessionId) {
-    logError('no session-id (page metadata or authored) — nothing to render');
+    logWarning(LOG_SCOPE, 'no session-id (page metadata or authored) — nothing to render');
     return null;
   }
 
   const sessionTimes = parseJsonMetadata('session-times');
   if (!hasEmbeddableVideo(sessionTimes)) {
-    logError('no embeddable video on this page — nothing to render');
+    logWarning(LOG_SCOPE, 'no embeddable video on this page — nothing to render');
     return null;
   }
 
