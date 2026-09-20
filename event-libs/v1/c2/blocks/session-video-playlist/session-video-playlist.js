@@ -1,6 +1,7 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
   sessions, sessionsStatus, initSessionState, liveStreamActiveIds, favorited, pendingActions,
+  getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
@@ -27,7 +28,7 @@ const LOG_SCOPE = 'session-video-playlist';
 
 const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
-const EVENT_CONFIG = { title: '', registerUrl: '/register' };
+const EVENT_CONFIG = { title: '' };
 
 export const _internals = { navigate: (href) => window.location.assign(href) };
 
@@ -398,7 +399,9 @@ function buildFavoriteButton(item) {
     if (event.detail > 0) button.blur();
     if (pendingActions.value.has(item.id)) return;
     await toggleFavoriteWithFeedback(item, {
-      eventConfig: EVENT_CONFIG,
+      // Resolve the RF registration link at click time (tier-1 config is bootstrapped by then);
+      // matches how the other blocks source registerUrl. Falls back to /register only if absent.
+      eventConfig: { ...EVENT_CONFIG, registerUrl: getEventApiConfig()?.registerUrl || '/register' },
       isFavorited: favorited.value.has(item.id),
     });
   });
