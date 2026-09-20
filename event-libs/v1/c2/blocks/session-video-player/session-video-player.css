@@ -48,3 +48,13 @@
 .session-video-hidden {
   display: none;
 }
+
+/* nav-offset adds 80px padding-block-start for nav clearance and is meant only for the page's
+   FIRST section (see docs/nav-clearance.md). When the full-width video renders, IT is the first
+   section, so the playlist-container below it must not apply nav-offset too — that second 80px is
+   a dead gap under the video. The full-width player marks its section (session-video-full-width) at
+   runtime; here we cancel the duplicate offset on any following playlist-container. Documented
+   MWPW-201396 nav-offset exception. */
+main > .section.session-video-full-width ~ .section.session-video-playlist-container.nav-offset {
+  padding-block-start: 0;
+}
