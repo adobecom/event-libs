@@ -93,7 +93,7 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-areas: "row" "actions";
+  grid-template-areas: "row" "meta" "actions";
   gap: var(--s2a-spacing-md);
   padding: var(--s2a-spacing-lg);
   color: var(--s2a-color-content-default);
@@ -105,7 +105,7 @@
     0 4px 6px rgb(0 0 0 / 8%);
 }
 
-.sb-info:has(.sb-info__desc-wrap) { grid-template-areas: "row" "desc" "actions"; }
+.sb-info:has(.sb-info__desc-wrap) { grid-template-areas: "row" "meta" "desc" "actions"; }
 
 .sb-info.is-expanded {
   grid-template-areas:
@@ -116,7 +116,7 @@
     "viewall";
 }
 
-/* Mobile only — collapsed+favorited hides the description's grid row too, not just visually. */
+/* Mobile only — collapsed+favorited hides the badge/description grid rows too, not just visually. */
 .sb-info.is-favorited:not(.is-expanded) { grid-template-areas: "row" "actions"; }
 
 .sb-info__row {
@@ -133,6 +133,7 @@
   font-size: var(--s2a-font-size-lg);
   line-height: 1;
   font-weight: var(--s2a-font-weight-heading, 900);
+  letter-spacing: var(--s2a-font-letter-spacing-neg-0-2, -0.2px);
 }
 
 .sb-info__expand {
@@ -149,7 +150,7 @@
 .sb-info__expand-icon {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   transform: rotate(90deg);
   transition: transform 0.2s ease;
 }
@@ -197,14 +198,64 @@
   font-size: var(--s2a-font-size-md, 16px);
 }
 
+/* Mobile only — collapsed+favorited hides this too, not just the description (see the
+   matching .sb-info__desc-wrap rule below). */
+.sb-info.is-favorited:not(.is-expanded) .sb-info__meta { display: none; }
+
 /* Overrides CategoryBadge's inline per-track icon color — channel icon is always white here. */
 .sb-info__meta .sg-category-badge__icon-color { color: #fff; }
 
-/* Overrides .sg-category-badge__label's own literal 14px (sessions-guide.css). */
+/* Desktop badge spec (mobile+tablet override font-size/weight/line-height below). */
 .sb-info__meta .sg-category-badge__label {
-  font-size: 16px;
+  font-size: 14px;
   line-height: 20px;
-  font-weight: 400;
+  font-weight: 500;
+}
+
+/* Mobile + tablet share the badge label spec (Figma) — only desktop (1280px+) keeps the base
+   values above. The 16px icon is the same at every breakpoint, but kept media-scoped (mobile+
+   tablet here, desktop in the min-width:1280px block) rather than on the base rule, so it doesn't
+   trip no-descending-specificity against the later .sb-ended__* svg rules. */
+@media (max-width: 1279px) {
+  .sb-info__meta .sg-category-badge__label {
+    color: var(--s2a-color-gray-300, #dadada);
+    font-family: var(--body-font-family);
+    font-size: var(--s2a-font-size-sm, 14px);
+    font-weight: var(--s2a-font-weight-adobe-clean-medium, 500);
+    line-height: var(--s2a-font-line-height-xs, 18px);
+  }
+
+  .sb-info__meta .sg-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* Mobile only (Figma dev-mode spec) — tablet/desktop keep the standard grid gap. */
+@media (max-width: 767px) {
+  /* Figma dev-mode spec calls for a different gap between each row (7px/7px/14px), not the
+     standard uniform grid gap above — zero that out here and space each row with its own
+     margin-top instead. */
+  .sb-info {
+    gap: 0;
+  }
+
+  .sb-info__meta {
+    margin-top: 7px;
+  }
+
+  .sb-info__desc-wrap {
+    margin-top: 7px;
+  }
+
+  .sb-info__desc {
+    line-height: 18px;
+  }
+
+  .sb-info__actions {
+    margin-top: 14px;
+    gap: 6px;
+  }
 }
 
 .sb-info__desc-wrap {
@@ -246,12 +297,17 @@
   .sb-info {
     grid-template-columns: 1fr auto;
     align-items: center;
-    grid-template-areas: "row actions";
+    grid-template-areas:
+      "row actions"
+      "meta meta";
   }
 
+  /* Badges show unconditionally from tablet up (Figma 8454:53851) — unlike mobile, there's no
+     collapsed/expanded distinction for this row here. */
   .sb-info:has(.sb-info__desc-wrap) {
     grid-template-areas:
       "row actions"
+      "meta meta"
       "desc desc";
   }
 
@@ -264,10 +320,11 @@
       "viewall viewall";
   }
 
-  /* Reverses the mobile-only .is-favorited hide above — description always shows here. */
+  /* Reverses the mobile-only .is-favorited hide above — badge and description always show here. */
   .sb-info.is-favorited:not(.is-expanded) {
     grid-template-areas:
       "row actions"
+      "meta meta"
       "desc desc";
   }
 
@@ -284,10 +341,23 @@
   /* Favorite moves after Share (rightmost) — reversed from mobile's DOM/visual order. */
   .sb-info__icon-btn--favorite { order: 1; }
 
-  .sb-info__desc-wrap { font-size: 16px; }
+  .sb-info__expand-icon { justify-content: center; }
+
+  .sb-info__actions { gap: 5px; }
+
+  /* The 16px grid gap is right for title→badge but too wide for badge→description; a -12px
+     margin trims that one spot to 4px without disturbing the uniform gap elsewhere. */
+  .sb-info__desc-wrap {
+    font-size: 16px;
+    margin-top: -12px;
+  }
+
+  .sb-info__desc { line-height: 1.5; }
 
   /* stylelint-disable-next-line value-no-vendor-prefix */
   .sb-info.is-favorited:not(.is-expanded) .sb-info__desc-wrap { display: -webkit-box; }
+
+  .sb-info.is-favorited:not(.is-expanded) .sb-info__meta { display: flex; }
 
   /* Pinned to 18px on tablet; sessions-guide's own tablet rule would otherwise bump this to 24px. */
   .session-broadcast .sg-section-title {
@@ -590,20 +660,24 @@
     gap: var(--s2a-spacing-lg, 24px);
   }
 
+  /* Figma 8482:20025: 4px white frame around the whole card, 20px radius. */
   .sb-carousel-section--also-live .sg-live-card {
     width: 100%;
-    max-width: 1104px;
-    border: none;
-    border-radius: var(--s2a-border-radius-lg, 32px);
+    max-width: 1156px;
+    border: 4px solid var(--s2a-color-background-default, #fff);
+    border-radius: 20px;
   }
 
-  /* Fixed 560x316 (not aspect-ratio) since a real <img> needs an explicit height beside a flex-row sibling. */
+  /* Fixed 560x316 (not aspect-ratio) since a real <img> needs an explicit height beside a flex-row
+     sibling. 1px translucent-white border. Radius is 16px, not the card's 20px: the card's 4px
+     border + overflow:hidden clips children to a 16px inner corner, so 16px nests concentrically
+     and keeps the white frame a uniform 4px (a 20px image corner would be clipped unevenly). */
   .sb-carousel-section--also-live .sg-live-card__image {
     width: 560px;
     height: 316px;
     aspect-ratio: auto;
-    border: none;
-    border-radius: var(--s2a-border-radius-lg, 32px);
+    border: 1px solid rgb(255 255 255 / 15%);
+    border-radius: 16px;
   }
 
   /* Back to the image's bottom edge; the narrow card's top-edge placement is its own design. */
@@ -614,35 +688,75 @@
     right: 20px;
   }
 
+  /* Figma 8482:20025 layout: title → badges centered as a group, buttons pinned to the bottom.
+     LiveCard's DOM order is meta→title→desc→actions, so flex order reorders to title→badges→
+     actions and the description is dropped entirely for this card. */
   .sb-carousel-section--also-live .sg-live-card__body {
     flex: 1;
     width: auto;
-    padding: var(--s2a-spacing-2xl, 40px);
-    justify-content: space-between;
-    gap: 2px;
+    padding: var(--s2a-spacing-xl, 32px);
+    gap: var(--s2a-spacing-xs, 8px);
   }
 
-  .sb-carousel-section--also-live .sg-live-card__meta {
-    justify-content: flex-start;
-    gap: var(--s2a-spacing-sm, 12px);
-  }
-
+  /* Two auto margins (title top + actions top) split the free space evenly, centering the
+     title+badges group in the area above the button row, which stays pinned to the bottom. */
   .sb-carousel-section--also-live .sg-live-card__title {
-    margin: 0;
+    order: 1;
+    margin: auto 0 0;
     font-family: var(--s2a-font-family-heading);
     font-size: var(--s2a-font-size-3xl, 32px);
     font-weight: var(--s2a-font-weight-heading, 900);
   }
 
-  /* Shown here, unlike the narrow card. */
-  /* stylelint-disable-next-line value-no-vendor-prefix */
-  .sb-carousel-section--also-live .sg-live-card__desc { display: -webkit-box; }
+  .sb-carousel-section--also-live .sg-live-card__meta {
+    order: 2;
+    justify-content: flex-start;
+    gap: var(--s2a-spacing-md, 16px);
+  }
+
+  /* Card badge (Figma 8482:20025): 12px label. Icon size set below, after the button-icon rules
+     to keep selectors in ascending-specificity order. */
+  .sb-carousel-section--also-live .sg-live-card__meta .sg-category-badge__label {
+    font-size: var(--s2a-font-size-xs, 12px);
+  }
+
+  /* order:3 + margin-top:auto pins the button row to the bottom while title+badges stay centered. */
+  .sb-carousel-section--also-live .sg-live-card__actions {
+    order: 3;
+    margin-top: auto;
+  }
+
+  /* Not part of this card design (Figma shows title+badges only). */
+  .sb-carousel-section--also-live .sg-live-card__desc { display: none; }
 
   .sb-carousel-section--also-live .sg-live-card__btn { height: 40px; }
 
   .sb-carousel-section--also-live .sg-live-card__btn--watch { padding: 0 var(--s2a-spacing-lg, 24px); }
 
-  .sb-carousel-section--also-live .sg-live-card__btn--favorite { width: 40px; }
+  /* Figma 8482:20025: 12px play icon. */
+  .sb-carousel-section--also-live .sg-live-card__btn--watch svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Figma: 40px transparent button, 1px black outline, 14px icon. */
+  .sb-carousel-section--also-live .sg-live-card__btn--favorite {
+    width: 40px;
+    border-width: 1px;
+    background: transparent;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__btn--favorite svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Card badge icon (Figma 8482:20025): 16px. Placed last so its higher specificity doesn't
+     precede the lower-specificity button-icon rules above (no-descending-specificity). */
+  .sb-carousel-section--also-live .sg-live-card__meta .sg-icon svg {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 /* White section, gray-50 cards (inverse of Also Live); no right padding so cards peek off-edge. */
@@ -790,6 +904,29 @@
   .sb-carousel-section--up-next .sg-carousel__nav {
     top: 0;
   }
+
+  /* Dark "glass" ControlButton (Figma 8482:20025) — the light-theme .sg-carousel__arrow sits on
+     broadcast's dark carousel sections, so override to the on-dark treatment here. */
+  .sb-carousel-section--also-live .sg-carousel__arrow,
+  .sb-carousel-section--up-next .sg-carousel__arrow {
+    width: 48px;
+    height: 48px;
+    background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
+    border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+    backdrop-filter: blur(4px);
+    color: var(--s2a-color-content-knockout, #fff);
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__arrow:hover:not([disabled]),
+  .sb-carousel-section--up-next .sg-carousel__arrow:hover:not([disabled]) {
+    background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__arrow svg,
+  .sb-carousel-section--up-next .sg-carousel__arrow svg {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 /* 1192px is the shared 1280-1440px wrapper value; 1441px+ bumps it to 1440px near the end of this file. */
@@ -802,13 +939,19 @@
   }
 
   .sb-info {
-    padding-right: 0;
-    padding-left: 0;
+    padding: var(--s2a-spacing-xl, 32px) 0;
   }
 
   .sb-info__title {
     font-size: var(--s2a-font-size-2xl, 24px);
     line-height: var(--s2a-font-line-height-md, 24px);
+  }
+
+  /* Same 16px icon as mobile+tablet; kept here (not on the base rule) to avoid a false
+     no-descending-specificity flag against the later .sb-ended__* svg rules. */
+  .sb-info__meta .sg-icon svg {
+    width: 16px;
+    height: 16px;
   }
 }
 
