@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { readFile } from '@web/test-runner-commands';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
-import { sessions, favorited } from '../../../../event-libs/v1/utils/session-store.js';
+import { sessions } from '../../../../event-libs/v1/utils/session-store.js';
 import init from '../../../../event-libs/v1/c2/blocks/event-marquee/event-marquee.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -25,12 +25,10 @@ function sectionMetadataHtml(rows = {}) {
 // Same row shape as Milo's classic marquee.js: an optional first row is the
 // full-bleed background; the last row is the foreground (text + optional asset).
 function videoVariantHtml({
-  sessionId = 's-100', favoriteEnabled, shareEnabled, videoTitle, withBackground = true,
+  sessionId = 's-100', videoTitle, withBackground = true,
 } = {}) {
   const metaRows = {};
   if (sessionId) metaRows['session-id'] = sessionId;
-  if (favoriteEnabled !== undefined) metaRows['favorite-enabled'] = favoriteEnabled;
-  if (shareEnabled !== undefined) metaRows['share-enabled'] = shareEnabled;
   if (videoTitle !== undefined) metaRows['video-title'] = videoTitle;
 
   const backgroundRow = withBackground
@@ -81,7 +79,6 @@ describe('event-marquee', () => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
     sessions.value = [];
-    favorited.value = new Set();
   });
 
   describe('Text/CTA variant', () => {
