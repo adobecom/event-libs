@@ -144,6 +144,10 @@ describe('isNonProdHost', () => {
     expect(isNonProdHost('forge-replay-dev.adobe.io')).to.equal(true);
     expect(isNonProdHost('forge-replay-preprod.adobe.io')).to.equal(true);
   });
+
+  it('accepts the VPN-gated stage domain', () => {
+    expect(isNonProdHost('stage.adobe.com')).to.equal(true);
+  });
 });
 
 describe('resolveRoutedCampaignId', () => {
