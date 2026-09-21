@@ -195,6 +195,24 @@ export function getRsvpTokenInvalidMessage(manager) {
     : text;
 }
 
+export const RSVP_INVALID_SUBMISSION_MESSAGE_KEY = 'rsvp-invalid-submission-error-msg';
+
+/**
+ * Localized message for a submission 400 that isn't a confirmed capacity or
+ * token-identity failure (e.g. a schema-validation error on a field, an invalid
+ * or missing custom RSVP field, or a duplicate external attendee ID). Intentionally
+ * generic — the caller has a real backend error message/code but no per-field
+ * UI to point it at yet.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @returns {string}
+ */
+export function getRsvpInvalidSubmissionMessage(manager) {
+  const text = manager.getValue(RSVP_INVALID_SUBMISSION_MESSAGE_KEY);
+  return text === RSVP_INVALID_SUBMISSION_MESSAGE_KEY
+    ? 'There was a problem with the information you submitted. Please check your entries and try again.'
+    : text;
+}
+
 export const RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY = 'rsvp-token-already-registered-cta-text';
 
 /**
