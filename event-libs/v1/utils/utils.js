@@ -1,4 +1,6 @@
-import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN, RSVP_TOKEN_PATTERN } from './constances.js';
+import {
+  SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN, RSVP_TOKEN_PATTERN, FORGE_RENDER_ORIGINS,
+} from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { logError } from './lana-log.js';
 
@@ -6,10 +8,12 @@ const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
 // Shared gate for query-param debug/test overrides (branch switching, mocked server time,
 // mount-point fallbacks, etc.) — real prod domains (www.adobe.com and friends) never match
-// `.hlx.`/`.aem.`/`local`, so anything gated on this can't be triggered there.
+// `.hlx.`/`.aem.`/`local`, and Forge's render origins are exact-matched against
+// FORGE_RENDER_ORIGINS, so anything gated on this can't be triggered on real prod.
 // `hostname` param defaults to the real one but is overridable for tests.
 export function isNonProdHost(hostname = window.location.hostname) {
-  return hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local');
+  return hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local')
+    || FORGE_RENDER_ORIGINS.includes(hostname);
 }
 
 export const LIBS = (() => {

@@ -28,6 +28,14 @@ export const MAX_EVENT_PAGES = {
   sessionGuide: '/max/2026/sessions.html',
 };
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
+
+// Forge's render origins for testing ?serverTime= (and other non-prod overrides) — confirmed
+// by Brad (Forge) as required before PR #352's hostname gate promotes to prod.
+export const FORGE_RENDER_ORIGINS = [
+  'milo-core-prod.adobe.io',
+  'forge-replay-dev.adobe.io',
+  'forge-replay-preprod.adobe.io',
+];
 export const ENV_MAP = {
   dev: {
     name: 'dev',
