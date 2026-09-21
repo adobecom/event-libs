@@ -2,9 +2,10 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
   getSessionTimes, getAllSessionTimes, getState, stateForPhase, nextBoundary, formatDateTime,
-  renderStatus, mountSessionState, readStatusLabels,
+  renderStatus, mountSessionState, readStatusLabels, hasPlayableVideo,
 } from '../../../../../event-libs/v1/c2/blocks/event-session-details/session-state-view.js';
 import { PLAYBACK_PHASE } from '../../../../../event-libs/v1/c2/utils/video-session.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
 
@@ -344,6 +345,55 @@ describe('session-state-view', () => {
       setPage({ videos: [MPC_RECORDING], format: IPOD });
       expect(renderStatus('upcoming', times).textContent).to.equal('On-demand');
       expect(renderStatus('live', times).textContent).to.equal('On-demand');
+    });
+  });
+
+  // The eyebrow must honor the DVR delay just like the player does: while dvrDelayHours has not
+  // elapsed (measured from the event start), an ended IPOD session with a recording is still
+  // "Available soon", not "On-demand". Regression for the eyebrow flipping to On-demand the moment
+  // the session ended, ignoring the DVR window.
+  describe('renderStatus on-demand: DVR delay gates availability', () => {
+    const times = { start: 1794518100000, timezone: 'America/Los_Angeles' };
+    const IPOD = [{ value: 'in-person', label: 'In-Person' }, { value: 'on-demand-post-event', label: 'On demand, post event' }];
+    const MPC_RECORDING = { provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458902', kind: 'onDemand' };
+    const HOUR_MS = 3_600_000;
+
+    // `initTierOneEventConfig` is a module singleton that can't be re-initialized within a run, so
+    // the event start is fixed once (100h before now) and each test varies the DVR hours instead to
+    // move the unlock (eventStart + dvrHours) across "now". `custom-attributes` is re-read per call.
+    const EVENT_START_MS = Date.now() - (100 * HOUR_MS);
+
+    // An ended IPOD page with an MPC recording and an authored DVR delay.
+    const setDvrPage = (dvrHours) => {
+      setMetadata('session-times', JSON.stringify([{ endTimeMillis: 1, videos: [MPC_RECORDING] }]));
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'Format', values: IPOD },
+        { name: 'DVR Timing (in hours)', values: [{ value: String(dvrHours) }] },
+      ]));
+      setMetadata('tier-1-event-config', JSON.stringify({ eventStartDateTime: EVENT_START_MS }));
+      initTierOneEventConfig();
+    };
+
+    afterEach(() => {
+      document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
+    });
+
+    it('DVR window not yet elapsed -> Available soon (hasPlayableVideo false)', () => {
+      // unlock = eventStart(now-100h) + 772h → ~672h in the future → still pending.
+      setDvrPage(772);
+      expect(hasPlayableVideo()).to.be.false;
+      const el = renderStatus('on-demand', times);
+      expect(el.textContent).to.equal('Available soon');
+      expect(el.classList.contains('session-status--ipod-pending')).to.be.true;
+    });
+
+    it('DVR window elapsed -> On-demand (hasPlayableVideo true)', () => {
+      // unlock = eventStart(now-100h) + 1h → ~99h in the past → elapsed.
+      setDvrPage(1);
+      expect(hasPlayableVideo()).to.be.true;
+      const el = renderStatus('on-demand', times);
+      expect(el.textContent).to.equal('On-demand');
+      expect(el.classList.contains('session-status--on-demand')).to.be.true;
     });
   });
 

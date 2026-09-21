@@ -1,6 +1,7 @@
 import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
 import { logError } from '../../../utils/lana-log.js';
-import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
+import { getNowMs, getWatchDestination, isDvrPending } from '../../../utils/session-state.js';
+import { getEventStartMs } from '../../../utils/tier-1-event-config.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
 import {
   currentSessionHasEnded,
@@ -89,7 +90,12 @@ export function hasPlayableVideo(doc = document) {
     return false;
   }
   if (!currentSessionHasEnded(entries, getNowMs())) return false;
-  return findEmbeddableVideos(entries).length > 0;
+  if (findEmbeddableVideos(entries).length === 0) return false;
+  // Honor the DVR delay: an IPOD/MPC on-demand video isn't "available" until the DVR window has
+  // elapsed (same gate the player uses). Without this the eyebrow flipped to "On-demand" the moment
+  // the session ended, ignoring dvrDelayHours.
+  const session = buildSessionFromMetadata(entries);
+  return !isDvrPending(session, getNowMs(), getEventStartMs());
 }
 
 const normalizeAttr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
