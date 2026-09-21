@@ -443,45 +443,20 @@ function isWinningInstance(el, hasPlaylist) {
   return isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist;
 }
 
-// Hide the losing player without removing any Milo section from the DOM (a section removal
-// retriggers loadArea and loops). The full-width losing instance hides its whole
-// session-video-container section; a losing instance inside the playlist container hides only its
-// own element so the playlist itself stays visible.
+// Hide a losing player instance without removing any Milo section from the DOM (a section removal
+// retriggers loadArea and loops).
+//
+// When the loser is the one INSIDE the playlist container, hide just that element so the playlist
+// itself stays visible.
+//
+// When the loser is the full-width session-video-container, leave the (now player-less) section
+// rendered: it carries the same authored background as the playlist container below it, so it reads
+// as a seamless continuation rather than an empty band — and, still visible, it keeps providing its
+// own authored nav-offset clearance for the top of the page. No hiding, and no need to move
+// nav-offset onto the playlist.
 function hideLosingInstance(el) {
-  const fullWidthSection = closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS);
-  const target = fullWidthSection || el;
-  target.classList.add('session-video-hidden');
-}
-
-// nav-offset (an 80px padding-block-start for nav clearance) belongs only on the page's FIRST
-// section. When the full-width video-container renders, it is that first section — so the
-// playlist-container below it must not ALSO apply nav-offset, or its 80px padding becomes a dead
-// gap under the video. Authoring can't decide this (whether the full-width player renders is a
-// runtime call), so the winning full-width instance flags its section here; CSS then cancels the
-// duplicate offset on the playlist container. When the full-width player is absent, the flag is
-// never set and the playlist keeps its (correct) nav-offset as the first section.
-function markFullWidthVideoIfPresent(el) {
-  const fullWidthSection = closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS);
-  fullWidthSection?.classList.add('session-video-full-width');
-
-  // TEMP debug — confirm the marker landed and the playlist container is a FOLLOWING sibling
-  // (the `~` CSS override depends on that ordering). Remove before commit.
-  const playlist = document.querySelector('main > .section.session-video-playlist-container');
-  const sections = [...document.querySelectorAll('main > .section')];
-  // eslint-disable-next-line no-console
-  console.log('[nav-offset-fix]', {
-    fullWidthSectionFound: !!fullWidthSection,
-    fullWidthHasMarker: !!fullWidthSection?.classList.contains('session-video-full-width'),
-    fullWidthIndex: fullWidthSection ? sections.indexOf(fullWidthSection) : -1,
-    playlistFound: !!playlist,
-    playlistIndex: playlist ? sections.indexOf(playlist) : -1,
-    playlistHasNavOffset: !!playlist?.classList.contains('nav-offset'),
-    playlistIsAfterFullWidth: !!(fullWidthSection && playlist
-      && sections.indexOf(playlist) > sections.indexOf(fullWidthSection)),
-    playlistPaddingTop: playlist
-      ? getComputedStyle(playlist).paddingBlockStart : null,
-    sectionOrder: sections.map((s) => [...s.classList].filter((c) => c !== 'section').join('.')),
-  });
+  if (closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
+  el.classList.add('session-video-hidden');
 }
 
 function awaitEmbedDecision(el) {
@@ -561,7 +536,6 @@ function loadWhenDecided(el, sessionId, video) {
         hideLosingInstance(el);
         return;
       }
-      markFullWidthVideoIfPresent(el);
       loadVideoPlayer(el, sessionId, video);
     } catch (error) {
       logError(LOG_SCOPE, 'could not resolve the video layout decision', error);
