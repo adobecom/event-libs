@@ -381,19 +381,15 @@ describe('Events Form', () => {
       expect(regex.test('5551234567')).to.be.true;
     });
 
-    it('phone pattern rejects formatting-only values with no digit, unlike the backend\'s own (too permissive) PhoneNumberInput schema pattern', () => {
+    it('phone pattern matches the backend PhoneNumberInput schema pattern exactly, character-for-character', () => {
+      // Intentionally mirrors the backend's own permissiveness (no digit required,
+      // no minimum length) — the FE/BE contract must stay identical on both ends.
+      const backendPattern = /^[+\d\s\-().]+$/;
       const regex = new RegExp(`^(?:${PHONE_PATTERN})$`);
-      expect(regex.test('----')).to.be.false;
-      expect(regex.test('()')).to.be.false;
-      expect(regex.test('+')).to.be.false;
-    });
-
-    it('phone pattern allows up to the backend\'s real 30-char maxLength, not the old hardcoded 20-char cap', () => {
-      const regex = new RegExp(`^(?:${PHONE_PATTERN})$`);
-      const thirtyChars = `+${'1'.repeat(29)}`; // 30 chars total, was previously rejected past 20
-      expect(thirtyChars).to.have.lengthOf(30);
-      expect(regex.test(thirtyChars)).to.be.true;
-      expect(regex.test(`${thirtyChars}1`)).to.be.false; // 31 chars — over the backend's maxLength
+      const samples = ['+1 (555) 123-4567', '555-123-4567', '+15551234567', '5551234567', '----', '()', '+', '+-.() '];
+      samples.forEach((sample) => {
+        expect(regex.test(sample)).to.equal(backendPattern.test(sample), `mismatch for "${sample}"`);
+      });
     });
   });
 
@@ -406,6 +402,11 @@ describe('Events Form', () => {
     it('defaults firstName/lastName to the backend AttendeeName maxLength (30) when unauthored', () => {
       expect(resolveMaxlength('firstName', undefined)).to.equal(30);
       expect(resolveMaxlength('lastName', undefined)).to.equal(30);
+    });
+
+    it('defaults mobilePhone/businessPhone to the backend PhoneNumberInput maxLength (30) when unauthored', () => {
+      expect(resolveMaxlength('mobilePhone', undefined)).to.equal(30);
+      expect(resolveMaxlength('businessPhone', undefined)).to.equal(30);
     });
 
     it('defaults email to the backend Email maxLength (320) when unauthored', () => {

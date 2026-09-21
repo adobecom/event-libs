@@ -182,12 +182,10 @@ export const FALLBACK_LOCALES = {
 };
 export const LATEST_VERSION = 'v1';
 export const PHONE_FIELD_RE = /phone/i;
-// Backend's PhoneNumberInput schema only enforces `^[+\d\s\-().]+$` + maxLength
-// 30 (no minimum, no required digit) — that's too permissive to be a real phone
-// check ("----" or a lone "+" would pass it). This stays a strict subset of that
-// character set and length so nothing accepted here can ever fail backend
-// validation, while requiring an actual digit and a sane minimum length.
-export const PHONE_PATTERN = '^(?=.{7,30}$)\\+?[\\d\\s\\(\\)\\.\\-]*\\d[\\d\\s\\(\\)\\.\\-]*$';
+// Mirrors the backend's PhoneNumberInput schema pattern exactly (`^[+\d\s\-().]+$`)
+// so the FE/BE validation contract stays identical on both ends — the separate
+// maxLength (30) constraint is enforced via STANDARD_FIELD_MAX_LENGTHS below.
+export const PHONE_PATTERN = '^[+\\d\\s\\-()\\.]+$';
 export const STANDARD_FIELD_MAX_LENGTHS = {
   firstName: 30,
   lastName: 30,
