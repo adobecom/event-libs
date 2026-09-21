@@ -14,6 +14,7 @@ import {
 import { trapFocus } from '../utils/focus-trap.js';
 import { prefersReducedMotion } from '../utils/motion.js';
 import { isSafariMobile } from '../utils/browser.js';
+import { logWarning } from '../../../../utils/lana-log.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
@@ -178,7 +179,7 @@ export function DrawerShell() {
     const found = findSessionByParam(sessions.value, sessionParam);
     if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
     // Bounded: URLSearchParams decodes %0A, which would forge a second log line.
-    else window.lana?.log(`[sessions-guide] ?session=${encodeURIComponent(sessionParam).slice(0, 100)} matched no session`);
+    else logWarning('sessions-guide', `?session=${encodeURIComponent(sessionParam).slice(0, 100)} matched no session`);
   }, [sessionsStatus.value]);
 
   // openSessionGuideDetail() from another block.
@@ -190,7 +191,7 @@ export function DrawerShell() {
     });
     if (!result) return;
     if (!result.found) {
-      window.lana?.log(`[sessions-guide] openSessionGuideDetail: session "${result.sessionId}" not found`);
+      logWarning('sessions-guide', `openSessionGuideDetail: session "${result.sessionId}" not found`);
       return;
     }
     dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: result.defaultView });

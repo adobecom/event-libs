@@ -1,6 +1,7 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
 import { applyAreaTheme } from '../../utils/decorate.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 async function getPromotionalContentUrl() {
   const customPromotionalContentLocation = getMetadata('promotional-content-location');
@@ -33,7 +34,7 @@ export function getPromotionalContent() {
 
     return promotionalItemsAttr.values.map((v) => v?.value).filter(Boolean);
   } catch (error) {
-    window.lana?.log(`Error parsing custom-attributes: ${JSON.stringify(error)}`);
+    logError('promotional-content', 'Error parsing custom-attributes', error);
     return [];
   }
 }
@@ -51,7 +52,7 @@ async function getLegacyPromotionalContent() {
         return item;
       });
     } catch (error) {
-      window.lana?.log(`Error parsing promotional items: ${JSON.stringify(error)}`);
+      logError('promotional-content', 'Error parsing promotional items', error);
       return promotionalItems;
     }
   }
@@ -73,7 +74,7 @@ async function getLegacyPromotionalContent() {
     const data = json.data || [];
 
     if (!data || data.length === 0) {
-      window.lana?.log(`Error: No promotional content found at ${url}`);
+      logWarning('promotional-content', `No promotional content found at ${url}`);
       return [];
     }
 
@@ -84,7 +85,7 @@ async function getLegacyPromotionalContent() {
 
     return rehydratedPromotionalItems;
   } catch (error) {
-    window.lana?.log(`Error fetching promotional content: ${JSON.stringify(error)}`);
+    logError('promotional-content', 'Error fetching promotional content', error);
     return [];
   }
 }

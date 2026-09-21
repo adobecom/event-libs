@@ -978,6 +978,21 @@ describe('services/sessions/sessions-api', () => {
       expect(max25.contentCategory).to.deep.equal(['How To']);
     });
 
+    // RainFocus casing drifts across sessions (e.g. "Primary event site track"); the attribute
+    // name match is case-insensitive so the track still resolves.
+    it('matches custom-attribute names case-insensitively', () => {
+      const [session] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'lowercase-track',
+          customAttributes: [
+            ONLINE_FORMAT,
+            customAttr('Primary event site track', [selectValue('Creator', 'creator')]),
+          ],
+        }],
+      });
+      expect(session.primaryTrack).to.equal('Creator');
+    });
+
     it('leaves additionalTracks/trackOverride empty for a MAX25-shaped session with neither field', () => {
       expect(max25.additionalTracks).to.deep.equal([]);
       expect(max25.trackOverride).to.equal('');
@@ -1345,5 +1360,43 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
     expect(url).to.include('wcms-events-service-platform-deploy-ethos105-stage-9a5fdc.stage.cloud.adobe.io');
+  });
+
+  describe('fetchEslSessions failures are reported to lana', () => {
+    let lanaLogStub;
+
+    beforeEach(() => {
+      setEventServiceEnvOverride('prod');
+      lanaLogStub = sandbox.stub(window.lana, 'log');
+    });
+
+    it('logs a non-ok response before throwing', async () => {
+      sandbox.stub(window, 'fetch').resolves({ ok: false, status: 503 });
+      let error;
+      try {
+        await fetchSessions('event-1');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api]');
+      expect(lanaLogStub.firstCall.args[0]).to.include('event-1');
+      expect(lanaLogStub.firstCall.args[0]).to.include('503');
+    });
+
+    it('logs a network error before rethrowing', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('offline'));
+      let error;
+      try {
+        await fetchSessions('event-1');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] network error fetching session catalog for event event-1');
+      expect(lanaLogStub.firstCall.args[0]).to.include('offline');
+    });
   });
 });

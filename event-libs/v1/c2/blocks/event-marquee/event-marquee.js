@@ -2,6 +2,7 @@ import { createTag, getEventConfig, LIBS } from '../../../utils/utils.js';
 import { processAutoBlockLinks } from '../../../utils/decorate.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import { formatCountdown } from '../../../utils/date-time-helper.js';
+import { logWarning } from '../../../utils/lana-log.js';
 
 const DEFAULT_COUNTDOWN_LABEL = 'Session starts in:';
 
@@ -39,7 +40,7 @@ async function getSectionConfig(el, miloLibs) {
     if (raw && Number.isFinite(parsed)) {
       config.countdownEndTime = parsed;
     } else if (raw) {
-      window.lana?.log(`[event-marquee] invalid countdown-end-time-millis: ${raw}`);
+      logWarning('event-marquee', `invalid countdown-end-time-millis: ${raw}`);
     }
   }
   if (metadata['countdown-label']) {
@@ -110,7 +111,7 @@ export default async function init(el) {
     backgroundRow, foregroundRow, textCol, mediaCol,
   } = parseContent(el);
   if (!foregroundRow || !textCol) {
-    window.lana?.log('[event-marquee] expected a foreground row with a text column, got none');
+    logWarning('event-marquee', 'expected a foreground row with a text column, got none');
     return;
   }
 

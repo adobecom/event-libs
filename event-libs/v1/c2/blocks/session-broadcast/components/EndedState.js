@@ -5,6 +5,7 @@ import {
 import { toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
+import { logError } from '../../../../utils/lana-log.js';
 import { formatDuration } from '../../sessions-guide/utils/time.js';
 import { CategoryBadge } from '../../sessions-guide/components/CategoryBadge.js';
 import {
@@ -69,7 +70,7 @@ export function EndedState({ session }) {
       await navigator.clipboard.writeText(shareUrl);
       showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (err) {
-      window.lana?.log(`[session-broadcast] share failed: ${err.message}`);
+      logError('session-broadcast', 'share failed', err);
     }
   }
 

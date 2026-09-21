@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import {
   setFederalRootOverride,
   fetchFederalIcon,
@@ -190,5 +191,38 @@ describe('federal-icons — id collisions across inlined SVGs', () => {
   it('leaves an id-free icon untouched', async () => {
     const svg = await fetchFederalProductIcon('photoshop-64');
     expect(svg.querySelectorAll('[id]')).to.have.lengthOf(0);
+  });
+});
+
+describe('federal-icons — non-ok HTTP responses are reported to lana', () => {
+  let fetchStub;
+  let lanaLogStub;
+
+  beforeEach(() => {
+    setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+    fetchStub = sinon.stub(window, 'fetch').resolves({ ok: false, status: 500 });
+    lanaLogStub = sinon.stub(window.lana, 'log');
+  });
+
+  afterEach(() => {
+    fetchStub.restore();
+    lanaLogStub.restore();
+  });
+
+  it('logs a non-ok icon fetch instead of failing silently', async () => {
+    const svg = await fetchFederalIcon('non-ok-icon');
+    expect(svg).to.equal(null);
+    expect(lanaLogStub.calledOnce).to.equal(true);
+    expect(lanaLogStub.firstCall.args[0]).to.include('non-ok-icon.svg');
+    expect(lanaLogStub.firstCall.args[0]).to.include('500');
+  });
+
+  it('logs a non-ok icons.json response instead of failing silently', async () => {
+    const { fetchFederalIconList: freshFetchFederalIconList } = await import(`../../../../event-libs/v1/features/icons/federal-icons.js?t=${Math.random()}`);
+    const names = await freshFetchFederalIconList();
+    expect(names).to.deep.equal([]);
+    expect(lanaLogStub.calledOnce).to.equal(true);
+    expect(lanaLogStub.firstCall.args[0]).to.include('icons.json');
+    expect(lanaLogStub.firstCall.args[0]).to.include('500');
   });
 });

@@ -23,6 +23,8 @@
 // decoration has reached the point of initializing that component — there's no dedicated
 // "ready" event for this seam (checked milo's global-navigation.js), so this polls rather
 // than waiting on one.
+import { logError } from '../../utils/lana-log.js';
+
 const POLL_INTERVAL_MS = 250;
 const CALL_MAX_RETRIES = 8;
 const CALL_RETRY_DELAY_MS = 500;
@@ -61,7 +63,7 @@ async function tryResolveInstance() {
     const result = await window.UniversalNav.getComponent('notifications');
     return isUncInstance(result?.instance) ? result.instance : null;
   } catch (err) {
-    window.lana?.log(`[unc-client] getComponent('notifications') failed: ${err.message}`);
+    logError('unc-client', "getComponent('notifications') failed", err);
     return null;
   }
 }
@@ -101,7 +103,7 @@ export async function registerReminderRule(campaignId, campaignRule) {
     await callUncWithRetry(uncInstance, 'UpsertReminderFeatureFlag', payload);
     return true;
   } catch (err) {
-    window.lana?.log(`[unc-client] registerReminderRule failed for ${campaignId}: ${err.message}`);
+    logError('unc-client', `registerReminderRule failed for ${campaignId}`, err);
     return false;
   }
 }
@@ -114,7 +116,7 @@ export async function deleteReminderRule(campaignId) {
     await callUncWithRetry(uncInstance, 'DeleteReminderFeatureFlag', payload);
     return true;
   } catch (err) {
-    window.lana?.log(`[unc-client] deleteReminderRule failed for ${campaignId}: ${err.message}`);
+    logError('unc-client', `deleteReminderRule failed for ${campaignId}`, err);
     return false;
   }
 }
