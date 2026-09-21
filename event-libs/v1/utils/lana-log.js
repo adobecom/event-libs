@@ -1,3 +1,10 @@
+const PII_KEY_PATTERN = /email|name|phone|address|token|password|dob|birthdate/i;
+
+function redactPii(key, value) {
+  if (key && PII_KEY_PATTERN.test(key)) return '[REDACTED]';
+  return value;
+}
+
 function serializeLogData(data) {
   if (typeof data === 'string') return data;
   if (data instanceof Error) return `${data.name}: ${data.message}`;
@@ -5,7 +12,7 @@ function serializeLogData(data) {
     return `status=${data.status} ok=${data.ok} url=${data.url}`;
   }
   try {
-    return JSON.stringify(data);
+    return JSON.stringify(data, redactPii);
   } catch (e) {
     return String(data);
   }

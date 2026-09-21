@@ -215,6 +215,14 @@ function isSessionTimeFullError(resp) {
   return candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
 }
 
+// ESP error bodies can carry attendee-scoped data. Only surface a classification
+// value for logging, never the raw body.
+function describeSessionTimeError(err) {
+  if (!err || typeof err !== 'object') return err;
+  const candidates = [err.code, err.errorCode, err.error, err.type, err.message];
+  return candidates.find((v) => typeof v === 'string') || 'unknown error';
+}
+
 function computeIsEventClosed(eventData) {
   if (!eventData?.isFull) return false;
   // ESP returns allowWaitlisting as either boolean `true` or string `'true'` depending on source.
@@ -1484,7 +1492,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     updateCTAGroup(cardEl, session, { isEventRegistered: true, isBlocked: false });
     if (conflictFinalize) conflictFinalize(true);
   } else {
-    logError('sessions-hub,register', `Failed to register for session ${sessionId}`, resp.error);
+    logError('sessions-hub,register', `Failed to register for session ${sessionId}`, describeSessionTimeError(resp.error));
     if (conflictFinalize) {
       conflictFinalize(false);
     } else if (btn) {
@@ -1522,7 +1530,7 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
     updated.delete(sessionId);
     BlockMediator.set('registeredSessionIds', updated);
   } else {
-    logError('sessions-hub,unregister', `Failed to unregister from session ${sessionId}`, resp.error);
+    logError('sessions-hub,unregister', `Failed to unregister from session ${sessionId}`, describeSessionTimeError(resp.error));
     if (badge) {
       badge.disabled = false;
       badge.removeAttribute('aria-busy');
