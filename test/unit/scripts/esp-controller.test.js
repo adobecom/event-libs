@@ -201,8 +201,6 @@ describe('Adobe Event Service API', () => {
     });
 
     it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
-      // The backend sends business-logic 400s as plain text (e.g. res.status(400).send('Event is full')),
-      // not JSON — response.json() would throw on that body.
       sandbox.stub(window, 'fetch').resolves({ text: () => 'Event is full', ok: false, status: 400 });
 
       const result = await api.createAttendee({ name: 'John Doe' });

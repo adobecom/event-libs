@@ -382,8 +382,6 @@ describe('Events Form', () => {
     });
 
     it('phone pattern matches the backend PhoneNumberInput schema pattern exactly, character-for-character', () => {
-      // Intentionally mirrors the backend's own permissiveness (no digit required,
-      // no minimum length) — the FE/BE contract must stay identical on both ends.
       const backendPattern = /^[+\d\s\-().]+$/;
       const regex = new RegExp(`^(?:${PHONE_PATTERN})$`);
       const samples = ['+1 (555) 123-4567', '555-123-4567', '+15551234567', '5551234567', '----', '()', '+', '+-.() '];
@@ -394,7 +392,6 @@ describe('Events Form', () => {
   });
 
   describe('createInput - standard field maxlength defaults', () => {
-    // Mirrors createInput's `limit ?? STANDARD_FIELD_MAX_LENGTHS[field]` fallback.
     function resolveMaxlength(field, limit) {
       return limit ?? STANDARD_FIELD_MAX_LENGTHS[field];
     }
@@ -1156,8 +1153,6 @@ describe('Events Form', () => {
     });
 
     it('buildErrorMsg shows a generic "check your entries" message for a plain-text 400 that is not a confirmed capacity or token failure', async () => {
-      // e.g. CustomFieldRequired/CustomFieldInvalid/CustomFieldNotFound, or InvalidExternalIdMapping —
-      // a real submission problem, not something the FE should ever guess is a capacity issue.
       stubFetchByUrl({ json: () => ({}), ok: true });
       const form = document.createElement('form');
       await buildErrorMsg(form, 400, 'Custom field companyName is required');

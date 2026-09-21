@@ -88,10 +88,6 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   return options;
 }
 
-// Business-logic failures (e.g. EventFull, WaitlistingNotAllowed) are sent as
-// plain-text bodies by the backend, while schema-validation failures are JSON
-// (`{ message, errors }`). response.json() throws on the former, so the body
-// is read as text first and only parsed as JSON when it actually is JSON.
 async function parseFailureBody(response) {
   const text = await response.text();
   try {
