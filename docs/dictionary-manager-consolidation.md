@@ -39,7 +39,7 @@ const waitlistText = dictionaryManager.getValue('waitlist-cta-text');
 const closedText = dictionaryManager.getValue('event-full-cta-text');
 ```
 
-Form error messages (events-form, on submit 400): `event-full-error-msg`, `event-full-no-waitlist-error-msg`, `campaign-full-error-msg`, `campaign-full-no-waitlist-error-msg`, `rsvp-error-msg`.
+Form error messages (events-form, on submit failure — keyed off the backend's actual error, not guessed): `event-full-error-msg`, `event-full-no-waitlist-error-msg` (400, confirmed event-full), `campaign-full-error-msg`, `campaign-full-no-waitlist-error-msg` (409, confirmed campaign-full), `rsvp-invalid-submission-error-msg` (any other 400), `rsvp-error-msg` (generic fallback).
 
 ## Benefits of the Current Implementation
 

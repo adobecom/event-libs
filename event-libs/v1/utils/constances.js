@@ -194,5 +194,25 @@ export const FALLBACK_LOCALES = {
 };
 export const LATEST_VERSION = 'v1';
 export const PHONE_FIELD_RE = /phone/i;
-export const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
 export const BACKEND_PHONE_RE = /^[+\d\s\-().]+$/;
+export const PHONE_PATTERN = BACKEND_PHONE_RE.source;
+export const STANDARD_FIELD_MAX_LENGTHS = {
+  firstName: 30,
+  lastName: 30,
+  phoneticFirstName: 30,
+  phoneticLastName: 30,
+  email: 320,
+  mobilePhone: 30,
+  businessPhone: 30,
+  companyName: 200,
+  countryRegion: 200,
+  zipPostalCode: 200,
+  organizationName: 200,
+  title: 200,
+  primarySocialMediaAccount: 200,
+  dietaryRestrictions: 200,
+  executiveAssistantName: 200,
+  invitedBy: 200,
+  campaignId: 200,
+  specialRequirements: 1000,
+};
