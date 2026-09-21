@@ -30,14 +30,17 @@ export const MAX_EVENT_PAGES = {
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
 
 // Exact-match hostnames that isNonProdHost() should treat as non-prod but that don't fall
-// under its `.hlx.`/`.aem.`/`local` substring checks — each is either access-restricted
-// (VPN-gated) or a dedicated non-prod render origin, never reachable by real end users.
+// under its `.hlx.`/`.aem.`/`local` substring checks — dedicated non-prod render origins,
+// never reachable by real end users.
 export const NON_PROD_EXACT_HOSTS = [
   'milo-core-prod.adobe.io', // Forge render origin (confirmed by Brad/Forge, PR #352)
   'forge-replay-dev.adobe.io', // Forge render origin
   'forge-replay-preprod.adobe.io', // Forge render origin
-  'stage.adobe.com', // VPN-gated Adobe stage domain
 ];
+
+// VPN-gated Adobe stage domain — matched as `stage.adobe.com` itself or any subdomain of it
+// (business.stage.adobe.com, blog.stage.adobe.com, etc.) in isNonProdHost().
+export const STAGE_ADOBE_HOST = 'stage.adobe.com';
 export const ENV_MAP = {
   dev: {
     name: 'dev',
