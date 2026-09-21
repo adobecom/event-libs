@@ -332,17 +332,11 @@ export async function getFullState(eventId) {
   return { full, waitlistEnabled, usedCampaign };
 }
 
-// ESP returns allowWaitlisting as either boolean `true` or string `'true'`
-// depending on source (see sessions-hub.js's own normalization of the same field).
 export function isWaitlistingEnabled(eventObj) {
   const { allowWaitlisting } = eventObj?.data || {};
   return allowWaitlisting === true || allowWaitlisting === 'true';
 }
 
-// Resolves which "full" message flavor to show once the backend has already
-// confirmed capacity is the cause (via its error message) — this only picks
-// the copy variant from real event metadata, it never decides whether
-// something is full.
 async function getFullMessageKey(waitlistErrorKey, noWaitlistErrorKey) {
   const eventObj = await getEvent(getMetadata('event-id'));
   return eventObj.ok && isWaitlistingEnabled(eventObj) ? waitlistErrorKey : noWaitlistErrorKey;
@@ -363,9 +357,6 @@ export async function buildErrorMsg(parent, status, error) {
     await dictionaryManager.initialize();
     errorMsg = getRsvpTokenInvalidMessage(dictionaryManager);
   } else if (status === 400) {
-    // Any other 400 (schema-validation failure, invalid/missing custom RSVP
-    // field, duplicate external ID, etc.) is a real submission problem, not a
-    // capacity issue — say so honestly instead of guessing "event full".
     await dictionaryManager.initialize();
     errorMsg = getRsvpInvalidSubmissionMessage(dictionaryManager);
   } else if (status === 409 && message === 'Campaign is full') {
