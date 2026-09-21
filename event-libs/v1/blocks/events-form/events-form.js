@@ -1,9 +1,9 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getRsvpInvalidSubmissionMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
-import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
+import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN, STANDARD_FIELD_MAX_LENGTHS } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
 import { applyImplicitContactMethodsToPayload, getImplicitConsentRaw } from '../../utils/rsvp-consent.js';
@@ -332,22 +332,44 @@ export async function getFullState(eventId) {
   return { full, waitlistEnabled, usedCampaign };
 }
 
-export async function buildErrorMsg(parent, status) {
-  const eventId = getMetadata('event-id');
-  const eventObj = await getEvent(eventId);
+// ESP returns allowWaitlisting as either boolean `true` or string `'true'`
+// depending on source (see sessions-hub.js's own normalization of the same field).
+export function isWaitlistingEnabled(eventObj) {
+  const { allowWaitlisting } = eventObj?.data || {};
+  return allowWaitlisting === true || allowWaitlisting === 'true';
+}
 
-  if (!eventObj.ok) return;
+// Resolves which "full" message flavor to show once the backend has already
+// confirmed capacity is the cause (via its error message) — this only picks
+// the copy variant from real event metadata, it never decides whether
+// something is full.
+async function getFullMessageKey(waitlistErrorKey, noWaitlistErrorKey) {
+  const eventObj = await getEvent(getMetadata('event-id'));
+  return eventObj.ok && isWaitlistingEnabled(eventObj) ? waitlistErrorKey : noWaitlistErrorKey;
+}
+
+function getErrorMessage(error) {
+  return typeof error === 'string' ? error : error?.message;
+}
+
+export async function buildErrorMsg(parent, status, error) {
+  const message = getErrorMessage(error);
 
   let errorMsg;
-  if (status === 400) {
-    let errorKey = 'rsvp-error-msg';
-    const { full, waitlistEnabled, usedCampaign } = await getFullState(eventId);
-    if (full && usedCampaign) {
-      errorKey = waitlistEnabled ? 'campaign-full-error-msg' : 'campaign-full-no-waitlist-error-msg';
-    } else {
-      const eventInfo = eventObj.data;
-      errorKey = eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg';
-    }
+  if (status === 400 && message === 'Event is full') {
+    const errorKey = await getFullMessageKey('event-full-error-msg', 'event-full-no-waitlist-error-msg');
+    errorMsg = dictionaryManager.getValue(errorKey);
+  } else if (status === 400 && message === 'Authorization token is not valid for attendeeId') {
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpTokenInvalidMessage(dictionaryManager);
+  } else if (status === 400) {
+    // Any other 400 (schema-validation failure, invalid/missing custom RSVP
+    // field, duplicate external ID, etc.) is a real submission problem, not a
+    // capacity issue — say so honestly instead of guessing "event full".
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpInvalidSubmissionMessage(dictionaryManager);
+  } else if (status === 409 && message === 'Campaign is full') {
+    const errorKey = await getFullMessageKey('campaign-full-error-msg', 'campaign-full-no-waitlist-error-msg');
     errorMsg = dictionaryManager.getValue(errorKey);
   } else if (status === 409 && BlockMediator.get('imsProfile')?.rsvpToken) {
     // AttendeeAlreadyRegistered — this email is already registered for the event.
@@ -370,10 +392,10 @@ export async function buildErrorMsg(parent, status) {
     existingErrors.forEach((err) => err.remove());
   }
 
-  const error = createTag('p', { class: 'error' }, errorMsg);
-  parent.append(error);
+  const errorEl = createTag('p', { class: 'error' }, errorMsg);
+  parent.append(errorEl);
   setTimeout(() => {
-    error.remove();
+    errorEl.remove();
   }, 3000);
 }
 
@@ -469,24 +491,25 @@ function createButton({ type, label }, bp) {
           eventFormSendAnalytics(bp, 'Form Submit');
           if (shouldAutoRegisterSessions(respJson.data?.registrationStatus, BlockMediator.get('imsProfile'))) autoRegisterSessions();
         } else {
-          const { status } = respJson;
+          const { status, error } = respJson;
+          const message = getErrorMessage(error);
+
+          if (status === 400 && message === 'Event is full') {
+            const eventObj = await getEvent(getMetadata('event-id'));
+            if (isWaitlistingEnabled(eventObj)) {
+              button.textContent = dictionaryManager.getValue('waitlist-cta-text');
+              button.disabled = false;
+            } else {
+              button.textContent = dictionaryManager.getValue('event-full-cta-text');
+              button.disabled = true;
+            }
+          }
 
           if (status === 400) {
-            const fullState = await getFullState(getMetadata('event-id'));
-            if (fullState.full) {
-              if (fullState.waitlistEnabled) {
-                button.textContent = dictionaryManager.getValue('waitlist-cta-text');
-                button.disabled = false;
-              } else {
-                button.textContent = dictionaryManager.getValue('event-full-cta-text');
-                button.disabled = true;
-              }
-            }
-
             BlockMediator.set('rsvpData', null);
           }
 
-          buildErrorMsg(bp.form, status);
+          buildErrorMsg(bp.form, status, error);
         }
 
         button.removeAttribute('disabled');
@@ -523,7 +546,8 @@ function createInput({
   const resolvedPattern = pattern || (isPhoneField ? PHONE_PATTERN : null);
   if (resolvedPattern) attrs.pattern = resolvedPattern;
   if (title) attrs.title = title;
-  if (limit != null) attrs.maxlength = limit;
+  const resolvedLimit = limit ?? STANDARD_FIELD_MAX_LENGTHS[field];
+  if (resolvedLimit != null) attrs.maxlength = resolvedLimit;
   const input = createTag('input', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
@@ -532,7 +556,8 @@ function createInput({
 function createTextArea({ field, placeholder, required, defval, limit }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
   const attrs = { id: field, placeholder: placeholderText, value: defval };
-  if (limit != null) attrs.maxlength = limit;
+  const resolvedLimit = limit ?? STANDARD_FIELD_MAX_LENGTHS[field];
+  if (resolvedLimit != null) attrs.maxlength = resolvedLimit;
   const input = createTag('textarea', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
@@ -799,7 +824,7 @@ function decorateSuccessScreen(screen) {
             cta.classList.remove('loading');
 
             if (!rsvpResp.ok) {
-              buildErrorMsg(screen, rsvpResp.status);
+              buildErrorMsg(screen, rsvpResp.status, rsvpResp.error);
               return;
             }
 

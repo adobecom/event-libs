@@ -88,6 +88,19 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   return options;
 }
 
+// Business-logic failures (e.g. EventFull, WaitlistingNotAllowed) are sent as
+// plain-text bodies by the backend, while schema-validation failures are JSON
+// (`{ message, errors }`). response.json() throws on the former, so the body
+// is read as text first and only parsed as JSON when it actually is JSON.
+async function parseFailureBody(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 export async function getEvent(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -322,14 +335,14 @@ export async function createAttendee(attendeeData, rsvpToken = null) {
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
-    const data = await response.json();
 
     if (!response.ok) {
+      const error = await parseFailureBody(response);
       window.lana?.log(`Error: Failed to create attendee. Status:${JSON.stringify(response)}`);
-      return { ok: response.ok, status: response.status, error: data };
+      return { ok: response.ok, status: response.status, error };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
     window.lana?.log(`Error: Failed to create attendee. Error:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
@@ -348,14 +361,14 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
-    const data = await response.json();
 
     if (!response.ok) {
+      const error = await parseFailureBody(response);
       window.lana?.log(`Error: Failed to add attendee for event ${eventId}. Status:${JSON.stringify(response)}`);
-      return { ok: response.ok, status: response.status, error: data };
+      return { ok: response.ok, status: response.status, error };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
     window.lana?.log(`Error: Failed to add attendee for event ${eventId}:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
@@ -371,15 +384,15 @@ export async function updateAttendee(attendeeData) {
   const options = await constructRequestOptions('PUT', raw);
 
   try {
-      const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
-    const data = await response.json();
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
+      const error = await parseFailureBody(response);
       window.lana?.log(`Error: Failed to update attendee. Status:${JSON.stringify(response)}`);
-      return { ok: response.ok, status: response.status, error: data };
+      return { ok: response.ok, status: response.status, error };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
     window.lana?.log(`Error: Failed to update attendee:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };

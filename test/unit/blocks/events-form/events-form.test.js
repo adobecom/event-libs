@@ -4,6 +4,7 @@ import { getValidCampaignIdFromUrl, resetCampaignMapCache } from '../../../../ev
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 import { stripTags } from '../../../../event-libs/v1/utils/sanitize-utils.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
+import { PHONE_FIELD_RE, PHONE_PATTERN, STANDARD_FIELD_MAX_LENGTHS } from '../../../../event-libs/v1/utils/constances.js';
 
 describe('Events Form', () => {
   let block;
@@ -303,9 +304,6 @@ describe('Events Form', () => {
   });
 
   describe('createInput - phone field defaults', () => {
-    const PHONE_FIELD_RE = /phone/i;
-    const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
-
     function simulateCreatePhoneAwareInput({ type, field, pattern, title }) {
       const isPhoneField = type === 'tel' || type === 'phone' || (type !== 'text' && typeof field === 'string' && PHONE_FIELD_RE.test(field));
       const attrs = { type: isPhoneField ? 'tel' : type, id: field };
@@ -381,6 +379,54 @@ describe('Events Form', () => {
       expect(regex.test('555-123-4567')).to.be.true;
       expect(regex.test('+15551234567')).to.be.true;
       expect(regex.test('5551234567')).to.be.true;
+    });
+
+    it('phone pattern rejects formatting-only values with no digit, unlike the backend\'s own (too permissive) PhoneNumberInput schema pattern', () => {
+      const regex = new RegExp(`^(?:${PHONE_PATTERN})$`);
+      expect(regex.test('----')).to.be.false;
+      expect(regex.test('()')).to.be.false;
+      expect(regex.test('+')).to.be.false;
+    });
+
+    it('phone pattern allows up to the backend\'s real 30-char maxLength, not the old hardcoded 20-char cap', () => {
+      const regex = new RegExp(`^(?:${PHONE_PATTERN})$`);
+      const thirtyChars = `+${'1'.repeat(29)}`; // 30 chars total, was previously rejected past 20
+      expect(thirtyChars).to.have.lengthOf(30);
+      expect(regex.test(thirtyChars)).to.be.true;
+      expect(regex.test(`${thirtyChars}1`)).to.be.false; // 31 chars — over the backend's maxLength
+    });
+  });
+
+  describe('createInput - standard field maxlength defaults', () => {
+    // Mirrors createInput's `limit ?? STANDARD_FIELD_MAX_LENGTHS[field]` fallback.
+    function resolveMaxlength(field, limit) {
+      return limit ?? STANDARD_FIELD_MAX_LENGTHS[field];
+    }
+
+    it('defaults firstName/lastName to the backend AttendeeName maxLength (30) when unauthored', () => {
+      expect(resolveMaxlength('firstName', undefined)).to.equal(30);
+      expect(resolveMaxlength('lastName', undefined)).to.equal(30);
+    });
+
+    it('defaults email to the backend Email maxLength (320) when unauthored', () => {
+      expect(resolveMaxlength('email', undefined)).to.equal(320);
+    });
+
+    it('defaults free-text fields (e.g. companyName) to the backend AttendeeTextField maxLength (200) when unauthored', () => {
+      expect(resolveMaxlength('companyName', undefined)).to.equal(200);
+      expect(resolveMaxlength('countryRegion', undefined)).to.equal(200);
+    });
+
+    it('defaults specialRequirements to the backend SpecialRequirements maxLength (1000) when unauthored', () => {
+      expect(resolveMaxlength('specialRequirements', undefined)).to.equal(1000);
+    });
+
+    it('lets an authored limit override the standard default', () => {
+      expect(resolveMaxlength('firstName', 50)).to.equal(50);
+    });
+
+    it('leaves unrecognized/custom RSVP field names with no default', () => {
+      expect(resolveMaxlength('aiApproach', undefined)).to.be.undefined;
     });
   });
 
@@ -957,11 +1003,28 @@ describe('Events Form', () => {
     let originalHref;
     let getFullState;
     let buildErrorMsg;
+    let isWaitlistingEnabled;
 
     before(async () => {
       const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
       getFullState = module.getFullState;
       buildErrorMsg = module.buildErrorMsg;
+      isWaitlistingEnabled = module.isWaitlistingEnabled;
+    });
+
+    describe('isWaitlistingEnabled', () => {
+      it('treats a real boolean true the same as the string "true" — ESP returns either depending on source', () => {
+        expect(isWaitlistingEnabled({ data: { allowWaitlisting: true } })).to.be.true;
+        expect(isWaitlistingEnabled({ data: { allowWaitlisting: 'true' } })).to.be.true;
+      });
+
+      it('treats boolean false, the string "false", and a missing value as disabled', () => {
+        expect(isWaitlistingEnabled({ data: { allowWaitlisting: false } })).to.be.false;
+        expect(isWaitlistingEnabled({ data: { allowWaitlisting: 'false' } })).to.be.false;
+        expect(isWaitlistingEnabled({ data: {} })).to.be.false;
+        expect(isWaitlistingEnabled({})).to.be.false;
+        expect(isWaitlistingEnabled(undefined)).to.be.false;
+      });
     });
 
     beforeEach(() => {
@@ -1048,36 +1111,7 @@ describe('Events Form', () => {
       expect(state.usedCampaign).to.be.false;
     });
 
-    it('buildErrorMsg uses campaign-full error key when status 400 and campaign full', async () => {
-      window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
-      stubFetchByUrl(
-        {
-          json: () => ({
-            isFull: false,
-            allowWaitlisting: true,
-            attendeeCount: 50,
-            attendeeLimit: 100,
-          }),
-          ok: true,
-        },
-        {
-          json: () => ({
-            campaignId: 'camp-1',
-            attendeeLimit: 100,
-            attendeeCount: 100,
-            waitlistAttendeeCount: 0,
-          }),
-          ok: true,
-        },
-      );
-      const form = document.createElement('form');
-      await buildErrorMsg(form, 400);
-      const errorEl = form.querySelector('.error');
-      expect(errorEl).to.not.be.null;
-      expect(errorEl.textContent).to.equal('campaign-full-error-msg');
-    });
-
-    it('buildErrorMsg uses event-full error key when status 400 and no campaign in URL', async () => {
+    it('buildErrorMsg uses the event-full error key only when the backend confirms "Event is full" on a 400', async () => {
       stubFetchByUrl({
         json: () => ({
           isFull: true,
@@ -1088,10 +1122,56 @@ describe('Events Form', () => {
         ok: true,
       });
       const form = document.createElement('form');
-      await buildErrorMsg(form, 400);
+      await buildErrorMsg(form, 400, 'Event is full');
       const errorEl = form.querySelector('.error');
       expect(errorEl).to.not.be.null;
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
+    });
+
+    it('buildErrorMsg uses the campaign-full error key only when the backend confirms "Campaign is full" on a 409', async () => {
+      stubFetchByUrl({
+        json: () => ({
+          isFull: false,
+          allowWaitlisting: true,
+          attendeeCount: 50,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 409, 'Campaign is full');
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('campaign-full-error-msg');
+    });
+
+    it('buildErrorMsg shows the token-invalid message when a 400 is an rsvp-token/attendeeId mismatch', async () => {
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 400, 'Authorization token is not valid for attendeeId');
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('This registration link is no longer valid. It may have already been used or expired.');
+    });
+
+    it('buildErrorMsg shows a generic "check your entries" message for a plain-text 400 that is not a confirmed capacity or token failure', async () => {
+      // e.g. CustomFieldRequired/CustomFieldInvalid/CustomFieldNotFound, or InvalidExternalIdMapping —
+      // a real submission problem, not something the FE should ever guess is a capacity issue.
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 400, 'Custom field companyName is required');
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('There was a problem with the information you submitted. Please check your entries and try again.');
+    });
+
+    it('buildErrorMsg shows the same generic message for a JSON schema-validation 400 body', async () => {
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 400, { message: 'Invalid request', errors: [{ path: '.email', message: 'must match format "email"' }] });
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('There was a problem with the information you submitted. Please check your entries and try again.');
     });
 
     it('buildErrorMsg shows the already-registered message on a 409 when an RSVP token is active', async () => {
