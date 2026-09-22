@@ -1,4 +1,5 @@
 import { getMetadata } from './utils.js';
+import { logError } from './lana-log.js';
 
 const CHANNEL_ORDER = ['email', 'phone'];
 
@@ -69,7 +70,7 @@ export function applyImplicitContactMethodsToPayload(form, payload) {
       }
     }
   } catch (e) {
-    window.lana?.log(`implicit consent read failed: ${e instanceof Error ? e.message : String(e)}`);
+    logError('rsvp-consent', `implicit consent read failed for event ${getMetadata('event-id')}`, e);
     return;
   }
 

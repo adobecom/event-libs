@@ -1,5 +1,6 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 import { applyAreaTheme } from '../../utils/decorate.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 /** @param {HTMLElement} host */
 function ensureReparentSet(host) {
@@ -64,7 +65,7 @@ function disconnectReparentObserverAndRemoveOrphans(chronoBoxEl) {
       // Only detach nodes Milo moved outside the host; innerHTML handles the rest on swap.
       if (node?.isConnected && !chronoBoxEl.contains(node)) node.remove();
     } catch (error) {
-      window.lana?.log(`chrono-box reparent cleanup: ${error.message}`);
+      logError('chrono-box,reparent-cleanup', 'reparent cleanup failed', error);
     }
   });
   roots.clear();
@@ -87,7 +88,7 @@ export function cleanupChronoBoxOutboundNodes(chronoBoxEl) {
       }));
     }
   } catch (error) {
-    window.lana?.log(`chrono-box:before-swap event: ${error.message}`);
+    logError('chrono-box,before-swap', 'before-swap event dispatch failed', error);
   }
 
   const fns = chronoBoxEl._chronoBoxOutboundCleanup;
@@ -96,7 +97,7 @@ export function cleanupChronoBoxOutboundNodes(chronoBoxEl) {
       try {
         fn();
       } catch (error) {
-        window.lana?.log(`chrono-box outbound cleanup: ${error.message}`);
+        logError('chrono-box,outbound-cleanup', 'outbound cleanup callback failed', error);
       }
     });
     chronoBoxEl._chronoBoxOutboundCleanup = [];
@@ -132,11 +133,11 @@ function getSchedule(scheduleId) {
   try {
     thisSchedule = JSON.parse(scheduleJSONString)[scheduleId];
   } catch (error) {
-    window.lana?.log(`Error parsing schedule: ${error.message}`);
+    logError('chrono-box,schedule-parse', 'error parsing schedule', error);
   }
 
   if (!thisSchedule) {
-    window.lana?.log(`Schedule not found: ${scheduleId}`);
+    logWarning('chrono-box,schedule-lookup', 'schedule not found', scheduleId);
     return null;
   }
 
@@ -199,7 +200,7 @@ async function createWorker(workerUrl) {
     worker = new Worker(blobUrl);
     return { worker, blobUrl };
   } catch (error) {
-    window.lana?.log(`Failed to create worker: ${error.message}`);
+    logError('chrono-box,worker-create', 'failed to create worker', error);
     throw new Error(`Failed to create worker: ${error.message}`);
   }
 }
@@ -238,7 +239,7 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   try {
     worker.postMessage(messageData);
   } catch (error) {
-    window.lana?.log(`Error posting message to worker: ${error.message}`);
+    logError('chrono-box,worker-message', 'error posting message to worker', error);
     if (blobUrl) {
       URL.revokeObjectURL(blobUrl);
     }
@@ -250,7 +251,7 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   }
 
   worker.addEventListener('error', (event) => {
-    window.lana?.log(`chrono-box worker error: ${event.message || 'unknown'}`);
+    logError('chrono-box,worker-error', 'worker error', event.message || 'unknown');
   });
 
   return worker;
@@ -351,7 +352,7 @@ export default async function init(el) {
         try {
           staticSchedule = JSON.parse(value);
         } catch (error) {
-          window.lana?.log(`Error parsing static schedule: ${error.message}`);
+          logError('chrono-box,static-schedule-parse', 'error parsing static schedule', error);
         }
       }
     }
@@ -397,7 +398,7 @@ export default async function init(el) {
       pluginsOutputs.tabId,
     );
   } catch (error) {
-    window.lana?.log(`Error creating worker: ${error.message}`);
+    logError('chrono-box,worker-init', 'error creating worker', error);
     el.innerHTML = '<div class="error-message">Unable to initialize timing system. Please refresh the page.</div>';
     el.classList.add('error');
     return Promise.resolve();
@@ -454,12 +455,12 @@ export default async function init(el) {
           try {
             await openModalFromPageHashAfterFragment();
           } catch (error) {
-            window.lana?.log(`chrono-box modal hash: ${error.message}`);
+            logError('chrono-box,modal-hash', 'error opening modal from hash', error);
           }
           resolve();
         })
         .catch((error) => {
-          window.lana?.log(`Error loading fragment ${fragmentPath}: ${error.message}`);
+          logError('chrono-box,fragment-load', `error loading fragment ${fragmentPath}`, error);
           el.removeAttribute('style');
           el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
           el.classList.add('error');

@@ -1,4 +1,5 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
+import { logError } from '../../../utils/lana-log.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 
 const AUDIENCE = { ALL: 'all', SIGNED_IN: 'signed-in', IN_PERSON: 'in-person' };
@@ -53,7 +54,7 @@ async function isRegisteredInPerson() {
     const { isRegistered, inPersonAttendee } = await window.events.getRegistrationStatus();
     return isRegistered === true && inPersonAttendee === true;
   } catch (e) {
-    window.lana?.log(`[in-person-banner] registration status check failed: ${e.message}`);
+    logError('in-person-banner', 'registration status check failed', e);
     return false;
   }
 }

@@ -7,6 +7,7 @@ import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN, S
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
 import { applyImplicitContactMethodsToPayload, getImplicitConsentRaw } from '../../utils/rsvp-consent.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -454,7 +455,7 @@ async function autoRegisterSessions() {
   const newIds = new Set();
   results.forEach((r, i) => {
     if (r.status === 'fulfilled' && r.value.ok) newIds.add(autoRegTimes[i].sessionId);
-    else window.lana?.log(`Auto-registration failed for session time ${autoRegTimes[i]?.sessionTimeId}`);
+    else logWarning('events-form', `Auto-registration failed for session time ${autoRegTimes[i]?.sessionTimeId}`);
   });
 
   if (!newIds.size) return;
@@ -995,7 +996,7 @@ export function getRsvpConfigFromMeta() {
 
     return { data };
   } catch (error) {
-    window.lana?.log(`Failed to parse rsvp-config metadata: ${JSON.stringify(error)}`);
+    logError('events-form', 'Failed to parse rsvp-config metadata', error);
     return null;
   }
 }
@@ -1010,7 +1011,7 @@ async function createForm(bp, formData) {
     try {
       rsvpFieldsData = JSON.parse(getMetadata('rsvp-form-fields'));
     } catch (error) {
-      window.lana?.log(`Failed to parse partners metadata:\n${JSON.stringify(error, null, 2)}`);
+      logError('events-form', 'Failed to parse partners metadata', error);
     }
   }
 
@@ -1205,7 +1206,7 @@ export async function initFormBasedOnRSVPData(bp) {
 
   if (profile.account_type !== 'guest') {
     let existingAttendeeData = {};
-    const attendeeResp = await getAttendee();
+    const attendeeResp = await getAttendee(getMetadata('event-id'));
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
     if (syncUIWithRSVPStatus()) return;
     personalizeForm(block, { existingAttendeeData, profile });
@@ -1332,7 +1333,7 @@ function getFormLink(block, bp) {
     try {
       form.href = getRsvpConfigUrl();
     } catch (error) {
-      window.lana?.log(`Error getting RSVP config URL: ${JSON.stringify(error)}`);
+      logError('events-form', 'Error getting RSVP config URL', error);
       throw error;
     }
 

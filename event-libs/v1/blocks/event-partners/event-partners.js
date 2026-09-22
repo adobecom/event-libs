@@ -1,4 +1,5 @@
 import { createTag, getMetadata, getImageSource } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
  
 export function isOdd(number) {
   return number % 2 !== 0;
@@ -16,7 +17,7 @@ export default function init(el) {
     // FIXME: sponsors !== partners
     partnersData = JSON.parse(getMetadata('sponsors'));
   } catch (error) {
-    window.lana?.log(`Failed to parse partners metadata:\n${JSON.stringify(error, null, 2)}`);
+    logError('event-partners', 'Failed to parse partners metadata', error);
     el.remove();
     return;
   }
