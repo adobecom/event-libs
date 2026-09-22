@@ -107,13 +107,14 @@
 
 .sb-info:has(.sb-info__desc-wrap) { grid-template-areas: "row" "meta" "desc" "actions"; }
 
+/* Mobile expanded: actions pinned to the bottom (Figma 8454:53739), below View all details. */
 .sb-info.is-expanded {
   grid-template-areas:
     "row"
-    "actions"
     "meta"
     "desc"
-    "viewall";
+    "viewall"
+    "actions";
 }
 
 /* Mobile only — collapsed+favorited hides the badge/description grid rows too, not just visually. */
@@ -233,11 +234,12 @@
 
 /* Mobile only (Figma dev-mode spec) — tablet/desktop keep the standard grid gap. */
 @media (max-width: 767px) {
-  /* Figma dev-mode spec calls for a different gap between each row (7px/7px/14px), not the
-     standard uniform grid gap above — zero that out here and space each row with its own
-     margin-top instead. */
+  /* Figma dev-mode spec calls for a different gap between each row (7px/7px/14px), not the standard
+     uniform grid gap above — zero that out and space each row with its own margin-top instead.
+     Rounded bottom corners on the dark info card too (Figma 8454:53737). */
   .sb-info {
     gap: 0;
+    border-radius: 0 0 var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px);
   }
 
   .sb-info__meta {
@@ -252,9 +254,22 @@
     line-height: 18px;
   }
 
+  /* 8px between the description and View all details in the expanded card (Figma 8454:53739). */
+  .sb-info__view-all {
+    margin-top: var(--s2a-spacing-xs, 8px);
+  }
+
   .sb-info__actions {
     margin-top: 14px;
     gap: 6px;
+  }
+
+  /* Tuck Also Live up behind sb-info's rounded bottom so its #262626 fills the corner notches;
+     sb-info's z-index:1 keeps it painting on top. Adjacency-scoped so this only happens when the
+     section follows sb-info (not the ended state); padding-top restores the header's offset. */
+  .sb-info + .sb-carousel-section--also-live {
+    margin-top: calc(-1 * var(--s2a-border-radius-md, 16px));
+    padding-top: var(--s2a-spacing-xl, 32px);
   }
 }
 
@@ -770,6 +785,13 @@
 /* White section, gray-50 cards (inverse of Also Live); no right padding so cards peek off-edge. */
 .sb-carousel-section--up-next {
   padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-lg);
+}
+
+/* Tighter mobile padding (Figma): 16px top, 24px bottom, 24px left, 0 right. */
+@media (max-width: 767px) {
+  .sb-carousel-section--up-next {
+    padding: var(--s2a-spacing-md) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
+  }
 }
 
 .sb-carousel-section--up-next .sg-carousel__header { margin-bottom: var(--s2a-spacing-sm); }
