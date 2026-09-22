@@ -843,12 +843,25 @@ export default async function init(el) {
   const isOnDemandPhase = (phase) => phase === PLAYBACK_PHASE.ON_DEMAND;
 
   let started = false;
-  const onPlayable = (event) => {
-    if (event.detail?.sessionId !== sessionId) return;
+  const startFor = (phase) => {
     if (started || !el.isConnected) return;
-    if (!isOnDemandPhase(event.detail?.phase)) return;
+    // eslint-disable-next-line no-console
+    console.log('[svp-playlist] playable for current session', { phase, isOnDemand: isOnDemandPhase(phase) });
+    if (!isOnDemandPhase(phase)) {
+      // Not an on-demand premiere (e.g. DVR replay): no playlist. Still announce "no playlist" so
+      // the player embeds the video full-width instead of waiting forever for a layout decision.
+      // eslint-disable-next-line no-console
+      console.log('[svp-playlist] non-on-demand phase → announceVideoDecision(false), no playlist');
+      announceVideoDecision(false);
+      return;
+    }
     started = true;
     runRenderFlow();
+  };
+
+  const onPlayable = (event) => {
+    if (event.detail?.sessionId !== sessionId) return;
+    startFor(event.detail?.phase);
   };
 
   window.addEventListener('session-video-player:playable', onPlayable);
@@ -857,9 +870,7 @@ export default async function init(el) {
   });
 
   const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
-  if (alreadyPlayable?.sessionId === sessionId && isOnDemandPhase(alreadyPlayable?.phase)
-    && !started && el.isConnected) {
-    started = true;
-    runRenderFlow();
+  if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
+    startFor(alreadyPlayable.phase);
   }
 }
