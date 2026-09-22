@@ -3,6 +3,7 @@ import {
 } from '../../v1/deps/htm-preact.js';
 import { setDaToken, setDaFetch } from '../scripts/da-controller.js';
 import { setEspAuthToken } from '../../v1/utils/esp-controller.js';
+import { logError } from '../../v1/utils/lana-log.js';
 
 const DAContext = createContext();
 
@@ -26,7 +27,7 @@ const DAProvider = ({ children }) => {
         // No Milo/IMS bootstrap here, so reuse DA's token as the ESP auth bearer.
         setEspAuthToken(sdkToken);
       } catch (err) {
-        window.lana?.log(`DA SDK init error: ${err}`);
+        logError('session-guide-configurator,da-context', 'DA SDK init error', err);
         setError('Failed to initialize DA SDK. Please reload the page.');
       } finally {
         setIsLoading(false);

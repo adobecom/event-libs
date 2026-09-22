@@ -1,3 +1,5 @@
+import { logError } from '../../../../utils/lana-log.js';
+
 /**
  * MobileRider Controller
  * Handles all interactions with the MobileRider API
@@ -24,13 +26,13 @@ class MobileRiderController {
 
       if (!response.ok) {
         const error = await response.json();
-        window.lana?.log(`MobileRider getMediaStatus error: ${JSON.stringify(error)}`);
+        logError('mobile-rider-controller', 'getMediaStatus error', error);
         throw new Error(error.message || 'Failed to get media status');
       }
 
       return await response.json();
     } catch (error) {
-      window.lana?.log(`MobileRider getMediaStatus error: ${error.message}`);
+      logError('mobile-rider-controller', 'getMediaStatus error', error);
       throw error;
     }
   }
@@ -45,7 +47,7 @@ class MobileRiderController {
       const { active } = await this.getMediaStatus([id]);
       return active.includes(id);
     } catch (error) {
-      window.lana?.log(`MobileRider isMediaActive error: ${error.message}`);
+      logError('mobile-rider-controller', 'isMediaActive error', error);
       return false;
     }
   }
@@ -66,7 +68,7 @@ class MobileRiderController {
 
       return statusMap;
     } catch (error) {
-      window.lana?.log(`MobileRider getMediaStatusMap error: ${error.message}`);
+      logError('mobile-rider-controller', 'getMediaStatusMap error', error);
       // Return a map with all IDs set to false in case of error
       return new Map(ids.map((id) => [id, false]));
     }

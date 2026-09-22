@@ -1,4 +1,5 @@
 import { LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
+import { logInfo } from '../../utils/lana-log.js';
 
 const SELECTOR = '.section.bento.stack-mobile';
 
@@ -28,7 +29,7 @@ async function handleSection(section) {
     const initBentoStack = await loadBentoStack();
     initBentoStack(section);
   } catch (e) {
-    window.lana?.log(`milo-site-redesign-override failed: ${e}`, { tags: 'bento-stack', severity: 'info' });
+    logInfo('bento-stack', 'milo-site-redesign-override failed', e);
   }
 }
 

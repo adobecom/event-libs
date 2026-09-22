@@ -1,4 +1,5 @@
 import { useState } from '../../../v1/deps/htm-preact.js';
+import { logError } from '../../../v1/utils/lana-log.js';
 import { html } from '../../htm-wrapper.js';
 import { useSchedulesData, useSchedulesOperations, useSchedulesUI } from '../../context/SchedulesContext.js';
 import { useDA } from '../../context/DAContext.js';
@@ -30,7 +31,7 @@ export default function ScheduleHeader() {
         setToastError('Failed to copy link to clipboard');
       }
     } catch (error) {
-      window.lana?.log(`Error copying link: ${error}`);
+      logError('schedule-maker,schedule-header', 'Error copying link', error);
     }
   };
 

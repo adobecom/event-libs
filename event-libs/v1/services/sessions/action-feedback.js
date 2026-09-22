@@ -8,6 +8,7 @@ import {
   sessions, sessionsStatus, liveStreamActiveIds, getEventApiConfig,
 } from '../../utils/session-store.js';
 import { getNowMs, isPostEvent } from '../../utils/session-state.js';
+import { logError } from '../../utils/lana-log.js';
 
 // Shared toast copy for gated actions, used by both runSessionAction's failures and checkViewAccess.
 export function showAuthToast({ eventConfig, actionLabel }) {
@@ -45,10 +46,10 @@ export async function runSessionAction(actionFn, {
           }
         },
       }).catch((modalErr) => {
-        window.lana?.log(`[sessions-guide] ${actionLabel} conflict modal failed: ${modalErr.message}`);
+        logError('sessions-guide', `${actionLabel} conflict modal failed`, modalErr);
       });
     } else {
-      window.lana?.log(`[sessions-guide] ${actionLabel} failed: ${err.message}`);
+      logError('sessions-guide', `${actionLabel} failed`, err);
       showToast({ message: 'Something went wrong. Please try again.', variant: 'negative' });
     }
   }

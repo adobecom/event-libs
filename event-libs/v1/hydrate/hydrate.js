@@ -11,15 +11,15 @@ const registry = new Map();
 
 export function registerHydrator(blockName, hydrator) {
   if (!blockName || typeof hydrator !== 'function') {
-    logHydration(`Hydrator: registerHydrator("${blockName}") needs a function. Import your module first and register its default export.`);
+    logHydration(`Hydrator: registerHydrator("${blockName}") needs a function. Import your module first and register its default export.`, { tags: 'hydrate,registry', severity: 'warning' });
     return false;
   }
   if (hydrator.constructor?.name === 'AsyncFunction') {
-    logHydration(`Hydrator: registerHydrator("${blockName}") rejected an async function. Hydration must be synchronous.`);
+    logHydration(`Hydrator: registerHydrator("${blockName}") rejected an async function. Hydration must be synchronous.`, { tags: 'hydrate,registry', severity: 'warning' });
     return false;
   }
   if (registry.has(blockName)) {
-    logHydration(`Hydrator: registerHydrator("${blockName}") replaced an existing registration.`);
+    logHydration(`Hydrator: registerHydrator("${blockName}") replaced an existing registration.`, { tags: 'hydrate,registry', severity: 'warning' });
   }
   registry.set(blockName, hydrator);
   return true;
@@ -44,14 +44,14 @@ export function hydrateBlocks(area = document) {
     const hydrate = getRegisteredHydrator(blockName) ?? ownHydrator;
 
     if (!hydrate) {
-      logHydration(`Hydrator not found for block: ${blockName}`);
+      logHydration(`Hydrator not found for block: ${blockName}`, { tags: 'hydrate,registry', severity: 'warning' });
       continue;
     }
 
     try {
       if (hydrate(block) !== false) block.setAttribute(HYDRATED_ATTR, 'true');
     } catch (e) {
-      logHydration(`Hydrator failed for block ${blockName}: ${e.message}`);
+      logHydration(`Hydrator failed for block ${blockName}: ${e.message}`, { tags: 'hydrate,registry', severity: 'error' });
     }
   }
 }
