@@ -845,13 +845,9 @@ export default async function init(el) {
   let started = false;
   const startFor = (phase) => {
     if (started || !el.isConnected) return;
-    // eslint-disable-next-line no-console
-    console.log('[svp-playlist] playable for current session', { phase, isOnDemand: isOnDemandPhase(phase) });
     if (!isOnDemandPhase(phase)) {
       // Not an on-demand premiere (e.g. DVR replay): no playlist. Still announce "no playlist" so
       // the player embeds the video full-width instead of waiting forever for a layout decision.
-      // eslint-disable-next-line no-console
-      console.log('[svp-playlist] non-on-demand phase → announceVideoDecision(false), no playlist');
       announceVideoDecision(false);
       return;
     }

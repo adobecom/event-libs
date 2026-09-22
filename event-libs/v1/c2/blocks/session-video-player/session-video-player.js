@@ -475,33 +475,13 @@ function awaitEmbedDecision(el) {
 }
 
 function resolveVideoForPhase(phase, sessionTimes, session) {
-  // eslint-disable-next-line no-console
-  console.log('[svp-resolve] resolveVideoForPhase() CALLED', {
-    phase,
-    isPlayablePhase: PLAYABLE_PHASES.includes(phase),
-    mrDvrVideoId: session?.mrDvrVideoId,
-    mrSkinId: session?.mrSkinId,
-    mpcId: session?.mpcId,
-  });
   if (phase === PLAYBACK_PHASE.ON_DEMAND) {
-    const v = pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
-    // eslint-disable-next-line no-console
-    console.log('[svp-resolve] → ON_DEMAND video', v);
-    return v;
+    return pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
   }
   if (phase === PLAYBACK_PHASE.DVR_BUFFER) {
-    if (!session?.mrDvrVideoId) {
-      // eslint-disable-next-line no-console
-      console.log('[svp-resolve] → DVR_BUFFER but no mrDvrVideoId → null');
-      return null;
-    }
-    const v = { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
-    // eslint-disable-next-line no-console
-    console.log('[svp-resolve] → DVR_BUFFER video', v);
-    return v;
+    if (!session?.mrDvrVideoId) return null;
+    return { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
   }
-  // eslint-disable-next-line no-console
-  console.log('[svp-resolve] → phase is NOT playable (e.g. WATCH_LIVE / PRE_EVENT) → no video, no embed', { phase });
   return null;
 }
 
@@ -557,15 +537,6 @@ export default async function init(el) {
 
   const onPhase = (phase) => {
     if (!el.isConnected) return;
-    // eslint-disable-next-line no-console
-    console.log('[svp-resolve] onPhase() received phase', {
-      phase,
-      isPlayable: PLAYABLE_PHASES.includes(phase),
-      willCallResolve: PLAYABLE_PHASES.includes(phase),
-      note: PLAYABLE_PHASES.includes(phase)
-        ? 'playable → resolving a video to embed'
-        : 'NOT playable (e.g. WATCH_LIVE while stream is live) → no video, nothing embeds',
-    });
     const video = PLAYABLE_PHASES.includes(phase)
       ? resolveVideoForPhase(phase, sessionTimes, session)
       : null;
