@@ -598,6 +598,17 @@ export default async function init(el) {
       return;
     }
 
+    // Non-playable phase (WATCH_LIVE / PRE_EVENT) with a video already embedded: the phase moved
+    // back out of DVR/on-demand (e.g. the MR poll returned and the stream is actually live). Tear
+    // the mounted player down so a stale DVR/on-demand video doesn't keep showing under a live state.
+    if (embeddedPhase !== null && !PLAYABLE_PHASES.includes(phase)) {
+      el.querySelector('.mobile-rider')?.remove();
+      el.querySelector('.milo-video')?.remove();
+      delete el.dataset.embedded;
+      embeddedPhase = null;
+      return;
+    }
+
     if (embeddedPhase === null && PLAYABLE_PHASES.includes(phase)) {
       logWarning(LOG_SCOPE, `session is in "${phase}" phase with no embeddable video — removing`);
       el.remove();

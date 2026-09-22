@@ -192,8 +192,14 @@ export function mountSessionState({
   const scheduleBtn = isSchedulableSession() ? renderSchedule() : null;
   const watchBtn = renderWatchNow();
 
-  const ctaFor = (state, nowMs) => {
+  // 'live' → Watch now. Otherwise Add to schedule only while a session slot is still to come
+  // (nowMs < finalEnd). `phaseDriven` is true for the mrStreamId poll path, where DVR_BUFFER maps
+  // to an 'on-demand' state before the scheduled end: there we must follow the state (no schedule
+  // once we've left 'live'/'upcoming'), not the clock, or a DVR replay before finalEnd would still
+  // wrongly offer Add to schedule.
+  const ctaFor = (state, nowMs, phaseDriven = false) => {
     if (state === 'live') return watchBtn;
+    if (phaseDriven) return state === 'upcoming' ? scheduleBtn : null;
     return nowMs < finalEnd ? scheduleBtn : null;
   };
 
@@ -218,8 +224,8 @@ export function mountSessionState({
     applyCta(btn);
   };
 
-  const apply = (state, nowMs) => {
-    if (primaryCtaSlot) setCta(ctaFor(state, nowMs));
+  const apply = (state, nowMs, phaseDriven = false) => {
+    if (primaryCtaSlot) setCta(ctaFor(state, nowMs, phaseDriven));
     if (statusSlot) statusSlot.replaceChildren(renderStatus(state, earliest, statusLabels));
     if (ccEl) ccEl.hidden = state !== 'on-demand';
   };
@@ -234,7 +240,7 @@ export function mountSessionState({
     const stop = watchPlaybackPhase(session, (phase) => {
       const now = getNowMs();
       const state = phase == null ? getState(now, slots) : stateForPhase(phase);
-      apply(state, now);
+      apply(state, now, phase != null);
     });
     return stop;
   }

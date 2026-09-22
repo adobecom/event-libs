@@ -318,9 +318,12 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
       emitIfChanged();
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId]);
+    // Defer the first emit until the poll answers: an mrStreamId session must not resolve
+    // DVR/on-demand from an empty poll set before we know whether the stream is live, or a live
+    // session would briefly embed the DVR replay and then tear it down once the poll reports active.
+  } else {
+    emitIfChanged();
   }
-
-  emitIfChanged();
   scheduleNextClockTick();
 
   return function stop() {
