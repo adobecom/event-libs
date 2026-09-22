@@ -379,6 +379,18 @@
     font-size: var(--s2a-font-size-lg, 18px);
     line-height: var(--s2a-font-line-height-xs, 18px);
   }
+
+  /* Also Live + Up Next titles follow heading-6 on tablet (Figma). */
+  .sb-carousel-section--also-live .sg-section-title,
+  .sb-carousel-section--up-next .sg-section-title {
+    color: var(--s2a-color-content-inverse, #fff);
+    text-wrap: balance;
+    font-family: var(--s2a-font-family-heading);
+    font-size: var(--s2a-typography-font-size-heading-6);
+    font-weight: var(--s2a-font-weight-heading, 900);
+    line-height: var(--s2a-typography-line-height-heading-6, 18px);
+    letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  }
 }
 
 /* .sb-info has no background from tablet up — sits on .sb-app's own black instead. */
@@ -787,8 +799,9 @@
   padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-lg);
 }
 
-/* Tighter mobile padding (Figma): 16px top, 24px bottom, 24px left, 0 right. */
-@media (max-width: 767px) {
+/* Tighter mobile + tablet padding (Figma): 16px top, 24px bottom, 24px left, 0 right. Desktop
+   keeps its own 1280px+ rule. */
+@media (max-width: 1279px) {
   .sb-carousel-section--up-next {
     padding: var(--s2a-spacing-md) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
   }
