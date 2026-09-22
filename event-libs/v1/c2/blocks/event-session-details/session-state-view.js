@@ -177,15 +177,19 @@ export function mountSessionState({
   statusSlot, primaryCtaSlot, ccEl, statusLabels = DEFAULT_STATUS_LABELS,
 }) {
   const slots = getAllSessionTimes();
-  if (!slots.length) return;
-  const earliest = slots[0];
 
+  // IPOD sessions don't depend on session-times for the eyebrow (renderStatus uses hasPlayableVideo,
+  // and the DVR gate falls back to the event start when there are no times). Handle them first so
+  // an IPOD session with empty session-times still shows Available soon / On-demand.
   if (isInPersonIpodSession()) {
     if (primaryCtaSlot) primaryCtaSlot.replaceChildren();
-    if (statusSlot) statusSlot.replaceChildren(renderStatus(null, earliest, statusLabels));
+    if (statusSlot) statusSlot.replaceChildren(renderStatus(null, slots[0], statusLabels));
     if (ccEl) ccEl.hidden = !hasPlayableVideo();
     return;
   }
+
+  if (!slots.length) return;
+  const earliest = slots[0];
 
   const finalEnd = Math.max(...slots.map(({ end }) => end));
 

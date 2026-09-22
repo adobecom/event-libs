@@ -520,6 +520,17 @@ describe('session-state-view', () => {
       expect(statusSlot.textContent).to.equal('Available soon');
     });
 
+    it('IPOD session with empty session-times still renders the eyebrow (no early bailout)', () => {
+      ipodFormat();
+      setMetadata('session-times', '[]');
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+      expect(primaryCtaSlot.children.length).to.equal(0);
+      // No recording resolvable (no session-times) → not available yet → Available soon.
+      expect(statusSlot.textContent).to.equal('Available soon');
+      expect(statusSlot.querySelector('.session-status--ipod-pending')).to.exist;
+    });
+
     it('IPOD session with a recording, once ended, shows On-demand and still no CTA', () => {
       ipodFormat();
       const start = Date.now() - 3600000;
