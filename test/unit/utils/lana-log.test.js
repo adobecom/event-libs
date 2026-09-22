@@ -18,15 +18,17 @@ describe('lana-log', () => {
     window.lana.log = originalLog;
   });
 
+  const CONTEXT_PATTERN = /\| ua=.*,viewport=\d+x\d+,lang=.*,env=(dev|stage|prod)$/;
+
   it('formats the message with a [scope] prefix and sets tags/severity from scope', () => {
     logError('my-scope', 'thing failed');
-    expect(calls[0].msg).to.equal('[my-scope] thing failed');
+    expect(calls[0].msg).to.include('[my-scope] thing failed');
     expect(calls[0].options).to.deep.equal({ tags: 'my-scope', severity: 'error' });
   });
 
   it('omits the trailing data suffix when no data is passed', () => {
     logError('scope', 'msg');
-    expect(calls[0].msg).to.equal('[scope] msg');
+    expect(calls[0].msg).to.match(/^\[scope\] msg \|/);
   });
 
   it('maps each helper to its matching severity', () => {
@@ -42,13 +44,13 @@ describe('lana-log', () => {
 
   it('serializes an Error without producing "{}"', () => {
     logError('scope', 'msg', new Error('boom'));
-    expect(calls[0].msg).to.equal('[scope] msg: Error: boom');
+    expect(calls[0].msg).to.include('[scope] msg: Error: boom');
     expect(calls[0].msg).to.not.include('{}');
   });
 
   it('serializes a subclassed error using its own name, not a hardcoded "Error"', () => {
     logError('scope', 'msg', new TypeError('bad'));
-    expect(calls[0].msg).to.equal('[scope] msg: TypeError: bad');
+    expect(calls[0].msg).to.include('[scope] msg: TypeError: bad');
   });
 
   it('serializes a fetch Response without producing "{}"', () => {
@@ -61,26 +63,26 @@ describe('lana-log', () => {
 
   it('serializes a plain object via JSON.stringify', () => {
     logError('scope', 'msg', { foo: 'bar' });
-    expect(calls[0].msg).to.equal('[scope] msg: {"foo":"bar"}');
+    expect(calls[0].msg).to.include('[scope] msg: {"foo":"bar"}');
   });
 
   it('redacts PII-shaped keys on a plain object', () => {
     logError('scope', 'msg', { email: 'a@b.com', firstName: 'Jane', status: 'active' });
-    expect(calls[0].msg).to.equal(
+    expect(calls[0].msg).to.include(
       '[scope] msg: {"email":"[REDACTED]","firstName":"[REDACTED]","status":"active"}',
     );
   });
 
   it('redacts PII-shaped keys inside nested objects', () => {
     logError('scope', 'msg', { code: 'Conflict', attendee: { email: 'a@b.com', phone: '555-1234' } });
-    expect(calls[0].msg).to.equal(
+    expect(calls[0].msg).to.include(
       '[scope] msg: {"code":"Conflict","attendee":{"email":"[REDACTED]","phone":"[REDACTED]"}}',
     );
   });
 
   it('passes a thrown string through as-is rather than double-encoding it', () => {
     logError('scope', 'msg', 'oops');
-    expect(calls[0].msg).to.equal('[scope] msg: oops');
+    expect(calls[0].msg).to.include('[scope] msg: oops');
   });
 
   it('falls back to String(data) for a circular object instead of throwing', () => {
@@ -88,5 +90,23 @@ describe('lana-log', () => {
     circular.self = circular;
     expect(() => logError('scope', 'msg', circular)).to.not.throw();
     expect(calls[0].msg).to.include('[object Object]');
+  });
+
+  it('appends client context for warning, error, and critical severities', () => {
+    logWarning('scope', 'a');
+    logError('scope', 'b');
+    logCritical('scope', 'c');
+    calls.forEach((call) => expect(call.msg).to.match(CONTEXT_PATTERN));
+  });
+
+  it('does not append client context for debug or info severities', () => {
+    logDebug('scope', 'a');
+    logInfo('scope', 'b');
+    calls.forEach((call) => expect(call.msg).to.not.match(/\| ua=/));
+  });
+
+  it('includes ua, viewport, lang, and env fields in the appended context', () => {
+    logError('scope', 'msg');
+    expect(calls[0].msg).to.match(CONTEXT_PATTERN);
   });
 });
