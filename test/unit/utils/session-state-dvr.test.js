@@ -1,18 +1,28 @@
 import { expect } from '@esm-bundle/chai';
 import { dvrAvailableAtMs, isDvrPending } from '../../../event-libs/v1/utils/session-state.js';
 
-// Counts from the event start, not the session's own end — every DVR row in the audited
-// catalog carries the same 772, an event-wide policy rather than a per-session offset.
+// Unlock is anchored on the session's own END time + the authored hours (per team spec). When the
+// session has no session-times (no endTimeUtc), it falls back to the event start.
 const HOUR = 3_600_000;
 const EVENT_START = Date.parse('2026-11-10T14:00:00.000Z');
+const SESSION_END = Date.parse('2026-11-12T22:00:00.000Z');
+const endUtc = (ms) => new Date(ms).toISOString();
 
 describe('dvrAvailableAtMs', () => {
-  it('is the event start plus the authored hours', () => {
-    expect(dvrAvailableAtMs({ dvrDelayHours: 772 }, EVENT_START)).to.equal(EVENT_START + 772 * HOUR);
+  it('is the session end plus the authored hours', () => {
+    const session = { dvrDelayHours: 772, endTimeUtc: endUtc(SESSION_END) };
+    expect(dvrAvailableAtMs(session, EVENT_START)).to.equal(SESSION_END + 772 * HOUR);
   });
 
-  it('is the event start itself for 0 hours', () => {
-    expect(dvrAvailableAtMs({ dvrDelayHours: 0 }, EVENT_START)).to.equal(EVENT_START);
+  it('falls back to the event start when the session has no end time', () => {
+    expect(dvrAvailableAtMs({ dvrDelayHours: 772 }, EVENT_START)).to.equal(EVENT_START + 772 * HOUR);
+    expect(dvrAvailableAtMs({ dvrDelayHours: 772, endTimeUtc: '' }, EVENT_START))
+      .to.equal(EVENT_START + 772 * HOUR);
+  });
+
+  it('is the session end itself for 0 hours', () => {
+    const session = { dvrDelayHours: 0, endTimeUtc: endUtc(SESSION_END) };
+    expect(dvrAvailableAtMs(session, EVENT_START)).to.equal(SESSION_END);
   });
 
   it('is null with no DVR timing on the session', () => {
@@ -20,7 +30,7 @@ describe('dvrAvailableAtMs', () => {
     expect(dvrAvailableAtMs({}, EVENT_START)).to.be.null;
   });
 
-  it('is null with no authored event start to count from', () => {
+  it('is null with neither a session end nor an event start to count from', () => {
     expect(dvrAvailableAtMs({ dvrDelayHours: 772 }, null)).to.be.null;
   });
 });

@@ -358,28 +358,21 @@ describe('session-state-view', () => {
     const MPC_RECORDING = { provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458902', kind: 'onDemand' };
     const HOUR_MS = 3_600_000;
 
-    // `initTierOneEventConfig` is a module singleton that can't be re-initialized within a run, so
-    // the event start is fixed once (100h before now) and each test varies the DVR hours instead to
-    // move the unlock (eventStart + dvrHours) across "now". `custom-attributes` is re-read per call.
-    const EVENT_START_MS = Date.now() - (100 * HOUR_MS);
+    // Unlock is anchored on the session END time (+ dvrHours). The session ended 100h ago; each test
+    // varies the DVR hours to move the unlock (sessionEnd + dvrHours) across "now".
+    const SESSION_END_MS = Date.now() - (100 * HOUR_MS);
 
     // An ended IPOD page with an MPC recording and an authored DVR delay.
     const setDvrPage = (dvrHours) => {
-      setMetadata('session-times', JSON.stringify([{ endTimeMillis: 1, videos: [MPC_RECORDING] }]));
+      setMetadata('session-times', JSON.stringify([{ endTimeMillis: SESSION_END_MS, videos: [MPC_RECORDING] }]));
       setMetadata('custom-attributes', JSON.stringify([
         { name: 'Format', values: IPOD },
         { name: 'DVR Timing (in hours)', values: [{ value: String(dvrHours) }] },
       ]));
-      setMetadata('tier-1-event-config', JSON.stringify({ eventStartDateTime: EVENT_START_MS }));
-      initTierOneEventConfig();
     };
 
-    afterEach(() => {
-      document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
-    });
-
     it('DVR window not yet elapsed -> Available soon (hasPlayableVideo false)', () => {
-      // unlock = eventStart(now-100h) + 772h → ~672h in the future → still pending.
+      // unlock = sessionEnd(now-100h) + 772h → ~672h in the future → still pending.
       setDvrPage(772);
       expect(hasPlayableVideo()).to.be.false;
       const el = renderStatus('on-demand', times);
@@ -388,12 +381,30 @@ describe('session-state-view', () => {
     });
 
     it('DVR window elapsed -> On-demand (hasPlayableVideo true)', () => {
-      // unlock = eventStart(now-100h) + 1h → ~99h in the past → elapsed.
+      // unlock = sessionEnd(now-100h) + 1h → ~99h in the past → elapsed.
       setDvrPage(1);
       expect(hasPlayableVideo()).to.be.true;
       const el = renderStatus('on-demand', times);
       expect(el.textContent).to.equal('On-demand');
       expect(el.classList.contains('session-status--on-demand')).to.be.true;
+    });
+
+    it('no session-times -> falls back to eventStart + dvrHours (still pending)', () => {
+      // Empty session-times → no session end → anchor on event start (now-10h) + 772h → future.
+      setMetadata('session-times', '[]');
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'Format', values: IPOD },
+        { name: 'DVR Timing (in hours)', values: [{ value: '772' }] },
+      ]));
+      setMetadata('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - (10 * HOUR_MS) }));
+      initTierOneEventConfig();
+      // No embeddable video (session-times empty) → not playable regardless, but confirm not On-demand.
+      const el = renderStatus('on-demand', times);
+      expect(el.textContent).to.equal('Available soon');
+    });
+
+    afterEach(() => {
+      document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
     });
   });
 

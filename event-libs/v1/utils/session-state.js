@@ -24,10 +24,15 @@ export function getNowMs() {
 
 const HOUR_MS = 3_600_000;
 
-// Counted from the event start, not the session end — the attribute is authored event-wide.
+// On-demand unlocks at sessionEndTime + DVR delay (per team spec). Some sessions have no
+// session-times (endTimeUtc is empty) — for those there is no session end to anchor to, so fall
+// back to the event start. Returns null when neither anchor nor a DVR delay is available.
 export function dvrAvailableAtMs(session, eventStartMs) {
-  if (session?.dvrDelayHours == null || !eventStartMs) return null;
-  return eventStartMs + session.dvrDelayHours * HOUR_MS;
+  if (session?.dvrDelayHours == null) return null;
+  const sessionEndMs = Date.parse(session.endTimeUtc) || null;
+  const anchorMs = sessionEndMs ?? eventStartMs;
+  if (!anchorMs) return null;
+  return anchorMs + session.dvrDelayHours * HOUR_MS;
 }
 
 // Not read by sessions-guide's own filtering — kept as a shared utility for other blocks. Fails open.

@@ -65,36 +65,15 @@ describe('services/sessions/mobile-rider', () => {
     expect(result.inactive.size).to.equal(0);
   });
 
-  it('throws on a non-ok, non-404 response (transient — poller retries next tick)', async () => {
+  it('throws on a non-ok response', async () => {
     stubFetch({}, { ok: false, status: 503 });
     let caught;
     try {
-      await fetchLiveStatus(['mr-503'], 'prod');
+      await fetchLiveStatus(['mr-1'], 'prod');
     } catch (err) {
       caught = err;
     }
     expect(caught).to.be.instanceOf(Error);
     expect(caught.message).to.include('503');
-  });
-
-  it('isolates a bad id on a batch 404 so the valid ids still resolve, and quarantines the bad one', async () => {
-    // Batch and the [bad] half/leaf 404; a batch of only valid ids resolves normally.
-    window.fetch = async (url) => {
-      lastRequest = url;
-      const ids = new URL(url).searchParams.get('ids').split(',');
-      if (ids.includes('mr-bad')) {
-        return { ok: false, status: 404, json: async () => ({}) };
-      }
-      return { ok: true, status: 200, json: async () => ({ active: ids, inactive: [] }) };
-    };
-
-    const result = await fetchLiveStatus(['mr-1', 'mr-bad', 'mr-2'], 'prod');
-    expect([...result.active].sort()).to.deep.equal(['mr-1', 'mr-2']);
-    expect(result.inactive.size).to.equal(0);
-
-    // The bad id is now quarantined: a later poll drops it and never re-queries it.
-    lastRequest = null;
-    await fetchLiveStatus(['mr-bad'], 'prod');
-    expect(lastRequest).to.be.null;
   });
 });

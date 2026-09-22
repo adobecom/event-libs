@@ -14,6 +14,7 @@ import init, {
 import {
   sessions, sessionsStatus, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../event-libs/v1/utils/session-store.js';
+import { PLAYBACK_PHASE } from '../../../../../event-libs/v1/c2/utils/video-session.js';
 import BlockMediator from '../../../../../event-libs/v1/deps/block-mediator.min.js';
 
 const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
@@ -109,11 +110,11 @@ function addConfigRow(el, key, value) {
 
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
-// The playlist now renders ONLY when the player signals it has a video (it mirrors the player and
-// never renders alone). Tests that expect a render must init, then fire the player's playable
-// signal for the current session, then flush.
-const firePlayable = (sessionId = 'cur') => window.dispatchEvent(
-  new CustomEvent('session-video-player:playable', { detail: { sessionId } }),
+// The playlist now renders ONLY when the player signals it has an ON_DEMAND video (it mirrors the
+// player and never renders alone, and never alongside a DVR replay). Tests that expect a render
+// must init, then fire the player's playable signal (ON_DEMAND) for the current session, then flush.
+const firePlayable = (sessionId = 'cur', phase = PLAYBACK_PHASE.ON_DEMAND) => window.dispatchEvent(
+  new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }),
 );
 async function initAndPlay(playlist, sessionId = 'cur') {
   await init(playlist);
@@ -473,6 +474,47 @@ describe('session-video-playlist', () => {
 
       await initAndPlay(playlist);
 
+      expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
+    });
+
+    it('does NOT render during a DVR replay (DVR_BUFFER phase) — playlist is on-demand only', async () => {
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta({ endTimeMillis: Date.now() - HOUR_MS }));
+      setMeta('custom-attributes', playlistAttribute());
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+
+      await init(playlist);
+      await flush();
+      firePlayable('cur', PLAYBACK_PHASE.DVR_BUFFER);
+      await flush();
+
+      expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
+    });
+
+    it('renders once the phase flips from DVR_BUFFER to ON_DEMAND', async () => {
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta({ endTimeMillis: Date.now() - HOUR_MS }));
+      setMeta('custom-attributes', playlistAttribute());
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+
+      await init(playlist);
+      await flush();
+      firePlayable('cur', PLAYBACK_PHASE.DVR_BUFFER);
+      await flush();
+      expect(playlist.querySelector('.session-video-playlist-list')).to.not.exist;
+
+      firePlayable('cur', PLAYBACK_PHASE.ON_DEMAND);
+      await flush();
       expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
     });
 

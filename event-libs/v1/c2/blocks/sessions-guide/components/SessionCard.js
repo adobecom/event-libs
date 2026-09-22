@@ -46,8 +46,8 @@ export function SessionCard({
   } else {
     upcomingTimeLabel = formatSessionTime(session.startTimeUtc, userTz);
   }
-  // A DVR delay isn't watchable until the delay window elapses, measured from the event's own
-  // start, not this session's (see isDvrPending).
+  // A DVR delay isn't watchable until the delay window elapses, measured from this session's end
+  // (or the event start when the session has no times) — see dvrAvailableAtMs.
   const dvrPending = onDemand && isDvrPending(session, nowMs, getEventApiConfig()?.eventStartMs);
   const timeLabel = onDemand ? (dvrPending ? 'AVAILABLE SOON' : 'ON DEMAND') : upcomingTimeLabel;
 

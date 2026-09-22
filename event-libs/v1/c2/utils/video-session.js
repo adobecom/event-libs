@@ -206,7 +206,7 @@ function simulivePhase(session, nowMs) {
   return PLAYBACK_PHASE.SIMULIVE;
 }
 
-function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasEverActive) {
+function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds) {
   const start = Date.parse(session.startTimeUtc) || null;
   if (start && nowMs < start) return PLAYBACK_PHASE.PRE_EVENT;
 
@@ -219,9 +219,9 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasE
     return PLAYBACK_PHASE.WATCH_LIVE;
   }
 
-  if (session.mrStreamId && !streamWasEverActive && end != null && nowMs < end) {
-    return PLAYBACK_PHASE.WATCH_LIVE;
-  }
+  // The MR poll is authoritative: if it reports the stream inactive (even on first land, before we
+  // have ever seen it active), we do NOT wait it out on WATCH_LIVE — we resolve DVR/on-demand from
+  // the timings below. Only a poll that lists the stream active (isLiveNow above) shows live.
 
   if (session.dvrDelayHours != null) {
     const availableAt = dvrAvailableAtMs(session, eventStartMs);
@@ -233,13 +233,13 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasE
 }
 
 export function getPlaybackPhase(session, {
-  nowMs, eventStartMs = null, liveStreamActiveIds = null, streamWasEverActive = false,
+  nowMs, eventStartMs = null, liveStreamActiveIds = null,
 } = {}) {
   const playbackCase = classifySessionPlayback(session);
   if (playbackCase === PLAYBACK_CASE.IPOD) return ipodPhase(session, nowMs, eventStartMs);
   if (playbackCase === PLAYBACK_CASE.SIMULIVE) return simulivePhase(session, nowMs);
   if (playbackCase === PLAYBACK_CASE.LIVE) {
-    return livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasEverActive);
+    return livePhase(session, nowMs, eventStartMs, liveStreamActiveIds);
   }
   return null;
 }
@@ -263,8 +263,6 @@ export function buildSessionFromMetadata(sessionTimes) {
   };
 }
 
-const HOUR_MS = 60 * 60 * 1000;
-
 export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}) {
   const candidates = [];
   const start = Date.parse(session.startTimeUtc) || null;
@@ -274,9 +272,10 @@ export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}
     candidates.push(start - (SIMULIVE_PRE_ROLL_MIN * MINUTE_MS));
   }
   if (end != null) candidates.push(end);
-  if (session.dvrDelayHours != null && eventStartMs != null) {
-    candidates.push(eventStartMs + session.dvrDelayHours * HOUR_MS);
-  }
+  // Same anchor as the DVR gate (session end, or event start when there are no session-times) so the
+  // scheduled tick fires exactly when ipodPhase/livePhase flips DVR_BUFFER/PRE_EVENT → ON_DEMAND.
+  const dvrUnlockMs = dvrAvailableAtMs(session, eventStartMs);
+  if (dvrUnlockMs != null) candidates.push(dvrUnlockMs);
   const future = candidates.filter((ms) => ms > nowMs);
   return future.length ? Math.min(...future) : null;
 }
@@ -286,7 +285,6 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   const resolveEventStartMs = () => (eventStartMs != null ? eventStartMs : getEventStartMs());
 
   let liveStreamActiveIds = new Set();
-  let streamWasEverActive = false;
   let lastPhase;
   let timerId = null;
   let stopped = false;
@@ -297,7 +295,6 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
       nowMs: getNowMs(),
       eventStartMs: resolveEventStartMs(),
       liveStreamActiveIds,
-      streamWasEverActive,
     });
     if (phase !== lastPhase) {
       lastPhase = phase;
@@ -318,15 +315,6 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   if (session.mrStreamId) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
-      const isActiveNow = liveStreamActiveIds.has(session.mrStreamId);
-      if (isActiveNow) streamWasEverActive = true;
-      // eslint-disable-next-line no-console
-      console.log('[MRPoll] watcher received poll result', {
-        mrStreamId: session.mrStreamId,
-        activeIds: [...liveStreamActiveIds],
-        thisStreamActiveNow: isActiveNow,
-        streamWasEverActive,
-      });
       emitIfChanged();
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId]);

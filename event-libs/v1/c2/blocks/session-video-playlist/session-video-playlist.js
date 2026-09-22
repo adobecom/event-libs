@@ -837,10 +837,16 @@ export default async function init(el) {
     });
   };
 
+  // Show the playlist only alongside an on-demand recording (MPC/YouTube). A livestream's DVR
+  // replay (phase DVR_BUFFER) is playable but is NOT an on-demand premiere, so no playlist there —
+  // it appears only once the phase reaches ON_DEMAND.
+  const isOnDemandPhase = (phase) => phase === PLAYBACK_PHASE.ON_DEMAND;
+
   let started = false;
   const onPlayable = (event) => {
     if (event.detail?.sessionId !== sessionId) return;
     if (started || !el.isConnected) return;
+    if (!isOnDemandPhase(event.detail?.phase)) return;
     started = true;
     runRenderFlow();
   };
@@ -851,7 +857,8 @@ export default async function init(el) {
   });
 
   const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
-  if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
+  if (alreadyPlayable?.sessionId === sessionId && isOnDemandPhase(alreadyPlayable?.phase)
+    && !started && el.isConnected) {
     started = true;
     runRenderFlow();
   }

@@ -576,14 +576,24 @@ export default async function init(el) {
 
     if (video) {
       const isFirstEmbed = embeddedPhase === null;
+      const previousPhase = embeddedPhase;
       embeddedPhase = phase;
+      // The playlist is only shown alongside an on-demand recording (MPC/YouTube), never the DVR
+      // replay of a livestream. Carry the phase so the playlist can decide, and re-announce when a
+      // DVR_BUFFER embed later swaps to ON_DEMAND so a page opened mid-DVR shows the playlist then.
       if (isFirstEmbed) {
-        BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId });
-        window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
+        BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
+        window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
         loadWhenDecided(el, sessionId, video);
-      } else if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
-        preconnectVideoProvider(video.provider);
-        loadVideoPlayer(el, sessionId, video);
+      } else {
+        if (previousPhase !== phase) {
+          BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
+          window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
+        }
+        if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
+          preconnectVideoProvider(video.provider);
+          loadVideoPlayer(el, sessionId, video);
+        }
       }
       return;
     }
