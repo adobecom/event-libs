@@ -1,4 +1,5 @@
 import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
+import { logError } from '../../../utils/lana-log.js';
 import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
 import { renderSchedule } from './schedule.js';
@@ -13,7 +14,7 @@ export function getAllSessionTimes(doc = document) {
   try {
     entries = JSON.parse(getMetadata('session-times', doc) || '[]');
   } catch (e) {
-    window.lana?.log(`[session-details] invalid session-times JSON: ${e.message}`);
+    logError('session-details', 'invalid session-times JSON', e);
     return [];
   }
   const lengthMs = (Number(getMetadata('session-length-in-minutes', doc)) || 0) * 60000;

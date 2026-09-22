@@ -1,3 +1,5 @@
+import { logWarning, logError } from '../../../../utils/lana-log.js';
+
 function pad(n) {
   return String(n).padStart(2, '0');
 }
@@ -88,7 +90,7 @@ export function generateICS(sessions) {
   });
 
   if (dropped.length) {
-    window.lana?.log(`[sessions-guide] ics: dropped ${dropped.length} session(s) with no valid start/end time: ${dropped.join(', ')}`);
+    logWarning('sessions-guide', `ics: dropped ${dropped.length} session(s) with no valid start/end time: ${dropped.join(', ')}`);
   }
 
   lines.push('END:VCALENDAR');
@@ -113,7 +115,7 @@ export function downloadICS(sessions, filename = 'my-sessions.ics') {
     URL.revokeObjectURL(url);
     return true;
   } catch (err) {
-    window.lana?.log(`[sessions-guide] ics download failed: ${err.message}`);
+    logError('sessions-guide', 'ics download failed', err);
     return false;
   }
 }
