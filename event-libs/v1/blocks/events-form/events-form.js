@@ -1,7 +1,7 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getRsvpDeclinedMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
@@ -398,6 +398,21 @@ function showSuccessMsgFirstScreen(bp) {
     bp.rsvpSuccessScreen?.classList.remove('hidden');
     bp.rsvpSuccessScreen?.querySelector('.first-screen')?.classList.remove('hidden');
   }
+}
+
+function showDeclinedMessage(bp) {
+  clearForm(bp.form);
+  bp.form.classList.add('hidden');
+  bp.eventHero.classList.add('hidden');
+
+  if (bp.formContainer.querySelector('.rsvp-declined-msg')) return;
+
+  (async () => {
+    await dictionaryManager.initialize();
+    const msg = getRsvpDeclinedMessage(dictionaryManager);
+    const error = createTag('p', { class: 'error rsvp-declined-msg' }, msg);
+    bp.formContainer.append(error);
+  })();
 }
 
 function eventFormSendAnalytics(bp, view) {
@@ -1173,6 +1188,10 @@ export async function initFormBasedOnRSVPData(bp) {
   const profile = BlockMediator.get('imsProfile');
   let confirmationViewTracked = false;
   const syncUIWithRSVPStatus = (rsvpData = BlockMediator.get('rsvpData')) => {
+    if (rsvpData?.registrationStatus === 'declined') {
+      showDeclinedMessage(bp);
+      return true;
+    }
     if (!VALID_REGISTRATION_STATUS.includes(rsvpData?.registrationStatus)) return false;
     showSuccessMsgFirstScreen(bp);
     if (!confirmationViewTracked) {

@@ -196,6 +196,22 @@ export function getRsvpTokenInvalidMessage(manager) {
     : text;
 }
 
+export const RSVP_DECLINED_MESSAGE_KEY = 'rsvp-declined-cta-text';
+
+/**
+ * Localized message shown when an attendee's registration was declined by the
+ * event marketer. Prevents a direct #rsvp-form-* anchor from silently letting
+ * a declined attendee re-register and override the marketer's decision.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @returns {string}
+ */
+export function getRsvpDeclinedMessage(manager) {
+  const text = manager.getValue(RSVP_DECLINED_MESSAGE_KEY);
+  return text === RSVP_DECLINED_MESSAGE_KEY
+    ? 'Your registration for this event was declined. Please contact the event organizer for more information.'
+    : text;
+}
+
 export const RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY = 'rsvp-token-already-registered-cta-text';
 
 /**
