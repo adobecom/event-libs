@@ -42,10 +42,6 @@
   }
 }
 
-/* A losing player instance inside the playlist container hides its own element in place (the
-   playlist keeps its section). It's not a `main > .section`, so the plain class suffices — a full-
-   width loser is left visible instead (see hideLosingInstance), so nothing here needs to override
-   Milo's `main > .section { display: block }`. */
 .session-video-hidden {
   display: none;
 }

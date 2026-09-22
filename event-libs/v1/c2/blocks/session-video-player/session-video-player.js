@@ -443,9 +443,6 @@ function isWinningInstance(el, hasPlaylist) {
   return isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist;
 }
 
-// Hide a losing playlist-container instance. The full-width container loser is left rendered: it
-// shares the playlist's background (reads as a seamless band) and keeps its own nav-offset clearance.
-// Never remove a Milo section — that retriggers loadArea and loops.
 function hideLosingInstance(el) {
   if (closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
   el.classList.add('session-video-hidden');
@@ -538,8 +535,6 @@ export default async function init(el) {
       const isFirstEmbed = embeddedPhase === null;
       const previousPhase = embeddedPhase;
       embeddedPhase = phase;
-      // Carry the phase so the playlist can decide (it shows only for ON_DEMAND); re-announce on a
-      // DVR_BUFFER → ON_DEMAND swap so a page opened mid-DVR shows the playlist once it premieres.
       if (isFirstEmbed) {
         BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
         window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
