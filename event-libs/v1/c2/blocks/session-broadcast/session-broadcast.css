@@ -599,15 +599,15 @@
   background: #262626;
 }
 
-/* Mobile-only tighter padding (Figma): 16px top/bottom, 24px left, 0 right. Tablet keeps the
-   base 32px above; desktop has its own 1280px+ rule. */
-@media (max-width: 767px) {
+/* Mobile + tablet tighter padding (Figma): 16px top/bottom, 24px left, 0 right (cards still peek
+   off the right). Desktop has its own 1280px+ rule. */
+@media (max-width: 1279px) {
   .sb-carousel-section--also-live {
     padding: var(--s2a-spacing-md) 0 var(--s2a-spacing-md) var(--s2a-spacing-lg);
   }
 }
 
-.sb-carousel-section--also-live .sg-carousel__header { margin-bottom: var(--s2a-spacing-sm); }
+.sb-carousel-section--also-live .sg-carousel__header { margin-bottom: var(--s2a-spacing-lg, 24px); }
 
 .sb-carousel-section--also-live .sg-section-title {
   color: var(--s2a-color-content-inverse, #fff);
@@ -826,13 +826,10 @@
   }
 }
 
-/* Nav hidden, cards swipeable instead; Carousel.js recomputes paged state from overflow-x, no JS needed. */
+/* Cards stay swipeable at this tier; both carousels now show nav on mobile+tablet (see the
+   max-width:1279px block below). Carousel.js drives paging off overflow-x with no JS change:
+   a native-scroll strip pages via scrollBy() from the same arrows. */
 @media (min-width: 768px) and (max-width: 1279px) {
-  .sb-carousel-section--also-live .sg-carousel__nav,
-  .sb-carousel-section--up-next .sg-carousel__nav {
-    display: none;
-  }
-
   .sb-carousel-section--also-live .sg-carousel__cards,
   .sb-carousel-section--up-next .sg-carousel__cards {
     overflow-x: auto;
@@ -897,6 +894,64 @@
   .sb-ended ~ .sb-carousel-section--up-next .sg-section-title {
     font-size: var(--s2a-font-size-2xl, 24px);
     line-height: var(--s2a-font-line-height-md, 24px);
+  }
+}
+
+/* Broadcast shows the carousel nav in the header on mobile + tablet too (Figma 9632:18521 /
+   9646:42838) — 40px dark-glass buttons at the top-right, unlike Session Guide which stays
+   swipe-only here. Buttons page the native-scroll strip via Carousel.js's scrollBy path, so the
+   cards are left untouched. Applies to both Also Live and Up Next. */
+@media (max-width: 1279px) {
+  /* Static so the absolute nav below anchors to .sg-carousel (the header band), not the body —
+     sessions-guide makes the body relative at 768-1023 for its own edge-float arrows. */
+  .sb-carousel-section--also-live .sg-carousel__body,
+  .sb-carousel-section--up-next .sg-carousel__body {
+    position: static;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__header,
+  .sb-carousel-section--up-next .sg-carousel__header {
+    min-height: 40px;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__nav,
+  .sb-carousel-section--up-next .sg-carousel__nav {
+    display: flex;
+    gap: var(--s2a-spacing-md, 16px);
+    position: absolute;
+    top: 0;
+    right: var(--s2a-spacing-lg, 24px);
+  }
+
+  /* Reset sessions-guide's 768-1023 edge-float positioning; here the arrows are flex children of
+     the header nav. Dark-glass ControlButton, 40px (desktop uses 48px). */
+  .sb-carousel-section--also-live .sg-carousel__arrow,
+  .sb-carousel-section--up-next .sg-carousel__arrow {
+    position: static;
+    transform: none;
+    width: 40px;
+    height: 40px;
+    background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
+    border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+    backdrop-filter: blur(4px);
+    color: var(--s2a-color-content-knockout, #fff);
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__arrow:hover:not([disabled]),
+  .sb-carousel-section--up-next .sg-carousel__arrow:hover:not([disabled]) {
+    background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__arrow svg,
+  .sb-carousel-section--up-next .sg-carousel__arrow svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* sessions-guide hides disabled arrows at 768-1023; broadcast keeps both, dimmed (base opacity). */
+  .sb-carousel-section--also-live .sg-carousel__arrow[disabled],
+  .sb-carousel-section--up-next .sg-carousel__arrow[disabled] {
+    display: flex;
   }
 }
 
