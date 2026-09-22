@@ -90,12 +90,31 @@ export function hasPlayableVideo(doc = document) {
     return false;
   }
   if (!currentSessionHasEnded(entries, getNowMs())) return false;
-  if (findEmbeddableVideos(entries).length === 0) return false;
+  const session = buildSessionFromMetadata(entries);
+  // Match the player's own resolution: it embeds an on-demand video from session-times OR, when
+  // session-times has none (empty catalog entry), from the authored MPC/YouTube id. Checking only
+  // session-times[].videos here left an IPOD session with no session-times stuck on "Available soon".
+  const hasVideo = findEmbeddableVideos(entries).length > 0 || !!session.mpcId || !!session.youTubeId;
+  if (!hasVideo) return false;
   // Honor the DVR delay: an IPOD/MPC on-demand video isn't "available" until the DVR window has
   // elapsed (same gate the player uses). Without this the eyebrow flipped to "On-demand" the moment
   // the session ended, ignoring dvrDelayHours.
-  const session = buildSessionFromMetadata(entries);
-  return !isDvrPending(session, getNowMs(), getEventStartMs());
+  const pending = isDvrPending(session, getNowMs(), getEventStartMs());
+  // TEMP debug — remove before commit.
+  // eslint-disable-next-line no-console
+  console.log('[eyebrow-debug] hasPlayableVideo', {
+    nowMs: getNowMs(),
+    eventStartMs: getEventStartMs(),
+    sessionEndUtc: session.endTimeUtc || '(none)',
+    mpcId: session.mpcId,
+    dvrDelayHours: session.dvrDelayHours,
+    unlockMs: (getEventStartMs() != null || session.endTimeUtc)
+      ? ((Date.parse(session.endTimeUtc) || getEventStartMs()) + (session.dvrDelayHours || 0) * 3600000)
+      : null,
+    dvrPending: pending,
+    result: hasVideo && !pending,
+  });
+  return !pending;
 }
 
 const normalizeAttr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');

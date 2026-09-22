@@ -389,18 +389,34 @@ describe('session-state-view', () => {
       expect(el.classList.contains('session-status--on-demand')).to.be.true;
     });
 
-    it('no session-times -> falls back to eventStart + dvrHours (still pending)', () => {
-      // Empty session-times → no session end → anchor on event start (now-10h) + 772h → future.
+    // Empty session-times: no session end, and the MPC video is only in custom attributes (not in
+    // session-times[].videos). Unlock anchors on the event start (fixed 200h ago here, since the
+    // tier-1 config singleton can't be re-initialized within a run); each test varies the DVR hours
+    // to move the unlock across "now". hasPlayableVideo must see the authored MPC id.
+    const EMPTY_TIMES_EVENT_START_OFFSET_HRS = 200;
+    const setEmptyTimesMpcPage = (dvrHours) => {
       setMetadata('session-times', '[]');
       setMetadata('custom-attributes', JSON.stringify([
         { name: 'Format', values: IPOD },
-        { name: 'DVR Timing (in hours)', values: [{ value: '772' }] },
+        { name: 'MPC ID', values: [{ value: '3458902' }] },
+        { name: 'DVR Timing (in hours)', values: [{ value: String(dvrHours) }] },
       ]));
-      setMetadata('tier-1-event-config', JSON.stringify({ eventStartDateTime: Date.now() - (10 * HOUR_MS) }));
+      setMetadata('tier-1-event-config', JSON.stringify({
+        eventStartDateTime: Date.now() - (EMPTY_TIMES_EVENT_START_OFFSET_HRS * HOUR_MS),
+      }));
       initTierOneEventConfig();
-      // No embeddable video (session-times empty) → not playable regardless, but confirm not On-demand.
-      const el = renderStatus('on-demand', times);
-      expect(el.textContent).to.equal('Available soon');
+    };
+
+    it('no session-times, before eventStart + dvrHours -> Available soon', () => {
+      // eventStart 200h ago + 772h → far future → pending.
+      setEmptyTimesMpcPage(772);
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
+    });
+
+    it('no session-times, past eventStart + dvrHours -> On-demand (MPC from attributes)', () => {
+      // eventStart 200h ago + 100h → ~100h in the past → elapsed. MPC id makes it playable.
+      setEmptyTimesMpcPage(100);
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
     });
 
     afterEach(() => {
