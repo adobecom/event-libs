@@ -24,9 +24,7 @@ export function getNowMs() {
 
 const HOUR_MS = 3_600_000;
 
-// On-demand unlocks at sessionEndTime + DVR delay (per team spec). Some sessions have no
-// session-times (endTimeUtc is empty) — for those there is no session end to anchor to, so fall
-// back to the event start. Returns null when neither anchor nor a DVR delay is available.
+// Unlock = sessionEnd + DVR delay, falling back to the event start when there is no session end.
 export function dvrAvailableAtMs(session, eventStartMs) {
   if (session?.dvrDelayHours == null) return null;
   const sessionEndMs = Date.parse(session.endTimeUtc) || null;

@@ -130,8 +130,7 @@ export function findEmbeddableVideos(sessionTimes) {
     .filter((video) => EMBEDDABLE_PROVIDERS.includes(video?.provider));
 }
 
-// Shared by the eyebrow (session-state-view.js hasPlayableVideo). Returns true when the first
-// session-times entry's end time has passed; missing/invalid end time is treated as ended.
+// True once the first session-times entry's end has passed; missing/invalid end is treated as ended.
 export function currentSessionHasEnded(sessionTimes, nowMs) {
   const firstEntry = (sessionTimes || [])[0];
   if (!firstEntry || !Number.isFinite(firstEntry.endTimeMillis)) return true;
@@ -219,10 +218,7 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds) {
     return PLAYBACK_PHASE.WATCH_LIVE;
   }
 
-  // The MR poll is authoritative: if it reports the stream inactive (even on first land, before we
-  // have ever seen it active), we do NOT wait it out on WATCH_LIVE — we resolve DVR/on-demand from
-  // the timings below. Only a poll that lists the stream active (isLiveNow above) shows live.
-
+  // Poll is authoritative: inactive means not live, so fall to DVR/on-demand by the timings below.
   if (session.dvrDelayHours != null) {
     const availableAt = dvrAvailableAtMs(session, eventStartMs);
     if (availableAt != null && nowMs < availableAt) return PLAYBACK_PHASE.DVR_BUFFER;
@@ -272,8 +268,7 @@ export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}
     candidates.push(start - (SIMULIVE_PRE_ROLL_MIN * MINUTE_MS));
   }
   if (end != null) candidates.push(end);
-  // Same anchor as the DVR gate (session end, or event start when there are no session-times) so the
-  // scheduled tick fires exactly when ipodPhase/livePhase flips DVR_BUFFER/PRE_EVENT → ON_DEMAND.
+  // Same anchor as the phase gate, so the tick fires exactly when the DVR window unlocks.
   const dvrUnlockMs = dvrAvailableAtMs(session, eventStartMs);
   if (dvrUnlockMs != null) candidates.push(dvrUnlockMs);
   const future = candidates.filter((ms) => ms > nowMs);
@@ -318,9 +313,7 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
       emitIfChanged();
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId]);
-    // Defer the first emit until the poll answers: an mrStreamId session must not resolve
-    // DVR/on-demand from an empty poll set before we know whether the stream is live, or a live
-    // session would briefly embed the DVR replay and then tear it down once the poll reports active.
+    // Defer the first emit until the poll answers, so a live session doesn't briefly show DVR first.
   } else {
     emitIfChanged();
   }

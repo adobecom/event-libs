@@ -50,12 +50,8 @@ export function getState(nowMs, slots) {
   return nowMs < Math.min(...list.map(({ start }) => start)) ? 'upcoming' : 'on-demand';
 }
 
-// Maps the shared playback phase (from watchPlaybackPhase — the same poll-aware engine the video
-// player uses) to the eyebrow's status. This keeps the eyebrow and the player in sync: while the
-// MobileRider stream is live the phase stays WATCH_LIVE, so the eyebrow reads 'live' instead of
-// flipping to 'on-demand' at the authored end time. Once the live stream ends the player switches
-// to the DVR replay — per product, the eyebrow reads 'on-demand' from that point on (DVR_BUFFER and
-// ON_DEMAND both). SIMULIVE is a premiere, so 'live'.
+// Maps the shared playback phase to the eyebrow status, so eyebrow and player never disagree.
+// DVR_BUFFER and ON_DEMAND both read 'on-demand'; SIMULIVE/WATCH_LIVE read 'live'.
 export function stateForPhase(phase) {
   switch (phase) {
     case PLAYBACK_PHASE.PRE_EVENT: return 'upcoming';
@@ -93,14 +89,10 @@ export function hasPlayableVideo(doc = document) {
   }
   if (!currentSessionHasEnded(entries, getNowMs())) return false;
   const session = buildSessionFromMetadata(entries);
-  // Match the player's own resolution: it embeds an on-demand video from session-times OR, when
-  // session-times has none (empty catalog entry), from the authored MPC/YouTube id. Checking only
-  // session-times[].videos here left an IPOD session with no session-times stuck on "Available soon".
+  // Match the player: on-demand video from session-times, or the authored MPC/YouTube id when empty.
   const hasVideo = findEmbeddableVideos(entries).length > 0 || !!session.mpcId || !!session.youTubeId;
   if (!hasVideo) return false;
-  // Honor the DVR delay: an IPOD/MPC on-demand video isn't "available" until the DVR window has
-  // elapsed (same gate the player uses). Without this the eyebrow flipped to "On-demand" the moment
-  // the session ended, ignoring dvrDelayHours.
+  // Not "available" until the DVR window elapses (same gate the player uses).
   return !isDvrPending(session, getNowMs(), getEventStartMs());
 }
 
@@ -184,9 +176,7 @@ export function mountSessionState({
 }) {
   const slots = getAllSessionTimes();
 
-  // IPOD sessions don't depend on session-times for the eyebrow (renderStatus uses hasPlayableVideo,
-  // and the DVR gate falls back to the event start when there are no times). Handle them first so
-  // an IPOD session with empty session-times still shows Available soon / On-demand.
+  // IPOD eyebrow doesn't need session-times — handle first so an empty-session-times IPOD still renders.
   if (isInPersonIpodSession()) {
     if (primaryCtaSlot) primaryCtaSlot.replaceChildren();
     const ipodSession = buildSessionFromMetadata(parseJsonMetadata('session-times', 'session-details'));
@@ -214,11 +204,8 @@ export function mountSessionState({
   const scheduleBtn = isSchedulableSession() ? renderSchedule() : null;
   const watchBtn = renderWatchNow();
 
-  // 'live' → Watch now. Otherwise Add to schedule only while a session slot is still to come
-  // (nowMs < finalEnd). `phaseDriven` is true for the mrStreamId poll path, where DVR_BUFFER maps
-  // to an 'on-demand' state before the scheduled end: there we must follow the state (no schedule
-  // once we've left 'live'/'upcoming'), not the clock, or a DVR replay before finalEnd would still
-  // wrongly offer Add to schedule.
+  // 'live' → Watch now; 'upcoming' → Add to schedule. On the poll path (phaseDriven) follow the
+  // state — no schedule once DVR/on-demand — instead of the clock, which could still be < finalEnd.
   const ctaFor = (state, nowMs, phaseDriven = false) => {
     if (state === 'live') return watchBtn;
     if (phaseDriven) return state === 'upcoming' ? scheduleBtn : null;
@@ -254,10 +241,8 @@ export function mountSessionState({
 
   const session = buildSessionFromMetadata(parseJsonMetadata('session-times', 'session-details'));
 
-  // A livestreamed session (mrStreamId) is driven by the same poll-aware engine the video player
-  // uses (watchPlaybackPhase), so the eyebrow and player never disagree: while the MobileRider
-  // stream is live the phase stays WATCH_LIVE and the eyebrow reads 'live' rather than flipping to
-  // 'on-demand' at the authored end time. Non-live sessions keep the simple clock-based loop.
+  // Livestreamed sessions follow the poll-aware phase engine (watchPlaybackPhase) so the eyebrow
+  // stays in sync with the player; non-live sessions use the simple clock-based loop below.
   if (session?.mrStreamId) {
     const stop = watchPlaybackPhase(session, (phase) => {
       const now = getNowMs();

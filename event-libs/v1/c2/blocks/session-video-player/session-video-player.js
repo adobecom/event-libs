@@ -443,17 +443,9 @@ function isWinningInstance(el, hasPlaylist) {
   return isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist;
 }
 
-// Hide a losing player instance without removing any Milo section from the DOM (a section removal
-// retriggers loadArea and loops).
-//
-// When the loser is the one INSIDE the playlist container, hide just that element so the playlist
-// itself stays visible.
-//
-// When the loser is the full-width session-video-container, leave the (now player-less) section
-// rendered: it carries the same authored background as the playlist container below it, so it reads
-// as a seamless continuation rather than an empty band — and, still visible, it keeps providing its
-// own authored nav-offset clearance for the top of the page. No hiding, and no need to move
-// nav-offset onto the playlist.
+// Hide a losing playlist-container instance. The full-width container loser is left rendered: it
+// shares the playlist's background (reads as a seamless band) and keeps its own nav-offset clearance.
+// Never remove a Milo section — that retriggers loadArea and loops.
 function hideLosingInstance(el) {
   if (closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
   el.classList.add('session-video-hidden');
@@ -510,9 +502,6 @@ function loadWhenDecided(el, sessionId, video) {
     try {
       const isWinner = await awaitEmbedDecision(el);
       if (!isWinner) {
-        // The losing instance hides ITSELF (display:none via a class) rather than having the
-        // playlist remove its section. Removing a Milo section from the DOM retriggers loadArea and
-        // loops; a hidden-but-present section does not.
         hideLosingInstance(el);
         return;
       }
@@ -549,9 +538,8 @@ export default async function init(el) {
       const isFirstEmbed = embeddedPhase === null;
       const previousPhase = embeddedPhase;
       embeddedPhase = phase;
-      // The playlist is only shown alongside an on-demand recording (MPC/YouTube), never the DVR
-      // replay of a livestream. Carry the phase so the playlist can decide, and re-announce when a
-      // DVR_BUFFER embed later swaps to ON_DEMAND so a page opened mid-DVR shows the playlist then.
+      // Carry the phase so the playlist can decide (it shows only for ON_DEMAND); re-announce on a
+      // DVR_BUFFER → ON_DEMAND swap so a page opened mid-DVR shows the playlist once it premieres.
       if (isFirstEmbed) {
         BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
         window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
@@ -569,9 +557,7 @@ export default async function init(el) {
       return;
     }
 
-    // Non-playable phase (WATCH_LIVE / PRE_EVENT) with a video already embedded: the phase moved
-    // back out of DVR/on-demand (e.g. the MR poll returned and the stream is actually live). Tear
-    // the mounted player down so a stale DVR/on-demand video doesn't keep showing under a live state.
+    // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player.
     if (embeddedPhase !== null && !PLAYABLE_PHASES.includes(phase)) {
       el.querySelector('.mobile-rider')?.remove();
       el.querySelector('.milo-video')?.remove();

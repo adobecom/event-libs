@@ -399,8 +399,7 @@ function buildFavoriteButton(item) {
     if (event.detail > 0) button.blur();
     if (pendingActions.value.has(item.id)) return;
     await toggleFavoriteWithFeedback(item, {
-      // Resolve the RF registration link at click time (tier-1 config is bootstrapped by then);
-      // matches how the other blocks source registerUrl. Falls back to /register only if absent.
+      // Resolve the RF registration link at click time (tier-1 config is bootstrapped by then).
       eventConfig: { ...EVENT_CONFIG, registerUrl: getEventApiConfig()?.registerUrl || '/register' },
       isFavorited: favorited.value.has(item.id),
     });
@@ -602,9 +601,7 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
-// The playlist's ONLY job here is to publish its yes/no answer. It does not remove any Milo
-// section (doing so retriggers loadArea and loops) — each losing player instance hides itself,
-// and the playlist removes only its own block via removeBlock() on the NO path.
+// Publish the playlist's yes/no answer to the player. Never remove a Milo section (loadArea loop).
 function announceVideoDecision(hasPlaylist) {
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 }
@@ -777,9 +774,6 @@ export default async function init(el) {
   }
 
   const render = (sessionList) => {
-    // The playlist gives the player a single yes/no answer based purely on its own row count,
-    // never on whether the player has already embedded. The player waits for this answer
-    // (awaitEmbedDecision) before embedding either full-width or inside the playlist container.
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
     if (!rows.length) {
@@ -837,17 +831,14 @@ export default async function init(el) {
     });
   };
 
-  // Show the playlist only alongside an on-demand recording (MPC/YouTube). A livestream's DVR
-  // replay (phase DVR_BUFFER) is playable but is NOT an on-demand premiere, so no playlist there —
-  // it appears only once the phase reaches ON_DEMAND.
+  // Playlist shows only for ON_DEMAND — never a DVR replay (DVR_BUFFER).
   const isOnDemandPhase = (phase) => phase === PLAYBACK_PHASE.ON_DEMAND;
 
   let started = false;
   const startFor = (phase) => {
     if (started || !el.isConnected) return;
     if (!isOnDemandPhase(phase)) {
-      // Not an on-demand premiere (e.g. DVR replay): no playlist. Still announce "no playlist" so
-      // the player embeds the video full-width instead of waiting forever for a layout decision.
+      // No playlist, but still answer so the player embeds full-width instead of waiting forever.
       announceVideoDecision(false);
       return;
     }

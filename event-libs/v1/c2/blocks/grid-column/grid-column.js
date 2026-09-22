@@ -4,9 +4,8 @@ import { logWarning } from '../../../utils/lana-log.js';
 export default async function init(el) {
   const link = el.querySelector('a');
   if (!link) return;
-  // Only a genuine /fragments/ link should be loaded as a fragment. A grid-column may contain
-  // other links (e.g. a rendered playlist's session-row links); loading one of those as a
-  // fragment re-decorates the area and, because the block re-renders its rows, loops indefinitely.
+  // Only load a genuine /fragments/ link — fragment-loading a dynamic link (e.g. a playlist's
+  // session-row link) re-decorates and re-renders it, looping indefinitely.
   if (!link.href.includes('/fragments/')) {
     logWarning('grid-column-c2', `link is missing the required /fragments/ path segment - ${link.href}`);
     return;
