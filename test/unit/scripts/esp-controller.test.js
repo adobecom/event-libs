@@ -211,11 +211,32 @@ describe('Adobe Event Service API', () => {
     });
 
     it('should return an error if attendee creation fails', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: false });
+      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
 
       const error = await api.createAttendee('123', { name: 'John Doe' });
       expect(error).to.be.an('object');
       expect(error.ok).to.be.false;
+    });
+
+    it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => 'Event is full', ok: false, status: 400 });
+
+      const result = await api.createAttendee('123', { name: 'John Doe' });
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(400);
+      expect(result.error).to.equal('Event is full');
+    });
+
+    it('should still parse a JSON schema-validation error body', async () => {
+      sandbox.stub(window, 'fetch').resolves({
+        text: () => JSON.stringify({ message: 'Invalid request', errors: [{ path: '.email', message: 'must match format "email"' }] }),
+        ok: false,
+        status: 400,
+      });
+
+      const result = await api.createAttendee('123', { name: 'John Doe' });
+      expect(result.status).to.equal(400);
+      expect(result.error).to.deep.equal({ message: 'Invalid request', errors: [{ path: '.email', message: 'must match format "email"' }] });
     });
 
     it('should report the failure to lana with the eventId', async () => {
@@ -291,11 +312,20 @@ describe('Adobe Event Service API', () => {
     });
 
     it('should return an error if attendee addition fails', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: false });
+      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
 
       const error = await api.addAttendeeToEvent('123', { name: 'John Doe' });
       expect(error).to.be.an('object');
       expect(error.ok).to.be.false;
+    });
+
+    it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => 'Event is full', ok: false, status: 400 });
+
+      const result = await api.addAttendeeToEvent('123', { attendeeId: 'att-1' });
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(400);
+      expect(result.error).to.equal('Event is full');
     });
 
     it('should report the failure to lana with the eventId and attendeeId', async () => {
@@ -371,10 +401,19 @@ describe('Adobe Event Service API', () => {
     });
 
     it('should return an error if attendee update fails', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: false });
+      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
       const error = await api.updateAttendee('123', { name: 'John Doe' });
       expect(error).to.be.an('object');
       expect(error.ok).to.be.false;
+    });
+
+    it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => 'Authorization token is not valid for attendeeId', ok: false, status: 400 });
+
+      const result = await api.updateAttendee('123', { attendeeId: 'att-1', name: 'John Doe' });
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(400);
+      expect(result.error).to.equal('Authorization token is not valid for attendeeId');
     });
 
     it('should report the failure to lana with the eventId and attendeeId', async () => {
@@ -585,7 +624,7 @@ describe('Adobe Event Service API', () => {
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1' });
       const fetchStub = sandbox.stub(window, 'fetch');
       fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
+      fetchStub.onCall(1).resolves({ text: () => JSON.stringify({ message: 'Gone' }), ok: false, status: 410 });
 
       const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData, 'tok-1');
       expect(result.ok).to.be.false;

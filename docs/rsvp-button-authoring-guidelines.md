@@ -104,15 +104,25 @@ Button text is managed through the dictionary system. The following keys are use
 
 ### Form error messages (RSVP form submit)
 
-When the form submit returns 400 (capacity full), the following keys are used:
+The message shown on a failed submission is driven by the backend's actual error, not
+guessed from other event/campaign data. The following keys are used:
 
-- `event-full-error-msg` - Shown when the **event** is full and waitlisting is allowed
-- `event-full-no-waitlist-error-msg` - Shown when the **event** is full and waitlisting is disabled
-- `campaign-full-error-msg` - Shown when the **campaign** (URL param `?campaign=...`) is full and waitlisting is allowed
-- `campaign-full-no-waitlist-error-msg` - Shown when the **campaign** is full and waitlisting is disabled
-- `rsvp-error-msg` - Generic RSVP error for other failure statuses
+- `event-full-error-msg` - Shown on a `400` only when the backend confirms the **event** is
+  full (`"Event is full"`) and waitlisting is allowed
+- `event-full-no-waitlist-error-msg` - Same, but waitlisting is disabled
+- `campaign-full-error-msg` - Shown on a `409` only when the backend confirms the
+  **campaign** (URL param `?campaign=...`) is full (`"Campaign is full"`) and waitlisting
+  is allowed
+- `campaign-full-no-waitlist-error-msg` - Same, but waitlisting is disabled
+- `rsvp-token-invalid-cta-text` - Reused for a `400` auth/token-identity mismatch, and for
+  a `401`/`404`/`410` while an RSVP token is active
+- `rsvp-invalid-submission-error-msg` - Any other `400` (a schema-validation failure, an
+  invalid or missing custom RSVP field, a duplicate external ID, etc.) — a real submission
+  problem, never shown as a capacity message
+- `rsvp-error-msg` - Generic fallback for any other failure status
 
-Campaign-full keys are used only when the user submitted with a valid campaign ID in the URL and the capacity limit that was reached is the campaign's, not the event's.
+Note that a full campaign is reported by the backend as a `409`, not a `400` — despite the
+key names starting with "campaign-full", these are only ever selected on a `409`.
 
 ## User Authentication Handling
 
