@@ -1,4 +1,5 @@
 import { getMetadata, getImageSource } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
 
 export function injectEventSchema() {
   let venueObject;
@@ -7,13 +8,13 @@ export function injectEventSchema() {
   try {
     venueObject = JSON.parse(getMetadata('venue'));
   } catch (error) {
-    window.lana?.log(`Failed to parse venue metadata:\n${JSON.stringify(error, null, 2)}`);
+    logError('event-schema', 'Failed to parse venue metadata', error);
   }
 
   try {
     photos = JSON.parse(getMetadata('photos'));
   } catch (error) {
-    window.lana?.log(`Failed to parse photos metadata:\n${JSON.stringify(error, null, 2)}`);
+    logError('event-schema', 'Failed to parse photos metadata', error);
   }
 
   const name = getMetadata('event-title');

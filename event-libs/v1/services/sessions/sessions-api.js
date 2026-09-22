@@ -1,6 +1,7 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
 import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 // Catalog URLs always carry prod's host; on non-prod pages point them at the current origin instead.
 export function sessionPageUrlForEnv(
@@ -294,7 +295,7 @@ export function reportDroppedSessions(
     .map(([session, reason]) => `${describeRawSession(session)} — ${reason}`)
     .join('; ');
   const rest = dropped.length - DROP_LOG_LIMIT;
-  window.lana?.log(`[sessions-api] dropped ${dropped.length} session(s): ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
+  logWarning('sessions-api', `dropped ${dropped.length} session(s): ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
 
   if (isProd) return;
   // eslint-disable-next-line no-console
@@ -418,8 +419,15 @@ export function mapEslPayloadToRawSessions(payload) {
 // Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost.
 async function fetchEslSessions(eventId) {
   const options = await constructRequestOptions('GET', null, false, true);
-  const res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, options);
+  let res;
+  try {
+    res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, options);
+  } catch (err) {
+    logError('sessions-api', `network error fetching session catalog for event ${eventId}`, err);
+    throw err;
+  }
   if (!res.ok) {
+    logError('sessions-api', `session catalog fetch failed for event ${eventId}`, res);
     throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
   }
   const payload = await res.json();

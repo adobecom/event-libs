@@ -60,7 +60,7 @@ export default function hydrateImageLinks(block) {
     if (!metadataValue) return false;
     data = JSON.parse(metadataValue);
   } catch (error) {
-    logHydration(`Hydrator: Failed to parse metadata "${metadataKey}": ${error.message}`);
+    logHydration(`Hydrator: Failed to parse metadata "${metadataKey}": ${error.message}`, { tags: 'hydrate,image-links', severity: 'error' });
     return false;
   }
 
