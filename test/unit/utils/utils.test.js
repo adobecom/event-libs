@@ -138,6 +138,23 @@ describe('isNonProdHost', () => {
     expect(isNonProdHost('localhost')).to.equal(true);
     expect(isNonProdHost('local.adobe.com')).to.equal(true);
   });
+
+  it('accepts Forge render origins', () => {
+    expect(isNonProdHost('milo-core-prod.adobe.io')).to.equal(true);
+    expect(isNonProdHost('forge-replay-dev.adobe.io')).to.equal(true);
+    expect(isNonProdHost('forge-replay-preprod.adobe.io')).to.equal(true);
+  });
+
+  it('accepts the VPN-gated stage domain and its subdomains', () => {
+    expect(isNonProdHost('stage.adobe.com')).to.equal(true);
+    expect(isNonProdHost('business.stage.adobe.com')).to.equal(true);
+    expect(isNonProdHost('blog.stage.adobe.com')).to.equal(true);
+  });
+
+  it('rejects hosts that only resemble the stage domain', () => {
+    expect(isNonProdHost('stage.adobe.com.evil.com')).to.equal(false);
+    expect(isNonProdHost('notstage.adobe.com')).to.equal(false);
+  });
 });
 
 describe('resolveRoutedCampaignId', () => {

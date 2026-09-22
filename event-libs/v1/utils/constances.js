@@ -28,6 +28,19 @@ export const MAX_EVENT_PAGES = {
   sessionGuide: '/max/2026/sessions.html',
 };
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
+
+// Exact-match hostnames that isNonProdHost() should treat as non-prod but that don't fall
+// under its `.hlx.`/`.aem.`/`local` substring checks — dedicated non-prod render origins,
+// never reachable by real end users.
+export const NON_PROD_EXACT_HOSTS = [
+  'milo-core-prod.adobe.io', // Forge render origin (confirmed by Brad/Forge, PR #352)
+  'forge-replay-dev.adobe.io', // Forge render origin
+  'forge-replay-preprod.adobe.io', // Forge render origin
+];
+
+// VPN-gated Adobe stage domain — matched as `stage.adobe.com` itself or any subdomain of it
+// (business.stage.adobe.com, blog.stage.adobe.com, etc.) in isNonProdHost().
+export const STAGE_ADOBE_HOST = 'stage.adobe.com';
 export const ENV_MAP = {
   dev: {
     name: 'dev',
@@ -181,5 +194,25 @@ export const FALLBACK_LOCALES = {
 };
 export const LATEST_VERSION = 'v1';
 export const PHONE_FIELD_RE = /phone/i;
-export const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
 export const BACKEND_PHONE_RE = /^[+\d\s\-().]+$/;
+export const PHONE_PATTERN = BACKEND_PHONE_RE.source;
+export const STANDARD_FIELD_MAX_LENGTHS = {
+  firstName: 30,
+  lastName: 30,
+  phoneticFirstName: 30,
+  phoneticLastName: 30,
+  email: 320,
+  mobilePhone: 30,
+  businessPhone: 30,
+  companyName: 200,
+  countryRegion: 200,
+  zipPostalCode: 200,
+  organizationName: 200,
+  title: 200,
+  primarySocialMediaAccount: 200,
+  dietaryRestrictions: 200,
+  executiveAssistantName: 200,
+  invitedBy: 200,
+  campaignId: 200,
+  specialRequirements: 1000,
+};
