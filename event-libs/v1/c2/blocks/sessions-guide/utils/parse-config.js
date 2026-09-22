@@ -1,4 +1,5 @@
 import { detectUserTimezone } from './time.js';
+import { logWarning } from '../../../../utils/lana-log.js';
 
 // Authored { attributeId, displayName, enabled } -> FilterPanel's { id, label }. `id` is the
 // attributeId getFilterValue() resolves against customAttributeValues. Order is display order.
@@ -14,7 +15,7 @@ export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) 
   try {
     authored = JSON.parse(el.dataset.sessionGuideConfig || '{}');
   } catch {
-    window.lana?.log(`[${logPrefix}] invalid data-session-guide-config JSON`);
+    logWarning(logPrefix, 'invalid data-session-guide-config JSON');
   }
 
   const surface = forcedSurface || authored.surface || 'widget';

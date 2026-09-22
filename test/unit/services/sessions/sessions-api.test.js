@@ -1324,4 +1324,42 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     const [url] = fetchStub.firstCall.args;
     expect(url).to.include('wcms-events-service-platform-deploy-ethos105-stage-9a5fdc.stage.cloud.adobe.io');
   });
+
+  describe('fetchEslSessions failures are reported to lana', () => {
+    let lanaLogStub;
+
+    beforeEach(() => {
+      setEventServiceEnvOverride('prod');
+      lanaLogStub = sandbox.stub(window.lana, 'log');
+    });
+
+    it('logs a non-ok response before throwing', async () => {
+      sandbox.stub(window, 'fetch').resolves({ ok: false, status: 503 });
+      let error;
+      try {
+        await fetchSessions('event-1');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api]');
+      expect(lanaLogStub.firstCall.args[0]).to.include('event-1');
+      expect(lanaLogStub.firstCall.args[0]).to.include('503');
+    });
+
+    it('logs a network error before rethrowing', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('offline'));
+      let error;
+      try {
+        await fetchSessions('event-1');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(lanaLogStub.calledOnce).to.equal(true);
+      expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] network error fetching session catalog for event event-1');
+      expect(lanaLogStub.firstCall.args[0]).to.include('offline');
+    });
+  });
 });

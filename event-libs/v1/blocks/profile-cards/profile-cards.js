@@ -6,6 +6,7 @@ import {
   getEventConfig,
   LIBS,
 } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
 
 let modalLoader;
 
@@ -442,7 +443,7 @@ async function openProfileModal(profileData, index) {
       class: 'profile-cards-modal',
     });
   } catch (error) {
-    window.lana?.log(`Failed to open profile modal:\n${JSON.stringify(error, null, 2)}`);
+    logError('profile-cards', 'Failed to open profile modal', error);
   }
 }
 
@@ -712,7 +713,7 @@ export default function init(el) {
     try {
       data = JSON.parse(getMetadata('speakers'));
     } catch (error) {
-      window.lana?.log(`Failed to parse speakers metadata:\n${JSON.stringify(error, null, 2)}`);
+      logError('profile-cards', 'Failed to parse speakers metadata', error);
       el.remove();
       return;
     }

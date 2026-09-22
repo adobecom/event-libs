@@ -1,4 +1,5 @@
 import { createTag } from '../../../utils/utils.js';
+import { logError } from '../../../utils/lana-log.js';
 import { safeUrl } from '../sessions-guide/utils/url.js';
 import initEventCard from '../event-card/event-card.js';
 import initEventCarousel from '../event-carousel/event-carousel.js';
@@ -57,7 +58,7 @@ export default async function init(el) {
   try {
     config = el.dataset.featuredSessionsConfig ? JSON.parse(el.dataset.featuredSessionsConfig) : null;
   } catch (error) {
-    window.lana?.log(`featured-sessions: failed to parse config: ${error.message}`);
+    logError('featured-sessions', 'failed to parse config', error);
     el.remove();
     return;
   }

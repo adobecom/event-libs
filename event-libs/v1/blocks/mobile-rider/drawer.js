@@ -1,5 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 import { createTag } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
 
 class Drawer {
   constructor(root, cfg = {}) {
@@ -67,7 +68,7 @@ class Drawer {
       // Pass the data back to MobileRider
       await this.onClick(el, data);
     } catch (e) {
-      window.lana?.log?.(`[Drawer] Click callback failed: ${e.message}`);
+      logError('mobile-rider,drawer', 'Click callback failed', e);
     }
   }
 
@@ -102,7 +103,7 @@ export default function initDrawers(root, cfg) {
   try {
     return new Drawer(root, cfg);
   } catch (e) {
-    window.lana?.log?.(`Drawer init failed: ${e.message}`);
+    logError('mobile-rider,drawer', 'Drawer init failed', e);
     return null;
   }
 }

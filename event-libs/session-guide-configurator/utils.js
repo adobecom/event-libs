@@ -1,4 +1,5 @@
 import { parseEncodedConfig } from '../v1/utils/utils.js';
+import { logError } from '../v1/utils/lana-log.js';
 import { DA_ORIGIN, DA_APP_PATH, CONFIG_LINK_HASH_KEY } from './constants.js';
 
 // componentName is the primary label, not just a fallback — an event can have
@@ -25,7 +26,7 @@ export async function copyTextToClipboard(text) {
     document.body.removeChild(textArea);
     return successful;
   } catch (error) {
-    window.lana?.log(`Error copying to clipboard: ${error}`);
+    logError('session-guide-configurator,utils', 'Error copying to clipboard', error);
     return false;
   }
 }
@@ -101,7 +102,7 @@ export async function copySessionGuideConfigLink(url, linkText) {
     }
     return await copyTextToClipboard(url);
   } catch (error) {
-    window.lana?.log(`Error copying session guide link to clipboard: ${error}`);
+    logError('session-guide-configurator,utils', 'Error copying session guide link to clipboard', error);
     return false;
   }
 }

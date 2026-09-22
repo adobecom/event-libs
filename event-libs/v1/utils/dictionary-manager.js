@@ -1,5 +1,6 @@
 import { LIBS, getEventConfig, getMetadata } from './utils.js';
 import { FALLBACK_LOCALES } from './constances.js';
+import { logError } from './lana-log.js';
 
 export class DictionaryManager {
   #dictionaries = {};
@@ -57,7 +58,7 @@ export class DictionaryManager {
         DictionaryManager.#dictionaryCache = json;
         return json;
       } catch (error) {
-        window.lana?.log(`Error fetching dictionary:\n${JSON.stringify(error)}`);
+        logError('dictionary-manager,fetch-dictionary', 'Error fetching dictionary', error);
         // Clear the promise so retry is possible
         DictionaryManager.#dictionaryPromise = null;
         throw error;
@@ -97,7 +98,7 @@ export class DictionaryManager {
         }
       });
     } catch (error) {
-      window.lana?.log(`Error loading dictionary sheets:\n${JSON.stringify(error)}`);
+      logError('dictionary-manager,load-sheets', 'Error loading dictionary sheets', error);
       throw error;
     }
   }

@@ -1,4 +1,5 @@
 import { getMetadata } from '../../utils/utils.js';
+import { logError } from '../../utils/lana-log.js';
 
 export const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
 
@@ -8,10 +9,6 @@ export const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
 
 export const VIDEO_CONTAINER_CLASS = 'session-video-container';
 export const VIDEO_PLAYLIST_CONTAINER_CLASS = 'session-video-playlist-container';
-
-function logError(scope, message) {
-  window.lana?.log(`[${scope}] ${message}`);
-}
 
 export function sectionHasStyle(section, styleClass) {
   if (!section) return false;
@@ -50,7 +47,7 @@ export function readJsonFromStorage(key, fallback, scope) {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch (error) {
-    logError(scope, `localStorage read failed for "${key}": ${error.message}`);
+    logError(scope, `localStorage read failed for "${key}"`, error);
     return fallback;
   }
 }
@@ -59,7 +56,7 @@ export function writeJsonToStorage(key, value, scope) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
-    logError(scope, `localStorage write failed for "${key}": ${error.message}`);
+    logError(scope, `localStorage write failed for "${key}"`, error);
   }
 }
 
@@ -69,7 +66,7 @@ export function parseJsonMetadata(name, scope) {
   try {
     return JSON.parse(raw);
   } catch (error) {
-    logError(scope, `invalid ${name} page metadata: ${error.message}`);
+    logError(scope, `invalid ${name} page metadata`, error);
     return null;
   }
 }
