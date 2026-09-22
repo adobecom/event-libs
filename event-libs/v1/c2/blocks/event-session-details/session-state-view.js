@@ -1,6 +1,8 @@
 import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
 import { logError } from '../../../utils/lana-log.js';
-import { getNowMs, getWatchDestination, isDvrPending } from '../../../utils/session-state.js';
+import {
+  getNowMs, getWatchDestination, isDvrPending, dvrAvailableAtMs,
+} from '../../../utils/session-state.js';
 import { getEventStartMs } from '../../../utils/tier-1-event-config.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
 import {
@@ -99,22 +101,7 @@ export function hasPlayableVideo(doc = document) {
   // Honor the DVR delay: an IPOD/MPC on-demand video isn't "available" until the DVR window has
   // elapsed (same gate the player uses). Without this the eyebrow flipped to "On-demand" the moment
   // the session ended, ignoring dvrDelayHours.
-  const pending = isDvrPending(session, getNowMs(), getEventStartMs());
-  // TEMP debug — remove before commit.
-  // eslint-disable-next-line no-console
-  console.log('[eyebrow-debug] hasPlayableVideo', {
-    nowMs: getNowMs(),
-    eventStartMs: getEventStartMs(),
-    sessionEndUtc: session.endTimeUtc || '(none)',
-    mpcId: session.mpcId,
-    dvrDelayHours: session.dvrDelayHours,
-    unlockMs: (getEventStartMs() != null || session.endTimeUtc)
-      ? ((Date.parse(session.endTimeUtc) || getEventStartMs()) + (session.dvrDelayHours || 0) * 3600000)
-      : null,
-    dvrPending: pending,
-    result: hasVideo && !pending,
-  });
-  return !pending;
+  return !isDvrPending(session, getNowMs(), getEventStartMs());
 }
 
 const normalizeAttr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -202,9 +189,21 @@ export function mountSessionState({
   // an IPOD session with empty session-times still shows Available soon / On-demand.
   if (isInPersonIpodSession()) {
     if (primaryCtaSlot) primaryCtaSlot.replaceChildren();
-    if (statusSlot) statusSlot.replaceChildren(renderStatus(null, slots[0], statusLabels));
-    if (ccEl) ccEl.hidden = !hasPlayableVideo();
-    return;
+    const ipodSession = buildSessionFromMetadata(parseJsonMetadata('session-times', 'session-details'));
+    let ipodTimer = null;
+    const renderIpod = () => {
+      if (statusSlot) statusSlot.replaceChildren(renderStatus(null, slots[0], statusLabels));
+      if (ccEl) ccEl.hidden = !hasPlayableVideo();
+      // Re-render at the DVR unlock so "Available soon" flips to "On-demand" without a reload.
+      const now = getNowMs();
+      const unlockMs = dvrAvailableAtMs(ipodSession, getEventStartMs());
+      if (ipodTimer != null) { clearTimeout(ipodTimer); ipodTimer = null; }
+      if (unlockMs != null && now < unlockMs) {
+        ipodTimer = setTimeout(renderIpod, Math.min((unlockMs - now) + 500, MAX_TIMEOUT));
+      }
+    };
+    renderIpod();
+    return () => { if (ipodTimer != null) clearTimeout(ipodTimer); };
   }
 
   if (!slots.length) return;
