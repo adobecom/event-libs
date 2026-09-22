@@ -599,6 +599,14 @@
   background: #262626;
 }
 
+/* Mobile-only tighter padding (Figma): 16px top/bottom, 24px left, 0 right. Tablet keeps the
+   base 32px above; desktop has its own 1280px+ rule. */
+@media (max-width: 767px) {
+  .sb-carousel-section--also-live {
+    padding: var(--s2a-spacing-md) 0 var(--s2a-spacing-md) var(--s2a-spacing-lg);
+  }
+}
+
 .sb-carousel-section--also-live .sg-carousel__header { margin-bottom: var(--s2a-spacing-sm); }
 
 .sb-carousel-section--also-live .sg-section-title {
