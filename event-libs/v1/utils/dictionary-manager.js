@@ -196,6 +196,15 @@ export function getRsvpTokenInvalidMessage(manager) {
     : text;
 }
 
+export const RSVP_INVALID_SUBMISSION_MESSAGE_KEY = 'rsvp-invalid-submission-error-msg';
+
+export function getRsvpInvalidSubmissionMessage(manager) {
+  const text = manager.getValue(RSVP_INVALID_SUBMISSION_MESSAGE_KEY);
+  return text === RSVP_INVALID_SUBMISSION_MESSAGE_KEY
+    ? 'There was a problem with the information you submitted. Please check your entries and try again.'
+    : text;
+}
+
 export const RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY = 'rsvp-token-already-registered-cta-text';
 
 /**

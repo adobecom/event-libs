@@ -64,6 +64,20 @@ describe('lana-log', () => {
     expect(calls[0].msg).to.equal('[scope] msg: {"foo":"bar"}');
   });
 
+  it('redacts PII-shaped keys on a plain object', () => {
+    logError('scope', 'msg', { email: 'a@b.com', firstName: 'Jane', status: 'active' });
+    expect(calls[0].msg).to.equal(
+      '[scope] msg: {"email":"[REDACTED]","firstName":"[REDACTED]","status":"active"}',
+    );
+  });
+
+  it('redacts PII-shaped keys inside nested objects', () => {
+    logError('scope', 'msg', { code: 'Conflict', attendee: { email: 'a@b.com', phone: '555-1234' } });
+    expect(calls[0].msg).to.equal(
+      '[scope] msg: {"code":"Conflict","attendee":{"email":"[REDACTED]","phone":"[REDACTED]"}}',
+    );
+  });
+
   it('passes a thrown string through as-is rather than double-encoding it', () => {
     logError('scope', 'msg', 'oops');
     expect(calls[0].msg).to.equal('[scope] msg: oops');

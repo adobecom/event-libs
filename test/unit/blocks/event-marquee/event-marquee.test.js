@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { readFile } from '@web/test-runner-commands';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
-import { sessions, favorited } from '../../../../event-libs/v1/utils/session-store.js';
+import { sessions } from '../../../../event-libs/v1/utils/session-store.js';
 import init from '../../../../event-libs/v1/c2/blocks/event-marquee/event-marquee.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -25,12 +25,10 @@ function sectionMetadataHtml(rows = {}) {
 // Same row shape as Milo's classic marquee.js: an optional first row is the
 // full-bleed background; the last row is the foreground (text + optional asset).
 function videoVariantHtml({
-  sessionId = 's-100', favoriteEnabled, shareEnabled, videoTitle, withBackground = true,
+  sessionId = 's-100', videoTitle, withBackground = true,
 } = {}) {
   const metaRows = {};
   if (sessionId) metaRows['session-id'] = sessionId;
-  if (favoriteEnabled !== undefined) metaRows['favorite-enabled'] = favoriteEnabled;
-  if (shareEnabled !== undefined) metaRows['share-enabled'] = shareEnabled;
   if (videoTitle !== undefined) metaRows['video-title'] = videoTitle;
 
   const backgroundRow = withBackground
@@ -81,7 +79,6 @@ describe('event-marquee', () => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
     sessions.value = [];
-    favorited.value = new Set();
   });
 
   describe('Text/CTA variant', () => {
@@ -222,59 +219,14 @@ describe('event-marquee', () => {
       expect(el.querySelector('.event-marquee-media .milo-video')).to.exist;
     });
 
-    it('renders a Favorite button when the authored session-id matches a known session', async () => {
+    it('does not render favorite or share actions (feature disabled)', async () => {
       sessions.value = [{ id: 's-100', rfCode: 'rf-100' }];
       document.body.innerHTML = videoVariantHtml({ sessionId: 's-100' });
       const el = document.querySelector('.event-marquee');
       await init(el);
 
-      const favoriteBtn = el.querySelector('.event-marquee-favorite');
-      expect(favoriteBtn).to.exist;
-      expect(favoriteBtn.getAttribute('aria-label')).to.equal('Add to favorites');
-      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
-      expect(favoriteBtn.classList.contains('is-favorited')).to.be.false;
-    });
-
-    it('reflects the favorited signal reactively', async () => {
-      sessions.value = [{ id: 's-100', rfCode: 'rf-100' }];
-      document.body.innerHTML = videoVariantHtml({ sessionId: 's-100' });
-      const el = document.querySelector('.event-marquee');
-      await init(el);
-
-      favorited.value = new Set(['s-100']);
-      const favoriteBtn = el.querySelector('.event-marquee-favorite');
-      expect(favoriteBtn.classList.contains('is-favorited')).to.be.true;
-      expect(favoriteBtn.getAttribute('aria-label')).to.equal('Remove from favorites');
-      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
-    });
-
-    it('does not render a Favorite button when no session-id is authored', async () => {
-      document.body.innerHTML = videoVariantHtml({ sessionId: '' });
-      const el = document.querySelector('.event-marquee');
-      await init(el);
+      expect(el.querySelector('.event-marquee-actions')).to.not.exist;
       expect(el.querySelector('.event-marquee-favorite')).to.not.exist;
-    });
-
-    it('does not render a Favorite button when favorite-enabled is explicitly false', async () => {
-      sessions.value = [{ id: 's-100', rfCode: 'rf-100' }];
-      document.body.innerHTML = videoVariantHtml({ sessionId: 's-100', favoriteEnabled: false });
-      const el = document.querySelector('.event-marquee');
-      await init(el);
-      expect(el.querySelector('.event-marquee-favorite')).to.not.exist;
-    });
-
-    it('renders a share button by default', async () => {
-      document.body.innerHTML = videoVariantHtml({ sessionId: '' });
-      const el = document.querySelector('.event-marquee');
-      await init(el);
-      expect(el.querySelector('.event-marquee-share')).to.exist;
-      expect(el.querySelector('.event-marquee-share').getAttribute('daa-ll')).to.equal('Share');
-    });
-
-    it('omits the share button when share-enabled is explicitly false', async () => {
-      document.body.innerHTML = videoVariantHtml({ sessionId: '', shareEnabled: false });
-      const el = document.querySelector('.event-marquee');
-      await init(el);
       expect(el.querySelector('.event-marquee-share')).to.not.exist;
     });
 
@@ -338,7 +290,7 @@ describe('event-marquee', () => {
       sessions.value = [{ id: 'S-AbC123', rfCode: 'rf-1' }];
       const el = document.querySelector('.event-marquee');
       await init(el);
-      expect(el.querySelector('.event-marquee-favorite')).to.exist;
+      expect(el.classList.contains('event-marquee-video')).to.be.true;
     });
   });
 
