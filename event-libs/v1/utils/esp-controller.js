@@ -89,6 +89,15 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   return options;
 }
 
+async function parseFailureBody(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 export async function getEvent(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -323,14 +332,14 @@ export async function createAttendee(eventId, attendeeData, rsvpToken = null) {
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
-    const data = await response.json();
 
     if (!response.ok) {
+      const error = await parseFailureBody(response);
       logError('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
-      return { ok: response.ok, status: response.status, error: data };
+      return { ok: response.ok, status: response.status, error };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
     logError('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
@@ -349,14 +358,14 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
-    const data = await response.json();
 
     if (!response.ok) {
+      const error = await parseFailureBody(response);
       logError('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
-      return { ok: response.ok, status: response.status, error: data };
+      return { ok: response.ok, status: response.status, error };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
     logError('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
@@ -372,15 +381,15 @@ export async function updateAttendee(eventId, attendeeData) {
   const options = await constructRequestOptions('PUT', raw);
 
   try {
-      const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
-    const data = await response.json();
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
+      const error = await parseFailureBody(response);
       logError('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
-      return { ok: response.ok, status: response.status, error: data };
+      return { ok: response.ok, status: response.status, error };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
     logError('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
