@@ -1,5 +1,8 @@
 import { expect } from '@esm-bundle/chai';
-import { BroadcastBody } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/components/BroadcastApp.js';
+import sinon from 'sinon';
+import {
+  BroadcastBody, scheduleSwitchScroll, SWITCH_SCROLL_DELAY_MS,
+} from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/components/BroadcastApp.js';
 import {
   sessions, sessionsStatus, liveStreamActiveIds,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
@@ -286,6 +289,40 @@ describe('BroadcastBody', () => {
         config: { ...CONFIG, sessionEndedImageUrlMobile: 'https://example.com/mobile.png' },
       });
       expect(out).to.not.include('--sb-app-ended-bg');
+    });
+  });
+
+  // handleSwitchSession itself lives inside BroadcastBody's closure and calls this on every
+  // switch (see BroadcastApp.js) — not directly reachable through this mocked htm-preact
+  // harness (useState/useEffect are no-ops, and nested components like AlsoLiveCarousel never
+  // actually invoke onSwitchSession here; see the file-level comment above). This exercises the
+  // delay/scroll behavior itself, decoupled from that closure.
+  describe('scheduleSwitchScroll (session switch scroll)', () => {
+    let clock;
+    let scrollToStub;
+
+    beforeEach(() => {
+      clock = sinon.useFakeTimers();
+      scrollToStub = sinon.stub(window, 'scrollTo');
+    });
+
+    afterEach(() => {
+      clock.restore();
+      scrollToStub.restore();
+    });
+
+    it('does not scroll synchronously', () => {
+      scheduleSwitchScroll();
+      expect(scrollToStub.called).to.equal(false);
+    });
+
+    it('scrolls to the top exactly once after SWITCH_SCROLL_DELAY_MS', () => {
+      scheduleSwitchScroll();
+      clock.tick(SWITCH_SCROLL_DELAY_MS - 1);
+      expect(scrollToStub.called).to.equal(false);
+      clock.tick(1);
+      expect(scrollToStub.calledOnce).to.equal(true);
+      expect(scrollToStub.firstCall.args[0]).to.include({ top: 0 });
     });
   });
 });

@@ -45,6 +45,15 @@ export const SCHEDULE_REFRESH_MS = 5_000;
 // from a dynamically-imported module) a moment to settle before scrolling.
 export const SWITCH_SCROLL_DELAY_MS = 300;
 
+// Split out from handleSwitchSession below so the delay/scroll behavior itself is callable (and
+// its timer inspectable via sinon fake timers) without going through this mocked htm-preact
+// harness's no-op useState/useEffect — see BroadcastBody.test.js's "session switch scroll" block.
+export function scheduleSwitchScroll(delayMs = SWITCH_SCROLL_DELAY_MS) {
+  return setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
+  }, delayMs);
+}
+
 // Exported separately so tests can call it without mounting the Provider tree.
 export function BroadcastBody({ config }) {
   // sessionStorage backs up history.state, which isn't guaranteed to survive a hard refresh.
@@ -101,9 +110,7 @@ export function BroadcastBody({ config }) {
     pushSessionState(session.id);
     setManualSessionId(session.id);
     trackBroadcastEvent(`Broadcast-Session-Switch | ${session.id}`);
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: scrollBehavior() });
-    }, SWITCH_SCROLL_DELAY_MS);
+    scheduleSwitchScroll();
   }
 
   // Session Guide's widget has no prop path in - watchSameSessionRequest is the only channel.
