@@ -18,7 +18,6 @@ export const buildLiveCard = () => LiveCard;
 // Non-MR sessions need this manual tick; MR sessions get an equivalent refresh from the poller.
 export const PROGRESS_REFRESH_MS = 30_000;
 
-// guideConfig.liveCardMobileMaxWidth overrides this cutoff (session-broadcast uses 1279).
 const DEFAULT_MOBILE_MAX_WIDTH = 1023;
 const matchesMobile = (maxWidth) => !!window.matchMedia?.(`(max-width: ${maxWidth}px)`).matches;
 function useIsMobile(maxWidth) {
@@ -81,7 +80,6 @@ export function LiveCard({
   // Meta row's second slot is shared: Recommended+upcoming shows time, others show a track badge.
   const showTime = variant === 'recommended' && sessionState === 'upcoming';
   const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
-  // Mobile's badges row is separate from the time row, so both can show together.
   const badgesSecondTrack = (session.additionalTracks || [])[0];
 
   const cardClass = [

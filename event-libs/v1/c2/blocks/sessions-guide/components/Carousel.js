@@ -65,8 +65,7 @@ export function Carousel({
   const sessionCount = sessions?.length || 0;
   const maxOffset = Math.max(0, sessionCount - visibleCountRef.current);
 
-  // Re-measures once sessions load async (mount effect can fire before the strip exists), and
-  // re-clamps offset if the list shrinks under an already-paged-forward carousel.
+  // Re-measures for async-loaded sessions; the mount effect above can fire before the strip exists.
   useEffect(() => {
     measure();
     refreshEdges();
@@ -80,7 +79,6 @@ export function Carousel({
   const atStart = paged ? clampedOffset <= 0 : edges.atStart;
   const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 
-  // pageByGroup steps by visible card count instead of 1; maxOffset caps the last, partial step.
   const step = pageByGroup ? Math.max(1, visibleCountRef.current) : 1;
   const goPrev = () => {
     if (paged) { setOffset((o) => Math.max(0, o - step)); return; }

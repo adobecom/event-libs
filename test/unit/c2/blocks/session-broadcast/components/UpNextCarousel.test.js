@@ -17,7 +17,6 @@ describe('UpNextCarousel', () => {
     expect(out).to.include('sb-carousel-section--up-next');
   });
 
-  // Real stepping behavior is covered in Carousel.test.js and verified live in a browser.
   it('renders without throwing now that pageByGroup is passed to Carousel', () => {
     expect(() => UpNextCarousel({ sessions: [SESSION] })).to.not.throw();
   });

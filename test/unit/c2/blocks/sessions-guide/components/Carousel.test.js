@@ -151,7 +151,6 @@ describe('Carousel', () => {
     expect(() => Carousel({ sessions: [SESSION_A], forceLive: true })).to.not.throw();
   });
 
-  // Mocked hooks can't exercise real stepping here — only that the prop doesn't break rendering.
   it('accepts pageByGroup without throwing, defaulting to one-at-a-time paging otherwise', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);

@@ -2,8 +2,6 @@ import { expect } from '@esm-bundle/chai';
 import init, { parseBroadcastConfig, observeFillHeight } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
 import { sessionsStatus } from '../../../../../event-libs/v1/utils/session-store.js';
 
-// Each "session ended image ..." row supports a link or an embedded picture; the fixture
-// builds a real anchor by default — embedded-picture authoring gets its own test below.
 function block(rows) {
   const el = document.createElement('div');
   el.className = 'session-broadcast';
@@ -189,7 +187,6 @@ describe('parseBroadcastConfig', () => {
     expect(parseBroadcastConfig(el).sessionEndedImageUrlMobile).to.equal('https://example.com/ended.png');
   });
 
-  // A DA "linked image" cell can nest a <picture> inside its <a>, so both can exist together.
   describe('legacy "session ended image" row (bigger source from an authored <picture>)', () => {
     function blockWithPicture(sourceWidths) {
       const el = block([['Session ended image', 'https://example.com/ended.png']]);
@@ -253,9 +250,7 @@ describe('parseBroadcastConfig', () => {
       expect(config.sessionEndedImageUrlTablet).to.match(/\/media\.jpg$/); // widest source, query params stripped
     });
 
-    // Real regression: srcset isn't auto-resolved like a.href/img.src, so DA's relative paths
-    // failed safeUrl()'s absolute-URL check silently. Asserts the exact value, not a substring,
-    // so an unresolved relative string can't pass again.
+    // Real regression: an unresolved relative srcset path failed safeUrl() silently.
     it('resolves a relative srcset path to an absolute URL, then strips its query params', () => {
       const el = document.createElement('div');
       el.innerHTML = `

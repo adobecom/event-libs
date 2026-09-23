@@ -1063,17 +1063,14 @@
   overflow: hidden;
 }
 
-/* Mobile: title or its time row renders first, so the usual top margin is just whitespace. */
 .sg-live-card--mobile .sg-live-card__title {
   margin-top: 0;
 }
 
-/* Scoped to the modifier class so desktop keeps its own height. */
 .sg-live-card--mobile .sg-live-card__image {
   height: 175px;
 }
 
-/* Own modifier, not .sg-live-card__time — that one keeps divider styling for the desktop meta row. */
 .sg-live-card__time--mobile {
   margin: 0 0 var(--s2a-spacing-sm) 0;
   color: var(--s2a-color-gray-700);
@@ -1781,8 +1778,6 @@
   }
 
   .sg-carousel__track { margin-right: 0; }
-
-  /* No override here — normal tablet now shares the mobile redesign (.sg-live-card--mobile). */
 }
 
 /* ── Tablet only: floating carousel arrows ───────────────────────────────── */
@@ -1871,8 +1866,7 @@
 
   /* ── Live card ─────────────────────────────────────────────── */
 
-  /* :not(.sg-live-card--mobile) guards against session-broadcast's cards, which carry that
-     class up to 1280px (guideConfig.liveCardMobileMaxWidth). */
+  /* Guards against session-broadcast's cards, which carry .sg-live-card--mobile up to 1280px. */
   .sg-live-card:not(.sg-live-card--mobile) {
     flex-direction: row;
     width: 100%;
@@ -2363,7 +2357,6 @@
     max-width: 1156px;
   }
 
-  /* Base 8px gap reads too tight at this card size. */
   .sg-full-page .sg-carousel-section--live .sg-carousel__cards {
     gap: var(--s2a-spacing-lg);
   }

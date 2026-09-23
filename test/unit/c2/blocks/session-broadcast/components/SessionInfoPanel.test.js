@@ -59,7 +59,6 @@ describe('SessionInfoPanel', () => {
     expect(out).to.include('is-favorited');
   });
 
-  // CategoryBadge itself isn't invoked by this string-render harness — just guards the wrapper.
   it('shows the badge row wrapper when collapsed and not favorited', () => {
     const out = SessionInfoPanel({ session: SESSION });
     expect(out).to.include('sb-info__meta');

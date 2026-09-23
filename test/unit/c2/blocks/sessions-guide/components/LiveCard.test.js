@@ -85,8 +85,6 @@ describe('LiveCard', () => {
     liveStreamActiveIds.value = new Set();
   });
 
-  // The ambient test viewport is inside the mobile range, so tests wanting desktop layout
-  // must call forceMobile(false) explicitly too, not just tests wanting mobile.
   let originalMatchMedia;
   beforeEach(() => { originalMatchMedia = window.matchMedia; });
   afterEach(() => { window.matchMedia = originalMatchMedia; });

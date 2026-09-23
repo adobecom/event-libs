@@ -31,7 +31,6 @@ import { AlsoLiveCarousel } from './AlsoLiveCarousel.js';
 import { UpNextCarousel } from './UpNextCarousel.js';
 
 // surface:'page' routes clicks through onCardClick/onWatchSamePage instead of LiveCard's own.
-// liveCardMobileMaxWidth: mobile layout runs up to 1280px here, not sessions-guide's 1024px.
 const GUIDE_CONFIG = {
   userTz: detectUserTimezone(), surface: 'page', theme: 'light', liveCardMobileMaxWidth: 1279,
 };
@@ -39,10 +38,8 @@ const GUIDE_CONFIG = {
 // Exported for tests; see the effect below for why this needs its own tick.
 export const SCHEDULE_REFRESH_MS = 5_000;
 
-// Delay lets the new player's async layout (e.g. MpcPlayerAdapter's iframe) settle first.
 export const SWITCH_SCROLL_DELAY_MS = 300;
 
-// Split out for testability — handleSwitchSession's closure isn't reachable from tests.
 export function scheduleSwitchScroll(delayMs = SWITCH_SCROLL_DELAY_MS) {
   return setTimeout(() => {
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
@@ -164,7 +161,6 @@ export function BroadcastBody({ config }) {
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
     && !schedule.pendingCandidates?.length && !schedule.alsoLive.length && !schedule.upNext.length;
 
-  // Feeds .sb-app:has(.sb-ended) — one background var per breakpoint tier.
   const endedActive = !schedule.activeSession && !!schedule.endedSession;
   const endedBgVars = endedActive ? {
     '--sb-app-ended-bg-mobile': safeUrl(config.sessionEndedImageUrlMobile),

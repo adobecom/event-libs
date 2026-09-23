@@ -18,7 +18,6 @@ const DEFAULTS = {
   sessionEndedImageUrlDesktopXl: '',
 };
 
-// Order = fallback-search order below. Third column: prefer the largest <picture> source.
 const SESSION_ENDED_IMAGE_LABELS = [
   ['sessionEndedImageUrlMobile', 'session ended image mobile', false],
   ['sessionEndedImageUrlTablet', 'session ended image tablet', false],
@@ -26,7 +25,6 @@ const SESSION_ENDED_IMAGE_LABELS = [
   ['sessionEndedImageUrlDesktopXl', 'session ended image desktop xl', true],
 ];
 
-// Fallback for pages authored before the four rows above existed.
 const LEGACY_SESSION_ENDED_IMAGE_LABEL = 'session ended image';
 
 function getRowValueEl(el, label) {
@@ -59,7 +57,6 @@ function firstSrcsetUrl(srcset) {
   return (srcset || '').trim().split(',')[0]?.trim().split(/\s+/)[0] || '';
 }
 
-// Largest source from a row's authored <picture>; reads a URL only, never re-renders.
 function extractLargestPictureUrl(el, label) {
   const picture = getRowValueEl(el, label)?.querySelector('picture');
   const sources = [...(picture?.querySelectorAll('source[srcset]') || [])];
@@ -80,7 +77,6 @@ function extractRowImageUrl(el, label, preferLargest) {
   return extractImageUrl(el, label);
 }
 
-// Backfills an empty slot from its nearest authored neighbor; ties favor the smaller one.
 function fillNearestAvailable(values) {
   return values.map((value, i) => {
     if (value) return value;
@@ -92,7 +88,6 @@ function fillNearestAvailable(values) {
   });
 }
 
-// Drops AEM's optimization params — the optimized rendition looks pixelated at larger sizes.
 function stripOptimizationParams(url) {
   if (!url) return url;
   try {
@@ -104,7 +99,6 @@ function stripOptimizationParams(url) {
   }
 }
 
-// Mobile keeps DA's optimized rendition; every other tier is rewritten to the original asset.
 function applyOptimizationPolicy(urls, mobileKey) {
   return Object.fromEntries(Object.entries(urls).map(
     ([key, url]) => [key, key === mobileKey ? url : stripOptimizationParams(url)],
@@ -119,7 +113,6 @@ function extractSessionEndedImageUrls(el) {
   const keys = SESSION_ENDED_IMAGE_LABELS.map(([key]) => key);
   const [mobileKey] = keys;
 
-  // None of the four rows authored at all — fall back to the legacy single-row scheme.
   if (filled.every((url) => !url)) {
     const legacySmall = extractImageUrl(el, LEGACY_SESSION_ENDED_IMAGE_LABEL);
     const legacyLarge = extractLargestPictureUrl(el, LEGACY_SESSION_ENDED_IMAGE_LABEL);

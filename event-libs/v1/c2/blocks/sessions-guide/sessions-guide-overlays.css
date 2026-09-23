@@ -544,7 +544,6 @@
   gap: var(--s2a-spacing-xs);
 }
 
-/* Matches event-featured-products.css: a lone product spans both columns. */
 .sg-detail__products > *:only-child {
   grid-column: 1 / -1;
 }

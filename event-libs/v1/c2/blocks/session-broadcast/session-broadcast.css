@@ -109,7 +109,6 @@
     "actions";
 }
 
-/* Removes the grid rows entirely, not just hides them visually. */
 .sb-info.is-favorited:not(.is-expanded) { grid-template-areas: "row" "actions"; }
 
 .sb-info__row {
@@ -196,7 +195,6 @@
 /* Overrides CategoryBadge's inline per-track icon color — channel icon is always white here. */
 .sb-info__meta .sg-category-badge__icon-color { color: #fff; }
 
-/* Desktop badge spec (mobile+tablet override font-size/weight/line-height below). */
 .sb-info__meta .sg-category-badge__label {
   font-size: 14px;
   line-height: 20px;
@@ -220,7 +218,6 @@
 }
 
 @media (max-width: 767px) {
-  /* Custom per-row gaps instead of the uniform grid gap; rounded bottom corners too. */
   .sb-info {
     gap: 0;
     border-radius: 0 0 var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px);
@@ -247,8 +244,6 @@
     gap: 6px;
   }
 
-  /* Tucks Also Live behind sb-info's rounded bottom so its bg fills the corner notches;
-     only when adjacent to sb-info (not the ended state). padding-top restores the offset. */
   .sb-info + .sb-carousel-section--also-live {
     margin-top: calc(-1 * var(--s2a-border-radius-md, 16px));
     padding-top: var(--s2a-spacing-xl, 32px);
@@ -299,7 +294,6 @@
       "meta meta";
   }
 
-  /* No collapsed/expanded distinction for badges from tablet up. */
   .sb-info:has(.sb-info__desc-wrap) {
     grid-template-areas:
       "row actions"
@@ -316,7 +310,6 @@
       "viewall viewall";
   }
 
-  /* Reverses the mobile-only .is-favorited hide above — badge and description always show here. */
   .sb-info.is-favorited:not(.is-expanded) {
     grid-template-areas:
       "row actions"
@@ -341,7 +334,6 @@
 
   .sb-info__actions { gap: 5px; }
 
-  /* -12px trims the shared 16px gap down to 4px for this one spot only. */
   .sb-info__desc-wrap {
     font-size: 16px;
     margin-top: -12px;
@@ -536,8 +528,6 @@
   height: 20px;
 }
 
-/* Pseudo-element bleed, not a JS <img>. overflow-x:hidden guards the ::before's 100vw
-   against the scrollbar's own width. */
 .sb-app:has(.sb-ended) {
   position: relative;
   isolation: isolate;
@@ -545,9 +535,6 @@
   background: var(--s2a-color-gray-1000, #000);
 }
 
-/* top clears GNAV. left:50%/margin-left:-50vw bleeds to the true viewport edges without
-   needing to know the container's width. background-size is width-locked, not cover —
-   cover would crop most of the image's width on this tall, narrow element. */
 .sb-app:has(.sb-ended)::before {
   content: '';
   position: absolute;
@@ -563,7 +550,6 @@
   background-size: 100% auto;
 }
 
-/* Belt-and-suspenders on top of parseBroadcastConfig's own backfill (session-broadcast.js). */
 @media (min-width: 768px) {
   .sb-app:has(.sb-ended)::before {
     background-image: var(--sb-app-ended-bg-tablet, var(--sb-app-ended-bg-mobile, none));
@@ -610,7 +596,6 @@
 
 .sb-carousel-section--also-live .sg-live-card__btn { height: 32px; }
 
-/* Background stays black here instead of sessions-guide's #292929. */
 .sb-carousel-section--also-live .sg-live-card__btn--watch {
   background: #000;
 }
@@ -664,8 +649,6 @@
     border-radius: 20px;
   }
 
-  /* Fixed size (not aspect-ratio): a real <img> needs explicit height beside a flex-row
-     sibling. Radius is 16px (not the card's 20px) to nest inside its 4px border cleanly. */
   .sb-carousel-section--also-live .sg-live-card__image {
     width: 560px;
     height: 316px;
@@ -682,7 +665,6 @@
     width: 192px;
   }
 
-  /* flex `order` reorders LiveCard's meta→title→desc→actions DOM into title→badges→actions. */
   .sb-carousel-section--also-live .sg-live-card__body {
     flex: 1;
     width: auto;
@@ -690,7 +672,6 @@
     gap: var(--s2a-spacing-xs, 8px);
   }
 
-  /* Two auto margins center title+badges while pinning actions to the bottom. */
   .sb-carousel-section--also-live .sg-live-card__title {
     order: 1;
     margin: auto 0 0;
@@ -809,7 +790,6 @@
   }
 }
 
-/* Cards stay swipeable; Carousel.js's existing scrollBy() path drives the new nav buttons. */
 @media (min-width: 768px) and (max-width: 1279px) {
   .sb-carousel-section--also-live .sg-carousel__cards,
   .sb-carousel-section--up-next .sg-carousel__cards {
@@ -863,9 +843,7 @@
   }
 }
 
-/* Broadcast shows nav in the header at mobile/tablet too (Session Guide stays swipe-only). */
 @media (max-width: 1279px) {
-  /* Anchors the absolute nav below to .sg-carousel, not the body (unlike sessions-guide). */
   .sb-carousel-section--also-live .sg-carousel__body,
   .sb-carousel-section--up-next .sg-carousel__body {
     position: static;
@@ -885,7 +863,6 @@
     right: var(--s2a-spacing-lg, 24px);
   }
 
-  /* Resets sessions-guide's edge-float positioning — arrows are flex children here. */
   .sb-carousel-section--also-live .sg-carousel__arrow,
   .sb-carousel-section--up-next .sg-carousel__arrow {
     position: static;
@@ -909,14 +886,12 @@
     height: 14px;
   }
 
-  /* sessions-guide hides disabled arrows at 768-1023; broadcast keeps both, dimmed (base opacity). */
   .sb-carousel-section--also-live .sg-carousel__arrow[disabled],
   .sb-carousel-section--up-next .sg-carousel__arrow[disabled] {
     display: flex;
   }
 }
 
-/* Matches the out-of-flow nav's 48px button height so top:0 aligns with the title. */
 @media (min-width: 1280px) {
   .sb-carousel-section--also-live .sg-carousel__header,
   .sb-carousel-section--up-next .sg-carousel__header {
@@ -930,7 +905,6 @@
     top: 0;
   }
 
-  /* Overrides the light-theme arrow for broadcast's dark carousel sections. */
   .sb-carousel-section--also-live .sg-carousel__arrow,
   .sb-carousel-section--up-next .sg-carousel__arrow {
     width: 48px;
@@ -994,7 +968,6 @@
     color: var(--s2a-color-content-inverse, #fff);
   }
 
-  /* Steps up from heading-6 (768px+) to heading-5; Also Live piggybacks on Up Next's rule. */
   .sb-carousel-section--also-live .sg-section-title,
   .sb-carousel-section--up-next .sg-section-title {
     line-height: var(--s2a-typography-line-height-heading-5); /* 100% */
@@ -1006,7 +979,6 @@
     margin-right: calc((100vw - 1192px) / -2);
   }
 
-  /* Real resting height (not the min-height below) — hovered cards overflow without shifting siblings. */
   .sb-carousel-section--up-next .sg-carousel__cards {
     padding-right: 0;
     align-items: center;

@@ -292,8 +292,6 @@ describe('BroadcastBody', () => {
     });
   });
 
-  // handleSwitchSession's closure isn't reachable through this mocked harness (see file-level
-  // comment above); this tests the extracted delay/scroll behavior directly instead.
   describe('scheduleSwitchScroll (session switch scroll)', () => {
     let clock;
     let scrollToStub;
