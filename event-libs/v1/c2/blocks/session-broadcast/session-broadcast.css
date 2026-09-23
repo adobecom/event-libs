@@ -28,12 +28,19 @@
 /* --sb-fill-height is synced to the footer's top edge by JS; a floor, not a fixed height.
    padding-top clears GNAV: same var()/fallback as sessions-guide's own .sg-full-page__header-wrap
    — GNAV is fixed/sticky and doesn't occupy layout space, so nothing else pushes content below
-   it on load. */
+   it on load. overflow-anchor:none opts this whole subtree out of the page's scroll anchoring:
+   switching sessions can grow the player (e.g. MpcPlayerAdapter's iframe, built from a
+   dynamically-imported module, arrives a beat after the initial 0-height mount) while the page
+   is already scrolled to the top from handleSwitchSession's explicit scrollTo — without this,
+   the browser "helpfully" scrolls back down afterward to keep whatever was anchored in view,
+   undoing that jump. This only stops the auto-readjustment; it doesn't reserve any space, so it
+   can't introduce a layout gap the way a fixed aspect-ratio did. */
 .sb-app {
   display: block;
   min-height: var(--sb-fill-height, 0);
   padding-top: var(--feds-nav-total-height, 80px);
   background: var(--s2a-color-gray-1000, #000);
+  overflow-anchor: none;
 }
 
 .sb-error,

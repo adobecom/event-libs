@@ -13,6 +13,7 @@ import { showToast } from '../../../../features/toast/toast.js';
 import { SessionGuideProvider } from '../../sessions-guide/store/index.js';
 import { detectUserTimezone } from '../../sessions-guide/utils/time.js';
 import { findSessionByParam } from '../../sessions-guide/utils/url.js';
+import { scrollBehavior } from '../../sessions-guide/utils/motion.js';
 import { LoadingState, sessionsStatusMessage } from '../../sessions-guide/components/LoadingState.js';
 import { getBroadcastSchedule, isSessionLiveNow } from '../utils/broadcast-schedule.js';
 import {
@@ -39,6 +40,10 @@ const GUIDE_CONFIG = {
 
 // Exported for tests; see the effect below for why this needs its own tick.
 export const SCHEDULE_REFRESH_MS = 5_000;
+
+// Exported for tests. Gives the new player's own layout (e.g. MpcPlayerAdapter's iframe, built
+// from a dynamically-imported module) a moment to settle before scrolling.
+export const SWITCH_SCROLL_DELAY_MS = 300;
 
 // Exported separately so tests can call it without mounting the Provider tree.
 export function BroadcastBody({ config }) {
@@ -84,10 +89,21 @@ export function BroadcastBody({ config }) {
     stripWatchParam(isLive ? requested.id : null);
   }, [sessionsStatus.value]);
 
+  // Same "switch in place, then scroll to the player" contract as LiveCard's own internal
+  // watch-same-page branch and SessionDetailOverlay's handleWatch — this is the broadcast
+  // page's equivalent (routed here via onWatchSamePage, which preempts LiveCard's own branch),
+  // and was missing the scroll: state updated correctly, but nothing brought the player into
+  // view, so it only appeared to scroll when an incidental layout shift happened to do it.
+  // The scroll runs after the switch (once the new player has started mounting), delayed by
+  // SWITCH_SCROLL_DELAY_MS so its own layout has settled first — overflow-anchor:none on
+  // .sb-app (session-broadcast.css) is the other half of this fix.
   function handleSwitchSession(session) {
     pushSessionState(session.id);
     setManualSessionId(session.id);
     trackBroadcastEvent(`Broadcast-Session-Switch | ${session.id}`);
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
+    }, SWITCH_SCROLL_DELAY_MS);
   }
 
   // Session Guide's widget has no prop path in - watchSameSessionRequest is the only channel.
