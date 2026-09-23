@@ -15,6 +15,7 @@ describe('notification-widget', () => {
   function bell() { return mountPoint.querySelector('.swan-notif__bell'); }
   function panel() { return mountPoint.querySelector('.swan-notif__panel'); }
   function badge() { return mountPoint.querySelector('.swan-notif__badge'); }
+  function tooltip() { return mountPoint.querySelector('.swan-notif__tooltip'); }
   function sectionTitle() { return mountPoint.querySelector('.swan-notif__section-title'); }
   function rows() { return [...mountPoint.querySelectorAll('.swan-notif__row')]; }
   function announcer() { return mountPoint.querySelector('.swan-notif__sr-only'); }
@@ -193,6 +194,14 @@ describe('notification-widget', () => {
   it('does not mount a second widget on a repeated call', () => {
     mountNotificationWidget();
     expect(mountPoint.querySelectorAll('.swan-notif__bell')).to.have.lengthOf(1);
+  });
+
+  describe('hover tooltip', () => {
+    it('renders a hidden-from-AT tooltip labeled "Notifications" right after the bell', () => {
+      expect(tooltip().getAttribute('aria-hidden')).to.equal('true');
+      expect(tooltip().querySelector('.swan-notif__tooltip-label').textContent).to.equal('Notifications');
+      expect(bell().nextElementSibling).to.equal(tooltip());
+    });
   });
 
   describe('closing other gnav popups', () => {
