@@ -1,5 +1,5 @@
 import { fetchLiveStatus } from './mobile-rider.js';
-import { getEventApiConfig } from '../../utils/session-store.js';
+import { getEventApiConfig, deriveMrEnv } from '../../utils/session-store.js';
 import { logError } from '../../utils/lana-log.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
@@ -27,7 +27,7 @@ async function tick(g) {
   if (!ids.length) return;
   g.inFlight = true;
   try {
-    const { active, inactive } = await fetchLiveStatus(ids, getEventApiConfig()?.mrEnv);
+    const { active, inactive } = await fetchLiveStatus(ids, getEventApiConfig()?.mrEnv ?? deriveMrEnv());
     const result = { active: [...active], inactive: [...inactive] };
     listeners.forEach((entry) => entry.notify(result, ids));
   } catch (error) {

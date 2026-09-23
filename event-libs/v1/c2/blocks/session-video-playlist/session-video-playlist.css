@@ -5,12 +5,19 @@
     --vp-bg: var(--vp-authored-bg, var(--s2a-color-gray-25));
     --vp-fg: var(--s2a-color-gray-900);
     --vp-row-bg: var(--s2a-color-gray-50);
-    --vp-track-bg: var(--s2a-color-transparent-black-16);
-    --vp-muted: var(--s2a-color-transparent-black-64);
+    /* stylelint-disable-next-line color-no-hex -- exact Figma progress-track color on the light
+       desktop pod; no --s2a- token resolves to #D3D3D3 */
+    --vp-track-bg: #d3d3d3;
+    --vp-muted: var(--s2a-color-gray-700);
     --vp-playing-bg: var(--s2a-color-gray-900);
     --vp-playing-fg: var(--s2a-color-gray-25);
     --vp-playing-track-bg: var(--s2a-color-gray-700);
-    --vp-playing-muted: var(--s2a-color-transparent-white-64);
+    /* stylelint-disable-next-line color-no-hex -- Figma "S2AC/Palette/gray/700" resolved in
+       dark mode (the is-playing/hover row is dark even on desktop) = #AFAFAF. Our --s2a-color-
+       gray-700 only carries the light value (#505050), so the dark-mode hex is inlined here. */
+    --vp-playing-muted: #afafaf;
+    --vp-subdued-content: var(--s2a-color-gray-800);
+    --vp-title: var(--s2a-color-gray-1000);
 
     flex: 0 0 349px;
     align-self: flex-start;
@@ -47,15 +54,18 @@
 }
 
 .session-video-playlist {
-  display: flex;
+  display: none;
   flex-direction: column;
   box-sizing: border-box;
   background: var(--vp-bg, var(--s2a-color-gray-25, #fff));
   color: var(--vp-fg, var(--s2a-color-gray-900, #1e1e1e));
   border-radius: var(--s2a-border-radius-md, 16px);
-  padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
   margin-bottom: var(--s2a-spacing-8, 8px);
   overflow: hidden;
+}
+
+.session-video-playlist.is-rendered {
+  display: flex;
 }
 
 .session-video-playlist-handle,
@@ -64,7 +74,7 @@
   flex-shrink: 0;
 }
 
-.session-video-playlist > :not(.session-video-playlist-handle, .session-video-playlist-top, .session-video-playlist-list, .session-video-playlist-show-more) {
+.session-video-playlist > :not(.session-video-playlist-handle, .session-video-playlist-top, .session-video-playlist-wrapper, .session-video-playlist-show-more) {
   display: none;
 }
 
@@ -87,7 +97,17 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--s2a-spacing-xs) var(--s2a-spacing-md);
-  padding-bottom: var(--s2a-spacing-8, 8px);
+  padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-md);
+}
+
+.session-video-playlist-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 0 var(--s2a-spacing-md);
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .session-video-playlist-title {
@@ -120,14 +140,15 @@
   gap: var(--s2a-spacing-xs);
   margin: 0 0 0 auto;
   font-size: var(--s2a-font-size-sm);
+  color: var(--vp-subdued-content);
   cursor: pointer;
 }
 
 .session-video-playlist-autoplay-toggle {
   appearance: none;
   position: relative;
-  width: 32px;
-  height: 18px;
+  width: 22px;
+  height: 14px;
   margin: 0;
   border-radius: var(--s2a-border-radius-round);
   /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this exact
@@ -141,10 +162,10 @@
 .session-video-playlist-autoplay-toggle::before {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
+  top: 3px;
+  left: 3px;
+  width: 8px;
+  height: 8px;
   border-radius: var(--s2a-border-radius-round);
   background: var(--s2a-color-gray-25, #fff);
   transition: transform 0.2s ease;
@@ -155,7 +176,7 @@
 }
 
 .session-video-playlist-autoplay-toggle:checked::before {
-  transform: translateX(14px);
+  transform: translateX(8px);
 }
 
 .session-video-playlist-list {
@@ -165,31 +186,29 @@
   align-items: flex-start;
   gap: var(--s2a-spacing-xs);
   min-height: 0;
-  padding: 0;
-  overflow-y: auto;
   box-sizing: border-box;
 }
 
 @media (min-width: 1024px) {
-  .session-video-playlist-list::-webkit-scrollbar {
+  .session-video-playlist-wrapper::-webkit-scrollbar {
     /* stylelint-disable-next-line property-no-vendor-prefix -- prefixed form required; Chrome ignores unprefixed appearance in ::-webkit-scrollbar */
     -webkit-appearance: none;
     width: 10px;
   }
 
-  .session-video-playlist-list::-webkit-scrollbar-track {
+  .session-video-playlist-wrapper::-webkit-scrollbar-track {
     background: var(--s2a-color-transparent-black-16);
     border-radius: var(--s2a-border-radius-round);
   }
 
-  .session-video-playlist-list::-webkit-scrollbar-thumb {
+  .session-video-playlist-wrapper::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     border-radius: var(--s2a-border-radius-round);
     background: var(--s2a-color-gray-500);
     background-clip: content-box;
   }
 
-  .session-video-playlist-list::-webkit-scrollbar-thumb:hover {
+  .session-video-playlist-wrapper::-webkit-scrollbar-thumb:hover {
     background: var(--s2a-color-gray-700);
     background-clip: content-box;
   }
@@ -201,8 +220,8 @@
   gap: var(--s2a-spacing-sm);
   width: 100%;
   box-sizing: border-box;
-  border-radius: var(--s2a-border-radius-sm, 8px);
-  padding: var(--s2a-spacing-xs);
+  border-radius: var(--s2a-border-radius-8, 8px);
+  padding: var(--s2a-spacing-2xs) var(--s2a-spacing-12, 12px) var(--s2a-spacing-2xs) var(--s2a-spacing-2xs);
   background: var(--vp-row-bg);
   cursor: pointer;
 }
@@ -213,18 +232,17 @@
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
   min-width: 0;
+  color: var(--vp-fg);
   text-decoration: none;
 }
 
 .session-video-playlist-row.is-playing {
   background: var(--vp-playing-bg);
-  color: var(--vp-playing-fg);
 }
 
 @media (hover: hover) {
   .session-video-playlist-row:hover {
     background: var(--vp-playing-bg);
-    color: var(--vp-playing-fg);
   }
 }
 
@@ -232,6 +250,16 @@
 .session-video-playlist-row-content:focus-visible {
   outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
   outline-offset: 2px;
+}
+
+.session-video-playlist-row.is-playing .session-video-playlist-row-content {
+  color: var(--vp-playing-fg);
+}
+
+@media (hover: hover) {
+  .session-video-playlist-row:hover .session-video-playlist-row-content {
+    color: var(--vp-playing-fg);
+  }
 }
 
 .session-video-playlist-row-thumb-wrap {
@@ -290,34 +318,48 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  justify-content: space-between;
   gap: var(--s2a-spacing-3xs);
   min-width: 0;
 }
 
 .session-video-playlist-row-title {
   overflow: hidden;
+  max-height: 56px;
   font-size: var(--s2a-font-size-sm);
   font-weight: 700;
   line-height: 18px;
   letter-spacing: 0;
+  color: var(--vp-title);
   /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-  flex: 1 0 0;
+  flex: 0 1 auto;
   align-self: stretch;
+}
+
+.session-video-playlist-row.is-playing .session-video-playlist-row-title {
+  color: var(--vp-playing-fg);
+}
+
+@media (hover: hover) {
+  .session-video-playlist-row:hover .session-video-playlist-row-title {
+    color: var(--vp-playing-fg);
+  }
 }
 
 .session-video-playlist-row-progress {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--s2a-spacing-xs);
 }
 
 .session-video-playlist-row-progress-track {
   flex: 1 1 auto;
-  height: 4px;
-  border-radius: var(--s2a-border-radius-round);
+  height: 6px;
+  border-radius: 3px;
   background: var(--vp-track-bg);
   overflow: hidden;
 }
@@ -362,6 +404,7 @@
   flex-direction: column;
   flex-shrink: 0;
   gap: var(--s2a-spacing-xs);
+  padding: var(--s2a-spacing-3xs) 0;
 }
 
 .session-video-playlist-row-favorite,
@@ -373,9 +416,11 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: var(--s2a-border-width-sm, 1px) solid currentcolor;
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100);
   border-radius: var(--s2a-border-radius-round);
-  background: var(--s2a-color-gray-100);
+  /* stylelint-disable-next-line color-no-hex -- exact Figma favorite/play chip fill; no --s2a-
+     token resolves to #D0D0D0 */
+  background: #d0d0d0;
   color: var(--vp-fg);
   cursor: pointer;
 }
@@ -430,7 +475,7 @@
 @media (min-width: 1024px) {
   .session-video-playlist-show-more {
     display: flex;
-    padding-top: var(--s2a-spacing-lg, 24px);
+    padding: var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md);
     align-items: center;
     align-self: flex-start;
     gap: var(--s2a-spacing-xs);
@@ -476,27 +521,71 @@
     --vp-playing-track-bg: var(--s2a-color-gray-300);
     --vp-playing-muted: var(--s2a-color-gray-700);
 
+    /* stylelint-disable-next-line color-no-hex -- dark-mode value of Figma "neutral-subdued-
+       content" (gray-800 → #DBDBDB); no --s2a- token resolves to this exact hex */
+    --vp-subdued-content: #dbdbdb;
+    --vp-title: var(--s2a-color-gray-25);
+
     position: fixed;
+    left: var(--s2a-spacing-xs);
+    right: var(--s2a-spacing-xs);
+    bottom: var(--s2a-spacing-xs);
+    z-index: 2;
+    border-radius: var(--s2a-border-radius-md, 16px);
+    transition: max-height 0.3s ease, inset 0.3s ease, border-radius 0.3s ease;
+  }
+
+  .session-video-playlist.is-expanded {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 2;
     border-radius: var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px) 0 0;
-    transition: max-height 0.3s ease;
-    padding: 9px var(--s2a-spacing-md) var(--s2a-spacing-md);
   }
 
   .session-video-playlist.is-dragging {
     transition: none;
   }
 
-  .session-video-playlist.is-expanded {
-    padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
+  .session-video-playlist-wrapper {
+    padding: 0 0 var(--s2a-spacing-lg) var(--s2a-spacing-md);
+    margin: 0 var(--s2a-spacing-xs) 0 0;
+  }
+
+  .session-video-playlist:not(.is-expanded) .session-video-playlist-wrapper {
+    display: none;
+  }
+
+  .session-video-playlist-list {
+    margin-right: var(--s2a-spacing-xs);
+  }
+
+  .session-video-playlist-row {
+    position: relative;
+  }
+
+  .session-video-playlist-row-actions {
+    position: absolute;
+    top: var(--s2a-spacing-2xs);
+    right: var(--s2a-spacing-12, 12px);
+  }
+
+  .session-video-playlist-row-title {
+    padding-right: calc(32px + var(--s2a-spacing-sm));
+  }
+
+  .session-video-playlist-row-play-icon {
+    align-items: unset;
+    justify-content: unset;
+    margin: 0;
+    padding: 9px;
+    border-radius: 50%;
   }
 
   .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
   .session-video-playlist-row.is-playing .session-video-playlist-row-play {
     background: var(--vp-playing-bg);
+    border-color: var(--s2a-color-gray-1000);
+    margin: var(--s2a-spacing-xs) 0 var(--s2a-spacing-3xs) 0;
   }
 
   .session-video-playlist-handle {
@@ -505,7 +594,8 @@
     justify-content: center;
     width: 100%;
     height: 24px;
-    margin-bottom: var(--s2a-spacing-sm);
+    padding: var(--s2a-spacing-12, 12px) var(--s2a-spacing-md) var(--s2a-spacing-xs);
+    box-sizing: border-box;
     touch-action: none;
     cursor: grab;
   }
@@ -536,8 +626,8 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
     border: none;
     border-radius: var(--s2a-border-radius-round);
     background: none;
@@ -548,14 +638,16 @@
     width: 17px;
     height: 10px;
     transition: transform 0.2s ease;
+    transform: rotate(180deg);
   }
 
   .session-video-playlist-toggle[aria-expanded='true'] svg {
-    transform: rotate(180deg);
+    transform: rotate(0deg);
   }
 
   .session-video-playlist-top {
     flex-wrap: nowrap;
+    padding: var(--s2a-spacing-xs) var(--s2a-spacing-md);
     cursor: pointer;
   }
 
@@ -623,15 +715,13 @@
   }
 
   .session-video-playlist-autoplay-toggle:checked {
-    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
-       exact Figma mobile track color */
-    background: #dbdbdb;
+    background: var(--vp-subdued-content);
   }
 
   .session-video-playlist-title {
-    font-size: var(--s2a-typography-font-size-heading-6);
+    font-size: var(--s2a-font-size-lg, 18px);
     font-weight: 900;
-    line-height: var(--s2a-typography-line-height-title-6, 18px);
+    line-height: var(--s2a-font-line-height-18, 18px);
     letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
   }
 

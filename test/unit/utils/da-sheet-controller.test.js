@@ -80,6 +80,18 @@ describe('utils/da-sheet-controller', () => {
       expect(result.version).to.equal(3);
     });
 
+    it('returns [] for a non-owned sheet name on a single-sheet file (no duplicate of the one sheet)', async () => {
+      stubFetch({ ':type': 'sheet', ':sheetname': 'data', data: [{ eventId: 'a' }] });
+      const result = await readSheet('org', 'repo', '/path.json', 'homepage');
+      expect(result.data).to.deep.equal([]);
+    });
+
+    it('still returns the rows when the requested name matches the single sheet', async () => {
+      stubFetch({ ':type': 'sheet', ':sheetname': 'data', data: [{ eventId: 'a' }] });
+      const result = await readSheet('org', 'repo', '/path.json', 'data');
+      expect(result.data).to.deep.equal([{ eventId: 'a' }]);
+    });
+
     it('returns an empty array when data is missing entirely', async () => {
       stubFetch({ ':type': 'sheet' });
       const result = await readSheet('org', 'repo', '/path.json');

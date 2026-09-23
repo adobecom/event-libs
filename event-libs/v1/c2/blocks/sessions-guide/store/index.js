@@ -31,9 +31,12 @@ function getDefaultDay(eventDays, userTz) {
 
 // UI-only state for this block's own widget chrome; cross-block data lives in session-store.js.
 export function buildInitialState(guideConfig) {
+  // Full page always starts on Live & Upcoming, even when logged in — only the widget defaults
+  // a registered user straight to My Sessions.
+  const isFullPage = guideConfig?.surface === 'page';
   return {
     drawerState: 'hidden',
-    activeView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
+    activeView: (!isFullPage && auth.value.isRegistered) ? 'my-sessions' : 'live-upcoming',
     eventDays: [],
     activeDay: '',
     activeFilters: {},

@@ -102,7 +102,13 @@ export async function readSheet(org, repo, path, sheetName = OWNED_SHEET_NAME) {
   if (!result.ok) return result;
   const body = result.data;
   const isMultiSheet = body?.[':type'] === 'multi-sheet';
-  const rows = coerceRows(isMultiSheet ? body?.[sheetName]?.data : body?.data);
+  // A single-sheet file holds exactly one named sheet, so a caller probing a
+  // second name (e.g. 'homepage' on a not-yet-multi-sheet file) must get []
+  // — not a duplicate of the one sheet's rows.
+  const singleSheetName = body?.[':sheetname'] || OWNED_SHEET_NAME;
+  const rows = coerceRows(isMultiSheet
+    ? body?.[sheetName]?.data
+    : (sheetName === singleSheetName ? body?.data : []));
   const otherSheets = isMultiSheet
     ? Object.fromEntries(
       Object.entries(body).filter(([key]) => key !== sheetName && !key.startsWith(':')),

@@ -4,9 +4,17 @@ import { logError } from './lana-log.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
+// Shared gate for query-param debug/test overrides (branch switching, mocked server time,
+// mount-point fallbacks, etc.) — real prod domains (www.adobe.com and friends) never match
+// `.hlx.`/`.aem.`/`local`, so anything gated on this can't be triggered there.
+// `hostname` param defaults to the real one but is overridable for tests.
+export function isNonProdHost(hostname = window.location.hostname) {
+  return hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local');
+}
+
 export const LIBS = (() => {
-  const { hostname, search } = window.location;
-  if (!(hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local'))) return '/libs';
+  const { search } = window.location;
+  if (!isNonProdHost()) return '/libs';
   const branch = new URLSearchParams(search).get('milolibs') || 'main';
   if (!/^[a-zA-Z0-9_-]+$/.test(branch)) throw new Error('Invalid branch name.');
   if (branch === 'local') return 'http://localhost:6456/libs';

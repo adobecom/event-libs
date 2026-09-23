@@ -2,7 +2,7 @@ import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
   sessions, sessionsStatus, initSessionState, liveStreamActiveIds, favorited, pendingActions,
 } from '../../../utils/session-store.js';
-import { deriveSessionState, getNowMs, dvrAvailableAtMs } from '../../../utils/session-state.js';
+import { getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { initTierOneEventConfig, getEventStartMs } from '../../../utils/tier-1-event-config.js';
@@ -10,16 +10,19 @@ import { readBackgroundConfig } from '../../utils/background-config.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
+  VIDEO_PLAYABLE_KEY,
   VIDEO_CONTAINER_CLASS,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   findSectionWithStyle,
   getVideoProgress as readVideoProgress,
+  onElementDetached,
   parseJsonMetadata as parseSharedJsonMetadata,
-  currentSessionHasEnded,
   findEmbeddableVideos,
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
+  getPlaybackPhase,
+  PLAYBACK_PHASE,
 } from '../../utils/video-session.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
 
@@ -29,6 +32,8 @@ const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
 const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 
+export const _internals = { navigate: (href) => window.location.assign(href) };
+
 const BLOCK_CSS_URL = new URL('./session-video-playlist.css', import.meta.url).href;
 
 const DEFAULT_MIN_SESSIONS = 4;
@@ -37,7 +42,8 @@ const FALLBACK_EVENT_START_MS = new Date('2026-11-08T08:00:00-04:00').getTime();
 const DESKTOP_BREAKPOINT_PX = 1024;
 const VIEWPORT_CAP_GUTTER_PX = 24;
 const DRAWER_GAP_PX = 16;
-const DRAWER_FLOOR_PX = 75;
+const DRAWER_TOP_GAP_PX = 100;
+const DRAWER_FLOOR_PX = 78;
 const DRAWER_MIN_EXPANDED_PX = 150;
 const TITLE_LINE_CAP = 2;
 const AUTOPLAY_STORAGE_KEY = 'session-video-playlist:play-all';
@@ -72,12 +78,13 @@ export function computeProgressPercent(progress) {
 }
 
 export function computeDrawerCapPx(viewportHeight, titleBottom, {
-  floor = 0, gap = 0, playerBottom = null, minExpanded = 0,
+  floor = 0, gap = 0, playerBottom = null, minExpanded = 0, topGap = gap,
 } = {}) {
-  if (titleBottom == null) return Math.max(floor, viewportHeight * 0.7);
+  const viewportCap = viewportHeight - topGap;
+  if (titleBottom == null) return Math.max(floor, Math.min(viewportHeight * 0.7, viewportCap));
   const titleCap = viewportHeight - titleBottom - gap;
   const playerCap = playerBottom == null ? Infinity : viewportHeight - playerBottom - gap;
-  return Math.max(floor, minExpanded, Math.min(titleCap, playerCap));
+  return Math.max(floor, minExpanded, Math.min(titleCap, playerCap, viewportCap));
 }
 
 export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
@@ -85,15 +92,12 @@ export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
   return titleTop + Math.min(titleHeight, capHeight);
 }
 
-function isOnDemand(session, nowMs) {
-  return deriveSessionState(session, liveStreamActiveIds.value, nowMs) === 'on-demand';
-}
-
 function hasPremiered(session, eventStartMs, nowMs) {
-  if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
-  const availableAt = dvrAvailableAtMs(session, eventStartMs);
-  if (availableAt == null) return false;
-  return nowMs >= availableAt;
+  return getPlaybackPhase(session, {
+    nowMs,
+    eventStartMs,
+    liveStreamActiveIds: liveStreamActiveIds.value,
+  }) === PLAYBACK_PHASE.ON_DEMAND;
 }
 
 function hasEmbeddableVideo(sessionTimes) {
@@ -108,7 +112,7 @@ function compareByStartTime(a, b) {
 }
 
 function hasVideoSource(session) {
-  return Boolean(session.mpcId || session.youTubeId || session.mrDvrVideoId);
+  return Boolean(session.mpcId || session.youTubeId);
 }
 
 export function resolveTopicPlaylist(
@@ -189,19 +193,11 @@ function findPlayerBottom(el) {
   return player ? player.getBoundingClientRect().bottom : null;
 }
 
-function onElementDetached(element, teardown) {
-  const observer = new MutationObserver(() => {
-    if (element.isConnected) return;
-    observer.disconnect();
-    teardown();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-  return observer;
-}
-
 class Drawer {
   constructor(el, { titleEl, toggleEl, handleEl, headerEl }) {
     this.el = el;
+    this.originalParent = el.parentElement;
+    this.originalNextSibling = el.nextSibling;
     this.titleEl = titleEl;
     this.toggleEl = toggleEl;
     this.handleEl = handleEl;
@@ -226,6 +222,7 @@ class Drawer {
     return computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
       floor: DRAWER_FLOOR_PX,
       gap: DRAWER_GAP_PX,
+      topGap: DRAWER_TOP_GAP_PX,
       playerBottom: findPlayerBottom(this.el),
       minExpanded: DRAWER_MIN_EXPANDED_PX,
     });
@@ -233,6 +230,20 @@ class Drawer {
 
   measureDragCapPx() {
     return window.innerHeight;
+  }
+
+  #reconcilePlacement() {
+    const inBody = this.el.parentElement === document.body;
+    if (!this.isDesktop() && !inBody) {
+      document.body.append(this.el);
+    } else if (this.isDesktop() && inBody) {
+      this.originalParent?.insertBefore(this.el, this.originalNextSibling);
+    }
+  }
+
+  reflow() {
+    this.#reconcilePlacement();
+    this.applyMobileHeight();
   }
 
   applyMobileHeight() {
@@ -253,7 +264,8 @@ class Drawer {
     this.el.classList.toggle('is-expanded', this.expanded);
     this.toggleEl?.setAttribute('aria-expanded', String(this.expanded));
     this.toggleEl?.setAttribute('aria-label', this.expanded ? 'Collapse playlist' : 'Expand playlist');
-    if (!this.isDesktop()) this.applyMobileHeight();
+    this.#reconcilePlacement();
+    this.applyMobileHeight();
   }
 
   toggle() {
@@ -410,7 +422,7 @@ function buildPlayButton(activate, title) {
   return button;
 }
 
-function buildRow(item, { onSelect }) {
+function buildRow(item, { onSelect, hideProgressBar = false }) {
   const row = createTag('div', {
     class: 'session-video-playlist-row',
     role: 'listitem',
@@ -430,11 +442,13 @@ function buildRow(item, { onSelect }) {
   const meta = createTag('div', { class: 'session-video-playlist-row-meta' }, '', { parent: content });
   createTag('span', { class: 'session-video-playlist-row-title' }, item.title, { parent: meta });
 
-  const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
-  const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
-  const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
-  fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
-  createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
+  if (!hideProgressBar) {
+    const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
+    const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
+    const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
+    fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
+    createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
+  }
 
   const activate = () => onSelect(item, row);
   const actions = createTag('div', { class: 'session-video-playlist-row-actions' }, '', { parent: row });
@@ -486,10 +500,12 @@ export function applyExpandedHeightCap(
 
 function buildTopicView(el, allRows, {
   maxSessions = DEFAULT_MAX_SESSIONS, defaultThumbnail = '', currentSessionId = null,
+  hideProgressBar = false,
 } = {}) {
 
   const rows = allRows;
-  const list = createTag('div', { class: 'session-video-playlist-list', role: 'list' }, '', { parent: el });
+  const wrapper = createTag('div', { class: 'session-video-playlist-wrapper' }, '', { parent: el });
+  const list = createTag('div', { class: 'session-video-playlist-list', role: 'list' }, '', { parent: wrapper });
   rows.forEach((session) => {
     const row = buildRow(
       {
@@ -509,8 +525,9 @@ function buildTopicView(el, allRows, {
       },
       {
         onSelect: (item) => {
-          if (item.href) window.location.assign(item.href);
+          if (item.href) _internals.navigate(item.href);
         },
+        hideProgressBar,
       },
     );
     list.append(row);
@@ -529,6 +546,12 @@ function buildTopicView(el, allRows, {
     });
   }
 
+  const capWrapperHeight = () => {
+    applyExpandedHeightCap(list, maxSessions);
+    wrapper.style.maxHeight = list.style.maxHeight;
+    list.style.maxHeight = '';
+  };
+
   if (rows.length > SHOW_MORE_INITIAL_ROWS) {
     const showMore = createTag('button', {
       type: 'button',
@@ -546,18 +569,18 @@ function buildTopicView(el, allRows, {
       showMore.setAttribute('aria-expanded', String(expanded));
       showMore.setAttribute('aria-label', expanded ? 'Show less sessions' : 'Show more sessions');
       label.textContent = expanded ? 'Show less' : 'Show more';
-      applyExpandedHeightCap(list, maxSessions);
+      capWrapperHeight();
     });
   }
 
-  applyExpandedHeightCap(list, maxSessions);
+  capWrapperHeight();
 
   let pendingFrame = null;
   const handleResize = () => {
     if (pendingFrame != null) return;
     pendingFrame = requestAnimationFrame(() => {
       pendingFrame = null;
-      applyExpandedHeightCap(list, maxSessions);
+      capWrapperHeight();
     });
   };
   window.addEventListener('resize', handleResize);
@@ -655,11 +678,6 @@ function resolveRenderContext(el) {
     return null;
   }
 
-  if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
-    logError('current session has not ended yet — nothing to render');
-    return null;
-  }
-
   return {
     config,
     sessionId,
@@ -669,6 +687,7 @@ function resolveRenderContext(el) {
     minSessions: Number.parseInt(config['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS,
     maxSessions: Number.parseInt(config['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS,
     defaultThumbnail: readDefaultThumbnail(el) || config['default-thumbnail'] || '',
+    hideProgressBar: (config['hide-progress-bar'] ?? '').trim().toLowerCase() === 'true',
   };
 }
 
@@ -685,7 +704,7 @@ function listenForPlayerEvents(el, sessionId) {
     if (!nextRow?.dataset.href) return;
 
     el.dataset.autoAdvanceHref = nextRow.dataset.href;
-    window.location.assign(nextRow.dataset.href);
+    _internals.navigate(nextRow.dataset.href);
   };
 
   window.addEventListener('session-video-player:progress', handleProgress);
@@ -712,7 +731,7 @@ export default async function init(el) {
   }
   const {
     sessionId, sessionTimes, pageCustomAttributes, eventStartMs,
-    minSessions, maxSessions, defaultThumbnail, config: cfg,
+    minSessions, maxSessions, defaultThumbnail, hideProgressBar, config: cfg,
   } = context;
 
   const stopListeningForPlayerEvents = listenForPlayerEvents(el, sessionId);
@@ -724,6 +743,7 @@ export default async function init(el) {
     const startTimeMillis = (sessionTimes || [])[0]?.startTimeMillis;
     return {
       id: sessionId,
+      rfSessionId: (getMetadata('external-session-id') || '').replace(/^rf-/, ''),
       title: findSessionHeadingText(el) || getMetadata('og:title') || '',
       thumbnailUrl: getMetadata('og:image') || null,
       duration: 0,
@@ -777,7 +797,7 @@ export default async function init(el) {
       if (pendingResizeFrame != null) return;
       pendingResizeFrame = requestAnimationFrame(() => {
         pendingResizeFrame = null;
-        drawer.applyMobileHeight();
+        drawer.reflow();
       });
     };
     window.addEventListener('resize', handleResize);
@@ -808,20 +828,27 @@ export default async function init(el) {
     el.replaceChildren();
     const handle = createTag('div', { class: 'session-video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
     const { header, toggle } = buildHeader(displayRows);
-    buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
+    buildTopicView(el, displayRows, {
+      maxSessions, defaultThumbnail, currentSessionId: sessionId, hideProgressBar,
+    });
     el.querySelector('.session-video-playlist-list')?.setAttribute('id', LIST_ID);
     setUpDrawer({ header, toggle, handle });
+
+    el.classList.add('is-rendered');
 
     el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
   };
 
-  const existing = sessions.value;
-  if (existing.length) {
-    render(existing);
-  } else if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
-    removeBlock(el);
-  } else {
-
+  const runRenderFlow = () => {
+    const existing = sessions.value;
+    if (existing.length) {
+      render(existing);
+      return;
+    }
+    if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
+      removeBlock(el);
+      return;
+    }
     let unsubscribeSessions = () => {};
     let unsubscribeStatus = () => {};
     const stopWaiting = () => {
@@ -842,5 +869,24 @@ export default async function init(el) {
       stopWaiting();
       removeBlock(el);
     });
+  };
+
+  let started = false;
+  const onPlayable = (event) => {
+    if (event.detail?.sessionId !== sessionId) return;
+    if (started || !el.isConnected) return;
+    started = true;
+    runRenderFlow();
+  };
+
+  window.addEventListener('session-video-player:playable', onPlayable);
+  onElementDetached(el, () => {
+    window.removeEventListener('session-video-player:playable', onPlayable);
+  });
+
+  const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
+  if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
+    started = true;
+    runRenderFlow();
   }
 }

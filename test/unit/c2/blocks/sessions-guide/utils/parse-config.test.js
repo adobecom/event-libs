@@ -17,7 +17,7 @@ describe('parse-config/filterCategories', () => {
     expect(config.filterCategories).to.deep.equal([]);
   });
 
-  it('maps authored filterCategories to { id: attributeId, label: displayName }, preserving order', () => {
+  it('maps authored filterCategories to { id: attributeId, label: displayName, slug }, preserving order', () => {
     const config = parseSessionsGuideConfig(elWithConfig({
       filterCategories: [
         { attributeId: 'attr-audience', label: 'Audience', displayName: 'Who it\'s for', enabled: true },
@@ -25,8 +25,8 @@ describe('parse-config/filterCategories', () => {
       ],
     }));
     expect(config.filterCategories).to.deep.equal([
-      { id: 'attr-audience', label: 'Who it\'s for' },
-      { id: 'attr-level', label: 'Level' },
+      { id: 'attr-audience', label: 'Who it\'s for', slug: 'who-its-for' },
+      { id: 'attr-level', label: 'Level', slug: 'level' },
     ]);
   });
 
@@ -34,7 +34,7 @@ describe('parse-config/filterCategories', () => {
     const config = parseSessionsGuideConfig(elWithConfig({
       filterCategories: [{ attributeId: 'attr-audience', label: 'Audience', enabled: true }],
     }));
-    expect(config.filterCategories).to.deep.equal([{ id: 'attr-audience', label: 'Audience' }]);
+    expect(config.filterCategories).to.deep.equal([{ id: 'attr-audience', label: 'Audience', slug: 'audience' }]);
   });
 
   it('drops disabled entries', () => {
@@ -44,7 +44,31 @@ describe('parse-config/filterCategories', () => {
         { attributeId: 'attr-level', label: 'Level', displayName: 'Level', enabled: true },
       ],
     }));
-    expect(config.filterCategories).to.deep.equal([{ id: 'attr-level', label: 'Level' }]);
+    expect(config.filterCategories).to.deep.equal([{ id: 'attr-level', label: 'Level', slug: 'level' }]);
+  });
+
+  it('slugifies the label: lowercase, spaces to hyphens, punctuation stripped', () => {
+    const config = parseSessionsGuideConfig(elWithConfig({
+      filterCategories: [{ attributeId: 'attr-1', label: 'x', displayName: 'Who it\'s for?', enabled: true }],
+    }));
+    expect(config.filterCategories[0].slug).to.equal('who-its-for');
+  });
+
+  it('disambiguates two categories that slugify to the same value, in authoring order', () => {
+    const config = parseSessionsGuideConfig(elWithConfig({
+      filterCategories: [
+        { attributeId: 'attr-a', label: 'Region', displayName: 'Region', enabled: true },
+        { attributeId: 'attr-b', label: 'region', displayName: 'region', enabled: true },
+      ],
+    }));
+    expect(config.filterCategories.map((c) => c.slug)).to.deep.equal(['region', 'region-2']);
+  });
+
+  it('falls back to the attributeId when the label slugifies to an empty string', () => {
+    const config = parseSessionsGuideConfig(elWithConfig({
+      filterCategories: [{ attributeId: 'attr-1', label: '???', displayName: '???', enabled: true }],
+    }));
+    expect(config.filterCategories[0].slug).to.equal('attr-1');
   });
 
   it('yields an empty array (no panel) when authored but every entry is disabled', () => {

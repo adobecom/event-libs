@@ -34,23 +34,6 @@ export async function copyTextToClipboard(text) {
   }
 }
 
-export function formatSessionTime(sessionTime) {
-  if (!sessionTime?.startTimeMillis) return '';
-  try {
-    return new Date(sessionTime.startTimeMillis).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone: sessionTime.timezone || undefined,
-      timeZoneName: 'short',
-    });
-  } catch {
-    return '';
-  }
-}
-
 export function isTrackIconEntryComplete(entry) {
   if (!entry) return true;
   return !entry.color || !!entry.icon;
@@ -159,6 +142,8 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
   const entry = {
     sessionId: session.sessionId,
     sessionCode: session.sessionCode,
+    rfCode: match?.externalSessionTimeId?.replace(/^rf-/, ''),
+    rfSessionId: session.externalSessionId?.replace(/^rf-/, ''),
     enTitle: session.enTitle,
     track: getSessionPrimaryTrack(session) || '',
     url: session.url,
