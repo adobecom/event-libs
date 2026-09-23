@@ -254,6 +254,27 @@ describe('event-marquee', () => {
       expect(el.querySelector('.event-marquee-video-title')).to.not.exist;
     });
 
+    it('detects an event-youtube block as a player and renders the video title', async () => {
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="event-marquee">
+            <div>
+              <div><h2>Live now</h2></div>
+              <div><div class="fragment"><div class="section"><div class="event-youtube"></div></div></div></div>
+            </div>
+          </div>
+          <div class="section-metadata">
+            <div><div>video-title</div><div>YouTube keynote title</div></div>
+          </div>
+        </div>
+      `;
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      const title = el.querySelector('.event-marquee-media .event-marquee-video-title');
+      expect(title).to.exist;
+      expect(title.textContent).to.equal('YouTube keynote title');
+    });
+
     it('does not render a video title for an ambient/decorative video asset (no player)', async () => {
       document.body.innerHTML = `
         <div class="event-marquee">

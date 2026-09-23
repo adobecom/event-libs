@@ -55,6 +55,7 @@ function detectPlayer(mediaCol) {
   if (mediaCol.querySelector('.mobile-rider')) return { type: 'mobile-rider', processed: true };
   const mrLink = mediaCol.querySelector('a[href*="mobilerider.com"]');
   if (mrLink) return { type: 'mobile-rider', processed: false };
+  if (mediaCol.querySelector('.event-youtube')) return { type: 'event-youtube' };
   const miloVideo = mediaCol.querySelector('.milo-video');
   if (miloVideo) return { type: 'milo-video' };
   return null;
