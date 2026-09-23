@@ -361,23 +361,3 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
   color: var(--s2a-color-gray-600, #717171);
   list-style: none;
 }
-
-/* Mobile / collapsed gnav: full-width sheet anchored under the fixed top bar, at milo's
-   own gnav breakpoint (global-navigation.css:569,627) rather than inventing a new one.
-   `.feds-notifications-wrapper` is rendered once, right alongside `.feds-utilities` in
-   gnav's own template — assumed to be the same DOM node in both desktop and mobile/
-   hamburger gnav the same way `.feds-utilities` is, so this widget needs only this one
-   CSS-driven layout switch, not a second injection point. Flagged for manual QA against
-   federal's actual mobile/hamburger markup once federal#203 ships, since that assumption
-   hasn't been verified against a real rendered page yet. --swan-notif-mobile-top lets a
-   consumer page override the assumed gnav height if it differs from the default. */
-@media (max-width: 900px) {
-  .swan-notif__panel {
-    position: fixed;
-    top: var(--swan-notif-mobile-top, 56px);
-    right: 8px;
-    left: 8px;
-    width: auto;
-    max-width: none;
-  }
-}
