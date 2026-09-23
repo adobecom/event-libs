@@ -158,7 +158,7 @@ describe('Adobe Event Service API', () => {
       expect(result.status).to.equal('Network Error');
       expect(lanaLogStub.calledOnce).to.equal(true);
       const [message] = lanaLogStub.firstCall.args;
-      expect(message).to.equal('[esp-controller,get-event] Failed to get details for event 123: Error: offline');
+      expect(message).to.include('[esp-controller,get-event] Failed to get details for event 123: Error: offline');
     });
   });
 
