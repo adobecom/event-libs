@@ -1,3 +1,5 @@
+import { getEventServiceEnv } from './utils.js';
+
 const PII_KEY_PATTERN = /email|name|phone|address|token|password|dob|birthdate/i;
 
 function redactPii(key, value) {
@@ -18,9 +20,23 @@ function serializeLogData(data) {
   }
 }
 
+function getClientContext() {
+  try {
+    const { userAgent, language } = navigator;
+    const viewport = `${window.innerWidth}x${window.innerHeight}`;
+    const { name: env } = getEventServiceEnv();
+    return `ua=${userAgent},viewport=${viewport},lang=${language},env=${env}`;
+  } catch {
+    return '';
+  }
+}
+
 function send(severity, scope, message, data) {
   const suffix = data === undefined ? '' : `: ${serializeLogData(data)}`;
-  window.lana?.log(`[${scope}] ${message}${suffix}`, { tags: scope, severity });
+  const context = ['warning', 'error', 'critical'].includes(severity)
+    ? ` | ${getClientContext()}`
+    : '';
+  window.lana?.log(`[${scope}] ${message}${suffix}${context}`, { tags: scope, severity });
 }
 
 export function logDebug(scope, message, data) {
