@@ -377,12 +377,12 @@
     line-height: var(--s2a-font-line-height-xs, 18px);
   }
 
-  /* Also Live + Up Next titles follow heading-6 on tablet (Figma). */
+  /* Also Live + Up Next titles follow heading-6 on tablet (Figma); font-family now set at the
+     base rules below so it's no longer just this tier. */
   .sb-carousel-section--also-live .sg-section-title,
   .sb-carousel-section--up-next .sg-section-title {
     color: var(--s2a-color-content-inverse, #fff);
     text-wrap: balance;
-    font-family: var(--s2a-font-family-heading);
     font-size: var(--s2a-typography-font-size-heading-6);
     font-weight: var(--s2a-font-weight-heading, 900);
     line-height: var(--s2a-typography-line-height-heading-6, 18px);
@@ -405,15 +405,26 @@
   }
 }
 
-/* Intentional exception to the no-hardcoded-spacing rule: padding-top 64px matches Figma. */
+/* Intentional exception to the no-hardcoded-spacing rule: padding-top 64px matches Figma
+   (desktop; mobile/tablet override top/bottom below per Figma 8454:54024/8454:54044). */
 .sb-ended {
   position: relative;
   padding: var(--s2a-spacing-4xl, 64px) var(--s2a-spacing-lg, 24px) var(--s2a-spacing-xl, 32px);
   background: transparent;
 
   --s2a-color-content-default: #fff;
-  --s2a-color-content-subtle: rgb(255 255 255 / 64%);
-  --s2a-color-border-default: var(--s2a-color-gray-300, #dadada);
+}
+
+@media (max-width: 767px) {
+  .sb-ended {
+    padding: var(--s2a-spacing-2xl, 40px) var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md, 16px);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-ended {
+    padding-bottom: var(--s2a-spacing-md, 16px);
+  }
 }
 
 .sb-ended__eyebrow {
@@ -487,51 +498,6 @@
   }
 }
 
-.sb-ended__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--s2a-spacing-md, 16px);
-  margin-top: var(--s2a-spacing-lg, 24px);
-  color: var(--s2a-color-border-default);
-  font-size: var(--s2a-font-size-md, 16px);
-}
-
-/* Same overrides as .sb-info__meta above. */
-.sb-ended__meta .sg-category-badge__icon-color { color: var(--s2a-color-border-default); }
-.sb-ended__meta .sg-category-badge__label { font-size: 16px; }
-
-.sb-ended__desc-wrap {
-  margin-top: var(--s2a-spacing-2xs, 4px);
-  overflow: hidden;
-  color: var(--s2a-color-content-subtle);
-  font-size: var(--s2a-font-size-md, 16px);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.sb-ended__desc-wrap.is-expanded {
-  white-space: normal;
-  text-overflow: clip;
-}
-
-.sb-ended__desc {
-  margin: 0;
-  line-height: 1.5;
-}
-
-.sb-ended__view-more {
-  margin-top: var(--s2a-spacing-2xs, 4px);
-  padding: 0;
-  color: var(--s2a-color-border-default);
-  font-family: var(--s2a-font-family-label);
-  font-size: 16px;
-  font-weight: bold;
-  text-align: left;
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-
 .sb-ended__actions {
   display: flex;
   align-items: center;
@@ -543,7 +509,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--s2a-spacing-xs, 8px);
-  padding: 14px var(--s2a-spacing-lg, 24px);
+  padding: 11px var(--s2a-spacing-lg, 24px);
   color: var(--s2a-color-button-content-primary-solid-inverse, #000);
   font-family: var(--s2a-font-family-label);
   font-size: var(--s2a-typography-font-size-label, 14px);
@@ -579,9 +545,16 @@
   border: 1px solid #fff;
 }
 
-.sb-ended__icon-btn svg {
+.sb-ended__icon-btn--favorite svg {
   width: 16px;
   height: 16px;
+}
+
+/* Share (the plain, unmodified .sb-ended__icon-btn) gets a larger 20px icon; Favorite (above)
+   keeps 16px — placed after for ascending specificity (stylelint no-descending-specificity). */
+.sb-ended__icon-btn:not(.sb-ended__icon-btn--favorite) svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* Bleeds the ended-state photo behind siblings via a pseudo-element + isolation, not a JS <img>.
@@ -664,6 +637,7 @@
 
 .sb-carousel-section--also-live .sg-section-title {
   color: var(--s2a-color-content-inverse, #fff);
+  font-family: var(--s2a-font-family-heading);
   letter-spacing: -0.2px;
 }
 
@@ -840,6 +814,7 @@
 
 .sb-carousel-section--up-next .sg-section-title {
   color: var(--s2a-color-gray-25, #fff);
+  font-family: var(--s2a-font-family-heading);
   letter-spacing: -0.2px;
 }
 
@@ -938,22 +913,12 @@
   color: var(--s2a-color-content-inverse, #fff);
 }
 
-/* Padding shrinks on tablet once ended - these sections sit below .sb-ended's marquee, not the player. */
-@media (min-width: 768px) and (max-width: 1279px) {
-  .sb-ended ~ .sb-carousel-section--also-live,
-  .sb-ended ~ .sb-carousel-section--up-next {
-    padding-top: var(--s2a-spacing-lg, 24px);
-    padding-bottom: var(--s2a-spacing-xl, 32px);
-  }
-}
+/* Both Also Live and Up Next now keep the shared tablet padding (16px 0 16px/24px 24px) whether
+   or not the session has ended — no tablet-only ended-state padding override left. */
 
-/* Wins the specificity tie once .sb-ended is present, growing the gap from the shared 24px to 32px. */
+/* .sg-carousel__header keeps the shared 24px margin-bottom (desktop, above) even when ended —
+   no ended-state override left for it. */
 @media (min-width: 1280px) {
-  .sb-ended ~ .sb-carousel-section--also-live .sg-carousel__header,
-  .sb-ended ~ .sb-carousel-section--up-next .sg-carousel__header {
-    margin-bottom: var(--s2a-spacing-xl, 32px);
-  }
-
   .sb-ended ~ .sb-carousel-section--also-live .sg-section-title,
   .sb-ended ~ .sb-carousel-section--up-next .sg-section-title {
     font-size: var(--s2a-font-size-2xl, 24px);
@@ -1029,6 +994,7 @@
 
   .sb-carousel-section--also-live .sg-carousel__nav,
   .sb-carousel-section--up-next .sg-carousel__nav {
+    gap: var(--s2a-spacing-md, 16px);
     top: 0;
   }
 
@@ -1099,16 +1065,26 @@
     color: var(--s2a-color-content-inverse, #fff);
   }
 
+  /* Desktop steps up from the shared heading-6 line-height/letter-spacing (768px+ above) to
+     heading-5's — Also Live doesn't have its own desktop .sg-section-title rule yet, so it's
+     added here alongside Up Next's. */
+  .sb-carousel-section--also-live .sg-section-title,
+  .sb-carousel-section--up-next .sg-section-title {
+    line-height: var(--s2a-typography-line-height-heading-5); /* 100% */
+    letter-spacing: var(--s2a-font-letter-spacing-4xl);
+  }
+
   /* Same edge-bleed reasoning as Also Live above. */
   .sb-carousel-section--up-next .sg-carousel__track {
     margin-right: calc((100vw - 1192px) / -2);
   }
 
-  /* Fixed 124px row height lets a taller hovered card overflow symmetrically instead of shifting siblings. */
+  /* Fixed 130px row height (the card's real resting height, not the stale 124px min-height
+     below) lets a taller hovered card overflow symmetrically instead of shifting siblings. */
   .sb-carousel-section--up-next .sg-carousel__cards {
     padding-right: 0;
     align-items: center;
-    height: 124px;
+    height: 130px;
   }
 
   /* Replicates sessions-guide's hover treatment directly since this DOM lacks its gating ancestor class. */
@@ -1117,7 +1093,7 @@
     flex-direction: row;
     align-items: stretch;
     width: 379px;
-    min-height: 124px;
+    min-height: 130px;
     padding: var(--s2a-spacing-lg, 24px);
 
     /* border-box keeps this 1px border from shifting geometry when it appears on hover. */
