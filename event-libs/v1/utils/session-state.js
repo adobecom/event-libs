@@ -1,12 +1,10 @@
 import { getHomepagePath, getBroadcastPath } from './tier-1-event-config.js';
 import { MAX_EVENT_PAGES } from './constances.js';
-import { isNonProdHost } from './utils.js';
 
 // `?serverTime=<ms>` simulates landing at a given instant; an origin, not a freeze — the clock
-// keeps advancing. Gated to non-prod hosts only (isNonProdHost()) — nobody should be able to
-// mock the clock on a real adobe.com page.
+// keeps advancing. Works in every environment, including production — matching the timing
+// framework's own `?timing=`/`?serverTime=` params, which have never been environment-gated.
 const SERVER_TIME_ORIGIN = (() => {
-  if (!isNonProdHost()) return null;
   try {
     const raw = new URLSearchParams(window.location.search).get('serverTime');
     const ms = raw ? parseInt(raw, 10) : NaN;

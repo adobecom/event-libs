@@ -121,7 +121,7 @@ describe('shouldForceGuestSignIn', () => {
 });
 
 describe('isNonProdHost', () => {
-  // Shared gate for debug/test query params (?milolibs=, ?serverTime=, ?swanMountFallback=)
+  // Shared gate for debug/test query params (?milolibs=, ?swanMountFallback=)
   // — real prod domains must never match, or those overrides would work on adobe.com itself.
   it('rejects real production domains', () => {
     expect(isNonProdHost('www.adobe.com')).to.equal(false);
