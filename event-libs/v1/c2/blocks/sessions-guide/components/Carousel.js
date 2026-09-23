@@ -9,6 +9,7 @@ export const buildCarousel = () => Carousel;
 export function Carousel({
   sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
   CardComponent = LiveCard, timeDisplay, showDurationBadge, showDescription, forceLive,
+  pageByGroup = false,
 }) {
   // Hooks run before the empty-list bail-out, to keep hook order stable across renders.
   const [offset, setOffset] = useState(0);
@@ -82,12 +83,16 @@ export function Carousel({
   const atStart = paged ? clampedOffset <= 0 : edges.atStart;
   const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 
+  // pageByGroup (session-broadcast's Upcoming carousel): step by however many cards are fully
+  // visible, not one at a time — maxOffset already stops the last step short of overshooting
+  // past the end when fewer than a full group remains.
+  const step = pageByGroup ? Math.max(1, visibleCountRef.current) : 1;
   const goPrev = () => {
-    if (paged) { setOffset((o) => Math.max(0, o - 1)); return; }
+    if (paged) { setOffset((o) => Math.max(0, o - step)); return; }
     stripRef.current?.scrollBy({ left: -(cardWidthRef.current || 300), behavior: scrollBehavior() });
   };
   const goNext = () => {
-    if (paged) { setOffset((o) => Math.min(maxOffset, o + 1)); return; }
+    if (paged) { setOffset((o) => Math.min(maxOffset, o + step)); return; }
     stripRef.current?.scrollBy({ left: cardWidthRef.current || 300, behavior: scrollBehavior() });
   };
 

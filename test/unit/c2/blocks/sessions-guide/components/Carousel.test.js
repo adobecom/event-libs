@@ -151,6 +151,19 @@ describe('Carousel', () => {
     expect(() => Carousel({ sessions: [SESSION_A], forceLive: true })).to.not.throw();
   });
 
+  // pageByGroup (session-broadcast's Upcoming carousel — see UpNextCarousel.js) steps
+  // prev/next by however many cards are fully visible (visibleCountRef, set by measure()),
+  // not one at a time. The mocked htm-preact used here no-ops useState/useRef/useEffect (see
+  // its own file), so the actual stepping and don't-overshoot clamp can't be exercised through
+  // this string-render harness — only that the prop doesn't break rendering. Real stepping is
+  // verified via a preview harness in a real browser.
+  it('accepts pageByGroup without throwing, defaulting to one-at-a-time paging otherwise', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    expect(() => Carousel({ sessions: [SESSION_A, SESSION_B], pageByGroup: true })).to.not.throw();
+    expect(() => Carousel({ sessions: [SESSION_A, SESSION_B] })).to.not.throw();
+  });
+
   // session-broadcast's Upcoming section passes SessionCard instead of the default LiveCard —
   // see UpNextCarousel.js. Like the onCardClick/onWatchSamePage tests above, the card itself
   // sits inside a multi-sibling template whose first literal isn't a bare `<`, so this mock

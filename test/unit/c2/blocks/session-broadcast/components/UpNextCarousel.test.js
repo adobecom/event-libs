@@ -16,4 +16,12 @@ describe('UpNextCarousel', () => {
     const out = UpNextCarousel({ sessions: [SESSION] });
     expect(out).to.include('sb-carousel-section--up-next');
   });
+
+  // pageByGroup makes the shared Carousel's prev/next arrows step by however many cards are
+  // fully visible instead of one at a time — real stepping behavior (including the
+  // don't-overshoot clamp) is exercised in Carousel.test.js and verified live in a browser, since
+  // it depends on real layout measurement the mocked htm-preact used here can't provide.
+  it('renders without throwing now that pageByGroup is passed to Carousel', () => {
+    expect(() => UpNextCarousel({ sessions: [SESSION] })).to.not.throw();
+  });
 });
