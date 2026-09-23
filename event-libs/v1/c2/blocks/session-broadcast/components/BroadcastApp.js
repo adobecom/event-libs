@@ -13,6 +13,7 @@ import { showToast } from '../../../../features/toast/toast.js';
 import { SessionGuideProvider } from '../../sessions-guide/store/index.js';
 import { detectUserTimezone } from '../../sessions-guide/utils/time.js';
 import { findSessionByParam } from '../../sessions-guide/utils/url.js';
+import { scrollBehavior } from '../../sessions-guide/utils/motion.js';
 import { LoadingState, sessionsStatusMessage } from '../../sessions-guide/components/LoadingState.js';
 import { getBroadcastSchedule, isSessionLiveNow } from '../utils/broadcast-schedule.js';
 import {
@@ -30,10 +31,20 @@ import { AlsoLiveCarousel } from './AlsoLiveCarousel.js';
 import { UpNextCarousel } from './UpNextCarousel.js';
 
 // surface:'page' routes clicks through onCardClick/onWatchSamePage instead of LiveCard's own.
-const GUIDE_CONFIG = { userTz: detectUserTimezone(), surface: 'page', theme: 'light' };
+const GUIDE_CONFIG = {
+  userTz: detectUserTimezone(), surface: 'page', theme: 'light', liveCardMobileMaxWidth: 1279,
+};
 
 // Exported for tests; see the effect below for why this needs its own tick.
 export const SCHEDULE_REFRESH_MS = 5_000;
+
+export const SWITCH_SCROLL_DELAY_MS = 300;
+
+export function scheduleSwitchScroll(delayMs = SWITCH_SCROLL_DELAY_MS) {
+  return setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
+  }, delayMs);
+}
 
 // Exported separately so tests can call it without mounting the Provider tree.
 export function BroadcastBody({ config }) {
@@ -83,6 +94,7 @@ export function BroadcastBody({ config }) {
     pushSessionState(session.id);
     setManualSessionId(session.id);
     trackBroadcastEvent(`Broadcast-Session-Switch | ${session.id}`);
+    scheduleSwitchScroll();
   }
 
   // Session Guide's widget has no prop path in - watchSameSessionRequest is the only channel.
@@ -149,13 +161,17 @@ export function BroadcastBody({ config }) {
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
     && !schedule.pendingCandidates?.length && !schedule.alsoLive.length && !schedule.upNext.length;
 
-  // Feeds .sb-app:has(.sb-ended) in the CSS; --sb-app-ended-bg-lg falls back to --sb-app-ended-bg.
   const endedActive = !schedule.activeSession && !!schedule.endedSession;
-  const endedBgUrl = endedActive ? safeUrl(config.sessionEndedImageUrl) : '';
-  const endedBgUrlLarge = endedActive ? safeUrl(config.sessionEndedImageUrlLarge) : '';
-  const appStyle = endedBgUrl
-    ? `--sb-app-ended-bg: url("${endedBgUrl}");${endedBgUrlLarge ? ` --sb-app-ended-bg-lg: url("${endedBgUrlLarge}");` : ''}`
-    : '';
+  const endedBgVars = endedActive ? {
+    '--sb-app-ended-bg-mobile': safeUrl(config.sessionEndedImageUrlMobile),
+    '--sb-app-ended-bg-tablet': safeUrl(config.sessionEndedImageUrlTablet),
+    '--sb-app-ended-bg-desktop': safeUrl(config.sessionEndedImageUrlDesktop),
+    '--sb-app-ended-bg-desktop-xl': safeUrl(config.sessionEndedImageUrlDesktopXl),
+  } : {};
+  const appStyle = Object.entries(endedBgVars)
+    .filter(([, url]) => url)
+    .map(([name, url]) => `${name}: url("${url}")`)
+    .join(';');
 
   return html`
     <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')} style=${appStyle}>

@@ -1063,15 +1063,25 @@
   overflow: hidden;
 }
 
-/* Mobile 'live' card: title renders first, so its usual top margin is just leading whitespace. */
-.sg-live-card--mobile-live .sg-live-card__title {
+.sg-live-card--mobile .sg-live-card__title {
   margin-top: 0;
 }
 
-/* Figma 8463:87698 — 311x355 total. Scoped to the modifier class so recommended/desktop keep
-   their own height. */
-.sg-live-card--mobile-live .sg-live-card__image {
+.sg-live-card--mobile .sg-live-card__image {
   height: 175px;
+}
+
+.sg-live-card__time--mobile {
+  margin: 0 0 var(--s2a-spacing-sm) 0;
+  color: var(--s2a-color-gray-700);
+  font-family: var(--body-font-family);
+  font-size: var(--s2a-font-size-xs);
+  font-weight: var(--s2a-font-weight-adobe-clean-medium);
+  line-height: var(--s2a-font-line-height-2xs);
+}
+
+.sg-live-card__time--mobile::before {
+  display: none;
 }
 
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
@@ -1089,7 +1099,7 @@
 }
 
 /* Figma 8463:87698 — same 16px rhythm as the rest of this card, instead of the shared 24px. */
-.sg-live-card--mobile-live .sg-live-card__actions {
+.sg-live-card--mobile .sg-live-card__actions {
   margin-top: var(--s2a-spacing-sm);
 }
 
@@ -1118,7 +1128,7 @@
 }
 
 /* Figma 8463:87698 — this card's buttons are 32px, not the shared 40px. */
-.sg-live-card--mobile-live .sg-live-card__btn {
+.sg-live-card--mobile .sg-live-card__btn {
   height: 32px;
 }
 
@@ -1158,7 +1168,7 @@
 }
 
 /* Keeps the favorite button a circle at the shrunk height above (base rule is a fixed 40px square). */
-.sg-live-card--mobile-live .sg-live-card__btn--favorite {
+.sg-live-card--mobile .sg-live-card__btn--favorite {
   width: 32px;
 }
 
@@ -1768,95 +1778,6 @@
   }
 
   .sg-carousel__track { margin-right: 0; }
-
-  /* ── Live card ─────────────────────────────────────────────── */
-
-  .sg-live-card {
-    flex-direction: column;
-    width: 311px;
-    flex-shrink: 0;
-    border-radius: var(--s2a-border-radius-md);
-    border: none;
-  }
-
-  .sg-live-card:is(:hover, :focus-within) {
-    background: #fff;
-    border-color: transparent;
-  }
-
-  .sg-live-card__image {
-    width: 100%;
-    height: 168px;
-    border-radius: var(--s2a-border-radius-md) var(--s2a-border-radius-md) var(--s2a-border-radius-md) var(--s2a-border-radius-md);
-    border: 1px solid rgb(255 255 255 / 15%);
-  }
-
-  .sg-live-card__body {
-    padding: var(--s2a-spacing-md);
-    justify-content: flex-start;
-    gap: 0;
-  }
-
-  .sg-live-card__meta {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s2a-spacing-xs);
-    margin: 0;
-  }
-
-  .sg-live-card__track-row { gap: var(--s2a-spacing-xs); }
-
-  .sg-live-card__track {
-    font-size: var(--s2a-font-size-sm);
-    font-weight: 500;
-    color: var(--s2a-color-content-default);
-  }
-
-  .sg-live-card__time {
-    font-size: var(--s2a-font-size-sm);
-    color: var(--s2a-color-content-default);
-    white-space: nowrap;
-    margin: 0;
-  }
-
-  .sg-live-card__title {
-    font-size: 20px;
-    color: var(--s2a-color-content-default);
-  }
-
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
-
-  .sg-live-card__actions { gap: 12px; }
-
-  .sg-live-card__btn--watch {
-    background: #292929;
-    color: #fff;
-    min-width: 90px;
-    padding: 0 var(--s2a-spacing-lg);
-  }
-
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
-    background: #292929;
-    color: #fff;
-  }
-
-  .sg-live-card__btn--schedule-cta {
-    background: #fff;
-    border: 1px solid #000;
-    color: #000;
-    min-width: auto;
-    padding: 0 var(--s2a-spacing-lg);
-  }
-
-  .sg-live-card__btn--favorite {
-    background: #fff;
-    border: 1px solid #292929;
-    color: #292929;
-  }
 }
 
 /* ── Tablet only: floating carousel arrows ───────────────────────────────── */
@@ -1945,7 +1866,8 @@
 
   /* ── Live card ─────────────────────────────────────────────── */
 
-  .sg-live-card {
+  /* Guards against session-broadcast's cards, which carry .sg-live-card--mobile up to 1280px. */
+  .sg-live-card:not(.sg-live-card--mobile) {
     flex-direction: row;
     width: 100%;
     max-width: 900px;
@@ -1953,28 +1875,28 @@
     border-radius: 20px;
   }
 
-  .sg-live-card:is(:hover, :focus-within) {
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) {
     background: #000;
     border-color: #000;
   }
 
   /* Fixed, not auto (Figma: 425x240): an <img> with height:100% keeps its own aspect ratio,
      so sibling cards could end up different heights depending on photo ratio otherwise. */
-  .sg-live-card__image {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__image {
     width: 425px;
     height: 240px;
     border-radius: var(--s2a-border-radius-md);
     border: none;
   }
 
-  .sg-live-card__progress-row {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__progress-row {
     top: auto;
     bottom: 13px;
     left: 27px;
     right: 20px;
   }
 
-  .sg-live-card__body {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__body {
     flex: none;
     width: 425px;
     padding: var(--s2a-spacing-lg);
@@ -1982,7 +1904,7 @@
     gap: 2px;
   }
 
-  .sg-live-card__meta {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__meta {
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
@@ -1990,39 +1912,39 @@
     margin: 0;
   }
 
-  .sg-live-card__track-row { gap: 6px; }
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__track-row { gap: 6px; }
 
-  .sg-live-card__track {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__track {
     font-size: var(--s2a-font-size-sm);
     font-weight: 500;
     color: #000;
   }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track { color: #fff; }
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__track { color: #fff; }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra { color: #fff; }
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__track-row,
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__track-extra { color: #fff; }
 
   /* Track colors can't be trusted against the dark hover fill — always go white. */
-  .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
 
-  .sg-live-card__time {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__time {
     font-size: var(--s2a-font-size-sm);
     color: var(--s2a-color-gray-700);
     white-space: nowrap;
     margin: 0;
   }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
 
-  .sg-live-card__title {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__title {
     font-size: var(--s2a-font-size-2xl);
     color: #000;
   }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: #fff; }
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__title { color: #fff; }
 
-  .sg-live-card__desc {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__desc {
     font-size: var(--s2a-font-size-sm);
     color: var(--s2a-color-gray-600, #717171);
     letter-spacing: -0.14px;
@@ -2039,26 +1961,26 @@
     overflow: hidden;
   }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__desc { color: #fff; }
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__desc { color: #fff; }
 
-  .sg-live-card__actions {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__actions {
     gap: var(--s2a-spacing-sm);
     margin-top: auto;
   }
 
-  .sg-live-card__btn--watch {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--watch {
     background: var(--s2a-color-gray-800);
     color: #fff;
     min-width: auto;
     padding: 0 var(--s2a-spacing-lg);
   }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--watch {
     background: #fff;
     color: #111;
   }
 
-  .sg-live-card__btn--schedule-cta {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule-cta {
     background: #fff;
     border: 1px solid #000;
     color: #000;
@@ -2067,28 +1989,28 @@
   }
 
   /* The hover fill turns black here — flip to a white border/text so it stays visible. */
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--schedule-cta {
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--schedule-cta {
     background: transparent;
     border-color: #fff;
     color: #fff;
   }
 
-  .sg-live-card__btn--schedule { display: none; }
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule { display: none; }
 
-  .sg-live-card__btn--favorite {
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--favorite {
     background: #fff;
     border: 1px solid #000;
     color: #000;
   }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--favorite {
     background: transparent;
     border-color: #fff;
     color: #fff;
   }
 
   /* Declared later to win over the base rule's dark border, invisible against this black hover fill. */
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
     border-color: #fff;
   }
 }
@@ -2428,9 +2350,15 @@
 
   /* .sg-carousel__card-wrap has no explicit width, so a % width on .sg-live-card can't resolve
      against it (content-sized flex item). flex-basis: 100% gives it a definite size to clamp
-     against. Scoped to full page — the widget's smaller cap doesn't hit this. */
+     against; max-width mirrors the card's own cap so the wrap can't render wider than it.
+     Scoped to full page — the widget's smaller cap doesn't hit this. */
   .sg-full-page .sg-carousel-section--live .sg-carousel__card-wrap {
     flex: 0 0 100%;
+    max-width: 1156px;
+  }
+
+  .sg-full-page .sg-carousel-section--live .sg-carousel__cards {
+    gap: var(--s2a-spacing-lg);
   }
 
   .sg-live-card:is(:hover, :focus-within) {

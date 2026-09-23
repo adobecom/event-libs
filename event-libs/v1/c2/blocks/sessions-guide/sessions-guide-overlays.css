@@ -544,6 +544,10 @@
   gap: var(--s2a-spacing-xs);
 }
 
+.sg-detail__products > *:only-child {
+  grid-column: 1 / -1;
+}
+
 .sg-detail__product-card {
   position: relative;
   display: flex;
