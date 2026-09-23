@@ -87,6 +87,10 @@ export const ENV_MAP = {
 };
 // CDN fronting session-catalog only, GET-only (MWPW-206486). dev/stage/prod only — local,
 // dev02, and stage02 have no CDN and default straight to their ESP origin.
+// NOTE: the dev CDN distribution is currently misconfigured on the infra side — it returns
+// a raw S3 AccessDenied error instead of proxying to the ESP dev origin. Flagged to infra;
+// left in the map since fetchEslSessions/getEventSessionCatalog already surface fetch
+// failures via logError, and it should start working once the distribution is fixed.
 const SESSION_CATALOG_CDN_MAP = {
   dev: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
   stage: 'https://events-platform-stage-cdn.aws125.adobeitc.com',
