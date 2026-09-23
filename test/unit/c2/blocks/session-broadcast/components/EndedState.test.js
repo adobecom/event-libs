@@ -28,9 +28,6 @@ describe('EndedState', () => {
     expect(out).to.include('Pixel & Product');
   });
 
-  // Meta (badges/duration), description, and "View more" were removed per Figma 8454:54024
-  // (mobile) / 8454:54044 (tablet), reused as-is at desktop/desktop-xl — the marquee is now just
-  // eyebrow, title, and actions, regardless of whether the session has a description.
   it('never renders the meta row, description, or "View more" toggle', () => {
     const out = EndedState({ session: SESSION });
     expect(out).to.not.include('sb-ended__meta');

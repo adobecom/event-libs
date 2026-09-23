@@ -12,8 +12,6 @@ import {
 
 // Covers "other sessions live" and "nothing live" with the same markup — Also Live/Up Next
 // below are the fallback actions. Background photo is a CSS background on .sb-app, not here.
-// No meta/badges, description, or "View more" — removed per Figma 8454:54024 (mobile) /
-// 8454:54044 (tablet), reused as-is at desktop/desktop-xl.
 export function EndedState({ session }) {
   if (!session) return null;
 

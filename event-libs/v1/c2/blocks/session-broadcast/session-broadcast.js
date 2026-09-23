@@ -18,11 +18,7 @@ const DEFAULTS = {
   sessionEndedImageUrlDesktopXl: '',
 };
 
-// Four breakpoint-specific rows (a crop that reads on mobile can fail completely on desktop XL,
-// and vice versa) — breakpoints match session-broadcast.css: <768 / 768-1279 / 1280-1440 / 1441+.
-// Order matters: it's also the fallback-search order below. The last column marks desktop tiers
-// as preferring the largest authored <picture> source (width=2000) over DA's default width=750
-// <img> fallback — mobile/tablet keep the lighter default.
+// Order = fallback-search order below. Third column: prefer the largest <picture> source.
 const SESSION_ENDED_IMAGE_LABELS = [
   ['sessionEndedImageUrlMobile', 'session ended image mobile', false],
   ['sessionEndedImageUrlTablet', 'session ended image tablet', false],
@@ -30,8 +26,7 @@ const SESSION_ENDED_IMAGE_LABELS = [
   ['sessionEndedImageUrlDesktopXl', 'session ended image desktop xl', true],
 ];
 
-// Pre-dates the four rows above; still read as a fallback so pages authored before this change
-// keep working unmodified.
+// Fallback for pages authored before the four rows above existed.
 const LEGACY_SESSION_ENDED_IMAGE_LABEL = 'session ended image';
 
 function getRowValueEl(el, label) {
@@ -64,11 +59,7 @@ function firstSrcsetUrl(srcset) {
   return (srcset || '').trim().split(',')[0]?.trim().split(/\s+/)[0] || '';
 }
 
-// Largest source from a row's authored <picture> (DA always emits a width=750 <img> fallback
-// alongside width=2000 <source>s — the picture can be bare or nested inside an <a>, since a
-// "linked image" cell can carry both). Reads a URL only, never re-renders — if
-// decorateImageLinks() already swapped it for an empty <video>, this degrades to the row's own
-// plain URL (extractImageUrl's width=750 <img> fallback) via the caller.
+// Largest source from a row's authored <picture>; reads a URL only, never re-renders.
 function extractLargestPictureUrl(el, label) {
   const picture = getRowValueEl(el, label)?.querySelector('picture');
   const sources = [...(picture?.querySelectorAll('source[srcset]') || [])];
@@ -81,8 +72,6 @@ function extractLargestPictureUrl(el, label) {
   return best.url ? resolveUrl(best.url) : '';
 }
 
-// Desktop tiers try the largest <picture> source first, falling back to extractImageUrl's
-// width=750 default when the row has no <picture> (e.g. authored as a plain link instead).
 function extractRowImageUrl(el, label, preferLargest) {
   if (preferLargest) {
     const largest = extractLargestPictureUrl(el, label);
@@ -91,9 +80,7 @@ function extractRowImageUrl(el, label, preferLargest) {
   return extractImageUrl(el, label);
 }
 
-// Backfills an empty slot from its nearest authored neighbor (one step away before two, etc.) —
-// "use what's available" instead of leaving a breakpoint with no image just because that one
-// exact size wasn't uploaded. Ties (equidistant smaller/larger neighbor) favor the smaller one.
+// Backfills an empty slot from its nearest authored neighbor; ties favor the smaller one.
 function fillNearestAvailable(values) {
   return values.map((value, i) => {
     if (value) return value;
@@ -105,8 +92,7 @@ function fillNearestAvailable(values) {
   });
 }
 
-// Drops AEM's optimization query params (width/format/optimize) — that rendition looked visibly
-// pixelated once stretched across a larger viewport, so tablet+ load the original asset instead.
+// Drops AEM's optimization params — the optimized rendition looks pixelated at larger sizes.
 function stripOptimizationParams(url) {
   if (!url) return url;
   try {
@@ -118,9 +104,7 @@ function stripOptimizationParams(url) {
   }
 }
 
-// Mobile keeps DA's optimized rendition (smaller payload matters more there); every other tier
-// is rewritten to the original, unprocessed asset regardless of which tier's image it ended up
-// using (including a value borrowed via fillNearestAvailable).
+// Mobile keeps DA's optimized rendition; every other tier is rewritten to the original asset.
 function applyOptimizationPolicy(urls, mobileKey) {
   return Object.fromEntries(Object.entries(urls).map(
     ([key, url]) => [key, key === mobileKey ? url : stripOptimizationParams(url)],

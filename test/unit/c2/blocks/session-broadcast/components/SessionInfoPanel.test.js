@@ -59,10 +59,7 @@ describe('SessionInfoPanel', () => {
     expect(out).to.include('is-favorited');
   });
 
-  // Same always-in-DOM/CSS-hides-it pattern as the description above (mobile Figma follow-up:
-  // badges now sit under the title and before the description in the collapsed layout too).
-  // CategoryBadge itself isn't actually invoked by this string-render harness (same limitation
-  // noted on LiveCard.test.js/Carousel.test.js) — this only guards the wrapper's render contract.
+  // CategoryBadge itself isn't invoked by this string-render harness — just guards the wrapper.
   it('shows the badge row wrapper when collapsed and not favorited', () => {
     const out = SessionInfoPanel({ session: SESSION });
     expect(out).to.include('sb-info__meta');

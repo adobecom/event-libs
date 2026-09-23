@@ -85,12 +85,8 @@ describe('LiveCard', () => {
     liveStreamActiveIds.value = new Set();
   });
 
-  // matchesMobile() reads window.matchMedia directly (not gated behind useEffect, which is a
-  // no-op in this string-render harness), so forcing it here is enough to exercise either
-  // branch without a real resize. Shared file-wide: the ambient test-runner viewport falls
-  // inside the mobile/normal-tablet range (<1024px, LiveCard.js's MOBILE_QUERY), so any test
-  // that wants the bigger-tablet/desktop meta-row layout has to force it explicitly too, not
-  // just tests that want the mobile layout.
+  // The ambient test viewport is inside the mobile range, so tests wanting desktop layout
+  // must call forceMobile(false) explicitly too, not just tests wanting mobile.
   let originalMatchMedia;
   beforeEach(() => { originalMatchMedia = window.matchMedia; });
   afterEach(() => { window.matchMedia = originalMatchMedia; });
@@ -333,9 +329,7 @@ describe('LiveCard', () => {
   // A live session with an additional event-site track badges both tracks side by side in
   // the time's slot, and drops the "+1" that would otherwise double count the second one.
   describe('additional track badge', () => {
-    // This block exercises the bigger-tablet/desktop meta-row layout (track-extra, the +1
-    // count) — force non-mobile so the ambient test-runner viewport can't tip it into the
-    // mobile/normal-tablet badges layout instead.
+    // Forces desktop meta-row layout; the ambient viewport defaults to mobile.
     beforeEach(() => forceMobile(false));
 
     const render = (session, props) => {
@@ -465,7 +459,6 @@ describe('LiveCard', () => {
     });
   });
 
-  // Figma 8463:87698 (live) / 9624:73879 (recommended) — mobile and normal tablet (<1024px).
   describe('mobile layout (title-then-badges, live and recommended variants)', () => {
     it('renders the title before the badges block on a mobile live card', () => {
       forceMobile(true);
@@ -512,8 +505,7 @@ describe('LiveCard', () => {
       const LiveCard = buildLiveCard(preact, makeStore());
       const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended' });
       expect(out).to.include('sg-live-card__time--mobile');
-      // 'MAX Keynote' also appears earlier, in the thumbnail's alt text — compare against the
-      // title button itself instead, same anchor the badges-ordering test above uses.
+      // 'MAX Keynote' also appears in the thumbnail's alt text, so compare against the title button.
       expect(out.indexOf('sg-live-card__time--mobile')).to.be.lessThan(out.indexOf('sg-live-card__title-btn'));
     });
 

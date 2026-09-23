@@ -292,11 +292,8 @@ describe('BroadcastBody', () => {
     });
   });
 
-  // handleSwitchSession itself lives inside BroadcastBody's closure and calls this on every
-  // switch (see BroadcastApp.js) — not directly reachable through this mocked htm-preact
-  // harness (useState/useEffect are no-ops, and nested components like AlsoLiveCarousel never
-  // actually invoke onSwitchSession here; see the file-level comment above). This exercises the
-  // delay/scroll behavior itself, decoupled from that closure.
+  // handleSwitchSession's closure isn't reachable through this mocked harness (see file-level
+  // comment above); this tests the extracted delay/scroll behavior directly instead.
   describe('scheduleSwitchScroll (session switch scroll)', () => {
     let clock;
     let scrollToStub;

@@ -18,10 +18,7 @@ export const buildLiveCard = () => LiveCard;
 // Non-MR sessions need this manual tick; MR sessions get an equivalent refresh from the poller.
 export const PROGRESS_REFRESH_MS = 30_000;
 
-// Covers phone and normal tablet (<1024px) by default — bigger tablet (1024-1279px) keeps its
-// own desktop-style layout below. guideConfig.liveCardMobileMaxWidth overrides the cutoff:
-// session-broadcast sets it to 1279 since it has no separate bigger-tablet look of its own.
-// Small, self-contained view state, not a shared util.
+// guideConfig.liveCardMobileMaxWidth overrides this cutoff (session-broadcast uses 1279).
 const DEFAULT_MOBILE_MAX_WIDTH = 1023;
 const matchesMobile = (maxWidth) => !!window.matchMedia?.(`(max-width: ${maxWidth}px)`).matches;
 function useIsMobile(maxWidth) {
@@ -51,9 +48,6 @@ export function LiveCard({
   const { guideConfig } = state;
   const { userTz, surface } = guideConfig;
   const isMobile = useIsMobile(guideConfig.liveCardMobileMaxWidth ?? DEFAULT_MOBILE_MAX_WIDTH);
-  // Mobile redesign — title, then a fixed-height badges block, then actions. Figma 8463:87698
-  // for 'live'; 9624:73879 for 'recommended' (same structure, minus the progress bar, plus an
-  // optional time row above the title).
   const useMobileLayout = isMobile;
 
   const isScheduled = scheduled.value.has(session.id);
@@ -87,8 +81,7 @@ export function LiveCard({
   // Meta row's second slot is shared: Recommended+upcoming shows time, others show a track badge.
   const showTime = variant === 'recommended' && sessionState === 'upcoming';
   const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
-  // Mobile's badges block has its own row, separate from the time row above the title, so a
-  // recommended+upcoming card can show both — unlike metaBlock's single shared desktop slot.
+  // Mobile's badges row is separate from the time row, so both can show together.
   const badgesSecondTrack = (session.additionalTracks || [])[0];
 
   const cardClass = [

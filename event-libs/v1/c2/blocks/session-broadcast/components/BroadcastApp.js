@@ -31,9 +31,7 @@ import { AlsoLiveCarousel } from './AlsoLiveCarousel.js';
 import { UpNextCarousel } from './UpNextCarousel.js';
 
 // surface:'page' routes clicks through onCardClick/onWatchSamePage instead of LiveCard's own.
-// liveCardMobileMaxWidth: broadcast has no separate bigger-tablet look of its own — LiveCard's
-// mobile layout (see LiveCard.js's MOBILE_QUERY) runs all the way to the 1280px desktop
-// breakpoint here, instead of session-guide's own 1024px cutoff.
+// liveCardMobileMaxWidth: mobile layout runs up to 1280px here, not sessions-guide's 1024px.
 const GUIDE_CONFIG = {
   userTz: detectUserTimezone(), surface: 'page', theme: 'light', liveCardMobileMaxWidth: 1279,
 };
@@ -41,13 +39,10 @@ const GUIDE_CONFIG = {
 // Exported for tests; see the effect below for why this needs its own tick.
 export const SCHEDULE_REFRESH_MS = 5_000;
 
-// Exported for tests. Gives the new player's own layout (e.g. MpcPlayerAdapter's iframe, built
-// from a dynamically-imported module) a moment to settle before scrolling.
+// Delay lets the new player's async layout (e.g. MpcPlayerAdapter's iframe) settle first.
 export const SWITCH_SCROLL_DELAY_MS = 300;
 
-// Split out from handleSwitchSession below so the delay/scroll behavior itself is callable (and
-// its timer inspectable via sinon fake timers) without going through this mocked htm-preact
-// harness's no-op useState/useEffect — see BroadcastBody.test.js's "session switch scroll" block.
+// Split out for testability — handleSwitchSession's closure isn't reachable from tests.
 export function scheduleSwitchScroll(delayMs = SWITCH_SCROLL_DELAY_MS) {
   return setTimeout(() => {
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
@@ -98,14 +93,6 @@ export function BroadcastBody({ config }) {
     stripWatchParam(isLive ? requested.id : null);
   }, [sessionsStatus.value]);
 
-  // Same "switch in place, then scroll to the player" contract as LiveCard's own internal
-  // watch-same-page branch and SessionDetailOverlay's handleWatch — this is the broadcast
-  // page's equivalent (routed here via onWatchSamePage, which preempts LiveCard's own branch),
-  // and was missing the scroll: state updated correctly, but nothing brought the player into
-  // view, so it only appeared to scroll when an incidental layout shift happened to do it.
-  // The scroll runs after the switch (once the new player has started mounting), delayed by
-  // SWITCH_SCROLL_DELAY_MS so its own layout has settled first — overflow-anchor:none on
-  // .sb-app (session-broadcast.css) is the other half of this fix.
   function handleSwitchSession(session) {
     pushSessionState(session.id);
     setManualSessionId(session.id);
@@ -177,8 +164,7 @@ export function BroadcastBody({ config }) {
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
     && !schedule.pendingCandidates?.length && !schedule.alsoLive.length && !schedule.upNext.length;
 
-  // Feeds .sb-app:has(.sb-ended) in the CSS — one background var per breakpoint tier; each
-  // media query there already picks the matching var, with a fallback chain down to mobile.
+  // Feeds .sb-app:has(.sb-ended) — one background var per breakpoint tier.
   const endedActive = !schedule.activeSession && !!schedule.endedSession;
   const endedBgVars = endedActive ? {
     '--sb-app-ended-bg-mobile': safeUrl(config.sessionEndedImageUrlMobile),

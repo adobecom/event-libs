@@ -2,10 +2,8 @@ import { expect } from '@esm-bundle/chai';
 import init, { parseBroadcastConfig, observeFillHeight } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
 import { sessionsStatus } from '../../../../../event-libs/v1/utils/session-store.js';
 
-// Every "session ended image ..." row (the four breakpoint-specific ones, plus the legacy
-// unsuffixed one) supports two authoring styles (see extractImageUrl's comment): a link to the
-// image asset, or an embedded picture. The fixture builds a real anchor for those rows by
-// default; embedded-picture authoring gets its own test below.
+// Each "session ended image ..." row supports a link or an embedded picture; the fixture
+// builds a real anchor by default — embedded-picture authoring gets its own test below.
 function block(rows) {
   const el = document.createElement('div');
   el.className = 'session-broadcast';
@@ -78,10 +76,6 @@ describe('parseBroadcastConfig', () => {
       expect(config.sessionEndedImageUrlDesktopXl).to.equal('https://example.com/desktop-xl.png');
     });
 
-    // Real DA-authored markup: each row is a bare <picture> (no wrapping <a>), with a width=750
-    // <img> fallback plus width=2000 <source>s. Desktop tiers pick the width=2000 source, then
-    // strip its optimization query params entirely (the optimized rendition looked pixelated) —
-    // mobile keeps DA's optimized width=750 default, query params and all.
     it('picks the widest source for desktop/desktop xl and strips its query params; mobile keeps the optimized default', () => {
       const el = document.createElement('div');
       el.innerHTML = `
@@ -122,8 +116,7 @@ describe('parseBroadcastConfig', () => {
     });
 
     it('backfills a missing tier from its nearest authored neighbor', () => {
-      // Only mobile + desktop authored — tablet (distance 1 from both) prefers the smaller
-      // neighbor, desktop xl (distance 1 from desktop only) takes desktop's image.
+      // Ties favor the smaller neighbor; desktop xl backfills from desktop only.
       const config = parseBroadcastConfig(block([
         ['Session ended image mobile', 'https://example.com/mobile.png'],
         ['Session ended image desktop', 'https://example.com/desktop.png'],
@@ -144,9 +137,6 @@ describe('parseBroadcastConfig', () => {
       expect(config.sessionEndedImageUrlDesktopXl).to.equal('https://example.com/desktop.png');
     });
 
-    // The optimization-stripping policy is applied by destination tier, not by wherever the
-    // final URL actually came from — so a backfilled value is reformatted for the slot it lands
-    // in, not left in whatever shape its origin tier used.
     it('applies each tier\'s optimization policy to a value borrowed via backfill', () => {
       const el = document.createElement('div');
       el.innerHTML = `
@@ -199,11 +189,7 @@ describe('parseBroadcastConfig', () => {
     expect(parseBroadcastConfig(el).sessionEndedImageUrlMobile).to.equal('https://example.com/ended.png');
   });
 
-  // The legacy row's larger tablet+ source is read from an authored <picture>'s own <source>s,
-  // if any exist alongside the row's link (DA's "linked image" convention nests a <picture>
-  // inside the <a>, so a link and a picture aren't mutually exclusive) — never rendered back
-  // into the page, only read for a URL string, so this can't reintroduce the
-  // decorateImageLinks() collision bug. Only exercised when none of the four new rows exist.
+  // A DA "linked image" cell can nest a <picture> inside its <a>, so both can exist together.
   describe('legacy "session ended image" row (bigger source from an authored <picture>)', () => {
     function blockWithPicture(sourceWidths) {
       const el = block([['Session ended image', 'https://example.com/ended.png']]);
@@ -267,15 +253,9 @@ describe('parseBroadcastConfig', () => {
       expect(config.sessionEndedImageUrlTablet).to.match(/\/media\.jpg$/); // widest source, query params stripped
     });
 
-    // The real bug: source.srcset (unlike a.href/img.src) is NEVER auto-resolved to an absolute
-    // URL by the browser — DA authors relative paths ("./image.jpg"), and that relative string
-    // would otherwise leak straight into BroadcastApp.js's safeUrl() check (which requires an
-    // absolute http(s):// or root-relative URL) and get silently dropped, which is exactly what
-    // was observed live: the legacy large-source lookup correctly IDENTIFIED the right source by
-    // width but never RESOLVED it, so it never actually made it into --sb-app-ended-bg-tablet.
-    // Asserting the exact resolved (and stripped) value here, not just a substring match, so this
-    // can't regress silently again the way the previous "real markup" test above did (it only
-    // checked `.include`, which stayed true even for the unresolved relative string).
+    // Real regression: srcset isn't auto-resolved like a.href/img.src, so DA's relative paths
+    // failed safeUrl()'s absolute-URL check silently. Asserts the exact value, not a substring,
+    // so an unresolved relative string can't pass again.
     it('resolves a relative srcset path to an absolute URL, then strips its query params', () => {
       const el = document.createElement('div');
       el.innerHTML = `
