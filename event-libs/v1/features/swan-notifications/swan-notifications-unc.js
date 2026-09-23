@@ -10,6 +10,7 @@ import { getSwanConfig } from './swan-config.js';
 import { calculateSessionTimes, buildStageCampaignRule } from './swan-payload.js';
 import { registerReminderRule, deleteReminderRule } from './unc-client.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
+import { getNowMs } from '../../utils/session-state.js';
 
 // Per-rfCode: which single stage's rule is currently registered/active, and its campaignId
 // (needed to delete it once superseded). v2 because the shape changed from the previous
@@ -87,7 +88,7 @@ export async function notifySessionScheduled(session) {
   if (!session?.rfCode) return;
   try {
     const state = readLocalState();
-    await applyStage(session, getSwanConfig(), Date.now(), state);
+    await applyStage(session, getSwanConfig(), getNowMs(), state);
     writeLocalState(state);
   } catch (err) {
     logError('swan-notifications-unc', `notifySessionScheduled failed for ${session.rfCode}`, err);
@@ -129,7 +130,7 @@ export async function reconcileSwanNotifications(getSessions, getScheduled) {
   reconcileInFlight = true;
   try {
     const swanConfig = getSwanConfig();
-    const now = Date.now();
+    const now = getNowMs();
     const sessionsById = new Map(getSessions().map((s) => [s.id, s]));
     const scheduledSessions = [...getScheduled()]
       .map((id) => sessionsById.get(id))
