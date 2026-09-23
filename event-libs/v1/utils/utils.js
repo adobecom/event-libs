@@ -4,7 +4,7 @@ import { logError } from './lana-log.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
-// Shared gate for query-param debug/test overrides (branch switching, mocked server time,
+// Shared gate for query-param debug/test overrides (branch switching, notification
 // mount-point fallbacks, etc.) — real prod domains (www.adobe.com and friends) never match
 // `.hlx.`/`.aem.`/`local`, so anything gated on this can't be triggered there.
 // `hostname` param defaults to the real one but is overridable for tests.
