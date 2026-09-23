@@ -270,7 +270,15 @@ function buildWidget(mount) {
     if (e.key === 'Escape') closePanel();
   }
 
+  function closeOtherGnavPopups() {
+    document.querySelectorAll('header.global-navigation [aria-expanded="true"]').forEach((trigger) => {
+      if (wrapper.contains(trigger)) return;
+      trigger.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   function openPanel() {
+    closeOtherGnavPopups();
     panel.hidden = false;
     button.setAttribute('aria-expanded', 'true');
     document.addEventListener('click', onOutsideClick);

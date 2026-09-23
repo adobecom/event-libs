@@ -195,6 +195,44 @@ describe('notification-widget', () => {
     expect(mountPoint.querySelectorAll('.swan-notif__bell')).to.have.lengthOf(1);
   });
 
+  describe('closing other gnav popups', () => {
+    let gnav;
+    let profileTrigger;
+
+    beforeEach(() => {
+      gnav = document.createElement('header');
+      gnav.className = 'global-navigation';
+      profileTrigger = document.createElement('button');
+      profileTrigger.setAttribute('aria-expanded', 'true');
+      gnav.append(profileTrigger);
+      document.body.append(gnav);
+    });
+
+    afterEach(() => {
+      if (!panel().hidden) bell().click();
+      gnav.remove();
+    });
+
+    it('closes an already-open gnav popup when the bell opens', () => {
+      bell().click();
+      expect(profileTrigger.getAttribute('aria-expanded')).to.equal('false');
+    });
+
+    it('still expands the bell itself', () => {
+      bell().click();
+      expect(bell().getAttribute('aria-expanded')).to.equal('true');
+    });
+
+    it('leaves aria-expanded elements outside header.global-navigation alone', () => {
+      const outside = document.createElement('button');
+      outside.setAttribute('aria-expanded', 'true');
+      document.body.append(outside);
+      bell().click();
+      expect(outside.getAttribute('aria-expanded')).to.equal('true');
+      outside.remove();
+    });
+  });
+
   describe('analytics attributes', () => {
     it('tags the bell button for click tracking', () => {
       expect(bell().getAttribute('daa-ll')).to.equal('Notification-Bell-Open');
