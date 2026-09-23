@@ -275,6 +275,9 @@ export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}
   return future.length ? Math.min(...future) : null;
 }
 
+// How long to wait for the MR poll's first result before falling back to a clock-based phase.
+const POLL_FIRST_EMIT_FALLBACK_MS = 5000;
+
 export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   if (!session) return () => {};
   const resolveEventStartMs = () => (eventStartMs != null ? eventStartMs : getEventStartMs());
@@ -282,10 +285,13 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   let liveStreamActiveIds = new Set();
   let lastPhase;
   let timerId = null;
+  let firstEmitTimerId = null;
+  let emitted = false;
   let stopped = false;
 
   const emitIfChanged = () => {
     if (stopped) return;
+    emitted = true;
     const phase = getPlaybackPhase(session, {
       nowMs: getNowMs(),
       eventStartMs: resolveEventStartMs(),
@@ -314,6 +320,9 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId]);
     // Defer the first emit until the poll answers, so a live session doesn't briefly show DVR first.
+    // But if the poll never answers (endpoint down), fall back to a clock-based phase after a short
+    // wait so the player never stays blank; a later poll result still overrides it.
+    firstEmitTimerId = setTimeout(() => { if (!emitted) emitIfChanged(); }, POLL_FIRST_EMIT_FALLBACK_MS);
   } else {
     emitIfChanged();
   }
@@ -322,6 +331,7 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   return function stop() {
     stopped = true;
     if (timerId != null) { clearTimeout(timerId); timerId = null; }
+    if (firstEmitTimerId != null) { clearTimeout(firstEmitTimerId); firstEmitTimerId = null; }
     if (session.mrStreamId) {
       unsubscribePoll();
       unregisterStreamIds([session.mrStreamId]);

@@ -836,7 +836,13 @@ export default async function init(el) {
 
   let started = false;
   const startFor = (phase) => {
-    if (started || !el.isConnected) return;
+    if (!el.isConnected) return;
+    if (started) {
+      // Already rendered for ON_DEMAND. If the phase later reverts to a non-on-demand state (e.g.
+      // the poll flips back to live), remove the now-stale playlist so it doesn't linger.
+      if (!isOnDemandPhase(phase)) removeBlock(el);
+      return;
+    }
     if (!isOnDemandPhase(phase)) {
       // No playlist, but still answer so the player embeds full-width instead of waiting forever.
       announceVideoDecision(false);

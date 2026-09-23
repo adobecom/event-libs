@@ -552,12 +552,15 @@ export default async function init(el) {
       return;
     }
 
-    // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player.
+    // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player and
+    // re-announce the phase so the playlist (if it had rendered for ON_DEMAND) can hide itself.
     if (embeddedPhase !== null && !PLAYABLE_PHASES.includes(phase)) {
       el.querySelector('.mobile-rider')?.remove();
       el.querySelector('.milo-video')?.remove();
       delete el.dataset.embedded;
       embeddedPhase = null;
+      BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
+      window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
       return;
     }
 

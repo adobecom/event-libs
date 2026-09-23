@@ -518,6 +518,30 @@ describe('session-video-playlist', () => {
       expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
     });
 
+    it('removes itself if the phase reverts from ON_DEMAND back to a non-on-demand phase', async () => {
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta({ endTimeMillis: Date.now() - HOUR_MS }));
+      setMeta('custom-attributes', playlistAttribute());
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+
+      await init(playlist);
+      await flush();
+      firePlayable('cur', PLAYBACK_PHASE.ON_DEMAND);
+      await flush();
+      expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
+      expect(playlist.isConnected).to.be.true;
+
+      // Poll flips the session back to live → playlist must not linger.
+      firePlayable('cur', PLAYBACK_PHASE.WATCH_LIVE);
+      await flush();
+      expect(playlist.isConnected).to.be.false;
+    });
+
     it('removes the block when the catalog is already ready but empty', async () => {
       const { playlist } = buildPage();
       setMeta('session-id', 'cur');
