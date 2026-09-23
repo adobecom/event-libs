@@ -7,6 +7,7 @@ import { renderQuickFacts } from './quick-facts.js';
 import { renderShare } from './share.js';
 import { renderFavorite } from './favorite.js';
 import { mountSessionState, readStatusLabels } from './session-state-view.js';
+import { onElementDetached } from '../../utils/video-session.js';
 
 export default async function init(el) {
   const background = readBackgroundConfig(el);
@@ -40,9 +41,12 @@ export default async function init(el) {
   if (share) actions.append(share);
   el.append(actions);
 
-  mountSessionState({
+  // mountSessionState may return a teardown (clears the IPOD re-render timer and unsubscribes the
+  // MobileRider poll for livestreamed sessions); run it when the block is detached to avoid leaks.
+  const stopSessionState = mountSessionState({
     statusSlot, primaryCtaSlot, ccEl: closedCaption, statusLabels,
   });
+  if (stopSessionState) onElementDetached(el, stopSessionState);
 
   const description = renderDescriptionClamp();
   if (description) el.append(description);

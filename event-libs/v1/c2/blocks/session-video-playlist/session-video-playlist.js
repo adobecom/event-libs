@@ -1,6 +1,7 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
   sessions, sessionsStatus, initSessionState, liveStreamActiveIds, favorited, pendingActions,
+  getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
@@ -11,9 +12,6 @@ import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
   VIDEO_PLAYABLE_KEY,
-  VIDEO_CONTAINER_CLASS,
-  VIDEO_PLAYLIST_CONTAINER_CLASS,
-  findSectionWithStyle,
   getVideoProgress as readVideoProgress,
   onElementDetached,
   parseJsonMetadata as parseSharedJsonMetadata,
@@ -30,7 +28,7 @@ const LOG_SCOPE = 'session-video-playlist';
 
 const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
-const EVENT_CONFIG = { title: '', registerUrl: '/register' };
+const EVENT_CONFIG = { title: '' };
 
 export const _internals = { navigate: (href) => window.location.assign(href) };
 
@@ -401,7 +399,8 @@ function buildFavoriteButton(item) {
     if (event.detail > 0) button.blur();
     if (pendingActions.value.has(item.id)) return;
     await toggleFavoriteWithFeedback(item, {
-      eventConfig: EVENT_CONFIG,
+      // Resolve the RF registration link at click time (tier-1 config is bootstrapped by then).
+      eventConfig: { ...EVENT_CONFIG, registerUrl: getEventApiConfig()?.registerUrl || '/register' },
       isFavorited: favorited.value.has(item.id),
     });
   });
@@ -602,44 +601,9 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
-const COLLAPSE_TRANSITION_MS = 250;
-const COLLAPSE_FALLBACK_MS = COLLAPSE_TRANSITION_MS + 100;
-
-function collapseAndRemove(target) {
-  if (!target || target.classList.contains('is-collapsing')) return;
-  target.classList.add('is-collapsing');
-
-  let removed = false;
-  const removeOnce = () => {
-    if (removed) return;
-    removed = true;
-    clearTimeout(fallbackTimer);
-    target.remove();
-  };
-
-  target.addEventListener('transitionend', removeOnce, { once: true });
-  const fallbackTimer = setTimeout(removeOnce, COLLAPSE_FALLBACK_MS);
-}
-
-function hasEmbeddedVideoPlayer(container) {
-  return container?.querySelector('.session-video-player')?.dataset.embedded === 'true';
-}
-
+// Publish the playlist's yes/no answer to the player. Never remove a Milo section (loadArea loop).
 function announceVideoDecision(hasPlaylist) {
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
-
-  if (hasPlaylist) {
-
-    const videoContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
-    if (!hasEmbeddedVideoPlayer(videoContainer)) collapseAndRemove(videoContainer);
-    return;
-  }
-
-  const playlistContainer = findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS);
-  if (!hasEmbeddedVideoPlayer(playlistContainer)) {
-    collapseAndRemove(playlistContainer?.querySelector('.session-video-player'));
-  }
-  collapseAndRemove(playlistContainer?.querySelector('.session-video-playlist'));
 }
 
 function removeBlock(el) {
@@ -810,10 +774,6 @@ export default async function init(el) {
   }
 
   const render = (sessionList) => {
-    if (hasEmbeddedVideoPlayer(findSectionWithStyle(VIDEO_CONTAINER_CLASS))) {
-      removeBlock(el);
-      return;
-    }
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
     if (!rows.length) {
@@ -871,12 +831,30 @@ export default async function init(el) {
     });
   };
 
+  // Playlist shows only for ON_DEMAND — never a DVR replay (DVR_BUFFER).
+  const isOnDemandPhase = (phase) => phase === PLAYBACK_PHASE.ON_DEMAND;
+
   let started = false;
-  const onPlayable = (event) => {
-    if (event.detail?.sessionId !== sessionId) return;
-    if (started || !el.isConnected) return;
+  const startFor = (phase) => {
+    if (!el.isConnected) return;
+    if (started) {
+      // Already rendered for ON_DEMAND. If the phase later reverts to a non-on-demand state (e.g.
+      // the poll flips back to live), remove the now-stale playlist so it doesn't linger.
+      if (!isOnDemandPhase(phase)) removeBlock(el);
+      return;
+    }
+    if (!isOnDemandPhase(phase)) {
+      // No playlist, but still answer so the player embeds full-width instead of waiting forever.
+      announceVideoDecision(false);
+      return;
+    }
     started = true;
     runRenderFlow();
+  };
+
+  const onPlayable = (event) => {
+    if (event.detail?.sessionId !== sessionId) return;
+    startFor(event.detail?.phase);
   };
 
   window.addEventListener('session-video-player:playable', onPlayable);
@@ -886,7 +864,6 @@ export default async function init(el) {
 
   const alreadyPlayable = BlockMediator.get(VIDEO_PLAYABLE_KEY);
   if (alreadyPlayable?.sessionId === sessionId && !started && el.isConnected) {
-    started = true;
-    runRenderFlow();
+    startFor(alreadyPlayable.phase);
   }
 }

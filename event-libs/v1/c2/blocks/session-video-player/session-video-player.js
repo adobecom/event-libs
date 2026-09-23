@@ -4,6 +4,7 @@ import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
   VIDEO_PLAYABLE_KEY,
+  VIDEO_CONTAINER_CLASS,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   closestSectionWithStyle,
   getVideoProgress as readVideoProgress,
@@ -442,6 +443,11 @@ function isWinningInstance(el, hasPlaylist) {
   return isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist;
 }
 
+function hideLosingInstance(el) {
+  if (closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
+  el.classList.add('session-video-hidden');
+}
+
 function awaitEmbedDecision(el) {
   const existingDecision = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
   if (existingDecision != null) {
@@ -492,7 +498,10 @@ function loadWhenDecided(el, sessionId, video) {
   (async () => {
     try {
       const isWinner = await awaitEmbedDecision(el);
-      if (!isWinner) return;
+      if (!isWinner) {
+        hideLosingInstance(el);
+        return;
+      }
       loadVideoPlayer(el, sessionId, video);
     } catch (error) {
       logError(LOG_SCOPE, 'could not resolve the video layout decision', error);
@@ -524,15 +533,34 @@ export default async function init(el) {
 
     if (video) {
       const isFirstEmbed = embeddedPhase === null;
+      const previousPhase = embeddedPhase;
       embeddedPhase = phase;
       if (isFirstEmbed) {
-        BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId });
-        window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
+        BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
+        window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
         loadWhenDecided(el, sessionId, video);
-      } else if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
-        preconnectVideoProvider(video.provider);
-        loadVideoPlayer(el, sessionId, video);
+      } else {
+        if (previousPhase !== phase) {
+          BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
+          window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
+        }
+        if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
+          preconnectVideoProvider(video.provider);
+          loadVideoPlayer(el, sessionId, video);
+        }
       }
+      return;
+    }
+
+    // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player and
+    // re-announce the phase so the playlist (if it had rendered for ON_DEMAND) can hide itself.
+    if (embeddedPhase !== null && !PLAYABLE_PHASES.includes(phase)) {
+      el.querySelector('.mobile-rider')?.remove();
+      el.querySelector('.milo-video')?.remove();
+      delete el.dataset.embedded;
+      embeddedPhase = null;
+      BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
+      window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
       return;
     }
 
