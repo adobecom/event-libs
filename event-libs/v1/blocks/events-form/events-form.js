@@ -933,12 +933,14 @@ async function addConsentSuite(form) {
   }
 }
 
-export function addTerms(form, terms) {
+export function addTerms(form, terms, hasConsentSuite = false) {
   if (!terms || terms.textContent === '') return;
   const submitWrapper = form.querySelector('.events-form-submit-wrapper');
   const termsWrapper = createTag('div', { class: 'field-wrapper events-form-full-width event-terms-wrapper field-group-wrapper' });
   const cell = terms.querySelector(':scope > div') || terms;
-  const termsContent = cell.querySelectorAll(':scope > p, :scope > ul, :scope > ol');
+  // The consent suite owns the consent line (authored as a list); skip it here to avoid a duplicate.
+  const selector = hasConsentSuite ? ':scope > p' : ':scope > p, :scope > ul, :scope > ol';
+  const termsContent = cell.querySelectorAll(selector);
 
   termsContent.forEach((el) => {
     termsWrapper.append(el);
@@ -946,7 +948,7 @@ export function addTerms(form, terms) {
 
   terms.remove();
 
-  submitWrapper.before(termsWrapper);
+  if (termsWrapper.children.length) submitWrapper.before(termsWrapper);
 }
 
 export function getRsvpConfigFromMeta() {
@@ -1097,13 +1099,15 @@ async function createForm(bp, formData) {
     formEl.append(fieldWrapper);
   });
 
-  addTerms(formEl, terms);
-
   const profile = BlockMediator.get('imsProfile');
   const showConsentForGuest = profile?.account_type === 'guest'
     && (getMetadata('allow-guest-registration') === 'true' || Boolean(profile?.rsvpToken));
   const forceConsent = getMetadata('force-consent-collection') === 'true';
-  if (showConsentForGuest || forceConsent) await addConsentSuite(formEl);
+  const hasConsentSuite = showConsentForGuest || forceConsent;
+
+  addTerms(formEl, terms, hasConsentSuite);
+
+  if (hasConsentSuite) await addConsentSuite(formEl);
 
   formEl.addEventListener('input', () => applyRules(formEl, rules));
   applyRules(formEl, rules);
