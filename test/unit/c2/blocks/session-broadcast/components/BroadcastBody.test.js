@@ -228,45 +228,51 @@ describe('BroadcastBody', () => {
       history.pushState({ session: 'ended-1' }, '', window.location.pathname);
     });
 
-    it('sets the custom property from the authored sessionEndedImageUrl once ended', () => {
+    it('sets the mobile custom property from the authored sessionEndedImageUrlMobile once ended', () => {
       const out = BroadcastBody({
-        config: { ...CONFIG, sessionEndedImageUrl: 'https://example.com/ended.png' },
+        config: { ...CONFIG, sessionEndedImageUrlMobile: 'https://example.com/mobile.png' },
       });
       // The mocked htm-preact HTML-escapes attribute values, so quotes come back as &quot;.
-      expect(out).to.include('--sb-app-ended-bg: url(&quot;https://example.com/ended.png&quot;)');
+      expect(out).to.include('--sb-app-ended-bg-mobile: url(&quot;https://example.com/mobile.png&quot;)');
     });
 
-    it('omits the custom property when ended but no image is authored', () => {
+    it('omits all four custom properties when ended but no image is authored', () => {
       const out = BroadcastBody({ config: CONFIG });
       expect(out).to.not.include('--sb-app-ended-bg');
     });
 
-    it('also sets --sb-app-ended-bg-lg when a larger picture source was authored', () => {
+    it('sets each of the four custom properties from its matching config field', () => {
       const out = BroadcastBody({
         config: {
           ...CONFIG,
-          sessionEndedImageUrl: 'https://example.com/ended.png',
-          sessionEndedImageUrlLarge: 'https://example.com/ended.png?width=2000',
+          sessionEndedImageUrlMobile: 'https://example.com/mobile.png',
+          sessionEndedImageUrlTablet: 'https://example.com/tablet.png',
+          sessionEndedImageUrlDesktop: 'https://example.com/desktop.png',
+          sessionEndedImageUrlDesktopXl: 'https://example.com/desktop-xl.png',
         },
       });
-      expect(out).to.include('--sb-app-ended-bg-lg: url(&quot;https://example.com/ended.png?width=2000&quot;)');
+      expect(out).to.include('--sb-app-ended-bg-mobile: url(&quot;https://example.com/mobile.png&quot;)');
+      expect(out).to.include('--sb-app-ended-bg-tablet: url(&quot;https://example.com/tablet.png&quot;)');
+      expect(out).to.include('--sb-app-ended-bg-desktop: url(&quot;https://example.com/desktop.png&quot;)');
+      expect(out).to.include('--sb-app-ended-bg-desktop-xl: url(&quot;https://example.com/desktop-xl.png&quot;)');
     });
 
-    it('omits --sb-app-ended-bg-lg when no larger source was authored', () => {
+    it('omits a tier\'s custom property when that tier has no config value', () => {
       const out = BroadcastBody({
-        config: { ...CONFIG, sessionEndedImageUrl: 'https://example.com/ended.png' },
+        config: { ...CONFIG, sessionEndedImageUrlMobile: 'https://example.com/mobile.png' },
       });
-      expect(out).to.not.include('--sb-app-ended-bg-lg');
+      expect(out).to.not.include('--sb-app-ended-bg-tablet');
+      expect(out).to.not.include('--sb-app-ended-bg-desktop');
     });
 
-    it('omits the custom property for an unsafe URL (e.g. a javascript: scheme)', () => {
+    it('omits a tier\'s custom property for an unsafe URL (e.g. a javascript: scheme)', () => {
       const out = BroadcastBody({
-        config: { ...CONFIG, sessionEndedImageUrl: 'javascript:alert(1)' },
+        config: { ...CONFIG, sessionEndedImageUrlMobile: 'javascript:alert(1)' },
       });
       expect(out).to.not.include('--sb-app-ended-bg');
     });
 
-    it('omits the custom property while a session is still live (not ended)', () => {
+    it('omits all four custom properties while a session is still live (not ended)', () => {
       sessions.value = [{
         id: 's-1',
         title: 'Live now',
@@ -277,7 +283,7 @@ describe('BroadcastBody', () => {
       }];
       history.pushState({ session: 's-1' }, '', window.location.pathname);
       const out = BroadcastBody({
-        config: { ...CONFIG, sessionEndedImageUrl: 'https://example.com/ended.png' },
+        config: { ...CONFIG, sessionEndedImageUrlMobile: 'https://example.com/mobile.png' },
       });
       expect(out).to.not.include('--sb-app-ended-bg');
     });

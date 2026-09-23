@@ -54,18 +54,15 @@
   border: none;
 }
 
-/* !important overrides c2-global.css/event-youtube.css's default width/radius for this bleed. */
-@media (min-width: 1024px) and (max-width: 1279px) {
-  .session-broadcast .milo-video {
-    max-width: none !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-  }
-
+/* Full-bleed width but 24px rounded corners on tablet (Figma 8454:53850); !important overrides
+   c2-global.css/event-youtube.css's own width/radius. overflow:hidden clips the video to the corners. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .session-broadcast .milo-video,
   .session-broadcast .youtube-video-container {
     max-width: none !important;
     margin: 0 !important;
-    border-radius: 0 !important;
+    border-radius: var(--s2a-border-radius-24, 24px) !important;
+    overflow: hidden !important;
   }
 }
 
@@ -587,32 +584,61 @@
   height: 16px;
 }
 
-/* Bleeds the ended-state photo behind siblings via a pseudo-element + isolation, not a JS <img>. */
+/* Bleeds the ended-state photo behind siblings via a pseudo-element + isolation, not a JS <img>.
+   overflow-x:hidden guards against the ::before's 100vw sometimes exceeding the visual viewport
+   by the scrollbar's own width. */
 .sb-app:has(.sb-ended) {
   position: relative;
   isolation: isolate;
+  overflow-x: hidden;
   background: var(--s2a-color-gray-1000, #000);
 }
 
-/* top+bottom:0 (no height) matches .sb-app's real height. No darkening here — authors darken
-   the photo itself before uploading it. */
+/* top matches .sb-app's own padding-top (--feds-nav-total-height) so the photo starts below the
+   reserved GNAV space instead of running behind it; bottom:0 (no explicit height) still matches
+   .sb-app's real height. No darkening here — authors darken the photo itself before uploading it.
+   left:50%/margin-left:-50vw (rather than left:0/width:100%) breaks the image out to the true
+   viewport edges even when .sb-app sits inside a page's standard padded/centered grid — relies
+   only on that container being horizontally centered, not on knowing its exact width (unlike the
+   fixed-1192px bleed calc used elsewhere in this file for the carousels). background-size is
+   width-locked (100% auto), not cover: .sb-app is usually much taller than it is wide, and cover
+   would scale up to fill that height, cropping away most of the image's width (looked "zoomed
+   in"). Width-locked always matches the image's horizontal edges to the screen's; any excess
+   height crops top-to-bottom (background-position: top) or falls through to .sb-app's own solid
+   background below the image. */
 .sb-app:has(.sb-ended)::before {
   content: '';
   position: absolute;
-  top: 0;
+  top: var(--feds-nav-total-height, 80px);
   bottom: 0;
-  left: 0;
+  left: 50%;
   z-index: -1;
-  width: 100%;
-  background-image: var(--sb-app-ended-bg, none);
+  width: 100vw;
+  margin-left: -50vw;
+  background-image: var(--sb-app-ended-bg-mobile, none);
   background-repeat: no-repeat;
   background-position: top center;
-  background-size: cover;
+  background-size: 100% auto;
 }
 
+/* Each tier falls back through the smaller ones — belt-and-suspenders on top of
+   parseBroadcastConfig's own nearest-available backfill (session-broadcast.js), in case an
+   author sets these vars some other way in the future. */
 @media (min-width: 768px) {
   .sb-app:has(.sb-ended)::before {
-    background-image: var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none));
+    background-image: var(--sb-app-ended-bg-tablet, var(--sb-app-ended-bg-mobile, none));
+  }
+}
+
+@media (min-width: 1280px) {
+  .sb-app:has(.sb-ended)::before {
+    background-image: var(--sb-app-ended-bg-desktop, var(--sb-app-ended-bg-tablet, var(--sb-app-ended-bg-mobile, none)));
+  }
+}
+
+@media (min-width: 1441px) {
+  .sb-app:has(.sb-ended)::before {
+    background-image: var(--sb-app-ended-bg-desktop-xl, var(--sb-app-ended-bg-desktop, var(--sb-app-ended-bg-tablet, var(--sb-app-ended-bg-mobile, none))));
   }
 }
 
@@ -715,12 +741,15 @@
     border-radius: 16px;
   }
 
-  /* Back to the image's bottom edge; the narrow card's top-edge placement is its own design. */
+  /* Back to the image's bottom edge; the narrow card's top-edge placement is its own design.
+     Figma 8482:20025: this row is a fixed 192px, not a full-bleed stretch — about a third of the
+     560px image, leaving the rest of the image clear. */
   .sb-carousel-section--also-live .sg-live-card__progress-row {
     top: auto;
     bottom: 13px;
     left: 27px;
-    right: 20px;
+    right: auto;
+    width: 192px;
   }
 
   /* Figma 8482:20025 layout: title → badges centered as a group, buttons pinned to the bottom.
@@ -979,8 +1008,8 @@
 
   .sb-carousel-section--also-live .sg-carousel__arrow svg,
   .sb-carousel-section--up-next .sg-carousel__arrow svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 
   /* sessions-guide hides disabled arrows at 768-1023; broadcast keeps both, dimmed (base opacity). */
@@ -990,11 +1019,11 @@
   }
 }
 
-/* min-height:40px matches the out-of-flow nav's button height so top:0 doesn't misalign with the title. */
+/* min-height:48px matches the out-of-flow nav's button height (48px at this tier) so top:0 doesn't misalign with the title. */
 @media (min-width: 1280px) {
   .sb-carousel-section--also-live .sg-carousel__header,
   .sb-carousel-section--up-next .sg-carousel__header {
-    min-height: 40px;
+    min-height: 48px;
     margin-bottom: var(--s2a-spacing-lg, 24px);
   }
 
@@ -1022,8 +1051,8 @@
 
   .sb-carousel-section--also-live .sg-carousel__arrow svg,
   .sb-carousel-section--up-next .sg-carousel__arrow svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 }
 
@@ -1055,9 +1084,9 @@
 
 /* Upcoming goes dark at desktop too, matching the player/Also Live above; ended-state rules can still override. */
 @media (min-width: 1280px) {
-  /* Asymmetric 32px/64px padding per design; horizontal padding is 0 since .sg-carousel handles centering. */
+  /* Symmetric 32px top/bottom padding per design; horizontal padding is 0 since .sg-carousel handles centering. */
   .sb-carousel-section--up-next {
-    padding: var(--s2a-spacing-xl, 32px) 0 var(--s2a-spacing-4xl, 64px);
+    padding: var(--s2a-spacing-xl, 32px) 0;
     background: var(--s2a-color-gray-1000, #000);
   }
 

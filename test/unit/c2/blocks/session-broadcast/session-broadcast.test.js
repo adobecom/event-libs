@@ -2,9 +2,10 @@ import { expect } from '@esm-bundle/chai';
 import init, { parseBroadcastConfig, observeFillHeight } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
 import { sessionsStatus } from '../../../../../event-libs/v1/utils/session-store.js';
 
-// "Session ended image" supports two authoring styles (see extractSessionEndedImageUrl's
-// comment): a link to the image asset, or an embedded picture. The fixture builds a real
-// anchor for that row by default; embedded-picture authoring gets its own test below.
+// Every "session ended image ..." row (the four breakpoint-specific ones, plus the legacy
+// unsuffixed one) supports two authoring styles (see extractImageUrl's comment): a link to the
+// image asset, or an embedded picture. The fixture builds a real anchor for those rows by
+// default; embedded-picture authoring gets its own test below.
 function block(rows) {
   const el = document.createElement('div');
   el.className = 'session-broadcast';
@@ -13,7 +14,7 @@ function block(rows) {
     const k = document.createElement('div');
     k.textContent = key;
     const v = document.createElement('div');
-    if (key === 'Session ended image') {
+    if (key.toLowerCase().startsWith('session ended image')) {
       const a = document.createElement('a');
       a.href = value;
       a.textContent = 'image';
@@ -34,12 +35,14 @@ describe('parseBroadcastConfig', () => {
       alsoLiveTitle: 'Currently Live',
       upcomingTitle: 'Upcoming',
       viewAllDetailsLabel: 'View all details',
-      sessionEndedImageUrl: '',
-      sessionEndedImageUrlLarge: '',
+      sessionEndedImageUrlMobile: '',
+      sessionEndedImageUrlTablet: '',
+      sessionEndedImageUrlDesktop: '',
+      sessionEndedImageUrlDesktopXl: '',
     });
   });
 
-  it('picks up all four authored rows', () => {
+  it('picks up the title/label rows plus the legacy image row', () => {
     const config = parseBroadcastConfig(block([
       ['Also live title', 'Live Now'],
       ['Upcoming title', 'Coming Up'],
@@ -49,13 +52,134 @@ describe('parseBroadcastConfig', () => {
     expect(config.alsoLiveTitle).to.equal('Live Now');
     expect(config.upcomingTitle).to.equal('Coming Up');
     expect(config.viewAllDetailsLabel).to.equal('See more');
-    expect(config.sessionEndedImageUrl).to.include('ended.png');
+    expect(config.sessionEndedImageUrlMobile).to.include('ended.png');
+    expect(config.sessionEndedImageUrlTablet).to.include('ended.png');
+    expect(config.sessionEndedImageUrlDesktop).to.include('ended.png');
+    expect(config.sessionEndedImageUrlDesktopXl).to.include('ended.png');
   });
 
   it('falls back to the default for any row left unauthored, independently of the others', () => {
     const config = parseBroadcastConfig(block([['Also live title', 'Live Now']]));
     expect(config.alsoLiveTitle).to.equal('Live Now');
     expect(config.upcomingTitle).to.equal('Upcoming');
+  });
+
+  describe('four breakpoint-specific "session ended image" rows', () => {
+    it('reads each of the four rows independently when all are authored', () => {
+      const config = parseBroadcastConfig(block([
+        ['Session ended image mobile', 'https://example.com/mobile.png'],
+        ['Session ended image tablet', 'https://example.com/tablet.png'],
+        ['Session ended image desktop', 'https://example.com/desktop.png'],
+        ['Session ended image desktop xl', 'https://example.com/desktop-xl.png'],
+      ]));
+      expect(config.sessionEndedImageUrlMobile).to.equal('https://example.com/mobile.png');
+      expect(config.sessionEndedImageUrlTablet).to.equal('https://example.com/tablet.png');
+      expect(config.sessionEndedImageUrlDesktop).to.equal('https://example.com/desktop.png');
+      expect(config.sessionEndedImageUrlDesktopXl).to.equal('https://example.com/desktop-xl.png');
+    });
+
+    // Real DA-authored markup: each row is a bare <picture> (no wrapping <a>), with a width=750
+    // <img> fallback plus width=2000 <source>s. Desktop tiers pick the width=2000 source, then
+    // strip its optimization query params entirely (the optimized rendition looked pixelated) —
+    // mobile keeps DA's optimized width=750 default, query params and all.
+    it('picks the widest source for desktop/desktop xl and strips its query params; mobile keeps the optimized default', () => {
+      const el = document.createElement('div');
+      el.innerHTML = `
+        <div><div>Session ended image mobile</div>
+          <div>
+            <picture>
+              <source type="image/webp" srcset="./media-a.png?width=2000&format=webply&optimize=medium" media="(min-width: 600px)">
+              <source type="image/webp" srcset="./media-a.png?width=750&format=webply&optimize=medium">
+              <source type="image/png" srcset="./media-a.png?width=2000&format=png&optimize=medium" media="(min-width: 600px)">
+              <img loading="lazy" alt="" src="./media-a.png?width=750&format=png&optimize=medium" width="750" height="1334">
+            </picture>
+          </div>
+        </div>
+        <div><div>Session ended image desktop</div>
+          <div>
+            <picture>
+              <source type="image/webp" srcset="./media-b.png?width=2000&format=webply&optimize=medium" media="(min-width: 600px)">
+              <source type="image/webp" srcset="./media-b.png?width=750&format=webply&optimize=medium">
+              <source type="image/png" srcset="./media-b.png?width=2000&format=png&optimize=medium" media="(min-width: 600px)">
+              <img loading="lazy" alt="" src="./media-b.png?width=750&format=png&optimize=medium" width="1440" height="620">
+            </picture>
+          </div>
+        </div>
+        <div><div>Session ended image desktop xl</div>
+          <div>
+            <picture>
+              <source type="image/webp" srcset="./media-c.png?width=2000&format=webply&optimize=medium" media="(min-width: 600px)">
+              <source type="image/webp" srcset="./media-c.png?width=750&format=webply&optimize=medium">
+              <source type="image/png" srcset="./media-c.png?width=2000&format=png&optimize=medium" media="(min-width: 600px)">
+              <img loading="lazy" alt="" src="./media-c.png?width=750&format=png&optimize=medium" width="1920" height="666">
+            </picture>
+          </div>
+        </div>`;
+      const config = parseBroadcastConfig(el);
+      expect(config.sessionEndedImageUrlMobile).to.include('media-a.png').and.to.include('width=750');
+      expect(config.sessionEndedImageUrlDesktop).to.match(/\/media-b\.png$/);
+      expect(config.sessionEndedImageUrlDesktopXl).to.match(/\/media-c\.png$/);
+    });
+
+    it('backfills a missing tier from its nearest authored neighbor', () => {
+      // Only mobile + desktop authored — tablet (distance 1 from both) prefers the smaller
+      // neighbor, desktop xl (distance 1 from desktop only) takes desktop's image.
+      const config = parseBroadcastConfig(block([
+        ['Session ended image mobile', 'https://example.com/mobile.png'],
+        ['Session ended image desktop', 'https://example.com/desktop.png'],
+      ]));
+      expect(config.sessionEndedImageUrlMobile).to.equal('https://example.com/mobile.png');
+      expect(config.sessionEndedImageUrlTablet).to.equal('https://example.com/mobile.png');
+      expect(config.sessionEndedImageUrlDesktop).to.equal('https://example.com/desktop.png');
+      expect(config.sessionEndedImageUrlDesktopXl).to.equal('https://example.com/desktop.png');
+    });
+
+    it('backfills every tier from a single authored image', () => {
+      const config = parseBroadcastConfig(block([
+        ['Session ended image desktop', 'https://example.com/desktop.png'],
+      ]));
+      expect(config.sessionEndedImageUrlMobile).to.equal('https://example.com/desktop.png');
+      expect(config.sessionEndedImageUrlTablet).to.equal('https://example.com/desktop.png');
+      expect(config.sessionEndedImageUrlDesktop).to.equal('https://example.com/desktop.png');
+      expect(config.sessionEndedImageUrlDesktopXl).to.equal('https://example.com/desktop.png');
+    });
+
+    // The optimization-stripping policy is applied by destination tier, not by wherever the
+    // final URL actually came from — so a backfilled value is reformatted for the slot it lands
+    // in, not left in whatever shape its origin tier used.
+    it('applies each tier\'s optimization policy to a value borrowed via backfill', () => {
+      const el = document.createElement('div');
+      el.innerHTML = `
+        <div><div>Session ended image mobile</div>
+          <div><a href="https://example.com/mobile.png?width=750&format=png&optimize=medium">image</a></div>
+        </div>`;
+      const config = parseBroadcastConfig(el);
+      // Tablet/desktop/desktop-xl all borrow mobile's image, but strip its query params anyway.
+      expect(config.sessionEndedImageUrlMobile).to.equal('https://example.com/mobile.png?width=750&format=png&optimize=medium');
+      expect(config.sessionEndedImageUrlTablet).to.equal('https://example.com/mobile.png');
+      expect(config.sessionEndedImageUrlDesktop).to.equal('https://example.com/mobile.png');
+      expect(config.sessionEndedImageUrlDesktopXl).to.equal('https://example.com/mobile.png');
+    });
+
+    it('falls back to the legacy single row when none of the four are authored', () => {
+      const config = parseBroadcastConfig(block([
+        ['Session ended image', 'https://example.com/legacy.png'],
+      ]));
+      expect(config.sessionEndedImageUrlMobile).to.equal('https://example.com/legacy.png');
+      expect(config.sessionEndedImageUrlTablet).to.equal('https://example.com/legacy.png');
+      expect(config.sessionEndedImageUrlDesktop).to.equal('https://example.com/legacy.png');
+      expect(config.sessionEndedImageUrlDesktopXl).to.equal('https://example.com/legacy.png');
+    });
+
+    it('prefers the four new rows over the legacy row when both are authored', () => {
+      const config = parseBroadcastConfig(block([
+        ['Session ended image', 'https://example.com/legacy.png'],
+        ['Session ended image mobile', 'https://example.com/mobile.png'],
+      ]));
+      expect(config.sessionEndedImageUrlMobile).to.equal('https://example.com/mobile.png');
+      // No other new row authored, so the rest backfill from mobile, not from the legacy row.
+      expect(config.sessionEndedImageUrlDesktopXl).to.equal('https://example.com/mobile.png');
+    });
   });
 
   it('also accepts "Session ended image" authored as an embedded picture, not just a link', () => {
@@ -72,14 +196,15 @@ describe('parseBroadcastConfig', () => {
     row.append(label, value);
     el.append(row);
 
-    expect(parseBroadcastConfig(el).sessionEndedImageUrl).to.equal('https://example.com/ended.png');
+    expect(parseBroadcastConfig(el).sessionEndedImageUrlMobile).to.equal('https://example.com/ended.png');
   });
 
-  // sessionEndedImageUrlLarge is read from an authored <picture>'s own <source>s, if any exist
-  // alongside the row's link (DA's "linked image" convention nests a <picture> inside the <a>,
-  // so a link and a picture aren't mutually exclusive) — never rendered back into the page, only
-  // read for a URL string, so this can't reintroduce the decorateImageLinks() collision bug.
-  describe('sessionEndedImageUrlLarge (bigger source from an authored <picture>)', () => {
+  // The legacy row's larger tablet+ source is read from an authored <picture>'s own <source>s,
+  // if any exist alongside the row's link (DA's "linked image" convention nests a <picture>
+  // inside the <a>, so a link and a picture aren't mutually exclusive) — never rendered back
+  // into the page, only read for a URL string, so this can't reintroduce the
+  // decorateImageLinks() collision bug. Only exercised when none of the four new rows exist.
+  describe('legacy "session ended image" row (bigger source from an authored <picture>)', () => {
     function blockWithPicture(sourceWidths) {
       const el = block([['Session ended image', 'https://example.com/ended.png']]);
       const valueEl = el.querySelector('div:last-child div:last-child');
@@ -95,17 +220,17 @@ describe('parseBroadcastConfig', () => {
       return el;
     }
 
-    it('picks the source with the largest width= value', () => {
+    it('picks a source and strips its optimization query params', () => {
       const config = parseBroadcastConfig(blockWithPicture([750, 2000, 1200]));
-      expect(config.sessionEndedImageUrlLarge).to.include('width=2000');
+      expect(config.sessionEndedImageUrlTablet).to.equal('https://example.com/ended.png');
     });
 
-    it('is empty when no picture was authored at all', () => {
+    it('falls back to the row\'s own URL for tablet+ when no picture was authored at all', () => {
       const config = parseBroadcastConfig(block([['Session ended image', 'https://example.com/ended.png']]));
-      expect(config.sessionEndedImageUrlLarge).to.equal('');
+      expect(config.sessionEndedImageUrlTablet).to.equal('https://example.com/ended.png');
     });
 
-    it('is empty when the picture has no <source> elements (e.g. img-only fallback)', () => {
+    it('falls back to the row\'s own URL when the picture has no <source> elements (e.g. img-only fallback)', () => {
       const el = block([['Session ended image', 'https://example.com/ended.png']]);
       const valueEl = el.querySelector('div:last-child div:last-child');
       const picture = document.createElement('picture');
@@ -113,12 +238,12 @@ describe('parseBroadcastConfig', () => {
       img.src = 'https://example.com/ended.png';
       picture.append(img);
       valueEl.querySelector('a').append(picture);
-      expect(parseBroadcastConfig(el).sessionEndedImageUrlLarge).to.equal('');
+      expect(parseBroadcastConfig(el).sessionEndedImageUrlTablet).to.equal('https://example.com/ended.png');
     });
 
     it('does not crash and picks a source even when none carry a width= value', () => {
       const config = parseBroadcastConfig(blockWithPicture([0, 0]));
-      expect(config.sessionEndedImageUrlLarge).to.include('ended.png');
+      expect(config.sessionEndedImageUrlTablet).to.include('ended.png');
     });
 
     // Real markup pulled directly from a live DA page (no <a> wraps the picture on this one —
@@ -138,20 +263,20 @@ describe('parseBroadcastConfig', () => {
           </div>
         </div>`;
       const config = parseBroadcastConfig(el);
-      expect(config.sessionEndedImageUrl).to.include('width=750'); // unchanged: <img> fallback, no <a> in this row
-      expect(config.sessionEndedImageUrlLarge).to.include('width=2000');
+      expect(config.sessionEndedImageUrlMobile).to.include('width=750'); // unchanged: <img> fallback, no <a> in this row
+      expect(config.sessionEndedImageUrlTablet).to.match(/\/media\.jpg$/); // widest source, query params stripped
     });
 
     // The real bug: source.srcset (unlike a.href/img.src) is NEVER auto-resolved to an absolute
     // URL by the browser — DA authors relative paths ("./image.jpg"), and that relative string
     // would otherwise leak straight into BroadcastApp.js's safeUrl() check (which requires an
     // absolute http(s):// or root-relative URL) and get silently dropped, which is exactly what
-    // was observed live: sessionEndedImageUrlLarge correctly IDENTIFIED the right source by width
-    // but never RESOLVED it, so it never actually made it into --sb-app-ended-bg-lg. Asserting
-    // the exact resolved value here, not just a substring match, so this can't regress silently
-    // again the way the previous "real markup" test above did (it only checked `.include`, which
-    // stayed true even for the unresolved relative string).
-    it('resolves a relative srcset path to an absolute URL', () => {
+    // was observed live: the legacy large-source lookup correctly IDENTIFIED the right source by
+    // width but never RESOLVED it, so it never actually made it into --sb-app-ended-bg-tablet.
+    // Asserting the exact resolved (and stripped) value here, not just a substring match, so this
+    // can't regress silently again the way the previous "real markup" test above did (it only
+    // checked `.include`, which stayed true even for the unresolved relative string).
+    it('resolves a relative srcset path to an absolute URL, then strips its query params', () => {
       const el = document.createElement('div');
       el.innerHTML = `
         <div><div>Session ended image</div>
@@ -163,10 +288,10 @@ describe('parseBroadcastConfig', () => {
           </div>
         </div>`;
       const config = parseBroadcastConfig(el);
-      expect(config.sessionEndedImageUrlLarge).to.equal(
-        new URL('./media.jpg?width=2000&format=webply&optimize=medium', document.baseURI).href,
-      );
-      expect(config.sessionEndedImageUrlLarge).to.match(/^https?:\/\//);
+      const resolved = new URL('./media.jpg?width=2000&format=webply&optimize=medium', document.baseURI);
+      resolved.search = '';
+      expect(config.sessionEndedImageUrlTablet).to.equal(resolved.href);
+      expect(config.sessionEndedImageUrlTablet).to.match(/^https?:\/\//);
     });
   });
 });

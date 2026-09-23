@@ -154,13 +154,19 @@ export function BroadcastBody({ config }) {
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
     && !schedule.pendingCandidates?.length && !schedule.alsoLive.length && !schedule.upNext.length;
 
-  // Feeds .sb-app:has(.sb-ended) in the CSS; --sb-app-ended-bg-lg falls back to --sb-app-ended-bg.
+  // Feeds .sb-app:has(.sb-ended) in the CSS — one background var per breakpoint tier; each
+  // media query there already picks the matching var, with a fallback chain down to mobile.
   const endedActive = !schedule.activeSession && !!schedule.endedSession;
-  const endedBgUrl = endedActive ? safeUrl(config.sessionEndedImageUrl) : '';
-  const endedBgUrlLarge = endedActive ? safeUrl(config.sessionEndedImageUrlLarge) : '';
-  const appStyle = endedBgUrl
-    ? `--sb-app-ended-bg: url("${endedBgUrl}");${endedBgUrlLarge ? ` --sb-app-ended-bg-lg: url("${endedBgUrlLarge}");` : ''}`
-    : '';
+  const endedBgVars = endedActive ? {
+    '--sb-app-ended-bg-mobile': safeUrl(config.sessionEndedImageUrlMobile),
+    '--sb-app-ended-bg-tablet': safeUrl(config.sessionEndedImageUrlTablet),
+    '--sb-app-ended-bg-desktop': safeUrl(config.sessionEndedImageUrlDesktop),
+    '--sb-app-ended-bg-desktop-xl': safeUrl(config.sessionEndedImageUrlDesktopXl),
+  } : {};
+  const appStyle = Object.entries(endedBgVars)
+    .filter(([, url]) => url)
+    .map(([name, url]) => `${name}: url("${url}")`)
+    .join(';');
 
   return html`
     <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')} style=${appStyle}>
