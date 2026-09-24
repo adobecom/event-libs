@@ -128,18 +128,6 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
-@media (width <= 767px) {
-  .upcoming-sessions-header {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .upcoming-sessions-controls {
-    margin-right: 0;
-  }
-}
-
 .upcoming-sessions-arrow--prev {
   transform: rotate(180deg);
 }
