@@ -9,6 +9,23 @@ function clearStore() {
   getEntries().forEach((entry) => removeEntry(entry.rfCode));
 }
 
+// Same-origin, genuinely loadable asset — unlike an https://example.com/... URL (blocked by
+// the test harness's no-external-network rule), this actually loads, so tests using it exercise
+// a real successful <img>, not a load that was always going to fail anyway.
+const REAL_THUMBNAIL_URL = '/test/unit/features/icons/mocks/federal/federal/assets/svgs/creative-cloud-64.svg';
+
+// Polls instead of a fixed sleep for an async fetch (e.g. fetchFederalTrackIcon) to resolve
+// and update the DOM — a fixed wait is either too short under a loaded CI machine (flaky) or
+// wastefully long otherwise.
+async function waitFor(predicate, { timeout = 1000, interval = 10 } = {}) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => { setTimeout(resolve, interval); });
+  }
+  throw new Error('waitFor: condition never became true');
+}
+
 describe('notification-widget', () => {
   let mountPoint;
 
@@ -200,9 +217,24 @@ describe('notification-widget', () => {
     // Real mouse/CDP-driven hover simulation (sendMouse) is too flaky under full-suite
     // concurrent test execution (CDP command contention across many parallel browser
     // sessions) to assert real-time delay behavior reliably, so this reads the actual
-    // CSSOM rule instead of simulating :hover.
-    function findHoverRule() {
-      const sheet = [...document.styleSheets].find((s) => s.href?.includes('notification-widget.css'));
+    // CSSOM rule instead of simulating :hover. loadStyle()'s <link> is fetched
+    // asynchronously, so document.styleSheets may not have parsed it yet the moment this
+    // describe block runs — poll until it has, rather than racing it.
+    async function loadedStylesheet() {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const sheet = [...document.styleSheets].find((s) => s.href?.includes('notification-widget.css'));
+        if (sheet) {
+          try {
+            if (sheet.cssRules.length) return sheet;
+          } catch { /* not yet parsed */ }
+        }
+        await new Promise((resolve) => { setTimeout(resolve, 20); });
+      }
+      throw new Error('notification-widget.css never became queryable via document.styleSheets');
+    }
+
+    async function findHoverRule() {
+      const sheet = await loadedStylesheet();
       const mediaRule = [...sheet.cssRules].find((rule) => rule instanceof CSSMediaRule);
       return [...mediaRule.cssRules].find((rule) => rule.selectorText.includes(':hover'));
     }
@@ -217,18 +249,19 @@ describe('notification-widget', () => {
       expect(tooltip().hidden).to.equal(true);
     });
 
-    it('is hidden by default via a visibility transition, not display, so a delay can apply', () => {
+    it('is hidden by default via a visibility transition, not display, so a delay can apply', async () => {
+      await loadedStylesheet();
       expect(getComputedStyle(tooltip()).visibility).to.equal('hidden');
     });
 
-    it('shows the tooltip only after a 2s hover/focus-visible delay', () => {
-      const rule = findHoverRule();
+    it('shows the tooltip only after a 2s hover/focus-visible delay', async () => {
+      const rule = await findHoverRule();
       expect(rule.style.visibility).to.equal('visible');
       expect(rule.style.transitionDelay).to.equal('2s');
     });
 
-    it('has no delay on the base (hidden) state, so leaving hover hides it immediately', () => {
-      const sheet = [...document.styleSheets].find((s) => s.href?.includes('notification-widget.css'));
+    it('has no delay on the base (hidden) state, so leaving hover hides it immediately', async () => {
+      const sheet = await loadedStylesheet();
       const baseRule = [...sheet.cssRules].find((rule) => rule.selectorText === '.swan-notif__tooltip');
       expect(baseRule.style.transitionDelay).to.equal('0s');
     });
@@ -392,21 +425,30 @@ describe('notification-widget', () => {
 
     it('swaps in the resolved track icon once fetchFederalTrackIcon resolves', async () => {
       addEntry('RF-1', { stage: 'reminder', title: 'First', trackIconName: 'branding' });
-      await new Promise((resolve) => { setTimeout(resolve, 100); });
-      const svg = icon().querySelector('svg');
-      expect(svg.classList.contains('icon-federal-branding')).to.equal(true);
+      await waitFor(() => icon().querySelector('svg.icon-federal'));
+      expect(icon().querySelector('svg').classList.contains('icon-federal-branding')).to.equal(true);
     });
 
     it('leaves SESSION_ICON_FALLBACK in place when the named track icon does not resolve', async () => {
       addEntry('RF-1', { stage: 'reminder', title: 'First', trackIconName: 'does-not-exist-anywhere' });
-      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      await new Promise((resolve) => { setTimeout(resolve, 250); });
       expect(icon().querySelector('svg.icon-federal')).to.equal(null);
     });
 
-    it('never renders a placeholder at all when the row has a real iconUrl', () => {
+    it('renders the thumbnail immediately, then swaps to the track icon once it resolves, since track icon wins', async () => {
       addEntry('RF-1', {
-        stage: 'reminder', title: 'First', iconUrl: 'https://example.com/thumb.png', trackIconName: 'branding',
+        stage: 'reminder', title: 'First', iconUrl: REAL_THUMBNAIL_URL, trackIconName: 'branding',
       });
+      expect(icon().tagName).to.equal('IMG');
+      await waitFor(() => icon().querySelector('svg.icon-federal'));
+      expect(icon().querySelector('svg').classList.contains('icon-federal-branding')).to.equal(true);
+    });
+
+    it('keeps the thumbnail when the named track icon does not resolve', async () => {
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', iconUrl: REAL_THUMBNAIL_URL, trackIconName: 'does-not-exist-anywhere',
+      });
+      await new Promise((resolve) => { setTimeout(resolve, 250); });
       expect(icon().tagName).to.equal('IMG');
     });
   });
@@ -434,6 +476,27 @@ describe('notification-widget', () => {
       addEntry('RF-2', { stage: 'live', title: 'Second' }); // rebuilds the whole list
       expect(() => staleImg.dispatchEvent(new Event('error'))).to.not.throw();
       expect(staleImg.isConnected).to.equal(false);
+    });
+
+    it('still upgrades to the track icon after falling back to the MAX badge, once the fetch resolves', async () => {
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', iconUrl: 'https://example.com/broken.png', trackIconName: 'branding',
+      });
+      icon().dispatchEvent(new Event('error'));
+      expect(icon().classList.contains('swan-notif__icon--placeholder')).to.equal(true);
+      await waitFor(() => icon().querySelector('svg.icon-federal'));
+      expect(icon().querySelector('svg').classList.contains('icon-federal-branding')).to.equal(true);
+    });
+
+    it('does not let a late thumbnail error undo an already-resolved track icon', async () => {
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', iconUrl: REAL_THUMBNAIL_URL, trackIconName: 'branding',
+      });
+      const img = icon();
+      await waitFor(() => icon().querySelector('svg.icon-federal-branding'));
+      expect(icon().querySelector('svg.icon-federal-branding')).to.not.equal(null);
+      expect(() => img.dispatchEvent(new Event('error'))).to.not.throw();
+      expect(icon().querySelector('svg.icon-federal-branding')).to.not.equal(null);
     });
   });
 });
