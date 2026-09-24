@@ -169,8 +169,6 @@ describe('services/sessions/rainfocus', () => {
       expect(error).to.be.an('error');
     });
 
-    // MWPW-207006: session-actions.js's toggleScheduleAction relies on this specific type
-    // to distinguish "RF says not registered" from any other write failure.
     it('rejects with RfAccessError on insufficient-access responseCode', async () => {
       stubFetch({ responseCode: '27', responseMessage: 'You must be registered...' });
       let error;

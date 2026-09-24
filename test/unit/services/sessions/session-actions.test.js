@@ -39,9 +39,6 @@ describe('services/sessions/session-actions', () => {
       expect(() => assertAuthorized()).to.not.throw();
     });
 
-    // MWPW-207006: post-event, favorite/schedule only require sign-in, not registration —
-    // isPostEvent() (session-state.js) is the same post-event switch action-feedback.js's
-    // fallbackViewForUnauthorized() already uses.
     it('does not throw when logged in but unregistered, once every session has ended (post-event)', () => {
       auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
       sessions.value = [
@@ -60,9 +57,6 @@ describe('services/sessions/session-actions', () => {
     });
   });
 
-  // Exercises the real toggleSchedule() -> rainfocus.js network path, so session-store.js's
-  // module-private eventApiConfig needs to be populated via a real initSessionState() first —
-  // no other file in this suite touches that path, see the comment on the fetch stub below.
   describe('toggleScheduleAction — RF responseCode 27 (MWPW-207006)', () => {
     let sandbox;
 
@@ -80,9 +74,6 @@ describe('services/sessions/session-actions', () => {
         return { ok: true, json: async () => ({}) };
       });
       initSessionState();
-      // loadSessions() batches sessions.value/sessionsStatus.value together once the
-      // (stubbed, empty) catalog fetch resolves — poll status rather than the array length,
-      // since the stub deliberately returns an empty catalog.
       await new Promise((resolve) => {
         const check = () => (sessionsStatus.value === 'ready' ? resolve() : setTimeout(check));
         check();

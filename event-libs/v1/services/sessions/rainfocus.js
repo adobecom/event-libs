@@ -60,9 +60,7 @@ async function rawFetch(rfApiUrl, endpoint, params) {
   return resp.json();
 }
 
-// Distinguishes "RF rejected this for lack of registration" (MWPW-207006) from every
-// other write failure, so callers can show a registration prompt instead of a generic
-// error toast.
+// Distinguishes RF's not-registered rejection from other write failures.
 export class RfAccessError extends Error {
   constructor(message) {
     super(message);

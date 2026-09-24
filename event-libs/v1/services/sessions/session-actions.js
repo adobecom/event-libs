@@ -31,8 +31,7 @@ function findScheduleConflict(incoming, allSessions, scheduledIds) {
 }
 
 // Exported so action-feedback.js's checkViewAccess() can reuse the same check.
-// Post-event (MWPW-207006): registration no longer gates favorite/schedule — signed-in
-// is sufficient, matching checkViewAccess's own fallbackViewForUnauthorized() switch.
+// Post-event, signed-in is enough — registration no longer gates these actions.
 export function assertAuthorized() {
   const { isLoggedIn, isRegistered } = auth.value;
   if (isLoggedIn !== true) throw new SessionActionError('auth-required');
@@ -54,10 +53,7 @@ export async function toggleScheduleAction(session, { showConflictModal = false 
   try {
     await toggleSchedule(session);
   } catch (err) {
-    // RF's own truth can still disagree with our client-side check (e.g. registration
-    // cache staleness, a mid-session registration change) — responseCode 27 means RF
-    // itself rejected this for lack of registration, so surface the same registration
-    // prompt as assertAuthorized() would, not a generic failure toast.
+    // RF can still reject as unregistered even if our own check passed.
     if (err instanceof RfAccessError) throw new SessionActionError('registration-required');
     throw new SessionActionError('network', { cause: err });
   }

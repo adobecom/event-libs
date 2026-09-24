@@ -2,14 +2,8 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
-// MWPW-207006: window.events.getRegistrationDetails() (da-events' registration-cache.js) is
-// now the primary source of both isRegistered and the RF auth token, replacing the /max-api/jwt
-// exchange as the default. The exchange itself stays in session-store.js as a fallback for pages
-// missing da-events' event-code metadata (see the dependency note in the MWPW-207006 plan doc).
-//
-// session-store.js holds module-level singleton state (initialized, eventApiConfig, etc.) that
-// @web/test-runner does not reliably reset between test files sharing a worker session — each
-// describe block below cache-busts its own import so it gets a fresh instance regardless.
+// session-store.js's module state isn't reliably reset between test files sharing a worker —
+// each test below cache-busts its own import to get a fresh instance.
 
 const EMPTY_CATALOG_RESPONSE = { sessions: [], sessionTimes: [], speakers: [] };
 
@@ -49,16 +43,14 @@ describe('session-store: window.events.getRegistrationDetails (MWPW-207006)', ()
     window.fetch = originalFetch;
     delete window.events;
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
-    // BlockMediator is a real, shared singleton across test files (unlike session-store.js's
-    // cache-busted copy) — reset so this profile doesn't leak into whichever test runs next.
+    // BlockMediator is a real shared singleton — reset so it doesn't leak into the next test.
     BlockMediator.set('imsProfile', undefined);
   });
 
   it('primary path: sources isRegistered and rfAuthToken from window.events, never calls /max-api/jwt', async () => {
     const store = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
-    // loggedInUser is deliberately empty — the legacy heuristic would read this as
-    // isRegistered:false, so a passing "isRegistered:true" here proves the real signal won,
-    // not a coincidence of both paths agreeing.
+    // Empty loggedInUser: the legacy heuristic would read this as false, so a passing true here
+    // proves the real signal won.
     const fetchState = stubFetch({ myDataResponse: { mySchedule: [], sessionInterests: [], loggedInUser: {} } });
     window.events = {
       getRegistrationDetails: () => Promise.resolve({ isRegistered: true, authToken: 'events-api-token', userKey: 'uk-1' }),
@@ -80,7 +72,6 @@ describe('session-store: window.events.getRegistrationDetails (MWPW-207006)', ()
     const fetchState = stubFetch({
       myDataResponse: { mySchedule: [], sessionInterests: [], loggedInUser: { firstName: 'Test' } },
     });
-    // window.events intentionally not set.
 
     BlockMediator.set('imsProfile', { first_name: 'Test', account_type: 'type1', userId: 'user-2' });
     setMetadata('tier-1-event-config', JSON.stringify({ rfApiUrl: 'https://mock.example/api' }));
@@ -92,13 +83,9 @@ describe('session-store: window.events.getRegistrationDetails (MWPW-207006)', ()
     expect(store.auth.value.isRegistered).to.be.true;
   });
 
-  // Reproduced live on broadcast-dev (2026-09): da-events' own cache can answer isRegistered
-  // from localStorage while its sessionStorage-scoped auth cache is stale/missing, so
-  // getRegistrationDetails() resolves successfully with no authToken at all.
   it('fallback: isRegistered resolves but no authToken comes with it — falls back to the jwt exchange for the credential only, keeping the real isRegistered', async () => {
     const store = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
-    // loggedInUser is deliberately empty — if the legacy heuristic were allowed to overwrite
-    // isRegistered once the fallback jwt/myData completes, this would flip it to false.
+    // Empty loggedInUser: proves the fallback jwt/myData path doesn't overwrite isRegistered.
     const fetchState = stubFetch({ myDataResponse: { mySchedule: [], sessionInterests: [], loggedInUser: {} } });
     window.events = { getRegistrationDetails: () => Promise.resolve({ isRegistered: true }) };
 
