@@ -203,8 +203,8 @@ describe('notification-widget', () => {
       expect(bell().nextElementSibling).to.equal(tooltip());
     });
 
-    it('is hidden inline at creation time, not only via the external stylesheet', () => {
-      expect(tooltip().style.display).to.equal('none');
+    it('is hidden natively at creation time, not only via the external stylesheet', () => {
+      expect(tooltip().hidden).to.equal(true);
     });
   });
 
