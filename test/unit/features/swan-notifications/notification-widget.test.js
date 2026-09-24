@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { mountNotificationWidget } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
+import { mountNotificationWidget, normalizeTimeCasing } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
 import {
   getEntries, removeEntry, upsertEntry,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
@@ -293,10 +293,58 @@ describe('notification-widget', () => {
       expect(timeLines[0].textContent).to.include('Oct');
     });
 
+    it('formats the start-time line without a day-of-week and with a comma separator', () => {
+      const startTimeMs = Date.parse('2026-10-28T16:00:00.000Z');
+      const endTimeMs = Date.parse('2026-10-28T17:00:00.000Z');
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', startTimeMs, endTimeMs,
+      });
+      const text = rows()[0].querySelectorAll('.swan-notif__time')[0].textContent;
+      // No day-of-week token and no "·" separator (was '{ddd}, {LLL} {dd} · ...').
+      expect(text).to.not.match(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),/);
+      expect(text).to.not.include('·');
+      // Date and time range are joined by ", " (from the template's literal comma).
+      expect(text).to.match(/^Oct \d{2}, /);
+      // Hours have no leading zero and lowercase am/pm with no leading space (tz-independent).
+      expect(text).to.not.match(/\b0\d:/);
+      expect(text).to.not.match(/\s(AM|PM)\b/);
+      expect(text).to.match(/(am|pm)\b/);
+    });
+
     it('does not show a start-time line for a live or on-demand row', () => {
       addEntry('RF-1', { stage: 'live', title: 'First' });
       const timeLines = rows()[0].querySelectorAll('.swan-notif__time');
       expect(timeLines).to.have.lengthOf(1); // relative "updated" time only
+    });
+  });
+
+  // Exercised on full '{LLL} {dd}, {timeRange} {timeZone}' strings (not just the time portion)
+  // so the leading-zero rule is proven not to touch the day-of-month number. Uses literal
+  // inputs because the rendered widget resolves the viewer's local timezone, which isn't
+  // deterministic across CI environments.
+  describe('normalizeTimeCasing', () => {
+    it('drops a leading zero on a single-digit hour and lowercases the meridiem on both times', () => {
+      expect(normalizeTimeCasing('Nov 10, 06:00 AM - 08:00 AM PST'))
+        .to.equal('Nov 10, 6:00am - 8:00am PST');
+    });
+
+    it('leaves an already-two-digit hour intact while still lowercasing the meridiem', () => {
+      expect(normalizeTimeCasing('Nov 10, 11:00 AM - 12:30 PM PST'))
+        .to.equal('Nov 10, 11:00am - 12:30pm PST');
+    });
+
+    it('does not strip a leading zero from the day-of-month number (e.g. "06")', () => {
+      // "06" here is the {dd} day-of-month, which must survive untouched — the hour rule
+      // only fires on a zero immediately followed by "H:MM".
+      const out = normalizeTimeCasing('Nov 06, 06:00 AM - 08:00 AM PST');
+      expect(out).to.equal('Nov 06, 6:00am - 8:00am PST');
+      expect(out).to.include('Nov 06,');
+    });
+
+    it('does not alter a year number that could appear in a custom template', () => {
+      // A leading-zero-free 4-digit year like "2026" must not be mangled.
+      expect(normalizeTimeCasing('Nov 06 2026, 06:00 AM PST'))
+        .to.equal('Nov 06 2026, 6:00am PST');
     });
   });
 
