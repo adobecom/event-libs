@@ -96,8 +96,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--s2a-spacing-xs) var(--s2a-spacing-md);
-  padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-md);
+  gap: var(--s2a-spacing-8, 8px);
+  /* Figma: collapsed "Up next" bar padding 9px top, 16px sides + bottom. */
+  padding: 9px var(--s2a-spacing-md) var(--s2a-spacing-md);
 }
 
 .session-video-playlist-wrapper {
