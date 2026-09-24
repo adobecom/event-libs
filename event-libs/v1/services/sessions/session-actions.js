@@ -1,6 +1,9 @@
 import {
-  auth, sessions, scheduled, pendingActions, toggleSchedule, toggleFavorite,
+  auth, sessions, scheduled, pendingActions, liveStreamActiveIds, toggleSchedule, toggleFavorite,
+  getEventApiConfig,
 } from '../../utils/session-store.js';
+import { isPostEvent, getNowMs } from '../../utils/session-state.js';
+import { RfAccessError } from './rainfocus.js';
 
 // Discriminated failure reason so callers can decide their own UI (toast copy,
 // login/register CTA, conflict modal) without this module knowing about any of it —
@@ -28,9 +31,13 @@ function findScheduleConflict(incoming, allSessions, scheduledIds) {
 }
 
 // Exported so action-feedback.js's checkViewAccess() can reuse the same check.
+// Post-event (MWPW-207006): registration no longer gates favorite/schedule — signed-in
+// is sufficient, matching checkViewAccess's own fallbackViewForUnauthorized() switch.
 export function assertAuthorized() {
   const { isLoggedIn, isRegistered } = auth.value;
   if (isLoggedIn !== true) throw new SessionActionError('auth-required');
+  const eventEndMs = getEventApiConfig()?.eventEndMs;
+  if (isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs)) return;
   if (isRegistered !== true) throw new SessionActionError('registration-required');
 }
 
@@ -47,6 +54,11 @@ export async function toggleScheduleAction(session, { showConflictModal = false 
   try {
     await toggleSchedule(session);
   } catch (err) {
+    // RF's own truth can still disagree with our client-side check (e.g. registration
+    // cache staleness, a mid-session registration change) — responseCode 27 means RF
+    // itself rejected this for lack of registration, so surface the same registration
+    // prompt as assertAuthorized() would, not a generic failure toast.
+    if (err instanceof RfAccessError) throw new SessionActionError('registration-required');
     throw new SessionActionError('network', { cause: err });
   }
 }

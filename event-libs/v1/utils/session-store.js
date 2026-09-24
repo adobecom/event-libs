@@ -55,6 +55,14 @@ let rfAuthTokenSettled = false;
 // cleanup (see reconcileSwanNotifications) so an empty `scheduled` before myData has loaded
 // is never mistaken for "the user has nothing scheduled."
 let scheduleKnown = false;
+// True once da-events' registration-cache.js (window.events.getRegistrationDetails)
+// has resolved isRegistered for us — gates loadMyData()'s own (weaker) fallback
+// heuristic so it never clobbers the real signal once it lands.
+let realRegistrationKnown = false;
+// Decided once, synchronously, in initSessionState(): whether resolveRegistrationAndAuth()
+// (da-events' API) owns rfAuthToken/isRegistered for this page load, or whether syncAuth()'s
+// legacy jwt exchange does. Demoted to false if the primary path fails outright.
+let useEventsApiForAuth = false;
 
 // The media-relay backend only has dev/stage/prod, so the finer-grained envs collapse.
 export function deriveMrEnv() {
@@ -70,7 +78,10 @@ function defaultRfApiUrlForEnv() {
   return isProd ? DEFAULT_RF_API_URL : STAGE_RF_API_URL;
 }
 
-// rfAuthTokenSettled gates maybeLoadMyData() so it can't fire mid-exchange with a null token.
+// Legacy fallback only (see resolveRegistrationAndAuth() below for the primary path) — kept
+// so a Tier 1 page missing da-events' event-code metadata (and therefore window.events) still
+// has some way to get an RF auth token. rfAuthTokenSettled gates maybeLoadMyData() so it can't
+// fire mid-exchange with a null token.
 async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
@@ -85,7 +96,8 @@ async function exchangeRfAuthToken(clientId) {
   maybeLoadMyData();
 }
 
-// isRegistered is not set here: rsvpData doesn't apply to T1 events. loadMyData() derives it.
+// isRegistered is not set here: rsvpData doesn't apply to T1 events. It comes from
+// resolveRegistrationAndAuth() (primary) or loadMyData() (legacy fallback) instead.
 function syncAuth() {
   const profile = BlockMediator.get('imsProfile');
   if (profile === undefined) return;
@@ -103,6 +115,15 @@ function syncAuth() {
   // (e.g. a later profile update) is harmless. Only feds mode has a local widget to mount —
   // unc mode relies entirely on gnav's own existing UNC-rendered bell.
   if (auth.value.isLoggedIn && getSwanMode() === 'feds') mountNotificationWidget();
+
+  if (useEventsApiForAuth) {
+    // rfAuthToken/isRegistered are resolveRegistrationAndAuth()'s job instead — but still
+    // give myData a chance to run now that isLoggedIn/realAuthConfirmed just settled, in case
+    // that call already resolved rfAuthTokenSettled before this profile arrived (order between
+    // the two isn't guaranteed either way).
+    maybeLoadMyData();
+    return;
+  }
   if (auth.value.isLoggedIn && profile.userId) {
     exchangeRfAuthToken(profile.userId);
   } else {
@@ -115,20 +136,65 @@ function syncAuth() {
   }
 }
 
+// Primary path (see useEventsApiForAuth): da-events' registration-cache.js (see
+// docs/registration-status-consumer-guide.md there) resolves a real isRegistered AND an RF
+// auth token from RF's rf-auth-seq-generic endpoint in one round trip, replacing the jwt
+// exchange above as the default. It does its own IMS-ready wait internally and calls
+// adobeIMS.getProfile() directly, so unlike exchangeRfAuthToken() this never depends on
+// imsProfile/profile.userId (sidesteps profile.js's getProfile() fallback-chain bug as a side
+// effect — see not-tracked/profile-js-partial-profile-bug.md, not fixed here).
+// userKey from the response is unused: it's only meaningful against the separate
+// /events/api/rf-favorites endpoint, which this codebase doesn't call — our own
+// addSession/removeSession/toggleSessionInterest/fetchMyData only need rfAuthToken.
+// Confirmed live (2026-09) that RF accepts this token for our own /max-api/* write calls
+// exactly like a token from exchangeRfAuthToken() would: same responseCode on success,
+// same responseCode 27 rejection for an unregistered user attempting to schedule.
+async function resolveRegistrationAndAuth() {
+  try {
+    const { isRegistered, authToken } = await window.events.getRegistrationDetails();
+    realRegistrationKnown = true;
+    auth.value = { ...auth.value, isRegistered };
+    if (authToken) {
+      rfAuthToken = authToken;
+      rfAuthTokenSettled = true;
+      maybeLoadMyData();
+      return;
+    }
+    // isRegistered resolved for real, but no usable RF credential came with it — e.g. its
+    // own IMS access-token check happened to be stale the moment its cache was read (see the
+    // consumer guide's cache-layer notes). Demote to the legacy jwt exchange for the
+    // credential only; realRegistrationKnown stays true above, so loadMyData()'s own weaker
+    // heuristic won't clobber the isRegistered we already have once that exchange completes.
+  } catch (err) {
+    // The primary path failed outright (network error, RF outage) — demote to the legacy
+    // jwt exchange rather than leaving rfAuthToken/isRegistered permanently unresolved.
+    // realRegistrationKnown stays false here, so loadMyData()'s own fallback heuristic still
+    // gets a chance to answer isRegistered once the legacy exchange completes.
+    logError('session-store,registration-cache', 'window.events.getRegistrationDetails failed', err);
+  }
+  useEventsApiForAuth = false;
+  syncAuth();
+}
+
 // RF's own objects, not bare ids: schedule keys on sessionTimeID, favorites on sessionID.
 function mapToSessionIds(entries, idField, matchField) {
   const idByRf = new Map(sessions.value.map((s) => [s[matchField], s.id]));
   return (entries || []).map((entry) => idByRf.get(entry[idField])).filter(Boolean);
 }
 
-// Needs the catalog loaded for mapToSessionIds(). isRegistered comes from loggedInUser.
+// Needs the catalog loaded for mapToSessionIds(). isRegistered comes from loggedInUser —
+// a weaker signal than resolveRegistrationAndAuth() above (only proves the identity
+// exists in RF, not that it's registered for the event), so it never overwrites a real
+// answer that's already landed; see realRegistrationKnown.
 async function loadMyData() {
   try {
     const data = await fetchMyData(rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     batch(() => {
       scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode'));
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
-      auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
+      if (!realRegistrationKnown) {
+        auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
+      }
     });
     scheduleKnown = true;
     // Immediate reconciliation now that both the session catalog and the user's
@@ -140,7 +206,7 @@ async function loadMyData() {
     logError('session-store,my-data', 'myData fetch failed', err);
     // A failed fetch is still a final, non-retried answer — isRegistered must not stay undefined,
     // and SWAN's orphan cleanup must not be gated forever on a fetch that will never resolve.
-    auth.value = { ...auth.value, isRegistered: null };
+    if (!realRegistrationKnown) auth.value = { ...auth.value, isRegistered: null };
     scheduleKnown = true;
   }
 }
@@ -153,11 +219,13 @@ function maybeLoadMyData() {
   if (!rfAuthTokenSettled) return;
   myDataAttempted = true;
   if (!rfAuthToken) {
-    // Settle isRegistered to null (not undefined) so isAuthResolved() doesn't spin forever.
-    // There's no schedule fetch coming either way, so treat it as known (empty) rather than
-    // leaving SWAN's orphan cleanup gated forever on a fetch that will never happen.
-    logWarning('session-store,my-data', 'no RF auth token — skipping myData, registration status unknown');
-    auth.value = { ...auth.value, isRegistered: null };
+    // Settle isRegistered to null (not undefined) so isAuthResolved() doesn't spin forever —
+    // unless resolveRegistrationAndAuth() already answered for real, in which case leave
+    // it alone. There's no schedule fetch coming either way, so treat scheduleKnown as final
+    // (empty) rather than leaving SWAN's orphan cleanup gated forever on a fetch that will
+    // never happen.
+    logWarning('session-store,my-data', 'no RF auth token — skipping myData, falling back for registration status');
+    if (!realRegistrationKnown) auth.value = { ...auth.value, isRegistered: null };
     scheduleKnown = true;
     return;
   }
@@ -255,9 +323,14 @@ export function initSessionState() {
   }
 
   mountToast();
+  // Decided once, before syncAuth() runs, so its branch on useEventsApiForAuth is consistent
+  // for the whole page load — see resolveRegistrationAndAuth() and the dependency note in the
+  // MWPW-207006 plan doc about da-events' event-code metadata being what actually creates this.
+  useEventsApiForAuth = !!window.events?.getRegistrationDetails;
   syncAuth();
   BlockMediator.subscribe('imsProfile', syncAuth);
   loadSessions();
+  if (useEventsApiForAuth) resolveRegistrationAndAuth();
 }
 
 function addToSet(sig, id) {

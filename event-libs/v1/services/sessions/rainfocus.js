@@ -60,6 +60,16 @@ async function rawFetch(rfApiUrl, endpoint, params) {
   return resp.json();
 }
 
+// Distinguishes "RF rejected this for lack of registration" (MWPW-207006) from every
+// other write failure, so callers can show a registration prompt instead of a generic
+// error toast.
+export class RfAccessError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'RfAccessError';
+  }
+}
+
 // Only write calls carry a responseCode (0/15 = success); reads never do.
 function handleWriteResponse(data) {
   const responseCode = data?.responseCode;
@@ -69,8 +79,8 @@ function handleWriteResponse(data) {
       return data;
     case '13': // schedule conflict
       throw new Error('RainFocus schedule conflict');
-    case '27': // insufficient access to schedule this session
-      throw new Error('Insufficient access to schedule this session');
+    case '27': // insufficient access to schedule this session — not registered
+      throw new RfAccessError(data?.responseMessage || 'Insufficient access to schedule this session');
     default:
       throw new Error(`RainFocus API error, responseCode: ${responseCode}`);
   }
