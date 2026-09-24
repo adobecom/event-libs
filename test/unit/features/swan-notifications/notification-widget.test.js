@@ -202,6 +202,10 @@ describe('notification-widget', () => {
       expect(tooltip().querySelector('.swan-notif__tooltip-label').textContent).to.equal('Notifications');
       expect(bell().nextElementSibling).to.equal(tooltip());
     });
+
+    it('is hidden inline at creation time, not only via the external stylesheet', () => {
+      expect(tooltip().style.display).to.equal('none');
+    });
   });
 
   describe('closing other gnav popups', () => {

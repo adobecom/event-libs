@@ -120,7 +120,7 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
 @media (min-width: 900px) {
   .swan-notif__bell:hover ~ .swan-notif__tooltip,
   .swan-notif__bell:focus-visible ~ .swan-notif__tooltip {
-    display: flex;
+    display: flex !important;
   }
 }
 
