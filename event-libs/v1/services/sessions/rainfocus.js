@@ -1,8 +1,7 @@
 import { logError, logWarning } from '../../utils/lana-log.js';
 
-// RainFocus schedule/favorites API, ported from northstar. Endpoint and profile id come from
-// tier-1-event-config, falling back to the defaults below. clientId is only sent by
-// fetchAuthToken. Several exports are unused, ported for parity, with unconfirmed shapes.
+// RainFocus schedule/favorites API. Endpoint/profile id come from tier-1-event-config,
+// falling back to the defaults below.
 
 // Same-origin Adobe.com proxy over RainFocus's API, avoiding CORS and the IP allowlist.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';

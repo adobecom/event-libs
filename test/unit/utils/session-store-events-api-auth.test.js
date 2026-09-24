@@ -49,8 +49,7 @@ describe('session-store: window.events.getRegistrationDetails (MWPW-207006)', ()
 
   it('primary path: sources isRegistered and rfAuthToken from window.events, never calls /max-api/jwt', async () => {
     const store = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
-    // Empty loggedInUser: the legacy heuristic would read this as false, so a passing true here
-    // proves the real signal won.
+    // Empty loggedInUser: proves a passing isRegistered:true came from the real signal.
     const fetchState = stubFetch({ myDataResponse: { mySchedule: [], sessionInterests: [], loggedInUser: {} } });
     window.events = {
       getRegistrationDetails: () => Promise.resolve({ isRegistered: true, authToken: 'events-api-token', userKey: 'uk-1' }),

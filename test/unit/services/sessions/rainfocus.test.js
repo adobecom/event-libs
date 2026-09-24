@@ -134,8 +134,7 @@ describe('services/sessions/rainfocus', () => {
     });
 
     it('addSession always sends virtual=true — MAX is a hybrid event, matches northstar', async () => {
-      // Without this, RF defaults the request to in-person-only attendance and rejects
-      // with responseCode 27 even for attendees who should be allowed to schedule.
+      // Otherwise RF defaults to in-person-only and rejects with responseCode 27.
       stubFetch({ responseCode: '0' });
       await addSession('st-1', 'auth-token', 'profile-1', 'https://example.com/rf/');
       const url = new URL(lastRequest);
