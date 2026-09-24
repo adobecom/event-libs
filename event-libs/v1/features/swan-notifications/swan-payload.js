@@ -4,6 +4,7 @@ import { getTrackIcon, getOverrideTrackIcon, getHomepagePath } from '../../utils
 import { MAX_EVENT_PAGES } from '../../utils/constances.js';
 import { getWatchDestination } from '../../utils/session-state.js';
 import { safeUrl } from '../../utils/utils.js';
+import { buildFederalTrackIconUrl } from '../icons/federal-icons.js';
 
 // Guards against Number(undefined) === NaN silently turning into a null/dropped
 // trigger time when an author omits the field.
@@ -70,11 +71,15 @@ export const STAGE_COPY = {
 // `category` is a kicker label ("Adobe MAX Session") distinct from `title` (the real session
 // title) — per the Figma spec's row layout, both render simultaneously on separate lines, so
 // unlike `title` this is never a fallback-only value.
+// Same precedence sessions-guide's resolveTrackBadge() uses: an author's explicit
+// trackOverride wins over the session's own primaryTrack.
+function resolveTrackIcon(session) {
+  return getOverrideTrackIcon(session.trackOverride) || getTrackIcon(session.primaryTrack);
+}
+
 export function buildNotificationEntry(session, stage, swanConfig) {
   const category = `Adobe ${swanConfig.eventName || 'Event'} Session`;
-  // Same precedence sessions-guide's resolveTrackBadge() uses: an author's explicit
-  // trackOverride wins over the session's own primaryTrack.
-  const trackIcon = getOverrideTrackIcon(session.trackOverride) || getTrackIcon(session.primaryTrack);
+  const trackIcon = resolveTrackIcon(session);
   return {
     title: session.title || category,
     category,
@@ -134,6 +139,11 @@ function toEpochSecondsString(isoString) {
 
 function buildTimelineContent(session, stage, swanConfig) {
   const sessionTitle = session.title || `Adobe ${swanConfig.eventName || 'Event'} Session`;
+  const trackIcon = resolveTrackIcon(session);
+  const serviceIcon = session.thumbnailUrl
+    || buildFederalTrackIconUrl(trackIcon?.icon)
+    || swanConfig.defaultNotificationIconUrl
+    || '';
   return {
     timeline: {
       viewtype: 'eventTimeline',
@@ -144,7 +154,7 @@ function buildTimelineContent(session, stage, swanConfig) {
         goLiveTime: toEpochSecondsString(session.startTimeUtc),
         goLiveExpireTime: toEpochSecondsString(session.endTimeUtc),
       },
-      serviceIconDetails: { serviceIcon: swanConfig.defaultNotificationIconUrl || '' },
+      serviceIconDetails: { serviceIcon },
       defaultAction: { url: resolveUncSessionUrl(session.sessionPageUrl) },
     },
   };

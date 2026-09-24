@@ -109,8 +109,12 @@ function useCurrentColorForBlack(svg) {
   return svg;
 }
 
+export function buildFederalTrackIconUrl(iconName) {
+  return iconName ? `${resolveFederalRoot()}/federal/assets/icons/track-icons/${iconName}.svg` : null;
+}
+
 export const fetchFederalTrackIcon = createFederalIconFetcher(
-  (iconName) => `${resolveFederalRoot()}/federal/assets/icons/track-icons/${iconName}.svg`,
+  buildFederalTrackIconUrl,
   { transform: useCurrentColorForBlack },
 );
 

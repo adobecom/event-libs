@@ -24,9 +24,10 @@
   justify-content: center;
   width: 32px;
   height: 32px;
+  margin-right: .25rem;
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius: .313rem;
   background: transparent;
   color: inherit;
   cursor: pointer;
