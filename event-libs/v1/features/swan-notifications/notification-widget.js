@@ -213,6 +213,10 @@ function buildWidget(mount) {
   badge.hidden = true;
   button.append(badge);
 
+  const tooltip = createTag('span', { class: 'swan-notif__tooltip', 'aria-hidden': 'true' });
+  tooltip.append(createTag('span', { class: 'swan-notif__tooltip-tip' }));
+  tooltip.append(createTag('span', { class: 'swan-notif__tooltip-label' }, dictionaryManager.getValue('Notifications')));
+
   // data-lenis-prevent: milo's Lenis smooth-scroll instance (loaded on foundation=c2 pages)
   // hijacks wheel/touch events at the document level; this attribute is Lenis's own
   // documented escape hatch for a nested scrollable region, already used the same way by
@@ -235,7 +239,7 @@ function buildWidget(mount) {
     class: 'swan-notif__sr-only', role: 'status', 'aria-live': 'polite',
   });
 
-  wrapper.append(button, panel, announcer);
+  wrapper.append(button, tooltip, panel, announcer);
   // Prepend rather than append: `.feds-notifications-wrapper` is empty so order doesn't
   // matter there, but the `?swanMountFallback=true` fallback mounts into `#universal-nav`
   // alongside UNC's other icons, where this needs to land first to match the Figma order.
@@ -270,7 +274,15 @@ function buildWidget(mount) {
     if (e.key === 'Escape') closePanel();
   }
 
+  function closeOtherGnavPopups() {
+    document.querySelectorAll('header.global-navigation [aria-expanded="true"]').forEach((trigger) => {
+      if (wrapper.contains(trigger)) return;
+      trigger.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   function openPanel() {
+    closeOtherGnavPopups();
     panel.hidden = false;
     button.setAttribute('aria-expanded', 'true');
     document.addEventListener('click', onOutsideClick);
