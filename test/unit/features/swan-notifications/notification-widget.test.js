@@ -197,6 +197,16 @@ describe('notification-widget', () => {
   });
 
   describe('hover tooltip', () => {
+    // Real mouse/CDP-driven hover simulation (sendMouse) is too flaky under full-suite
+    // concurrent test execution (CDP command contention across many parallel browser
+    // sessions) to assert real-time delay behavior reliably, so this reads the actual
+    // CSSOM rule instead of simulating :hover.
+    function findHoverRule() {
+      const sheet = [...document.styleSheets].find((s) => s.href?.includes('notification-widget.css'));
+      const mediaRule = [...sheet.cssRules].find((rule) => rule instanceof CSSMediaRule);
+      return [...mediaRule.cssRules].find((rule) => rule.selectorText.includes(':hover'));
+    }
+
     it('renders a hidden-from-AT tooltip labeled "Notifications" right after the bell', () => {
       expect(tooltip().getAttribute('aria-hidden')).to.equal('true');
       expect(tooltip().querySelector('.swan-notif__tooltip-label').textContent).to.equal('Notifications');
@@ -205,6 +215,22 @@ describe('notification-widget', () => {
 
     it('is hidden natively at creation time, not only via the external stylesheet', () => {
       expect(tooltip().hidden).to.equal(true);
+    });
+
+    it('is hidden by default via a visibility transition, not display, so a delay can apply', () => {
+      expect(getComputedStyle(tooltip()).visibility).to.equal('hidden');
+    });
+
+    it('shows the tooltip only after a 2s hover/focus-visible delay', () => {
+      const rule = findHoverRule();
+      expect(rule.style.visibility).to.equal('visible');
+      expect(rule.style.transitionDelay).to.equal('2s');
+    });
+
+    it('has no delay on the base (hidden) state, so leaving hover hides it immediately', () => {
+      const sheet = [...document.styleSheets].find((s) => s.href?.includes('notification-widget.css'));
+      const baseRule = [...sheet.cssRules].find((rule) => rule.selectorText === '.swan-notif__tooltip');
+      expect(baseRule.style.transitionDelay).to.equal('0s');
     });
   });
 

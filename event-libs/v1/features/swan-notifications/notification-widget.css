@@ -86,7 +86,7 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
 }
 
 .swan-notif__tooltip {
-  display: none;
+  display: flex;
   position: absolute;
   top: 100%;
   left: 50%;
@@ -97,6 +97,8 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
   max-width: 160px;
   pointer-events: none;
   white-space: nowrap;
+  visibility: hidden;
+  transition: visibility 0s linear;
 }
 
 .swan-notif__tooltip-tip {
@@ -120,7 +122,8 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
 @media (min-width: 900px) {
   .swan-notif__bell:hover ~ .swan-notif__tooltip,
   .swan-notif__bell:focus-visible ~ .swan-notif__tooltip {
-    display: flex;
+    visibility: visible;
+    transition-delay: 2s;
   }
 }
 
