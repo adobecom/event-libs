@@ -16,7 +16,7 @@ import { getSwanMode } from '../features/swan-notifications/swan-config.js';
 import { mountNotificationWidget } from '../features/swan-notifications/notification-widget.js';
 import { logError, logWarning } from './lana-log.js';
 
-// Shared, page-level state. Preact reads `.value` directly; non-Preact code uses `.subscribe()`/`.peek()`.
+// Preact reads `.value` directly; non-Preact code uses `.subscribe()`/`.peek()`.
 export const sessions = signal([]);
 export const sessionsStatus = signal('idle'); // idle | loading | ready | error
 export const liveStreamActiveIds = signal(new Set());
@@ -24,16 +24,14 @@ export const favorited = signal(new Set());
 export const scheduled = signal(new Set());
 export const auth = signal({ isLoggedIn: null, isRegistered: undefined, userFirstName: null });
 export const pendingActions = signal(new Set());
-// Bumped only when a derived session state changes; read purely as a re-render dependency.
+// Re-render dependency only.
 export const sessionStateVersion = signal(0);
-// A new object on every call, even for the same sessionId, so the signal always notifies.
+// New object each call, even for the same id, so the signal always notifies.
 export const sessionGuideRequest = signal(null);
-// Opposite direction of sessionGuideRequest: an already-mounted multi-session page (e.g.
-// Broadcast) asking to switch, since it has no other channel back to its own player state.
+// Reverse of sessionGuideRequest — a page asking to switch its own player.
 export const watchSameSessionRequest = signal(null);
 
-// Console debugging only — never runs on a real prod hit. Also checks hostname since
-// getEventServiceEnv() (the ESL/ESP backend env) can default to 'prod' on a preview/draft page.
+// Debug hook only; hostname check covers preview/draft hosts getEventServiceEnv() misreads as prod.
 const { hostname } = window.location;
 const isPreviewOrDevHost = hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local');
 if (isPreviewOrDevHost || getEventServiceEnv()?.name !== 'prod') {
@@ -50,11 +48,13 @@ let realAuthConfirmed = false;
 let rfAuthToken = null;
 let rfAuthTokenStarted = false;
 let rfAuthTokenSettled = false;
-// True once `scheduled` reflects a real answer (fetched, or definitively never going to be
-// fetched — e.g. logged out) rather than just its empty initial value. Gates SWAN's orphan
-// cleanup (see reconcileSwanNotifications) so an empty `scheduled` before myData has loaded
-// is never mistaken for "the user has nothing scheduled."
+// True once `scheduled` reflects a real (fetched or never-coming) answer, not just its empty
+// initial value — gates SWAN's orphan cleanup so empty doesn't mean "nothing scheduled" early.
 let scheduleKnown = false;
+// True once the real isRegistered has landed, so loadMyData()'s fallback can't overwrite it.
+let realRegistrationKnown = false;
+// Whether resolveRegistrationAndAuth() or the legacy jwt exchange owns auth this load.
+let useEventsApiForAuth = false;
 
 // The media-relay backend only has dev/stage/prod, so the finer-grained envs collapse.
 export function deriveMrEnv() {
@@ -70,7 +70,7 @@ function defaultRfApiUrlForEnv() {
   return isProd ? DEFAULT_RF_API_URL : STAGE_RF_API_URL;
 }
 
-// rfAuthTokenSettled gates maybeLoadMyData() so it can't fire mid-exchange with a null token.
+// Fallback only — see resolveRegistrationAndAuth() for the primary path.
 async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
@@ -85,7 +85,7 @@ async function exchangeRfAuthToken(clientId) {
   maybeLoadMyData();
 }
 
-// isRegistered is not set here: rsvpData doesn't apply to T1 events. loadMyData() derives it.
+// isRegistered comes from resolveRegistrationAndAuth() or loadMyData(), not here.
 function syncAuth() {
   const profile = BlockMediator.get('imsProfile');
   if (profile === undefined) return;
@@ -95,24 +95,43 @@ function syncAuth() {
     isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
     userFirstName: profile?.first_name ?? null,
   };
-  // Gated on real login, not just the mode flag: scheduling (the only thing that ever
-  // populates the notification store) requires an RF auth token from a real IMS profile,
-  // so an anonymous visitor's bell would only ever render empty. This also matches real
-  // UNC's own behavior — its notifications icon is excluded from SIGNED_OUT_ICONS too.
-  // mountNotificationWidget() is itself idempotent, so re-firing on every syncAuth() call
-  // (e.g. a later profile update) is harmless. Only feds mode has a local widget to mount —
-  // unc mode relies entirely on gnav's own existing UNC-rendered bell.
+  // Gated on real login: an anonymous visitor's bell would render empty. Idempotent, so
+  // re-firing on later profile updates is harmless. unc mode uses gnav's own bell instead.
   if (auth.value.isLoggedIn && getSwanMode() === 'feds') mountNotificationWidget();
+
+  if (useEventsApiForAuth) {
+    // Auth is resolveRegistrationAndAuth()'s job; just let myData run if it's ready.
+    maybeLoadMyData();
+    return;
+  }
   if (auth.value.isLoggedIn && profile.userId) {
     exchangeRfAuthToken(profile.userId);
   } else {
-    // Mark settled either way, so maybeLoadMyData() isn't blocked forever. Also: not logged
-    // in (or no userId) means there is definitively no schedule to fetch for this visitor,
-    // which is itself a real, final answer — not "still don't know."
+    // Not logged in (or no userId) is itself a final answer, not "still don't know."
     rfAuthTokenSettled = true;
     scheduleKnown = true;
     maybeLoadMyData();
   }
+}
+
+// Primary auth path: real isRegistered + RF token from da-events' registration-cache.js,
+// replacing the jwt exchange above. Falls back to it if no token comes back either way.
+async function resolveRegistrationAndAuth() {
+  try {
+    const { isRegistered, authToken } = await window.events.getRegistrationDetails();
+    realRegistrationKnown = true;
+    auth.value = { ...auth.value, isRegistered };
+    if (authToken) {
+      rfAuthToken = authToken;
+      rfAuthTokenSettled = true;
+      maybeLoadMyData();
+      return;
+    }
+  } catch (err) {
+    logError('session-store,registration-cache', 'window.events.getRegistrationDetails failed', err);
+  }
+  useEventsApiForAuth = false;
+  syncAuth();
 }
 
 // RF's own objects, not bare ids: schedule keys on sessionTimeID, favorites on sessionID.
@@ -121,26 +140,24 @@ function mapToSessionIds(entries, idField, matchField) {
   return (entries || []).map((entry) => idByRf.get(entry[idField])).filter(Boolean);
 }
 
-// Needs the catalog loaded for mapToSessionIds(). isRegistered comes from loggedInUser.
+// isRegistered here is a weaker fallback than resolveRegistrationAndAuth()'s — see realRegistrationKnown.
 async function loadMyData() {
   try {
     const data = await fetchMyData(rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     batch(() => {
       scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode'));
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
-      auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
+      if (!realRegistrationKnown) {
+        auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
+      }
     });
     scheduleKnown = true;
-    // Immediate reconciliation now that both the session catalog and the user's
-    // confirmed schedule have settled, rather than waiting for the next
-    // session-state-ticker.js tick (up to intervalMs away) to apply any stage
-    // transition that's already due.
+    // Reconcile now rather than waiting for the next ticker interval.
     reconcileSwanNotifications(() => sessions.value, () => scheduled.value, () => scheduleKnown);
   } catch (err) {
     logError('session-store,my-data', 'myData fetch failed', err);
-    // A failed fetch is still a final, non-retried answer — isRegistered must not stay undefined,
-    // and SWAN's orphan cleanup must not be gated forever on a fetch that will never resolve.
-    auth.value = { ...auth.value, isRegistered: null };
+    // A failed fetch is still a final answer — isRegistered must not stay undefined.
+    if (!realRegistrationKnown) auth.value = { ...auth.value, isRegistered: null };
     scheduleKnown = true;
   }
 }
@@ -153,11 +170,9 @@ function maybeLoadMyData() {
   if (!rfAuthTokenSettled) return;
   myDataAttempted = true;
   if (!rfAuthToken) {
-    // Settle isRegistered to null (not undefined) so isAuthResolved() doesn't spin forever.
-    // There's no schedule fetch coming either way, so treat it as known (empty) rather than
-    // leaving SWAN's orphan cleanup gated forever on a fetch that will never happen.
-    logWarning('session-store,my-data', 'no RF auth token — skipping myData, registration status unknown');
-    auth.value = { ...auth.value, isRegistered: null };
+    // null, not undefined, so isAuthResolved() doesn't spin forever.
+    logWarning('session-store,my-data', 'no RF auth token — skipping myData, falling back for registration status');
+    if (!realRegistrationKnown) auth.value = { ...auth.value, isRegistered: null };
     scheduleKnown = true;
     return;
   }
@@ -175,18 +190,12 @@ async function loadSessions() {
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, eventApiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
-    // Always runs: non-MR sessions still need transitions without a user interaction.
     startSessionStateTicker(
       () => sessions.value,
       () => liveStreamActiveIds.value,
       () => { sessionStateVersion.value += 1; },
       {
-        // Must be onTick, not onChange: onChange only fires when a session's coarse
-        // upcoming/live/on-demand bucket flips, which has no boundary at SWAN's
-        // reminder lead time (start minus a few minutes) — gating reconcile on it would
-        // mean the T-5-minute reminder is never applied by the periodic tick at all,
-        // only ever by the one-shot call below or by a schedule action that happens to
-        // land after the trigger time already passed.
+        // onTick, not onChange — onChange misses SWAN's reminder-lead-time boundary.
         onTick: () => reconcileSwanNotifications(() => sessions.value, () => scheduled.value, () => scheduleKnown),
       },
     );
@@ -230,9 +239,6 @@ export function initSessionState() {
   if (!tierOneConfig) {
     // eslint-disable-next-line no-console
     console.warn('[session-store] initialization skipped: tier-1-event-config metadata is missing or invalid');
-    // Skips loadSessions()/syncAuth() below, so this one line silently suppresses every
-    // session-catalog and RainFocus call for the page — needs to be visible in lana, not
-    // just devtools.
     logWarning('session-store,init', 'initialization skipped: tier-1-event-config metadata is missing or invalid');
     return;
   }
@@ -255,9 +261,11 @@ export function initSessionState() {
   }
 
   mountToast();
+  useEventsApiForAuth = !!window.events?.getRegistrationDetails;
   syncAuth();
   BlockMediator.subscribe('imsProfile', syncAuth);
   loadSessions();
+  if (useEventsApiForAuth) resolveRegistrationAndAuth();
 }
 
 function addToSet(sig, id) {
@@ -294,8 +302,7 @@ export async function toggleSchedule(session) {
     else addToSet(scheduled, session.id);
     setPending(session.id, false);
   });
-  // Fire-and-forget: a SWAN failure must never fail or roll back an already-successful
-  // RainFocus schedule mutation — each function swallows its own errors.
+  // Fire-and-forget — a SWAN failure must never roll back the RF mutation.
   if (isScheduled) notifySessionUnscheduled(session);
   else notifySessionScheduled(session);
 }
