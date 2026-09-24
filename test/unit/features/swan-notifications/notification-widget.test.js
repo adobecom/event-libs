@@ -15,6 +15,7 @@ describe('notification-widget', () => {
   function bell() { return mountPoint.querySelector('.swan-notif__bell'); }
   function panel() { return mountPoint.querySelector('.swan-notif__panel'); }
   function badge() { return mountPoint.querySelector('.swan-notif__badge'); }
+  function tooltip() { return mountPoint.querySelector('.swan-notif__tooltip'); }
   function sectionTitle() { return mountPoint.querySelector('.swan-notif__section-title'); }
   function rows() { return [...mountPoint.querySelectorAll('.swan-notif__row')]; }
   function announcer() { return mountPoint.querySelector('.swan-notif__sr-only'); }
@@ -193,6 +194,52 @@ describe('notification-widget', () => {
   it('does not mount a second widget on a repeated call', () => {
     mountNotificationWidget();
     expect(mountPoint.querySelectorAll('.swan-notif__bell')).to.have.lengthOf(1);
+  });
+
+  describe('hover tooltip', () => {
+    it('renders a hidden-from-AT tooltip labeled "Notifications" right after the bell', () => {
+      expect(tooltip().getAttribute('aria-hidden')).to.equal('true');
+      expect(tooltip().querySelector('.swan-notif__tooltip-label').textContent).to.equal('Notifications');
+      expect(bell().nextElementSibling).to.equal(tooltip());
+    });
+  });
+
+  describe('closing other gnav popups', () => {
+    let gnav;
+    let profileTrigger;
+
+    beforeEach(() => {
+      gnav = document.createElement('header');
+      gnav.className = 'global-navigation';
+      profileTrigger = document.createElement('button');
+      profileTrigger.setAttribute('aria-expanded', 'true');
+      gnav.append(profileTrigger);
+      document.body.append(gnav);
+    });
+
+    afterEach(() => {
+      if (!panel().hidden) bell().click();
+      gnav.remove();
+    });
+
+    it('closes an already-open gnav popup when the bell opens', () => {
+      bell().click();
+      expect(profileTrigger.getAttribute('aria-expanded')).to.equal('false');
+    });
+
+    it('still expands the bell itself', () => {
+      bell().click();
+      expect(bell().getAttribute('aria-expanded')).to.equal('true');
+    });
+
+    it('leaves aria-expanded elements outside header.global-navigation alone', () => {
+      const outside = document.createElement('button');
+      outside.setAttribute('aria-expanded', 'true');
+      document.body.append(outside);
+      bell().click();
+      expect(outside.getAttribute('aria-expanded')).to.equal('true');
+      outside.remove();
+    });
   });
 
   describe('analytics attributes', () => {
