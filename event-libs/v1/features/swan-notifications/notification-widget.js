@@ -214,6 +214,7 @@ function buildWidget(mount) {
   button.append(badge);
 
   const tooltip = createTag('span', { class: 'swan-notif__tooltip', 'aria-hidden': 'true' });
+  tooltip.hidden = true;
   tooltip.append(createTag('span', { class: 'swan-notif__tooltip-tip' }));
   tooltip.append(createTag('span', { class: 'swan-notif__tooltip-label' }, dictionaryManager.getValue('Notifications')));
 
