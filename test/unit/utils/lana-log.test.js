@@ -23,7 +23,7 @@ describe('lana-log', () => {
   it('formats the message with a [scope] prefix and sets tags/severity from scope', () => {
     logError('my-scope', 'thing failed');
     expect(calls[0].msg).to.include('[my-scope] thing failed');
-    expect(calls[0].options).to.deep.equal({ tags: 'my-scope', severity: 'error', sampleRate: 100 });
+    expect(calls[0].options).to.deep.equal({ tags: 'my-scope', severity: 'error', sampleRate: 10 });
   });
 
   it('omits the trailing data suffix when no data is passed', () => {
@@ -110,10 +110,14 @@ describe('lana-log', () => {
     expect(calls[0].msg).to.match(CONTEXT_PATTERN);
   });
 
-  it('forces full sampling for error and critical so they are never dropped by LANA\'s default 1% sample rate', () => {
+  it('forces full sampling for critical so it is never dropped by LANA\'s default 1% sample rate', () => {
+    logCritical('scope', 'a');
+    expect(calls[0].options.sampleRate).to.equal(100);
+  });
+
+  it('raises error to a 10% sample rate, well above LANA\'s default 1% but short of full sampling', () => {
     logError('scope', 'a');
-    logCritical('scope', 'b');
-    calls.forEach((call) => expect(call.options.sampleRate).to.equal(100));
+    expect(calls[0].options.sampleRate).to.equal(10);
   });
 
   it('leaves debug, info, and warning at LANA\'s default sample rate', () => {
