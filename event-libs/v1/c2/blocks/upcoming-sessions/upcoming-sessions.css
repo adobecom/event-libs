@@ -561,8 +561,8 @@
 
 .upcoming-sessions .sg-category-badge__icon {
   display: block;
-  width: var(--s2a-spacing-20, 20px);
-  height: var(--s2a-spacing-20, 20px);
+  width: var(--s2a-spacing-md, 16px);
+  height: var(--s2a-spacing-md, 16px);
 }
 
 .upcoming-sessions .sg-category-badge__label {
