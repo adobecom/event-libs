@@ -322,13 +322,13 @@
     width: 379px;
     min-height: 130px;
     padding: var(--s2a-spacing-lg, 24px);
-    gap: 0;
+    gap: var(--s2a-spacing-lg, 24px);
     border: var(--s2a-border-width-sm, 1px) solid transparent;
   }
 
   .upcoming-sessions .sg-card:is(:hover, :focus-within) {
-    width: 427px;
-    min-height: 150px;
+    width: 431px;
+    min-height: 128px;
     background: #262626;
     border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -337,12 +337,12 @@
 
   .upcoming-sessions .sg-card.is-scheduled,
   .upcoming-sessions .sg-card.is-favorited {
-    width: 427px;
+    width: 431px;
   }
 
   .upcoming-sessions .sg-card.is-scheduled:is(:hover, :focus-within),
   .upcoming-sessions .sg-card.is-favorited:is(:hover, :focus-within) {
-    min-height: 150px;
+    min-height: 128px;
     background: #262626;
     border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -351,8 +351,8 @@
 
   .upcoming-sessions .sg-card__body {
     flex: none;
-    width: 331px;
-    gap: 0;
+    width: 327px;
+    gap: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions .sg-card__badge-row {
@@ -373,9 +373,8 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: var(--s2a-spacing-xs, 8px);
+    gap: var(--s2a-spacing-lg, 24px);
     margin-top: auto;
-    padding-top: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__track {
@@ -418,7 +417,7 @@
   .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__actions,
   .upcoming-sessions .sg-card.is-scheduled .sg-card__actions,
   .upcoming-sessions .sg-card.is-favorited .sg-card__actions {
-    width: var(--s2a-spacing-2xl, 48px);
+    width: var(--s2a-spacing-xl, 32px);
     opacity: 1;
     pointer-events: auto;
   }
