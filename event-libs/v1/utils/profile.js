@@ -3,24 +3,10 @@ import { getEventAttendee, validateRsvpToken } from './esp-controller.js';
 import { getMetadata, getRsvpToken, waitForAdobeIMS } from './utils.js';
 
 export async function getProfile() {
-  const { feds, adobeProfile, fedsConfig, adobeIMS } = window;
-
-  const getUserProfile = () => {
-    if (fedsConfig?.universalNav) {
-      return feds?.services?.universalnav?.interface?.adobeProfile?.getUserProfile()
-          || adobeProfile?.getUserProfile();
-    }
-
-    return (
-      feds?.services?.profile?.interface?.adobeProfile?.getUserProfile()
-      || adobeProfile?.getUserProfile()
-      || adobeIMS?.getProfile()
-    );
-  };
-
-  const profile = await getUserProfile();
-
-  return profile;
+  if (!window.adobeIMS) await waitForAdobeIMS();
+  // Guard as Milo's gnav does: only call getProfile() for a signed-in user.
+  if (!window.adobeIMS?.isSignedInUser?.()) return null;
+  return window.adobeIMS.getProfile();
 }
 
 export async function lazyCaptureProfile() {
@@ -55,10 +41,11 @@ export async function lazyCaptureProfile() {
     }
 
     try {
+      // getProfile() returns null when IMS reports the user signed out.
       const profile = await getProfile();
       BlockMediator.set('imsProfile', profile);
 
-      if (!profile.noProfile && profile.account_type !== 'guest') {
+      if (profile && !profile.noProfile && profile.account_type !== 'guest') {
         const resp = await getEventAttendee(getMetadata('event-id'));
         BlockMediator.set('rsvpData', resp.ok ? resp.data : null);
       }

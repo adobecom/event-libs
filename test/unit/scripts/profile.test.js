@@ -47,20 +47,26 @@ describe('Profile Functions', () => {
     BlockMediator.set('rsvpData', undefined);
   });
 
-  it('should get the user profile', async () => {
-    window.feds = {
-      services: {
-        universalnav: { interface: { adobeProfile: { getUserProfile: () => Promise.resolve({ name: 'John Doe' }) } } },
-        profile: { interface: { adobeProfile: { getUserProfile: () => Promise.resolve({ name: 'John Doe' }) } } },
-      },
+  it('should get the user profile from IMS', async () => {
+    window.adobeIMS = {
+      isSignedInUser: () => true,
+      getProfile: () => Promise.resolve({ name: 'IMS User' }),
     };
-    window.adobeProfile = { getUserProfile: () => Promise.resolve({ name: 'Jane Doe' }) };
-    window.fedsConfig = { universalNav: true };
-    window.adobeIMS = { getProfile: () => Promise.resolve({ name: 'IMS User' }) };
 
     const profile = await getProfile();
 
-    expect(profile).to.deep.equal({ name: 'John Doe' });
+    expect(profile).to.deep.equal({ name: 'IMS User' });
+  });
+
+  it('should return null when the user is signed out', async () => {
+    window.adobeIMS = {
+      isSignedInUser: () => false,
+      getProfile: () => Promise.resolve({ name: 'IMS User' }),
+    };
+
+    const profile = await getProfile();
+
+    expect(profile).to.equal(null);
   });
 
   it('lazyCapture resolves synchronously when adobeIMS is already available', async () => {
@@ -86,13 +92,13 @@ describe('Profile Functions', () => {
     lazyCaptureProfile();
 
     await clock.tick(8000);
-    window.adobeIMS = { getProfile: () => Promise.resolve(null) };
+    // Signed-out user: getProfile() resolves to null, so imsProfile is set to null.
+    window.adobeIMS = { isSignedInUser: () => false, getProfile: () => Promise.resolve(null) };
 
     await clock.tick(3000);
     const profile = await getProfile();
     expect(profile).to.equal(null);
-    expect(BlockMediator.get('rsvpData')).to.equal(null);
-    expect(BlockMediator.get('imsProfile')).to.deep.equal({ noProfile: true });
+    expect(BlockMediator.get('imsProfile')).to.equal(null);
   });
 
   it('should return early when there is no event-id', async () => {
@@ -117,6 +123,7 @@ describe('Profile Functions', () => {
 
   it('should set rsvpData to null when profile capture fails', async () => {
     window.adobeIMS = {
+      isSignedInUser: () => true,
       getProfile: () => Promise.reject(new Error('failed profile lookup')),
     };
 
@@ -213,7 +220,7 @@ describe('Profile Functions', () => {
 
     it('should ignore a malformed rsvpToken and fall through to the normal profile flow', async () => {
       window.history.replaceState({}, '', `${window.location.pathname}?rsvpToken=too-short`);
-      window.adobeIMS = { getProfile: () => Promise.resolve({ name: 'IMS User', account_type: 'type1' }), getAccessToken: () => null };
+      window.adobeIMS = { isSignedInUser: () => true, getProfile: () => Promise.resolve({ name: 'IMS User', account_type: 'type1' }), getAccessToken: () => null };
       sinon.stub(window, 'fetch').resolves({ text: () => 'not found', ok: false });
 
       lazyCaptureProfile();
