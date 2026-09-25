@@ -4,6 +4,10 @@
   padding-bottom: var(--s2a-spacing-8, 8px);
 }
 
+.lenis.lenis-smooth .session-video-player .milo-video iframe {
+  pointer-events: auto;
+}
+
 @media (min-width: 1024px) {
   :root:has(meta[name="foundation"][content="c2"]) .session-video-playlist-container .session-video-player .milo-video,
   :root:has(meta[name="foundation"][content="c2"]) .session-video-container .session-video-player .milo-video {

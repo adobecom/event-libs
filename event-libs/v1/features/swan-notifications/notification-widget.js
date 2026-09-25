@@ -109,6 +109,16 @@ function renderIcon(entry) {
   return current;
 }
 
+// createTemplatedDateRange() is shared (and reachable from CMS-authored templates), so the
+// reminder line's time styling is fixed up here instead of in date-time-helper.js. Drops a
+// leading zero on the hour and lowercases the meridiem — the hour rule is anchored to a
+// H:MM colon pattern so it can't touch the {dd} day-of-month number (e.g. "06").
+export function normalizeTimeCasing(dateRangeStr) {
+  return dateRangeStr
+    .replace(/\b0(\d:\d{2})/g, '$1')
+    .replace(/\s(AM|PM)\b/gi, (_match, meridiem) => meridiem.toLowerCase());
+}
+
 // Three lines per the Figma spec (node 9690:20849): category kicker + stage pill, then the
 // session title (can wrap), then the relative timestamp alone — not the pill+timestamp
 // sharing a line under the title, which an earlier pass got wrong. A fourth, reminder-only
@@ -143,13 +153,13 @@ function renderRow(entry, locale, timezone, onDismiss) {
   body.append(title);
 
   if (entry.stage === 'reminder') {
-    const startTime = createTemplatedDateRange(
+    const startTime = normalizeTimeCasing(createTemplatedDateRange(
       entry.startTimeMs,
       entry.endTimeMs,
       locale,
-      '{ddd}, {LLL} {dd} · {timeRange} {timeZone}',
+      '{LLL} {dd}, {timeRange} {timeZone}',
       timezone,
-    );
+    ));
     if (startTime) body.append(createTag('p', { class: 'swan-notif__time' }, startTime));
   }
 
