@@ -197,7 +197,7 @@
 
 .upcoming-sessions .sg-card__title {
   font-family: 'Adobe Clean Spectrum VF', var(--body-font-family);
-  font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
+  font-weight: var(--s2a-font-weight-eyebrow, var(--s2a-font-weight-adobe-clean-bold, 700));
   font-size: var(--s2a-font-size-md, 16px);
   line-height: 1.25;
   color: var(--s2a-color-gray-1000, #000);
@@ -259,7 +259,11 @@
   font-size: var(--s2a-font-size-xs, 12px);
   color: var(--s2a-color-gray-600, #717171);
   margin-left: auto;
-  white-space: normal;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: right;
   line-height: 1.5;
   pointer-events: none;
