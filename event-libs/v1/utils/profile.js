@@ -3,9 +3,6 @@ import { getEventAttendee, validateRsvpToken } from './esp-controller.js';
 import { getMetadata, getRsvpToken, waitForAdobeIMS } from './utils.js';
 
 export async function getProfile() {
-  // IMS is the single source of truth for the profile — it carries every detail (userId,
-  // account_type, name, …). It loads asynchronously, so wait for it before reading; otherwise
-  // an early call would see no adobeIMS and wrongly treat a signed-in user as signed out.
   if (!window.adobeIMS) await waitForAdobeIMS();
   // Guard as Milo's gnav does: only call getProfile() for a signed-in user.
   if (!window.adobeIMS?.isSignedInUser?.()) return null;
