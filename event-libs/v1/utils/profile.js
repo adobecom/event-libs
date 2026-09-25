@@ -45,10 +45,10 @@ export async function lazyCaptureProfile() {
 
     try {
       // getProfile() returns null when IMS reports the user signed out.
-      const profile = await getProfile() || { noProfile: true };
+      const profile = await getProfile();
       BlockMediator.set('imsProfile', profile);
 
-      if (!profile.noProfile && profile.account_type !== 'guest') {
+      if (profile && !profile.noProfile && profile.account_type !== 'guest') {
         const resp = await getEventAttendee(getMetadata('event-id'));
         BlockMediator.set('rsvpData', resp.ok ? resp.data : null);
       }
