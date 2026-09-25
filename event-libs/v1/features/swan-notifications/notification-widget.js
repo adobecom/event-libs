@@ -5,6 +5,7 @@ import { FALLBACK_LOCALES } from '../../utils/constances.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getRelativeTime, createTemplatedDateRange } from '../../utils/date-time-helper.js';
 import { getNowMs } from '../../utils/session-state.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 import {
   notifications, markRead, markAllRead, dismissEntry, getEntries,
 } from './notification-store.js';
@@ -68,35 +69,44 @@ function resolveTimezone() {
   return getMetadata('event-type') === 'InPerson' ? getMetadata('timezone') : null;
 }
 
-// SESSION_ICON_FALLBACK is the placeholder's initial (and, absent a track icon, final)
-// content. When the session has a track icon, fetchFederalTrackIcon resolves it in the
-// background and swaps it in — but only if it actually resolves to something and the
-// placeholder is still on the page (renderList() rebuilds the whole <ul> on every store
-// change, so a slow fetch can easily outlive the row it was meant for).
-function renderTrackIconPlaceholder(entry) {
-  const placeholder = createTag('span', { class: 'swan-notif__icon swan-notif__icon--placeholder', 'aria-hidden': 'true' }, SESSION_ICON_FALLBACK);
-  if (entry.trackIconName) {
-    fetchFederalTrackIcon(entry.trackIconName).then((svg) => {
-      if (!svg || !placeholder.isConnected) return;
-      svg.setAttribute('width', '28');
-      svg.setAttribute('height', '28');
-      placeholder.replaceChildren(svg);
-    });
-  }
-  return placeholder;
+function renderMaxBadge() {
+  return createTag('span', { class: 'swan-notif__icon swan-notif__icon--placeholder', 'aria-hidden': 'true' }, SESSION_ICON_FALLBACK);
 }
 
-// entry.iconUrl only says a thumbnail was authored, not that it will actually load — a 404
-// or CORS failure would otherwise leave a broken-image glyph in place forever. Falling back
-// to the same track-icon/SESSION_ICON_FALLBACK chain here, rather than a bare placeholder,
-// means a broken thumbnail degrades exactly like having no thumbnail at all.
-function renderThumbnail(entry) {
-  if (!entry.iconUrl) return renderTrackIconPlaceholder(entry);
-  const img = createTag('img', { class: 'swan-notif__icon', src: entry.iconUrl, alt: '' });
-  img.addEventListener('error', () => {
-    if (img.isConnected) img.replaceWith(renderTrackIconPlaceholder(entry));
-  }, { once: true });
-  return img;
+// Priority is track icon, then the session's own thumbnail, then the MAX badge as a last
+// resort — a track icon wins even over a thumbnail that's already loaded, since
+// fetchFederalTrackIcon is always attempted whenever entry.trackIconName is set, regardless
+// of entry.iconUrl. `current` tracks whichever element is actually on the page right now, so
+// a resolved track icon always replaces it (thumbnail or badge), and a stale event (a late
+// <img> error after the track icon already won, or either firing after renderList() rebuilds
+// the whole <ul> for a different render) can never clobber whatever's already showing.
+function renderIcon(entry) {
+  let current = entry.iconUrl
+    ? createTag('img', { class: 'swan-notif__icon', src: entry.iconUrl, alt: '' })
+    : renderMaxBadge();
+
+  if (entry.iconUrl) {
+    const img = current;
+    img.addEventListener('error', () => {
+      if (current !== img || !img.isConnected) return;
+      const badge = renderMaxBadge();
+      img.replaceWith(badge);
+      current = badge;
+    }, { once: true });
+  }
+
+  if (entry.trackIconName) {
+    fetchFederalTrackIcon(entry.trackIconName).then((svg) => {
+      if (!svg || !current.isConnected) return;
+      svg.setAttribute('width', '28');
+      svg.setAttribute('height', '28');
+      const trackTile = createTag('span', { class: 'swan-notif__icon swan-notif__icon--placeholder', 'aria-hidden': 'true' }, svg);
+      current.replaceWith(trackTile);
+      current = trackTile;
+    });
+  }
+
+  return current;
 }
 
 // Three lines per the Figma spec (node 9690:20849): category kicker + stage pill, then the
@@ -115,7 +125,7 @@ function renderRow(entry, locale, timezone, onDismiss) {
   });
 
   row.append(createTag('span', { class: 'swan-notif__dot', 'aria-hidden': 'true' }));
-  row.append(renderThumbnail(entry));
+  row.append(renderIcon(entry));
 
   const body = createTag('div', { class: 'swan-notif__body' });
 
@@ -212,6 +222,11 @@ function buildWidget(mount) {
   badge.hidden = true;
   button.append(badge);
 
+  const tooltip = createTag('span', { class: 'swan-notif__tooltip', 'aria-hidden': 'true' });
+  tooltip.hidden = true;
+  tooltip.append(createTag('span', { class: 'swan-notif__tooltip-tip' }));
+  tooltip.append(createTag('span', { class: 'swan-notif__tooltip-label' }, dictionaryManager.getValue('Notifications')));
+
   // data-lenis-prevent: milo's Lenis smooth-scroll instance (loaded on foundation=c2 pages)
   // hijacks wheel/touch events at the document level; this attribute is Lenis's own
   // documented escape hatch for a nested scrollable region, already used the same way by
@@ -234,7 +249,7 @@ function buildWidget(mount) {
     class: 'swan-notif__sr-only', role: 'status', 'aria-live': 'polite',
   });
 
-  wrapper.append(button, panel, announcer);
+  wrapper.append(button, tooltip, panel, announcer);
   // Prepend rather than append: `.feds-notifications-wrapper` is empty so order doesn't
   // matter there, but the `?swanMountFallback=true` fallback mounts into `#universal-nav`
   // alongside UNC's other icons, where this needs to land first to match the Figma order.
@@ -269,7 +284,15 @@ function buildWidget(mount) {
     if (e.key === 'Escape') closePanel();
   }
 
+  function closeOtherGnavPopups() {
+    document.querySelectorAll('header.global-navigation [aria-expanded="true"]').forEach((trigger) => {
+      if (wrapper.contains(trigger)) return;
+      trigger.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   function openPanel() {
+    closeOtherGnavPopups();
     panel.hidden = false;
     button.setAttribute('aria-expanded', 'true');
     document.addEventListener('click', onOutsideClick);
@@ -334,7 +357,7 @@ export function mountNotificationWidget() {
   // buildWidget() calls dictionaryManager.getValue() synchronously regardless of whether this
   // has resolved yet; it just falls back to the English key text until it has.
   dictionaryManager.initialize().catch((err) => {
-    window.lana?.log(`[notification-widget] dictionary failed to load, using fallback copy: ${err.message}`);
+    logError('notification-widget', 'dictionary failed to load, using fallback copy', err);
   });
 
   waitForElement(MOUNT_SELECTOR).then((mount) => {
@@ -345,7 +368,7 @@ export function mountNotificationWidget() {
       // appear. session-store.js's syncAuth() re-invokes this on every imsProfile change,
       // giving this a real retry path rather than needing its own polling loop.
       mounted = false;
-      window.lana?.log('[notification-widget] gnav notifications placeholder never appeared — bell not mounted, will retry on next call');
+      logWarning('notification-widget', 'gnav notifications placeholder never appeared — bell not mounted, will retry on next call');
       return;
     }
     buildWidget(mount);

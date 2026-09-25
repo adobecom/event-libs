@@ -1,8 +1,7 @@
 import { logError, logWarning } from '../../utils/lana-log.js';
 
-// RainFocus schedule/favorites API, ported from northstar. Endpoint and profile id come from
-// tier-1-event-config, falling back to the defaults below. clientId is only sent by
-// fetchAuthToken. Several exports are unused, ported for parity, with unconfirmed shapes.
+// RainFocus schedule/favorites API. Endpoint/profile id come from tier-1-event-config,
+// falling back to the defaults below.
 
 // Same-origin Adobe.com proxy over RainFocus's API, avoiding CORS and the IP allowlist.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
@@ -60,6 +59,14 @@ async function rawFetch(rfApiUrl, endpoint, params) {
   return resp.json();
 }
 
+// Distinguishes RF's not-registered rejection from other write failures.
+export class RfAccessError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'RfAccessError';
+  }
+}
+
 // Only write calls carry a responseCode (0/15 = success); reads never do.
 function handleWriteResponse(data) {
   const responseCode = data?.responseCode;
@@ -69,8 +76,8 @@ function handleWriteResponse(data) {
       return data;
     case '13': // schedule conflict
       throw new Error('RainFocus schedule conflict');
-    case '27': // insufficient access to schedule this session
-      throw new Error('Insufficient access to schedule this session');
+    case '27': // insufficient access to schedule this session — not registered
+      throw new RfAccessError(data?.responseMessage || 'Insufficient access to schedule this session');
     default:
       throw new Error(`RainFocus API error, responseCode: ${responseCode}`);
   }

@@ -9,6 +9,7 @@ export const buildCarousel = () => Carousel;
 export function Carousel({
   sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
   CardComponent = LiveCard, timeDisplay, showDurationBadge, showDescription, forceLive,
+  pageByGroup = false,
 }) {
   // Hooks run before the empty-list bail-out, to keep hook order stable across renders.
   const [offset, setOffset] = useState(0);
@@ -64,9 +65,9 @@ export function Carousel({
   const sessionCount = sessions?.length || 0;
   const maxOffset = Math.max(0, sessionCount - visibleCountRef.current);
 
-  // Re-clamps offset when the list shrinks under an already-paged-forward carousel (e.g.
-  // several live sessions ending in the same tick), so translateX can't overshoot content.
+  // Re-measures for async-loaded sessions; the mount effect above can fire before the strip exists.
   useEffect(() => {
+    measure();
     refreshEdges();
     clampOffset();
   }, [sessionCount]);
@@ -78,12 +79,13 @@ export function Carousel({
   const atStart = paged ? clampedOffset <= 0 : edges.atStart;
   const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 
+  const step = pageByGroup ? Math.max(1, visibleCountRef.current) : 1;
   const goPrev = () => {
-    if (paged) { setOffset((o) => Math.max(0, o - 1)); return; }
+    if (paged) { setOffset((o) => Math.max(0, o - step)); return; }
     stripRef.current?.scrollBy({ left: -(cardWidthRef.current || 300), behavior: scrollBehavior() });
   };
   const goNext = () => {
-    if (paged) { setOffset((o) => Math.min(maxOffset, o + 1)); return; }
+    if (paged) { setOffset((o) => Math.min(maxOffset, o + step)); return; }
     stripRef.current?.scrollBy({ left: cardWidthRef.current || 300, behavior: scrollBehavior() });
   };
 
@@ -124,8 +126,8 @@ export function Carousel({
               disabled=${atStart}
               type="button"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M2.67915 6.76384L11.2053 6.76384C11.6361 6.76384 11.9853 6.41462 11.9853 5.98384C11.9853 5.55306 11.6361 5.20384 11.2053 5.20384L2.67935 5.20384L5.44863 2.43455C5.75324 2.12994 5.75324 1.63607 5.44863 1.33146C5.14402 1.02686 4.65015 1.02686 4.34555 1.33147L0.244622 5.4324C-0.0599855 5.737 -0.0599849 6.23087 0.244624 6.53548L4.34556 10.6364C4.65017 10.941 5.14403 10.941 5.44864 10.6364C5.75325 10.3318 5.75325 9.83793 5.44864 9.53332L2.67915 6.76384Z" fill="currentColor"/>
+              <svg width="12" height="12" viewBox="0 0 13.3333 13.3333" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" style="transform: scaleX(-1)">
+                <path d="M12.34 5.9933L8.33984 1.99311C7.96782 1.6211 7.36513 1.6211 6.99311 1.99311C6.6211 2.36513 6.6211 2.96782 6.99311 3.33984L9.36755 5.71428H1.66667C1.14026 5.71428 0.714286 6.14025 0.714286 6.66666C0.714286 7.19307 1.14026 7.61904 1.66667 7.61904H9.36756L6.99312 9.99348C6.6211 10.3655 6.6211 10.9682 6.99312 11.3402C7.17913 11.5262 7.42281 11.6192 7.66649 11.6192C7.91016 11.6192 8.15384 11.5262 8.33985 11.3402L12.34 7.34001C12.7121 6.96799 12.712 6.36532 12.34 5.9933Z" fill="currentColor"/>
               </svg>
             </button>
             <button
@@ -135,8 +137,8 @@ export function Carousel({
               disabled=${atEnd}
               type="button"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M9.32279 6.76475L0.796596 6.76475C0.365814 6.76475 0.0165963 6.41554 0.0165958 5.98475C0.0165953 5.55397 0.365812 5.20475 0.796595 5.20475L9.32259 5.20475L6.5533 2.43547C6.24869 2.13086 6.24869 1.63699 6.5533 1.33238C6.85791 1.02777 7.35178 1.02777 7.65639 1.33238L11.7573 5.43331C12.0619 5.73792 12.0619 6.23179 11.7573 6.5364L7.6564 10.6373C7.35179 10.9419 6.85792 10.9419 6.55331 10.6373C6.2487 10.3327 6.2487 9.83885 6.55331 9.53424L9.32279 6.76475Z" fill="currentColor"/>
+              <svg width="12" height="12" viewBox="0 0 13.3333 13.3333" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                <path d="M12.34 5.9933L8.33984 1.99311C7.96782 1.6211 7.36513 1.6211 6.99311 1.99311C6.6211 2.36513 6.6211 2.96782 6.99311 3.33984L9.36755 5.71428H1.66667C1.14026 5.71428 0.714286 6.14025 0.714286 6.66666C0.714286 7.19307 1.14026 7.61904 1.66667 7.61904H9.36756L6.99312 9.99348C6.6211 10.3655 6.6211 10.9682 6.99312 11.3402C7.17913 11.5262 7.42281 11.6192 7.66649 11.6192C7.91016 11.6192 8.15384 11.5262 8.33985 11.3402L12.34 7.34001C12.7121 6.96799 12.712 6.36532 12.34 5.9933Z" fill="currentColor"/>
               </svg>
             </button>
           </div>

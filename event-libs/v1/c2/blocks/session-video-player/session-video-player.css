@@ -41,3 +41,7 @@
     animation: none;
   }
 }
+
+.session-video-hidden {
+  display: none;
+}

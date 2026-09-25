@@ -43,7 +43,8 @@ function buildCategoryBadge(track) {
   (async () => {
     try {
       const svg = await fetchFederalTrackIcon(entry.icon);
-      if (!svg) return;
+      // No icon resolved — drop the empty color span so there's no blank slot before the label.
+      if (!svg) { iconColor.remove(); return; }
       svg.classList.add('mobile-rider-info-bar-category-icon');
       iconColor.append(svg);
     } catch (error) {
@@ -230,6 +231,7 @@ class MobileRider {
       role: 'region',
       'aria-label': 'Session info',
     }, '', { parent: this.root });
+    // Header row: title with the caret immediately after it (not pushed to the far edge).
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
     const titleEl = createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
     const paintTitle = (session) => {
@@ -245,6 +247,24 @@ class MobileRider {
     }, '', { parent: header });
     createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'Show more session info', { parent: toggle });
     createTag('span', { class: 'mobile-rider-info-bar-chevron', 'aria-hidden': 'true' }, ICON_CHEVRON_DOWN, { parent: toggle });
+    const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: bar });
+    const paintCategory = (session) => {
+      const track = session?.primaryTrack || cfg['session-category'] || '';
+      badgeSlot.replaceChildren();
+      const badge = buildCategoryBadge(track);
+      if (badge) badgeSlot.append(badge);
+      // Nothing to show — keep the slot out of layout entirely rather than leaving an empty area.
+      badgeSlot.hidden = !badge;
+    };
+    paintCategory(null);
+
+    const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description', id: panelId }, cfg['session-description'] || '', { parent: bar });
+    const paintDescription = (session) => {
+      const text = session?.description || cfg['session-description'] || '';
+      descriptionEl.textContent = text;
+      descriptionEl.classList.toggle('is-hidden', !text);
+    };
+    paintDescription(null);
 
     const toggleLabel = toggle.querySelector('.mobile-rider-info-bar-toggle-label');
     toggle.addEventListener('click', () => {
@@ -254,36 +274,18 @@ class MobileRider {
       bar.classList.toggle('is-expanded', !expanded);
     });
 
-    const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
-    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel', id: panelId }, '', { parent: panelWrap });
-    const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: panel });
-    const paintCategory = (session) => {
-      const track = session?.primaryTrack || cfg['session-category'] || '';
-      badgeSlot.replaceChildren();
-      const badge = buildCategoryBadge(track);
-      if (badge) badgeSlot.append(badge);
-    };
-    paintCategory(null);
-
-    const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'] || '', { parent: panel });
-    const paintDescription = (session) => {
-      const text = session?.description || cfg['session-description'] || '';
-      descriptionEl.textContent = text;
-      descriptionEl.classList.toggle('is-hidden', !text);
-    };
-    paintDescription(null);
-
+    // Only render "View all details" when an author has provided the label; unauthored → no button.
     const viewAllDetailsLabel = cfg['view-all-details-label'];
     if (viewAllDetailsLabel) {
       const more = createTag('button', {
         type: 'button',
         class: 'mobile-rider-info-bar-more',
         'daa-ll': 'View-All-Details',
-      }, viewAllDetailsLabel, { parent: panel });
+      }, viewAllDetailsLabel, { parent: bar });
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
     }
 
-    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
+    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: bar });
 
     initSessionState();
     // Share button is built only once the session resolves - safeUrl(undefined) would no-op.

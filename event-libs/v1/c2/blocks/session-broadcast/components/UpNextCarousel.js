@@ -17,6 +17,7 @@ export function UpNextCarousel({ sessions, title = 'Upcoming' }) {
         timeDisplay="range"
         onCardClick=${openSessionDetail}
         showDescription=${true}
+        pageByGroup=${true}
       />
     </div>
   `;

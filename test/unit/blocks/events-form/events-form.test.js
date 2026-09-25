@@ -4,7 +4,7 @@ import { getValidCampaignIdFromUrl, resetCampaignMapCache } from '../../../../ev
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 import { stripTags } from '../../../../event-libs/v1/utils/sanitize-utils.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
-import { PHONE_FIELD_RE, PHONE_PATTERN, STANDARD_FIELD_MAX_LENGTHS } from '../../../../event-libs/v1/utils/constances.js';
+import { PHONE_FIELD_RE, PHONE_PATTERN, BACKEND_PHONE_RE, STANDARD_FIELD_MAX_LENGTHS } from '../../../../event-libs/v1/utils/constances.js';
 
 describe('Events Form', () => {
   let block;
@@ -381,12 +381,15 @@ describe('Events Form', () => {
       expect(regex.test('5551234567')).to.be.true;
     });
 
+    it('phone pattern is derived from BACKEND_PHONE_RE, so the FE/BE contract can never drift apart', () => {
+      expect(PHONE_PATTERN).to.equal(BACKEND_PHONE_RE.source);
+    });
+
     it('phone pattern matches the backend PhoneNumberInput schema pattern exactly, character-for-character', () => {
-      const backendPattern = /^[+\d\s\-().]+$/;
       const regex = new RegExp(`^(?:${PHONE_PATTERN})$`);
       const samples = ['+1 (555) 123-4567', '555-123-4567', '+15551234567', '5551234567', '----', '()', '+', '+-.() '];
       samples.forEach((sample) => {
-        expect(regex.test(sample)).to.equal(backendPattern.test(sample), `mismatch for "${sample}"`);
+        expect(regex.test(sample)).to.equal(BACKEND_PHONE_RE.test(sample), `mismatch for "${sample}"`);
       });
     });
   });

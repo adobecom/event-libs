@@ -1,8 +1,18 @@
 import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
 import { logError } from '../../../utils/lana-log.js';
-import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
+import {
+  getNowMs, getWatchDestination, isDvrPending, dvrAvailableAtMs,
+} from '../../../utils/session-state.js';
+import { getEventStartMs } from '../../../utils/tier-1-event-config.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
-import { currentSessionHasEnded, findEmbeddableVideos } from '../../utils/video-session.js';
+import {
+  currentSessionHasEnded,
+  findEmbeddableVideos,
+  watchPlaybackPhase,
+  buildSessionFromMetadata,
+  parseJsonMetadata,
+  PLAYBACK_PHASE,
+} from '../../utils/video-session.js';
 import { renderSchedule } from './schedule.js';
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
@@ -40,6 +50,19 @@ export function getState(nowMs, slots) {
   return nowMs < Math.min(...list.map(({ start }) => start)) ? 'upcoming' : 'on-demand';
 }
 
+// Maps the shared playback phase to the eyebrow status, so eyebrow and player never disagree.
+// DVR_BUFFER and ON_DEMAND both read 'on-demand'; SIMULIVE/WATCH_LIVE read 'live'.
+export function stateForPhase(phase) {
+  switch (phase) {
+    case PLAYBACK_PHASE.PRE_EVENT: return 'upcoming';
+    case PLAYBACK_PHASE.SIMULIVE:
+    case PLAYBACK_PHASE.WATCH_LIVE: return 'live';
+    case PLAYBACK_PHASE.DVR_BUFFER:
+    case PLAYBACK_PHASE.ON_DEMAND: return 'on-demand';
+    default: return 'on-demand';
+  }
+}
+
 export function nextBoundary(nowMs, slots) {
   const points = [];
   slots.forEach(({ start, end }) => {
@@ -53,7 +76,7 @@ export function formatDateTime(ms) {
   const date = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(ms);
   const time = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short',
-  }).format(ms);
+  }).format(ms).replace(/\s(AM|PM)\b/, (_match, meridiem) => meridiem.toLowerCase());
   return `${date}, ${time}`;
 }
 
@@ -65,7 +88,12 @@ export function hasPlayableVideo(doc = document) {
     return false;
   }
   if (!currentSessionHasEnded(entries, getNowMs())) return false;
-  return findEmbeddableVideos(entries).length > 0;
+  const session = buildSessionFromMetadata(entries);
+  // Match the player: on-demand video from session-times, or the authored MPC/YouTube id when empty.
+  const hasVideo = findEmbeddableVideos(entries).length > 0 || !!session.mpcId || !!session.youTubeId;
+  if (!hasVideo) return false;
+  // Not "available" until the DVR window elapses (same gate the player uses).
+  return !isDvrPending(session, getNowMs(), getEventStartMs());
 }
 
 const normalizeAttr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -147,23 +175,40 @@ export function mountSessionState({
   statusSlot, primaryCtaSlot, ccEl, statusLabels = DEFAULT_STATUS_LABELS,
 }) {
   const slots = getAllSessionTimes();
-  if (!slots.length) return;
-  const earliest = slots[0];
 
+  // IPOD eyebrow doesn't need session-times — handle first so an empty-session-times IPOD still renders.
   if (isInPersonIpodSession()) {
     if (primaryCtaSlot) primaryCtaSlot.replaceChildren();
-    if (statusSlot) statusSlot.replaceChildren(renderStatus(null, earliest, statusLabels));
-    if (ccEl) ccEl.hidden = !hasPlayableVideo();
-    return;
+    const ipodSession = buildSessionFromMetadata(parseJsonMetadata('session-times', 'session-details'));
+    let ipodTimer = null;
+    const renderIpod = () => {
+      if (statusSlot) statusSlot.replaceChildren(renderStatus(null, slots[0], statusLabels));
+      if (ccEl) ccEl.hidden = !hasPlayableVideo();
+      // Re-render at the DVR unlock so "Available soon" flips to "On-demand" without a reload.
+      const now = getNowMs();
+      const unlockMs = dvrAvailableAtMs(ipodSession, getEventStartMs());
+      if (ipodTimer != null) { clearTimeout(ipodTimer); ipodTimer = null; }
+      if (unlockMs != null && now < unlockMs) {
+        ipodTimer = setTimeout(renderIpod, Math.min((unlockMs - now) + 500, MAX_TIMEOUT));
+      }
+    };
+    renderIpod();
+    return () => { if (ipodTimer != null) clearTimeout(ipodTimer); };
   }
+
+  if (!slots.length) return;
+  const earliest = slots[0];
 
   const finalEnd = Math.max(...slots.map(({ end }) => end));
 
   const scheduleBtn = isSchedulableSession() ? renderSchedule() : null;
   const watchBtn = renderWatchNow();
 
-  const ctaFor = (state, nowMs) => {
+  // 'live' → Watch now; 'upcoming' → Add to schedule. On the poll path (phaseDriven) follow the
+  // state — no schedule once DVR/on-demand — instead of the clock, which could still be < finalEnd.
+  const ctaFor = (state, nowMs, phaseDriven = false) => {
     if (state === 'live') return watchBtn;
+    if (phaseDriven) return state === 'upcoming' ? scheduleBtn : null;
     return nowMs < finalEnd ? scheduleBtn : null;
   };
 
@@ -188,11 +233,24 @@ export function mountSessionState({
     applyCta(btn);
   };
 
-  const apply = (state, nowMs) => {
-    if (primaryCtaSlot) setCta(ctaFor(state, nowMs));
+  const apply = (state, nowMs, phaseDriven = false) => {
+    if (primaryCtaSlot) setCta(ctaFor(state, nowMs, phaseDriven));
     if (statusSlot) statusSlot.replaceChildren(renderStatus(state, earliest, statusLabels));
     if (ccEl) ccEl.hidden = state !== 'on-demand';
   };
+
+  const session = buildSessionFromMetadata(parseJsonMetadata('session-times', 'session-details'));
+
+  // Livestreamed sessions follow the poll-aware phase engine (watchPlaybackPhase) so the eyebrow
+  // stays in sync with the player; non-live sessions use the simple clock-based loop below.
+  if (session?.mrStreamId) {
+    const stop = watchPlaybackPhase(session, (phase) => {
+      const now = getNowMs();
+      const state = phase == null ? getState(now, slots) : stateForPhase(phase);
+      apply(state, now, phase != null);
+    });
+    return stop;
+  }
 
   const evaluate = () => {
     const now = getNowMs();
@@ -201,4 +259,5 @@ export function mountSessionState({
     if (boundary !== null) setTimeout(evaluate, Math.min((boundary - now) + 500, MAX_TIMEOUT));
   };
   evaluate();
+  return undefined;
 }

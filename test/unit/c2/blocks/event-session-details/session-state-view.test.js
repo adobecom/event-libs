@@ -1,9 +1,11 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
-  getSessionTimes, getAllSessionTimes, getState, nextBoundary, formatDateTime, renderStatus,
-  mountSessionState, readStatusLabels,
+  getSessionTimes, getAllSessionTimes, getState, stateForPhase, nextBoundary, formatDateTime,
+  renderStatus, mountSessionState, readStatusLabels, hasPlayableVideo,
 } from '../../../../../event-libs/v1/c2/blocks/event-session-details/session-state-view.js';
+import { PLAYBACK_PHASE } from '../../../../../event-libs/v1/c2/utils/video-session.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
 
@@ -148,6 +150,17 @@ describe('session-state-view', () => {
     });
   });
 
+  // stateForPhase maps the shared playback phase (from watchPlaybackPhase, used for livestreamed
+  // sessions so the eyebrow and video player never disagree) to the eyebrow's status.
+  describe('stateForPhase', () => {
+    it('pre-event is upcoming', () => expect(stateForPhase(PLAYBACK_PHASE.PRE_EVENT)).to.equal('upcoming'));
+    it('watch-live is live', () => expect(stateForPhase(PLAYBACK_PHASE.WATCH_LIVE)).to.equal('live'));
+    it('simulive is live', () => expect(stateForPhase(PLAYBACK_PHASE.SIMULIVE)).to.equal('live'));
+    it('dvr-buffer is on-demand (live stream ended, replay/VOD playing)', () => expect(stateForPhase(PLAYBACK_PHASE.DVR_BUFFER)).to.equal('on-demand'));
+    it('on-demand is on-demand', () => expect(stateForPhase(PLAYBACK_PHASE.ON_DEMAND)).to.equal('on-demand'));
+    it('null/unknown falls back to on-demand', () => expect(stateForPhase(null)).to.equal('on-demand'));
+  });
+
   describe('nextBoundary', () => {
     const slots = [{ start: 1000, end: 2000 }, { start: 5000, end: 6000 }];
     it('targets the first start before anything has begun', () => {
@@ -167,12 +180,22 @@ describe('session-state-view', () => {
   describe('formatDateTime', () => {
     // Nov 12, 2026 21:15 UTC — well clear of the Nov 1, 2026 US DST-end transition, so
     // America/New_York (EST) and America/Chicago (CST) are both in stable standard time,
-    // exactly 1 hour apart: 'Nov 12, 4:15 PM EST' vs 'Nov 12, 3:15 PM CST'.
+    // exactly 1 hour apart: 'Nov 12, 4:15pm EST' vs 'Nov 12, 3:15pm CST'.
     const ms = 1794518100000;
 
     it('formats short month + time + tz abbreviation in the viewer\'s local timezone', () => {
       const result = withViewerTimezone('America/New_York', () => formatDateTime(ms));
-      expect(result).to.equal('Nov 12, 4:15 PM EST');
+      expect(result).to.equal('Nov 12, 4:15pm EST');
+    });
+
+    // MWPW-206791: am/pm must render lowercase with no space before it, while the tz
+    // abbreviation stays uppercase.
+    it('lowercases am/pm with no leading space but keeps the tz abbreviation uppercase', () => {
+      const result = withViewerTimezone('America/New_York', () => formatDateTime(ms));
+      expect(result).to.include('4:15pm');
+      expect(result).to.not.include('PM');
+      expect(result).to.not.include(' pm');
+      expect(result).to.include(' EST');
     });
 
     // Regression guard for MWPW-206824: the session's authored venue timezone must not
@@ -201,8 +224,8 @@ describe('session-state-view', () => {
     it('upcoming renders the date/time in the viewer\'s local timezone, not the authored venue timezone', () => {
       const el = withViewerTimezone('America/New_York', () => renderStatus('upcoming', times));
       expect(el.classList.contains('session-status--upcoming')).to.be.true;
-      expect(el.textContent).to.equal('Nov 12, 4:15 PM EST');
-      expect(el.textContent).to.not.equal('Nov 12, 3:15 PM CST');
+      expect(el.textContent).to.equal('Nov 12, 4:15pm EST');
+      expect(el.textContent).to.not.equal('Nov 12, 3:15pm CST');
     });
 
     it('live renders a dot + Live', () => {
@@ -335,6 +358,82 @@ describe('session-state-view', () => {
     });
   });
 
+  // The eyebrow must honor the DVR delay just like the player does: while dvrDelayHours has not
+  // elapsed (measured from the event start), an ended IPOD session with a recording is still
+  // "Available soon", not "On-demand". Regression for the eyebrow flipping to On-demand the moment
+  // the session ended, ignoring the DVR window.
+  describe('renderStatus on-demand: DVR delay gates availability', () => {
+    const times = { start: 1794518100000, timezone: 'America/Los_Angeles' };
+    const IPOD = [{ value: 'in-person', label: 'In-Person' }, { value: 'on-demand-post-event', label: 'On demand, post event' }];
+    const MPC_RECORDING = { provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458902', kind: 'onDemand' };
+    const HOUR_MS = 3_600_000;
+
+    // Unlock is anchored on the session END time (+ dvrHours). The session ended 100h ago; each test
+    // varies the DVR hours to move the unlock (sessionEnd + dvrHours) across "now".
+    const SESSION_END_MS = Date.now() - (100 * HOUR_MS);
+
+    // An ended IPOD page with an MPC recording and an authored DVR delay.
+    const setDvrPage = (dvrHours) => {
+      setMetadata('session-times', JSON.stringify([{ endTimeMillis: SESSION_END_MS, videos: [MPC_RECORDING] }]));
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'Format', values: IPOD },
+        { name: 'DVR Timing (in hours)', values: [{ value: String(dvrHours) }] },
+      ]));
+    };
+
+    it('DVR window not yet elapsed -> Available soon (hasPlayableVideo false)', () => {
+      // unlock = sessionEnd(now-100h) + 772h → ~672h in the future → still pending.
+      setDvrPage(772);
+      expect(hasPlayableVideo()).to.be.false;
+      const el = renderStatus('on-demand', times);
+      expect(el.textContent).to.equal('Available soon');
+      expect(el.classList.contains('session-status--ipod-pending')).to.be.true;
+    });
+
+    it('DVR window elapsed -> On-demand (hasPlayableVideo true)', () => {
+      // unlock = sessionEnd(now-100h) + 1h → ~99h in the past → elapsed.
+      setDvrPage(1);
+      expect(hasPlayableVideo()).to.be.true;
+      const el = renderStatus('on-demand', times);
+      expect(el.textContent).to.equal('On-demand');
+      expect(el.classList.contains('session-status--on-demand')).to.be.true;
+    });
+
+    // Empty session-times: no session end, and the MPC video is only in custom attributes (not in
+    // session-times[].videos). Unlock anchors on the event start (fixed 200h ago here, since the
+    // tier-1 config singleton can't be re-initialized within a run); each test varies the DVR hours
+    // to move the unlock across "now". hasPlayableVideo must see the authored MPC id.
+    const EMPTY_TIMES_EVENT_START_OFFSET_HRS = 200;
+    const setEmptyTimesMpcPage = (dvrHours) => {
+      setMetadata('session-times', '[]');
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'Format', values: IPOD },
+        { name: 'MPC ID', values: [{ value: '3458902' }] },
+        { name: 'DVR Timing (in hours)', values: [{ value: String(dvrHours) }] },
+      ]));
+      setMetadata('tier-1-event-config', JSON.stringify({
+        eventStartDateTime: Date.now() - (EMPTY_TIMES_EVENT_START_OFFSET_HRS * HOUR_MS),
+      }));
+      initTierOneEventConfig();
+    };
+
+    it('no session-times, before eventStart + dvrHours -> Available soon', () => {
+      // eventStart 200h ago + 772h → far future → pending.
+      setEmptyTimesMpcPage(772);
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
+    });
+
+    it('no session-times, past eventStart + dvrHours -> On-demand (MPC from attributes)', () => {
+      // eventStart 200h ago + 100h → ~100h in the past → elapsed. MPC id makes it playable.
+      setEmptyTimesMpcPage(100);
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+
+    afterEach(() => {
+      document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
+    });
+  });
+
   describe('authored status labels', () => {
     const blockWithRows = (rows) => {
       const el = document.createElement('div');
@@ -445,6 +544,17 @@ describe('session-state-view', () => {
       mountSessionState({ statusSlot, primaryCtaSlot });
       expect(primaryCtaSlot.children.length).to.equal(0);
       expect(statusSlot.textContent).to.equal('Available soon');
+    });
+
+    it('IPOD session with empty session-times still renders the eyebrow (no early bailout)', () => {
+      ipodFormat();
+      setMetadata('session-times', '[]');
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+      expect(primaryCtaSlot.children.length).to.equal(0);
+      // No recording resolvable (no session-times) → not available yet → Available soon.
+      expect(statusSlot.textContent).to.equal('Available soon');
+      expect(statusSlot.querySelector('.session-status--ipod-pending')).to.exist;
     });
 
     it('IPOD session with a recording, once ended, shows On-demand and still no CTA', () => {
