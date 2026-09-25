@@ -193,6 +193,7 @@
   flex-shrink: 0;
   width: 100%;
   margin-top: var(--s2a-spacing-md, 16px);
+  margin-bottom: 0;
 }
 
 .upcoming-sessions .sg-card__title {
