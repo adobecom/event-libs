@@ -1,5 +1,6 @@
 import { signal } from '../../deps/htm-preact.js';
 import { getNowMs } from '../../utils/session-state.js';
+import { logError } from '../../utils/lana-log.js';
 
 // Single local store: doubles as "what stage is currently registered" (SWAN's own
 // forward-only stage guard, see swan-notifications.js) and the notification widget's
@@ -13,7 +14,7 @@ function readLocalState() {
   try {
     return JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
   } catch (err) {
-    window.lana?.log(`[notification-store] local state was corrupt, resetting: ${err.message}`);
+    logError('notification-store', 'local state was corrupt, resetting', err);
     return {};
   }
 }
@@ -22,7 +23,7 @@ function writeLocalState(state) {
   try {
     window.localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(state));
   } catch (err) {
-    window.lana?.log(`[notification-store] failed to persist local state: ${err.message}`);
+    logError('notification-store', 'failed to persist local state', err);
   }
 }
 
@@ -71,7 +72,7 @@ window.addEventListener('storage', (e) => {
     // Object.values(state)/state[rfCode] access for the rest of the page session.
     state = (parsed && typeof parsed === 'object') ? parsed : {};
   } catch (err) {
-    window.lana?.log(`[notification-store] cross-tab storage event carried corrupt state, resetting: ${err.message}`);
+    logError('notification-store', 'cross-tab storage event carried corrupt state, resetting', err);
     state = {};
   }
   sequence = Math.max(0, ...Object.values(state).map((entry) => entry.seq || 0));

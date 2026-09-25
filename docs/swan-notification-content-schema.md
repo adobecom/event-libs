@@ -34,8 +34,20 @@ render"). This matches SWAN's actual use case (a session with a start/end time) 
 | `session.title` \|\| fallback | `timeline.eventData.title` | Only read for `viewtype: 'eventTimeline'` specifically. |
 | `session.startTimeUtc` | `timeline.eventData.goLiveTime` | Epoch **seconds, as a string** — matches the real example's format exactly. |
 | `session.endTimeUtc` | `timeline.eventData.goLiveExpireTime` | Epoch **seconds, as a string**. |
-| `swanConfig.defaultNotificationIconUrl` | `timeline.serviceIconDetails.serviceIcon` | Confirmed icon-resolution field (`Utils.getAvatarIconURLAndServiceIconInfo`) — SWAN has no avatar/asset icon, so this is the correct (only-populated) slot. |
+| `session.thumbnailUrl` \|\| track-icon URL \|\| `swanConfig.defaultNotificationIconUrl` \|\| `''` | `timeline.serviceIconDetails.serviceIcon` | Confirmed icon-resolution field (`Utils.getAvatarIconURLAndServiceIconInfo`) — SWAN has no avatar/asset icon, so this is still the only-populated slot. Same source precedence as feds mode's `iconUrl`/`trackIconName` (`buildNotificationEntry`), collapsed into one URL because UNC's plain `<img>` renderer (`BaseTimelineNotification.jsx`) has no client-side thumbnail-then-track-icon fallback the way feds mode's `notification-widget.js` does, so the choice must be fully resolved at payload-build time. The track-icon URL comes from `getOverrideTrackIcon`/`getTrackIcon` (`tier-1-event-config.js`) resolved to a bare URL via `buildFederalTrackIconUrl` (`features/icons/federal-icons.js`) — the same federal CDN path feds mode fetches and inlines as an SVG. |
 | `session.sessionPageUrl` (resolved to an absolute URL) | `timeline.defaultAction.url` | Confirmed click-through target (`RenderingUtility.handleDefaultAction`). |
+
+## Known limitation: no per-track color tinting in UNC (accepted gap)
+
+Feds mode recolors the track-icon SVG (`black` fill/stroke → `currentColor`, via
+`federal-icons.js`'s `useCurrentColorForBlack`) so a per-track CSS `color` can tint it, using
+the `color` field `getTrackIcon`/`getOverrideTrackIcon` return alongside `icon`. UNC's
+renderer only ever paints a plain `<img src={...}>` (`BaseTimelineNotification.jsx`) — there
+is no SVG inlining, no `currentColor` support, and no color/tint field anywhere in UNC's
+contract or engine. UNC-mode notifications therefore show the correct track-icon *shape*, in
+that icon's own authored (untinted) artwork colors, never per-track-tinted the way feds mode
+is. This is a platform limitation, not something `swan-payload.js` alone can close — accepted
+as out of scope.
 
 ## Fields deliberately omitted, and why
 

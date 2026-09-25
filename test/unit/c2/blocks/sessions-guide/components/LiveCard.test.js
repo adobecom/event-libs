@@ -85,6 +85,18 @@ describe('LiveCard', () => {
     liveStreamActiveIds.value = new Set();
   });
 
+  let originalMatchMedia;
+  beforeEach(() => { originalMatchMedia = window.matchMedia; });
+  afterEach(() => { window.matchMedia = originalMatchMedia; });
+
+  const forceMobile = (mobile) => {
+    window.matchMedia = (q) => ({
+      matches: q.includes('max-width: 1023px') ? mobile : !mobile,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+  };
+
   it('applies the track color to the thumbnail placeholder background', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
@@ -315,6 +327,9 @@ describe('LiveCard', () => {
   // A live session with an additional event-site track badges both tracks side by side in
   // the time's slot, and drops the "+1" that would otherwise double count the second one.
   describe('additional track badge', () => {
+    // Forces desktop meta-row layout; the ambient viewport defaults to mobile.
+    beforeEach(() => forceMobile(false));
+
     const render = (session, props) => {
       const LiveCard = buildLiveCard(preact, makeStore());
       return LiveCard({ session, ...props });
@@ -442,23 +457,7 @@ describe('LiveCard', () => {
     });
   });
 
-  // Figma 8463:87698 — mobile only, 'live' variant only. matchesMobile() reads window.matchMedia
-  // directly (not gated behind useEffect, which is a no-op in this string-render harness), so
-  // forcing it here is enough to exercise the branch without a real resize.
-  describe('mobile layout (title-then-badges, live variant only)', () => {
-    let originalMatchMedia;
-
-    beforeEach(() => { originalMatchMedia = window.matchMedia; });
-    afterEach(() => { window.matchMedia = originalMatchMedia; });
-
-    const forceMobile = (mobile) => {
-      window.matchMedia = (q) => ({
-        matches: q.includes('max-width: 767px') ? mobile : !mobile,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      });
-    };
-
+  describe('mobile layout (title-then-badges, live and recommended variants)', () => {
     it('renders the title before the badges block on a mobile live card', () => {
       forceMobile(true);
       const LiveCard = buildLiveCard(preact, makeStore());
@@ -490,13 +489,48 @@ describe('LiveCard', () => {
       expect(out).to.include('sg-live-card__meta');
     });
 
-    it('leaves the recommended variant on its current meta-then-title layout, even on mobile', () => {
+    it('moves the recommended variant onto the title-then-badges layout on mobile too', () => {
       forceMobile(true);
       const LiveCard = buildLiveCard(preact, makeStore());
       const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended' });
-      expect(out).to.not.include('sg-live-card__badges');
-      expect(out).to.include('sg-live-card__meta');
-      expect(out).to.include('sg-live-card__desc');
+      expect(out).to.include('sg-live-card__badges');
+      expect(out).to.not.include('sg-live-card__meta');
+      expect(out).to.not.include('sg-live-card__desc');
+    });
+
+    it('shows the time above the title for a mobile recommended card that is upcoming', () => {
+      forceMobile(true);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended' });
+      expect(out).to.include('sg-live-card__time--mobile');
+      // 'MAX Keynote' also appears in the thumbnail's alt text, so compare against the title button.
+      expect(out.indexOf('sg-live-card__time--mobile')).to.be.lessThan(out.indexOf('sg-live-card__title-btn'));
+    });
+
+    it('shows both the time row and two badges together on a mobile recommended upcoming card', () => {
+      forceMobile(true);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({
+        session: { ...UPCOMING_SESSION, additionalTracks: ['Branding', 'Ignored Second'] },
+        variant: 'recommended',
+      });
+      expect(out).to.include('sg-live-card__time--mobile');
+      expect(out).to.include('sg-live-card__badges');
+      expect(out).to.include('Branding');
+    });
+
+    it('omits the time above the title for a mobile recommended card that is already on demand', () => {
+      forceMobile(true);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: ON_DEMAND_SESSION, variant: 'recommended' });
+      expect(out).to.not.include('sg-live-card__time--mobile');
+    });
+
+    it('does not show the time above the title for a mobile live card', () => {
+      forceMobile(true);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_SESSION });
+      expect(out).to.not.include('sg-live-card__time--mobile');
     });
   });
 

@@ -111,7 +111,7 @@ export function onElementDetached(element, teardown) {
         try {
           w.teardown();
         } catch (error) {
-          logError('video-session', `element-detached teardown failed: ${error.message}`);
+          logError('video-session', 'element-detached teardown failed', error);
         }
       });
       if (detachWatchers.size === 0) {
@@ -130,6 +130,7 @@ export function findEmbeddableVideos(sessionTimes) {
     .filter((video) => EMBEDDABLE_PROVIDERS.includes(video?.provider));
 }
 
+// True once the first session-times entry's end has passed; missing/invalid end is treated as ended.
 export function currentSessionHasEnded(sessionTimes, nowMs) {
   const firstEntry = (sessionTimes || [])[0];
   if (!firstEntry || !Number.isFinite(firstEntry.endTimeMillis)) return true;
@@ -204,7 +205,7 @@ function simulivePhase(session, nowMs) {
   return PLAYBACK_PHASE.SIMULIVE;
 }
 
-function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasEverActive) {
+function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds) {
   const start = Date.parse(session.startTimeUtc) || null;
   if (start && nowMs < start) return PLAYBACK_PHASE.PRE_EVENT;
 
@@ -213,12 +214,11 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasE
   const isLiveNow = session.mrStreamId
     ? Boolean(liveStreamActiveIds?.has(session.mrStreamId))
     : (end == null || nowMs < end);
-  if (isLiveNow) return PLAYBACK_PHASE.WATCH_LIVE;
-
-  if (session.mrStreamId && !streamWasEverActive && end != null && nowMs < end) {
+  if (isLiveNow) {
     return PLAYBACK_PHASE.WATCH_LIVE;
   }
 
+  // Poll is authoritative: inactive means not live, so fall to DVR/on-demand by the timings below.
   if (session.dvrDelayHours != null) {
     const availableAt = dvrAvailableAtMs(session, eventStartMs);
     if (availableAt != null && nowMs < availableAt) return PLAYBACK_PHASE.DVR_BUFFER;
@@ -229,13 +229,13 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasE
 }
 
 export function getPlaybackPhase(session, {
-  nowMs, eventStartMs = null, liveStreamActiveIds = null, streamWasEverActive = false,
+  nowMs, eventStartMs = null, liveStreamActiveIds = null,
 } = {}) {
   const playbackCase = classifySessionPlayback(session);
   if (playbackCase === PLAYBACK_CASE.IPOD) return ipodPhase(session, nowMs, eventStartMs);
   if (playbackCase === PLAYBACK_CASE.SIMULIVE) return simulivePhase(session, nowMs);
   if (playbackCase === PLAYBACK_CASE.LIVE) {
-    return livePhase(session, nowMs, eventStartMs, liveStreamActiveIds, streamWasEverActive);
+    return livePhase(session, nowMs, eventStartMs, liveStreamActiveIds);
   }
   return null;
 }
@@ -259,8 +259,6 @@ export function buildSessionFromMetadata(sessionTimes) {
   };
 }
 
-const HOUR_MS = 60 * 60 * 1000;
-
 export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}) {
   const candidates = [];
   const start = Date.parse(session.startTimeUtc) || null;
@@ -270,30 +268,34 @@ export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}
     candidates.push(start - (SIMULIVE_PRE_ROLL_MIN * MINUTE_MS));
   }
   if (end != null) candidates.push(end);
-  if (session.dvrDelayHours != null && eventStartMs != null) {
-    candidates.push(eventStartMs + session.dvrDelayHours * HOUR_MS);
-  }
+  // Same anchor as the phase gate, so the tick fires exactly when the DVR window unlocks.
+  const dvrUnlockMs = dvrAvailableAtMs(session, eventStartMs);
+  if (dvrUnlockMs != null) candidates.push(dvrUnlockMs);
   const future = candidates.filter((ms) => ms > nowMs);
   return future.length ? Math.min(...future) : null;
 }
+
+// How long to wait for the MR poll's first result before falling back to a clock-based phase.
+const POLL_FIRST_EMIT_FALLBACK_MS = 5000;
 
 export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   if (!session) return () => {};
   const resolveEventStartMs = () => (eventStartMs != null ? eventStartMs : getEventStartMs());
 
   let liveStreamActiveIds = new Set();
-  let streamWasEverActive = false;
   let lastPhase;
   let timerId = null;
+  let firstEmitTimerId = null;
+  let emitted = false;
   let stopped = false;
 
   const emitIfChanged = () => {
     if (stopped) return;
+    emitted = true;
     const phase = getPlaybackPhase(session, {
       nowMs: getNowMs(),
       eventStartMs: resolveEventStartMs(),
       liveStreamActiveIds,
-      streamWasEverActive,
     });
     if (phase !== lastPhase) {
       lastPhase = phase;
@@ -314,18 +316,22 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   if (session.mrStreamId) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
-      if (liveStreamActiveIds.has(session.mrStreamId)) streamWasEverActive = true;
       emitIfChanged();
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId]);
+    // Defer the first emit until the poll answers, so a live session doesn't briefly show DVR first.
+    // But if the poll never answers (endpoint down), fall back to a clock-based phase after a short
+    // wait so the player never stays blank; a later poll result still overrides it.
+    firstEmitTimerId = setTimeout(() => { if (!emitted) emitIfChanged(); }, POLL_FIRST_EMIT_FALLBACK_MS);
+  } else {
+    emitIfChanged();
   }
-
-  emitIfChanged();
   scheduleNextClockTick();
 
   return function stop() {
     stopped = true;
     if (timerId != null) { clearTimeout(timerId); timerId = null; }
+    if (firstEmitTimerId != null) { clearTimeout(firstEmitTimerId); firstEmitTimerId = null; }
     if (session.mrStreamId) {
       unsubscribePoll();
       unregisterStreamIds([session.mrStreamId]);

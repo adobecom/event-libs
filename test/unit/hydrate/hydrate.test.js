@@ -56,6 +56,37 @@ describe('hydrateBlocks', () => {
     expect(images[1].src).to.equal('https://example.com/sponsor2.jpg');
   });
 
+  it('should render sponsors within a tier sorted by ordinal rather than metadata array order', async () => {
+    setMetadata('sponsors', JSON.stringify([
+      {
+        name: 'Sponsor 2',
+        image: { imageUrl: 'https://example.com/sponsor2.jpg' },
+        sponsorType: 'gold',
+        ordinal: 1,
+      },
+      {
+        name: 'Sponsor 1',
+        image: { imageUrl: 'https://example.com/sponsor1.jpg' },
+        sponsorType: 'gold',
+        ordinal: 0,
+      },
+    ]));
+
+    document.body.innerHTML = `
+      <div class="image-links hydrate sponsors gold">
+        <div><div><h2>Gold Sponsors</h2></div></div>
+      </div>
+    `;
+
+    hydrateBlocks(document);
+
+    const block = document.querySelector('.image-links');
+    const images = block.querySelectorAll('img');
+    expect(images).to.have.lengthOf(2);
+    expect(images[0].src).to.equal('https://example.com/sponsor1.jpg');
+    expect(images[1].src).to.equal('https://example.com/sponsor2.jpg');
+  });
+
   it('should filter sponsors by tier', async () => {
     setMetadata('sponsors', JSON.stringify([
       {

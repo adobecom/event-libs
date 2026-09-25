@@ -65,7 +65,7 @@ export function formatSessionDateTime(sessionTime) {
 
     return `${dateStr}, ${startLabel}–${endLabel}${tzAbbr ? ` ${tzAbbr}` : ''}`;
   } catch (error) {
-    window.lana?.log(`featured-sessions: date/time format failed: ${error.message}`);
+    logError('featured-sessions', 'date/time format failed', error);
     return '';
   }
 }

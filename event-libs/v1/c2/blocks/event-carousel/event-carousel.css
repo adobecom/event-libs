@@ -101,14 +101,14 @@
 
 .carousel-controls.dark-carousel .carousel-arrow,
 .section.dark .carousel-controls .carousel-arrow {
-  border-color: #e1e1e1;
-  background: #f3f3f3;
-  color: #000;
+  border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
+  color: var(--s2a-color-gray-25, #fff);
 }
 
 .carousel-controls.dark-carousel .carousel-arrow:hover,
 .section.dark .carousel-controls .carousel-arrow:hover {
-  background: #e1e1e1;
+  background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
 @media (width <= 767px) {

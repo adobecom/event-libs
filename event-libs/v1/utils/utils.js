@@ -1,4 +1,7 @@
-import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN, RSVP_TOKEN_PATTERN } from './constances.js';
+import {
+  SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN, RSVP_TOKEN_PATTERN, NON_PROD_EXACT_HOSTS,
+  STAGE_ADOBE_HOST,
+} from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { logError } from './lana-log.js';
 
@@ -6,10 +9,13 @@ const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
 // Shared gate for query-param debug/test overrides (branch switching, notification
 // mount-point fallbacks, etc.) — real prod domains (www.adobe.com and friends) never match
-// `.hlx.`/`.aem.`/`local`, so anything gated on this can't be triggered there.
+// `.hlx.`/`.aem.`/`local`, NON_PROD_EXACT_HOSTS, or STAGE_ADOBE_HOST (itself or a subdomain),
+// so anything gated on this can't be triggered on real prod.
 // `hostname` param defaults to the real one but is overridable for tests.
 export function isNonProdHost(hostname = window.location.hostname) {
-  return hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local');
+  return hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local')
+    || NON_PROD_EXACT_HOSTS.includes(hostname)
+    || hostname === STAGE_ADOBE_HOST || hostname.endsWith(`.${STAGE_ADOBE_HOST}`);
 }
 
 export const LIBS = (() => {

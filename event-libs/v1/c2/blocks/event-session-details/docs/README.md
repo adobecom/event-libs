@@ -52,7 +52,7 @@ field to read, so it never waits on the catalog:
 
 | State | Condition | Eyebrow | Closed captions |
 |---|---|---|---|
-| `upcoming` | `now` is before every slot's start | `Nov 11, 9:00 AM PST` | hidden |
+| `upcoming` | `now` is before every slot's start | `Nov 11, 9:00am PST` | hidden |
 | `live` | `now` is inside **any** slot (inclusive) | red dot + `Live` | hidden |
 | `on-demand` | anything else — after a slot, or between slots | `On-demand` / `Available soon` | shown |
 

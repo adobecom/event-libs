@@ -4,6 +4,7 @@ import {
   getBaseAttendeePayload,
   getEventAttendeePayload,
   getUnrecognizedAttendeeFields,
+  sanitizeLegacyPhoneFields,
 } from './data-utils.js';
 import { ENV_MAP, sessionCatalogHost } from './constances.js';
 import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
@@ -723,7 +724,10 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
         attendee = await createAttendee(eventId, filteredPayload);
       } else if (attendeeResp.data?.attendeeId) {
         // Use BaseAttendee filter for updating existing attendee
-        const payload = { ...attendeeResp.data, ...attendeeData };
+        const payload = {
+          ...sanitizeLegacyPhoneFields(attendeeResp.data, attendeeData),
+          ...attendeeData,
+        };
         const filteredPayload = getBaseAttendeePayload(payload);
         attendee = await updateAttendee(eventId, filteredPayload);
       }
