@@ -1,5 +1,12 @@
 .upcoming-sessions {
   position: relative;
+  box-sizing: border-box;
+}
+
+.upcoming-sessions *,
+.upcoming-sessions *::before,
+.upcoming-sessions *::after {
+  box-sizing: inherit;
 }
 
 .upcoming-sessions--attached {
