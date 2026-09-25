@@ -54,7 +54,7 @@
   align-items: center;
   gap: 10px;
   padding: var(--s2a-spacing-16, 16px);
-  border: 1px solid var(--s2a-color-gray-500, #8f8f8f);
+  border: 1px solid var(--s2a-color-gray-400, #c6c6c6);
   border-radius: var(--s2a-border-radius-16, 16px);
   background: var(--s2a-color-gray-25, #fff);
   color: var(--s2a-color-gray-1000, #000);
@@ -83,8 +83,10 @@
 
 .featured-product-arrow {
   position: absolute;
-  top: var(--s2a-spacing-8, 8px);
-  right: var(--s2a-spacing-8, 8px);
+
+  /* Figma's 8px offset is measured from outside the 1px border. */
+  top: 7px;
+  right: 7px;
   display: inline-flex;
   color: var(--s2a-color-gray-600, #717171);
 }

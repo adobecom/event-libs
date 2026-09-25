@@ -1,11 +1,18 @@
 @import '../../styles/tokens.css';
 
-.session-video-player {
+.session-video-player[data-embedded='true'] {
   padding-bottom: var(--s2a-spacing-8, 8px);
 }
 
 .lenis.lenis-smooth .session-video-player .milo-video iframe {
   pointer-events: auto;
+}
+
+@media (min-width: 768px) {
+  .session-video-player .milo-video {
+    border-radius: var(--s2a-border-radius-24, 24px);
+    overflow: hidden;
+  }
 }
 
 @media (min-width: 1024px) {
