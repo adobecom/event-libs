@@ -104,7 +104,6 @@ function syncAuth() {
     maybeLoadMyData();
     return;
   }
-  console.log('profile.userId:', profile.userId);
   if (auth.value.isLoggedIn && profile.userId) {
     exchangeRfAuthToken(profile.userId);
   } else {

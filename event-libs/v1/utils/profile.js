@@ -3,24 +3,11 @@ import { getEventAttendee, validateRsvpToken } from './esp-controller.js';
 import { getMetadata, getRsvpToken, waitForAdobeIMS } from './utils.js';
 
 export async function getProfile() {
-  const { feds, adobeProfile, fedsConfig, adobeIMS } = window;
-
-  const getUserProfile = () => {
-    if (fedsConfig?.universalNav) {
-      return feds?.services?.universalnav?.interface?.adobeProfile?.getUserProfile()
-          || adobeProfile?.getUserProfile();
-    }
-
-    return (
-      feds?.services?.profile?.interface?.adobeProfile?.getUserProfile()
-      || adobeProfile?.getUserProfile()
-      || adobeIMS?.getProfile()
-    );
-  };
-
-  const profile = await getUserProfile();
-
-  return profile;
+  // IMS is the single source of truth for the profile — it carries every detail (userId,
+  // account_type, name, …). Guard as Milo's gnav does: only call getProfile() once IMS exists
+  // and reports a signed-in user; otherwise there is no profile to fetch.
+  if (!window.adobeIMS?.isSignedInUser?.()) return null;
+  return window.adobeIMS.getProfile();
 }
 
 export async function lazyCaptureProfile() {
@@ -55,7 +42,8 @@ export async function lazyCaptureProfile() {
     }
 
     try {
-      const profile = await getProfile();
+      // getProfile() returns null when IMS reports the user signed out.
+      const profile = await getProfile() || { noProfile: true };
       BlockMediator.set('imsProfile', profile);
 
       if (!profile.noProfile && profile.account_type !== 'guest') {
