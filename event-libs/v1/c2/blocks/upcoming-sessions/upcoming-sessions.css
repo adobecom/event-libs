@@ -275,9 +275,10 @@
 
 .upcoming-sessions .sg-card.is-scheduled .sg-icon-btn--on-dark.sg-card__btn--schedule,
 .upcoming-sessions .sg-card.is-favorited .sg-icon-btn--on-dark.sg-card__btn--favorite {
-  background: transparent;
-  border-color: var(--s2a-color-gray-800, #292929);
-  backdrop-filter: blur(16px);
+  background: #fff;
+  border-color: var(--s2a-color-gray-100, #e9e9e9);
+  color: #000;
+  backdrop-filter: blur(4.6875px);
 }
 
 .upcoming-sessions.dark-card .sg-card,
@@ -424,12 +425,6 @@
 
   .upcoming-sessions .sg-card__actions::after {
     display: none;
-  }
-
-  /* Restores opaque white on hover only; the transparent resting state is invisible over the dark hover fill. */
-  .upcoming-sessions .sg-card.is-scheduled:is(:hover, :focus-within) .sg-icon-btn--on-dark.sg-card__btn--schedule,
-  .upcoming-sessions .sg-card.is-favorited:is(:hover, :focus-within) .sg-icon-btn--on-dark.sg-card__btn--favorite {
-    background: #fff;
   }
 
   /* stylelint-disable no-descending-specificity */
