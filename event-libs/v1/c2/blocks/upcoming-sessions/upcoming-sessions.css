@@ -148,13 +148,14 @@
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
-  width: 255px;
-  min-height: 152px;
+  width: 268px;
+  min-height: 0;
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
   cursor: pointer;
   transition: background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               min-height 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -166,12 +167,6 @@
 
 .upcoming-sessions .sg-card:active {
   background: var(--s2a-color-gray-75, #ececec);
-}
-
-.upcoming-sessions .sg-card:hover {
-  background: var(--s2a-color-gray-900, #131313);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
-  z-index: 2;
 }
 
 .upcoming-sessions .sg-card__body {
@@ -190,7 +185,7 @@
   align-items: center;
   flex-shrink: 0;
   width: 100%;
-  margin-top: var(--s2a-spacing-md, 16px);
+  margin-top: var(--s2a-spacing-sm, 12px);
 }
 
 .upcoming-sessions .sg-card__title {
@@ -210,10 +205,6 @@
   transition: color 0.2s;
 }
 
-.upcoming-sessions .sg-card:hover .sg-card__title {
-  color: var(--s2a-color-gray-25, #fff);
-}
-
 .upcoming-sessions .sg-card__footer {
   display: none;
 }
@@ -231,16 +222,8 @@
   transition: color 0.2s;
 }
 
-.upcoming-sessions .sg-card:hover .sg-card__track {
-  color: var(--s2a-color-gray-25, #fff);
-}
-
 .upcoming-sessions .sg-card__footer-badge {
   display: none;
-}
-
-.upcoming-sessions .sg-card:hover .sg-category-badge {
-  color: var(--s2a-color-gray-25, #fff);
 }
 
 .upcoming-sessions .sg-card__time {
@@ -250,10 +233,6 @@
   white-space: normal;
   text-align: right;
   transition: color 0.2s;
-}
-
-.upcoming-sessions .sg-card:hover .sg-card__time {
-  color: rgb(255 255 255 / 50%);
 }
 
 .upcoming-sessions .sg-card__actions {
@@ -279,20 +258,18 @@
   pointer-events: none;
 }
 
-.upcoming-sessions .sg-card.is-scheduled .sg-card__btn--schedule {
-  background: #fff;
-  border-color: #e9e9e9;
-  color: #000;
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark.sg-card__btn--schedule,
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark.sg-card__btn--favorite {
+  background: rgb(255 255 255 / 80%);
+  border-color: var(--s2a-color-gray-100, #e9e9e9);
+  backdrop-filter: blur(4.6875px);
 }
 
-.upcoming-sessions .sg-card.is-favorited .sg-card__btn--favorite {
-  background: #fff;
-  border-color: #e9e9e9;
-  color: #000;
-}
-
-.upcoming-sessions .sg-card:hover .sg-card__actions::after {
-  color: rgb(255 255 255 / 50%);
+.upcoming-sessions .sg-card.is-scheduled .sg-icon-btn--on-dark.sg-card__btn--schedule,
+.upcoming-sessions .sg-card.is-favorited .sg-icon-btn--on-dark.sg-card__btn--favorite {
+  background: transparent;
+  border-color: var(--s2a-color-gray-800, #292929);
+  backdrop-filter: blur(16px);
 }
 
 .upcoming-sessions.dark-card .sg-card,
@@ -332,23 +309,41 @@
 @media (min-width: 1280px) {
   .upcoming-sessions .sg-card {
     flex-direction: row;
-    align-items: flex-start;
-    width: 375px;
-    min-height: 128px;
+    align-items: stretch;
+    width: 379px;
+    min-height: 130px;
     padding: var(--s2a-spacing-lg, 24px);
     gap: var(--s2a-spacing-lg, 24px);
+    border: var(--s2a-border-width-sm, 1px) solid transparent;
   }
 
-  .upcoming-sessions .sg-card:is(:hover, :focus-within),
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) {
+    width: 427px;
+    min-height: 150px;
+    background: #262626;
+    border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+    box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+    z-index: 2;
+  }
+
   .upcoming-sessions .sg-card.is-scheduled,
   .upcoming-sessions .sg-card.is-favorited {
-    width: 431px;
-    min-height: 128px;
+    width: 427px;
+  }
+
+  .upcoming-sessions .sg-card.is-scheduled:is(:hover, :focus-within),
+  .upcoming-sessions .sg-card.is-favorited:is(:hover, :focus-within) {
+    min-height: 150px;
+    background: #262626;
+    border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+    box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+    z-index: 2;
   }
 
   .upcoming-sessions .sg-card__body {
-    width: auto;
-    gap: var(--s2a-spacing-md, 16px);
+    flex: none;
+    width: 331px;
+    gap: 0;
   }
 
   .upcoming-sessions .sg-card__badge-row {
@@ -361,25 +356,25 @@
     -webkit-line-clamp: 2;
   }
 
-  .upcoming-sessions .sg-card__footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s2a-spacing-lg, 24px);
-    margin-top: auto;
-    padding-top: var(--s2a-spacing-md);
-    position: absolute;
-    left: var(--s2a-spacing-lg, 24px);
-    right: var(--s2a-spacing-lg, 24px);
-    bottom: var(--s2a-spacing-lg, 24px);
-    transition: right 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__title {
+    color: var(--s2a-color-gray-25, #fff);
   }
 
-  /* Keeps the time to the left of the expanding action buttons instead of drifting under them. */
-  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__footer,
-  .upcoming-sessions .sg-card.is-scheduled .sg-card__footer,
-  .upcoming-sessions .sg-card.is-favorited .sg-card__footer {
-    right: calc(var(--s2a-spacing-lg, 24px) + var(--s2a-spacing-2xl, 48px) + var(--s2a-spacing-sm, 12px));
+  .upcoming-sessions .sg-card__footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s2a-spacing-xs, 8px);
+    margin-top: auto;
+    padding-top: var(--s2a-spacing-md, 16px);
+  }
+
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__track {
+    color: var(--s2a-color-gray-25, #fff);
+  }
+
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-category-badge {
+    color: var(--s2a-color-gray-25, #fff);
   }
 
   .upcoming-sessions .sg-card__track--footer {
@@ -394,9 +389,14 @@
     margin-left: auto;
   }
 
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__time {
+    color: rgb(255 255 255 / 50%);
+  }
+
   .upcoming-sessions .sg-card__actions {
     flex-direction: column;
     width: 0;
+    gap: var(--s2a-spacing-md, 16px);
     margin-top: 0;
     opacity: 0;
     pointer-events: none;
@@ -416,6 +416,12 @@
 
   .upcoming-sessions .sg-card__actions::after {
     display: none;
+  }
+
+  /* Restores opaque white on hover only; the transparent resting state is invisible over the dark hover fill. */
+  .upcoming-sessions .sg-card.is-scheduled:is(:hover, :focus-within) .sg-icon-btn--on-dark.sg-card__btn--schedule,
+  .upcoming-sessions .sg-card.is-favorited:is(:hover, :focus-within) .sg-icon-btn--on-dark.sg-card__btn--favorite {
+    background: #fff;
   }
 
   /* stylelint-disable no-descending-specificity */
