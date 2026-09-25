@@ -155,8 +155,8 @@
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
-  width: 268px;
-  min-height: 0;
+  width: 255px;
+  min-height: 152px;
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
   cursor: pointer;
@@ -192,7 +192,7 @@
   align-items: center;
   flex-shrink: 0;
   width: 100%;
-  margin-top: var(--s2a-spacing-sm, 12px);
+  margin-top: var(--s2a-spacing-md, 16px);
 }
 
 .upcoming-sessions .sg-card__title {
@@ -249,7 +249,7 @@
   flex-shrink: 0;
   width: 100%;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   opacity: 1;
   pointer-events: auto;
 }
