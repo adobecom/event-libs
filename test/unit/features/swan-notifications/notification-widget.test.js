@@ -176,22 +176,14 @@ describe('notification-widget', () => {
     expect(bell().getAttribute('aria-expanded')).to.equal('false');
   });
 
-  it('keeps entries unread while the panel is open the first time, so the dot is actually visible', () => {
-    addEntry('RF-1', { stage: 'reminder', title: 'First' });
-    bell().click();
-    expect(rows()[0].classList.contains('swan-notif__row--unread')).to.equal(true);
-    expect(badge().hidden).to.equal(false);
-  });
-
-  it('clears the badge on close, even for rows never individually clicked', () => {
+  it('clears the badge and marks all entries read when the panel opens', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     addEntry('RF-2', { stage: 'reminder', title: 'Second' });
     expect(badge().hidden).to.equal(false);
     bell().click();
-    expect(badge().hidden).to.equal(false); // still unread while open — see the test above
-    bell().click(); // closes
     expect(badge().hidden).to.equal(true);
     expect(getEntries().every((entry) => entry.read)).to.equal(true);
+    expect(rows().every((row) => !row.classList.contains('swan-notif__row--unread'))).to.equal(true);
   });
 
   it('closes the panel on an outside click', () => {
