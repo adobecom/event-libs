@@ -36,7 +36,10 @@ function send(severity, scope, message, data) {
   const context = ['warning', 'error', 'critical'].includes(severity)
     ? ` | ${getClientContext()}`
     : '';
-  window.lana?.log(`[${scope}] ${message}${suffix}${context}`, { tags: scope, severity });
+  const options = { tags: scope, severity };
+  if (severity === 'critical') options.sampleRate = 100;
+  else if (severity === 'error') options.sampleRate = 10;
+  window.lana?.log(`[${scope}] ${message}${suffix}${context}`, options);
 }
 
 export function logDebug(scope, message, data) {
