@@ -278,12 +278,6 @@ function buildWidget(mount) {
     button.setAttribute('aria-expanded', 'false');
     document.removeEventListener('click', onOutsideClick);
     document.removeEventListener('keydown', onKeydown);
-    // Closing, not opening, is "having seen" the list — marking read on open would clear
-    // the unread dot/tint before the attendee ever actually saw it (both happen
-    // synchronously, in the same tick, before the browser paints). This still clears the
-    // badge for entries never individually clicked, just one interaction later; markAllRead()
-    // itself no-ops (no signal write) when nothing is unread.
-    markAllRead();
   }
 
   function onOutsideClick(e) {
@@ -307,6 +301,7 @@ function buildWidget(mount) {
     button.setAttribute('aria-expanded', 'true');
     document.addEventListener('click', onOutsideClick);
     document.addEventListener('keydown', onKeydown);
+    markAllRead();
   }
 
   button.addEventListener('click', (e) => {
