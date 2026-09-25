@@ -171,8 +171,6 @@
 .upcoming-sessions .sg-card:hover {
   background: var(--s2a-color-gray-900, #131313);
   box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
-  width: 268px;
-  min-height: 160px;
   z-index: 2;
 }
 
@@ -192,7 +190,7 @@
   align-items: center;
   flex-shrink: 0;
   width: 100%;
-  margin-bottom: var(--s2a-spacing-md, 16px);
+  margin-top: var(--s2a-spacing-md, 16px);
 }
 
 .upcoming-sessions .sg-card__title {
@@ -345,7 +343,7 @@
   .upcoming-sessions .sg-card.is-scheduled,
   .upcoming-sessions .sg-card.is-favorited {
     width: 431px;
-    min-height: 134px;
+    min-height: 128px;
   }
 
   .upcoming-sessions .sg-card__body {
@@ -374,6 +372,14 @@
     left: var(--s2a-spacing-lg, 24px);
     right: var(--s2a-spacing-lg, 24px);
     bottom: var(--s2a-spacing-lg, 24px);
+    transition: right 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Keeps the time to the left of the expanding action buttons instead of drifting under them. */
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__footer,
+  .upcoming-sessions .sg-card.is-scheduled .sg-card__footer,
+  .upcoming-sessions .sg-card.is-favorited .sg-card__footer {
+    right: calc(var(--s2a-spacing-lg, 24px) + var(--s2a-spacing-2xl, 48px) + var(--s2a-spacing-sm, 12px));
   }
 
   .upcoming-sessions .sg-card__track--footer {

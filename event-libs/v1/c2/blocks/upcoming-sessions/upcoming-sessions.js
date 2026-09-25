@@ -61,27 +61,31 @@ function toIsoTimes(session) {
   };
 }
 
-// Intl always renders the meridiem as uppercase AM/PM; lowercase it while leaving
-// the timezone abbreviation (e.g. PDT/PST) untouched.
-function lowercaseMeridiem(time) {
-  return time.replace(/\b(AM|PM)\b/, (meridiem) => meridiem.toLowerCase());
+// Builds "9:00am" from Intl parts: drops the blank literal before the dayPeriod (so there's no
+// space before am/pm) and lowercases AM/PM, while leaving any trailing " PST" timezone abbr untouched.
+function joinTimeParts(parts) {
+  return parts.reduce((out, part, i) => {
+    if (part.type === 'literal' && part.value.trim() === '' && parts[i + 1]?.type === 'dayPeriod') return out;
+    return out + (part.type === 'dayPeriod' ? part.value.toLowerCase() : part.value);
+  }, '');
+}
+
+function formatSessionTime(millis, withTimeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    ...(withTimeZone ? { timeZoneName: 'short' } : {}),
+  }).formatToParts(new Date(millis));
+  return joinTimeParts(parts);
 }
 
 function formatTimeRange(session) {
   const { sessionTime } = session;
   if (!sessionTime) return '';
-  const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
   try {
-    const start = lowercaseMeridiem(
-      new Date(sessionTime.startTimeMillis).toLocaleTimeString('en-US', timeOptions),
-    );
-    const end = lowercaseMeridiem(
-      new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', {
-        ...timeOptions,
-        timeZoneName: 'short',
-      }),
-    );
-    return `${start} - ${end}`;
+    const start = formatSessionTime(sessionTime.startTimeMillis, false);
+    const end = formatSessionTime(sessionTime.endTimeMillis, true);
+    return `${start}–${end}`;
   } catch (error) {
     logError('upcoming-sessions', 'time format failed', error);
     return '';
@@ -176,12 +180,13 @@ export function buildCard(session) {
 
   const body = createTag('div', { class: 'sg-card__body' }, '', { parent: card });
 
+  // Title renders first so the track label follows it (Tablet/Mobile hierarchy: title, then track, then time/icons).
+  // session.enTitle is attacker-influenced (decoded from a hash payload) - set via .textContent, not html.
+  createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
+
   const badgeRow = createTag('div', { class: 'sg-card__badge-row' }, '', { parent: body });
   const topBadge = buildCategoryBadge(session.track);
   if (topBadge) badgeRow.append(topBadge);
-
-  // session.enTitle is attacker-influenced (decoded from a hash payload) - set via .textContent, not html.
-  createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
   const footer = createTag('div', { class: 'sg-card__footer' }, '', { parent: body });
   createTag('span', { class: 'sg-card__track sg-card__track--footer' }, '', { parent: footer }).textContent = primaryCategory(session);

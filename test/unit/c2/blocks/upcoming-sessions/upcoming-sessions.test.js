@@ -275,7 +275,7 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-card__title').textContent).to.equal('Intro to Adobe Express');
     });
 
-    it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone, with a lowercase am/pm', () => {
+    it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone, with a lowercase am/pm joined by an en dash and no space before am/pm', () => {
       const startMillis = Date.parse('2026-08-12T17:00:00.000Z');
       const card = buildCard(session({
         sessionTime: {
@@ -284,16 +284,23 @@ describe('upcoming-sessions', () => {
           timezone: 'America/Los_Angeles',
         },
       }));
-      const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
       const endMillis = startMillis + 60 * 60_000;
-      const lowercaseMeridiem = (time) => time.replace(/\b(AM|PM)\b/, (m) => m.toLowerCase());
-      const start = lowercaseMeridiem(new Date(startMillis).toLocaleTimeString('en-US', timeOptions));
-      const end = lowercaseMeridiem(
-        new Date(endMillis).toLocaleTimeString('en-US', { ...timeOptions, timeZoneName: 'short' }),
-      );
-      expect(card.querySelector('.sg-card__time').textContent).to.equal(`${start} - ${end}`);
-      expect(card.querySelector('.sg-card__time').textContent).to.match(/\b(am|pm)\b/);
+      const partsFor = (millis, withTimeZone) => new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        ...(withTimeZone ? { timeZoneName: 'short' } : {}),
+      }).formatToParts(new Date(millis));
+      const join = (parts) => parts.reduce((out, part, i) => {
+        if (part.type === 'literal' && part.value.trim() === '' && parts[i + 1]?.type === 'dayPeriod') return out;
+        return out + (part.type === 'dayPeriod' ? part.value.toLowerCase() : part.value);
+      }, '');
+      const start = join(partsFor(startMillis, false));
+      const end = join(partsFor(endMillis, true));
+      expect(card.querySelector('.sg-card__time').textContent).to.equal(`${start}–${end}`);
+      expect(card.querySelector('.sg-card__time').textContent).to.match(/(am|pm)\b/);
       expect(card.querySelector('.sg-card__time').textContent).to.not.match(/\b(AM|PM)\b/);
+      expect(card.querySelector('.sg-card__time').textContent).to.not.match(/ (am|pm)\b/);
+      expect(card.querySelector('.sg-card__time').textContent).to.not.match(/\d [-–] \d/);
     });
 
     it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {
@@ -341,6 +348,16 @@ describe('upcoming-sessions', () => {
       expect(footer.querySelector('.sg-card__track--footer').textContent).to.equal('Video');
       expect(footer.querySelector('.sg-card__footer-badge .sg-category-badge__label').textContent).to.equal('Video');
       expect(footer.querySelector('.sg-card__time')).to.not.equal(null);
+    });
+
+    it('renders the title before the badge-row so Tablet/Mobile shows title, then track, then time/icons', () => {
+      const card = buildCard(session());
+      const body = card.querySelector('.sg-card__body');
+      const children = [...body.children];
+      const titleIndex = children.findIndex((n) => n.classList.contains('sg-card__title'));
+      const badgeRowIndex = children.findIndex((n) => n.classList.contains('sg-card__badge-row'));
+      expect(titleIndex).to.be.greaterThan(-1);
+      expect(badgeRowIndex).to.be.greaterThan(titleIndex);
     });
 
     it('renders no badge (not a mainstage fallback) when the track has no icon config match', () => {
