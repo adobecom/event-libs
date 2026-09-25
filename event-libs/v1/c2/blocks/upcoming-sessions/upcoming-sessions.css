@@ -320,7 +320,7 @@
     width: 379px;
     min-height: 130px;
     padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-lg, 24px);
+    gap: 0;
     border: var(--s2a-border-width-sm, 1px) solid transparent;
   }
 
