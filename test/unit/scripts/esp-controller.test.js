@@ -226,6 +226,14 @@ describe('Adobe Event Service API', () => {
       expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
     });
 
+    it('should report the failure to lana even if the response body never resolves', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => new Promise(() => {}), ok: false, status: 400 });
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+      api.createAttendee('event-123', { name: 'John Doe' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(lanaLogStub.calledOnce).to.equal(true);
+    });
+
     it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
       sandbox.stub(window, 'fetch').resolves({ text: () => 'Event is full', ok: false, status: 400 });
 
@@ -328,6 +336,14 @@ describe('Adobe Event Service API', () => {
       expect(lanaLogStub.firstCall.args[0]).to.include('att-1');
     });
 
+    it('should report the failure to lana even if the response body never resolves', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => new Promise(() => {}), ok: false, status: 400 });
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+      api.addAttendeeToEvent('event-123', { attendeeId: 'att-1' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(lanaLogStub.calledOnce).to.equal(true);
+    });
+
     it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
       sandbox.stub(window, 'fetch').resolves({ text: () => 'Event is full', ok: false, status: 400 });
 
@@ -414,6 +430,14 @@ describe('Adobe Event Service API', () => {
       expect(lanaLogStub.calledOnce).to.equal(true);
       expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
       expect(lanaLogStub.firstCall.args[0]).to.include('att-1');
+    });
+
+    it('should report the failure to lana even if the response body never resolves', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => new Promise(() => {}), ok: false, status: 400 });
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+      api.updateAttendee('event-123', { attendeeId: 'att-1', name: 'John Doe' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(lanaLogStub.calledOnce).to.equal(true);
     });
 
     it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {

@@ -23,7 +23,7 @@ describe('lana-log', () => {
   it('formats the message with a [scope] prefix and sets tags/severity from scope', () => {
     logError('my-scope', 'thing failed');
     expect(calls[0].msg).to.include('[my-scope] thing failed');
-    expect(calls[0].options).to.deep.equal({ tags: 'my-scope', severity: 'error' });
+    expect(calls[0].options).to.deep.equal({ tags: 'my-scope', severity: 'error', sampleRate: 100 });
   });
 
   it('omits the trailing data suffix when no data is passed', () => {
@@ -108,5 +108,18 @@ describe('lana-log', () => {
   it('includes ua, viewport, lang, and env fields in the appended context', () => {
     logError('scope', 'msg');
     expect(calls[0].msg).to.match(CONTEXT_PATTERN);
+  });
+
+  it('forces full sampling for error and critical so they are never dropped by LANA\'s default 1% sample rate', () => {
+    logError('scope', 'a');
+    logCritical('scope', 'b');
+    calls.forEach((call) => expect(call.options.sampleRate).to.equal(100));
+  });
+
+  it('leaves debug, info, and warning at LANA\'s default sample rate', () => {
+    logDebug('scope', 'a');
+    logInfo('scope', 'b');
+    logWarning('scope', 'c');
+    calls.forEach((call) => expect(call.options).to.not.have.property('sampleRate'));
   });
 });

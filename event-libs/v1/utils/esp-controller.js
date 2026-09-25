@@ -335,8 +335,8 @@ export async function createAttendee(eventId, attendeeData, rsvpToken = null) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
 
     if (!response.ok) {
-      const error = await parseFailureBody(response);
       logError('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
+      const error = await parseFailureBody(response);
       return { ok: response.ok, status: response.status, error };
     }
 
@@ -361,8 +361,8 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
 
     if (!response.ok) {
-      const error = await parseFailureBody(response);
       logError('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
+      const error = await parseFailureBody(response);
       return { ok: response.ok, status: response.status, error };
     }
 
@@ -385,8 +385,8 @@ export async function updateAttendee(eventId, attendeeData) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
-      const error = await parseFailureBody(response);
       logError('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
+      const error = await parseFailureBody(response);
       return { ok: response.ok, status: response.status, error };
     }
 
