@@ -84,6 +84,14 @@
 }
 
 .upcoming-sessions-controls {
+  display: flex;
+  margin-right: var(--s2a-spacing-lg, 24px);
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--s2a-spacing-md, 16px);
+}
+
+.upcoming-sessions[data-few-sessions="true"] .upcoming-sessions-controls {
   display: none;
 }
 
@@ -118,20 +126,6 @@
 .upcoming-sessions.dark-card .upcoming-sessions-arrow:hover,
 .section.dark .upcoming-sessions .upcoming-sessions-arrow:hover {
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
-}
-
-@media (min-width: 1280px) {
-  .upcoming-sessions-controls {
-    display: flex;
-    margin-right: var(--s2a-spacing-lg, 24px);
-    flex-shrink: 0;
-    align-items: center;
-    gap: var(--s2a-spacing-md, 16px);
-  }
-
-  .upcoming-sessions[data-few-sessions="true"] .upcoming-sessions-controls {
-    display: none;
-  }
 }
 
 .upcoming-sessions-arrow--prev {

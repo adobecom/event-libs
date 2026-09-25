@@ -17,16 +17,10 @@
 }
 
 .carousel-controls {
-  display: none;
-}
-
-@media (width >= 900px) {
-  .carousel-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-  }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
 .carousel-heading {
@@ -113,6 +107,7 @@
 
 @media (width <= 767px) {
   .carousel-arrows {
+    justify-content: center;
     padding-inline: 16px;
   }
 
