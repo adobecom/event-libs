@@ -402,6 +402,16 @@
     --s2a-font-weight-caption: var(--s2a-font-weight-adobe-clean-bold);
 }
 
+/* Milo's own C2 foundation (libs/c2/styles.css) redefines the two font-family primitives above
+   as bare single names with no fallback list, at the same :root specificity — whichever loads
+   last wins the cascade. Bare names never resolve in Safari (blocks matching locally-installed
+   fonts) and fall through to the browser default serif. html:root outranks plain :root so this
+   file's fallback stack always wins, fixing every alias built on these two. See MWPW-206790. */
+html:root {
+  --s2a-font-family-adobe-clean: 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
+  --s2a-font-family-adobe-clean-display: 'Adobe Clean Display', adobe-clean-display, 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
+}
+
 
 /* =========================================
    Semantic Color Tokens — Light Mode
