@@ -2774,6 +2774,16 @@
     animation: sg-card-btn-reveal 0.22s ease both;
   }
 
+  /* Figma calls for a gray-900 outline at rest on both buttons; overrides the base
+     rule's near-invisible light-gray border-color (MWPW-207192). */
+  .sg-card:not(:hover, :focus-within).is-scheduled .sg-card__btn--favorite,
+  .sg-card:not(:hover, :focus-within).is-favorited .sg-card__btn--favorite,
+  .sg-card:not(:hover, :focus-within).is-scheduled .sg-card__btn--schedule,
+  .sg-card:not(:hover, :focus-within).is-favorited .sg-card__btn--schedule {
+    border-color: var(--s2a-color-gray-900, #131313);
+    color: var(--s2a-color-gray-900, #131313);
+  }
+
   .sg-card:not(:hover, :focus-within).is-scheduled:not(.is-favorited) .sg-card__btn--favorite,
   .sg-card:not(:hover, :focus-within).is-favorited:not(.is-scheduled) .sg-card__btn--schedule {
     display: none;
@@ -2781,6 +2791,47 @@
 
   .sg-card:not(:hover, :focus-within) .sg-card__btn--play {
     display: none;
+  }
+
+  /* Card hover always darkens to gray-900 (see .is-scheduled/.is-favorited:is(:hover...)
+     above); all three buttons become a solid white pill with a black icon so they read
+     clearly against it, per Figma (MWPW-207192). The button swaps between the
+     --outlined (unfavorited/unscheduled) and --solid (favorited/scheduled/play)
+     icon-button variants, so both are covered here; classes are repeated to outrank
+     each variant's own rule below, which would otherwise still win on `color` and
+     paint the icon white-on-white. */
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--favorite,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play {
+    background: #fff;
+    border-color: #fff;
+    color: #000;
+  }
+
+  /* Each variant also darkens further on its own :hover/:active — meant for buttons on a
+     light card, wrong once the card itself has gone dark. Neutralize both sub-states so
+     a directly-hovered/pressed button doesn't go dark-on-dark and hide its icon again. */
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--favorite:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play:hover:not(:disabled) {
+    background: rgb(255 255 255 / 64%);
+    border-color: #fff;
+  }
+
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--favorite:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play:active:not(:disabled) {
+    background: #fff;
+    border-color: transparent;
   }
 
   @keyframes sg-card-heart-slide {
