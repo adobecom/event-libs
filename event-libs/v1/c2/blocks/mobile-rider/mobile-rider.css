@@ -293,7 +293,7 @@
   line-height: 1;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .mobile-rider .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
@@ -302,9 +302,7 @@
   .mobile-rider-player:has(.mobile-rider-info-bar) .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px) 0 0;
   }
-}
 
-@media (min-width: 1024px) {
   /* Figma: the description is constrained to roughly the left half of the bar, not full width. */
   .mobile-rider .mobile-rider-info-bar-description {
     max-width: 60%;

@@ -8,17 +8,6 @@
   pointer-events: auto;
 }
 
-@media (min-width: 768px) {
-  .session-video-player .milo-video,
-  .session-video-player .milo-video iframe {
-    border-radius: var(--s2a-border-radius-24, 24px);
-  }
-
-  .session-video-player .milo-video {
-    overflow: hidden;
-  }
-}
-
 @media (min-width: 1024px) {
   :root:has(meta[name="foundation"][content="c2"]) .session-video-playlist-container .session-video-player .milo-video,
   :root:has(meta[name="foundation"][content="c2"]) .session-video-container .session-video-player .milo-video {
