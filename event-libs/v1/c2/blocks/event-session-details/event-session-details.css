@@ -130,6 +130,7 @@
   font-weight: 900;
   line-height: var(--s2a-typography-line-height-heading-3);
   letter-spacing: var(--s2a-typography-letter-spacing-heading-3);
+  text-wrap: balance;
 }
 
 @media (min-width: 1024px) {

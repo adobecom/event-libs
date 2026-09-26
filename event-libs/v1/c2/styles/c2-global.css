@@ -2,7 +2,7 @@
 
 @import './tokens.css';
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   :root:has(meta[name="foundation"][content="c2"]) .milo-video {
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
