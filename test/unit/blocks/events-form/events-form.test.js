@@ -763,6 +763,20 @@ describe('Events Form', () => {
   });
 
   describe('initFormBasedOnRSVPData', () => {
+    it('does not fetch attendee data for a signed-out profile', async () => {
+      const { initFormBasedOnRSVPData } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      const fetchStub = sinon.stub(window, 'fetch');
+      BlockMediator.set('imsProfile', null);
+
+      try {
+        await initFormBasedOnRSVPData({ block: document.createElement('div') });
+        expect(fetchStub.called).to.be.false;
+      } finally {
+        fetchStub.restore();
+        BlockMediator.set('imsProfile', undefined);
+      }
+    });
+
     function createStore(initialValue = null) {
       let value = initialValue;
       const subscribers = [];
@@ -1450,6 +1464,80 @@ describe('Events Form', () => {
       expect(result.data[0].type).to.equal('heading');
       expect(result.data[1].type).to.equal('divider');
     });
+  });
+});
+
+describe('onProfile', () => {
+  let metaRsvpConfig;
+  let dictionaryManager;
+  let initializeStub;
+  let onProfile;
+
+  before(async () => {
+    const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+    const dictionaryModule = await import('../../../../event-libs/v1/utils/dictionary-manager.js');
+    onProfile = module.onProfile;
+    dictionaryManager = dictionaryModule.dictionaryManager;
+  });
+
+  beforeEach(() => {
+    const allowGuestMeta = document.createElement('meta');
+    allowGuestMeta.name = 'allow-guest-registration';
+    allowGuestMeta.content = 'true';
+    document.head.append(allowGuestMeta);
+  });
+
+  afterEach(() => {
+    metaRsvpConfig?.remove();
+    metaRsvpConfig = null;
+    document.head.querySelectorAll('meta[name="rsvp-config"]').forEach((el) => el.remove());
+    document.head.querySelectorAll('meta[name="allow-guest-registration"]').forEach((el) => el.remove());
+    initializeStub?.restore();
+    initializeStub = null;
+    BlockMediator.set('imsProfile', undefined);
+    BlockMediator.set('eventData', undefined);
+    BlockMediator.set('rsvpData', undefined);
+  });
+
+  it('builds the RSVP form after the signed-out profile resolves to null', async () => {
+    initializeStub = sinon.stub(dictionaryManager, 'initialize').resolves();
+    const meta = document.createElement('meta');
+    meta.name = 'rsvp-config';
+    meta.content = JSON.stringify({
+      rsvpFormFields: [
+        { field: 'firstName', label: 'First Name', type: 'text', required: true, options: [] },
+      ],
+    });
+    document.head.append(meta);
+    metaRsvpConfig = meta;
+
+    const block = document.createElement('div');
+    block.classList.add('loading');
+    const eventHero = document.createElement('div');
+    eventHero.classList.add('loading');
+    const formContainer = document.createElement('div');
+    const formLink = document.createElement('a');
+    formLink.href = 'https://example.com/rsvp.json';
+    formContainer.append(formLink);
+    block.append(eventHero, formContainer);
+
+    BlockMediator.set('imsProfile', undefined);
+    BlockMediator.set('eventData', { inviteOnly: false });
+    await onProfile({
+      block,
+      eventHero,
+      formContainer,
+      form: formLink,
+      terms: document.createElement('div'),
+    }, null);
+
+    BlockMediator.set('imsProfile', null);
+    for (let attempt = 0; attempt < 20 && block.classList.contains('loading'); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    expect(block.querySelector('form input#firstName')).to.exist;
+    expect(block.classList.contains('loading')).to.be.false;
   });
 });
 
