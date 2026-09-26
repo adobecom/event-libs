@@ -9,8 +9,12 @@
 }
 
 @media (min-width: 768px) {
-  .session-video-player .milo-video {
+  .session-video-player .milo-video,
+  .session-video-player .milo-video iframe {
     border-radius: var(--s2a-border-radius-24, 24px);
+  }
+
+  .session-video-player .milo-video {
     overflow: hidden;
   }
 }
