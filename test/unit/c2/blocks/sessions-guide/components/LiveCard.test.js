@@ -6,6 +6,7 @@ import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
 import { initTierOneEventConfig } from '../../../../../../event-libs/v1/utils/tier-1-event-config.js';
+import { formatTimezoneAbbr } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/time.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
@@ -312,6 +313,12 @@ describe('LiveCard', () => {
       expect(out).to.include('\u2013');
     });
 
+    it('appends the timezone abbreviation to the time range (Figma: "9:15am–10:15am EST")', () => {
+      const out = render(UPCOMING_SESSION, { variant: 'recommended' });
+      const tzAbbr = formatTimezoneAbbr(UPCOMING_SESSION.startTimeUtc, 'America/Los_Angeles');
+      expect(out).to.include(tzAbbr);
+    });
+
     it('omits the time on a live card', () => {
       expect(render(LIVE_SESSION, {})).to.not.include('sg-live-card__time');
     });
@@ -466,12 +473,6 @@ describe('LiveCard', () => {
       expect(out.indexOf('MAX Keynote')).to.be.lessThan(out.indexOf('sg-live-card__badges'));
     });
 
-    it('drops the description on a mobile live card', () => {
-      forceMobile(true);
-      const LiveCard = buildLiveCard(preact, makeStore());
-      expect(LiveCard({ session: LIVE_SESSION })).to.not.include('sg-live-card__desc');
-    });
-
     it('stacks up to two badges, both sized down (iconSize 16 / size="sm")', () => {
       forceMobile(true);
       const LiveCard = buildLiveCard(preact, makeStore());
@@ -481,12 +482,22 @@ describe('LiveCard', () => {
       expect(out).to.include('Branding');
     });
 
-    it('keeps the desktop meta-then-title layout when not mobile, even for the live variant', () => {
+    it('keeps the desktop title-then-meta layout when not mobile, even for the live variant', () => {
       forceMobile(false);
       const LiveCard = buildLiveCard(preact, makeStore());
       const out = LiveCard({ session: LIVE_SESSION });
       expect(out).to.not.include('sg-live-card__badges');
       expect(out).to.include('sg-live-card__meta');
+    });
+
+    it('shows the time above the title for a desktop recommended card that is upcoming', () => {
+      forceMobile(false);
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended' });
+      expect(out).to.include('sg-live-card__time');
+      // 'MAX Keynote' also appears in the thumbnail's alt text, so compare against the title button.
+      expect(out.indexOf('sg-live-card__time')).to.be.lessThan(out.indexOf('sg-live-card__title-btn'));
+      expect(out.indexOf('sg-live-card__title-btn')).to.be.lessThan(out.indexOf('sg-live-card__meta'));
     });
 
     it('moves the recommended variant onto the title-then-badges layout on mobile too', () => {
@@ -495,7 +506,6 @@ describe('LiveCard', () => {
       const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended' });
       expect(out).to.include('sg-live-card__badges');
       expect(out).to.not.include('sg-live-card__meta');
-      expect(out).to.not.include('sg-live-card__desc');
     });
 
     it('shows the time above the title for a mobile recommended card that is upcoming', () => {

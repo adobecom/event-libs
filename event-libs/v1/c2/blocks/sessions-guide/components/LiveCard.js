@@ -1,6 +1,8 @@
 import { html, useEffect, useState } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
+import {
+  formatShortTime, formatTimezoneAbbr, formatDuration, getNowMs,
+} from '../utils/time.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds, requestWatchSameSession,
@@ -76,7 +78,9 @@ export function LiveCard({
   const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
-  const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
+  const tzAbbr = formatTimezoneAbbr(session.startTimeUtc, userTz);
+  // Figma: tight en dash between start/end, single timezone abbreviation trailing the range.
+  const timeRange = `${endTime ? `${startTime}–${endTime}` : startTime}${tzAbbr ? ` ${tzAbbr}` : ''}`;
   // Meta row's second slot is shared: Recommended+upcoming shows time, others show a track badge.
   const showTime = variant === 'recommended' && sessionState === 'upcoming';
   const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
@@ -191,9 +195,12 @@ export function LiveCard({
       ${secondTrack && html`<span class="sg-live-card__track-extra">
         <${CategoryBadge} track=${secondTrack} />
       </span>`}
-      ${showTime && html`<p class="sg-live-card__time">${timeRange}</p>`}
     </div>
   `;
+
+  // Figma (recommended + upcoming): time sits on its own line above the title, not inline
+  // with the track badges below it — same order the mobile layout already uses.
+  const timeBlock = showTime && html`<p class="sg-live-card__time">${timeRange}</p>`;
 
   // New mobile layout (Figma 8463:87698): up to 2 badges stacked in a fixed-height block, so a
   // 1-badge card and a 2-badge card are always the same total height.
@@ -220,7 +227,9 @@ export function LiveCard({
       <div class="sg-live-card__body">
         ${useMobileLayout
     ? html`${showTime && html`<p class="sg-live-card__time sg-live-card__time--mobile">${timeRange}</p>`}${titleBlock}${badgesBlock}`
-    : html`${metaBlock}${titleBlock}<p class="sg-live-card__desc">${session.description}</p>`}
+    : html`<div class="sg-live-card__content">
+        ${timeBlock}${titleBlock}${metaBlock}
+      </div>`}
         <div class="sg-live-card__actions">
           ${primaryCta}
           ${schedulingEnabled && html`<button
@@ -241,8 +250,8 @@ export function LiveCard({
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
           >${isFavorited
-    ? html`<${IconHeartFilled} size=${useMobileLayout ? 16 : 20} />`
-    : html`<${IconHeartOutline} size=${useMobileLayout ? 16 : 20} />`}</button>`}
+    ? html`<${IconHeartFilled} size=${16} />`
+    : html`<${IconHeartOutline} size=${16} />`}</button>`}
           ${variant === 'live' && showDurationBadge && durationLabel && html`<span class="sg-live-card__actions-time">${durationLabel}</span>`}
         </div>
       </div>
