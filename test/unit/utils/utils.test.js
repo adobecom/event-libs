@@ -114,8 +114,11 @@ describe('shouldForceGuestSignIn', () => {
     expect(shouldForceGuestSignIn({ account_type: 'type3' }, false)).to.equal(false);
   });
 
-  it('does not force sign-in when profile is null/undefined', () => {
-    expect(shouldForceGuestSignIn(null, false)).to.equal(false);
+  it('forces sign-in for a resolved signed-out profile', () => {
+    expect(shouldForceGuestSignIn(null, false)).to.equal(true);
+  });
+
+  it('does not force sign-in when profile is still unresolved', () => {
     expect(shouldForceGuestSignIn(undefined, false)).to.equal(false);
   });
 });
