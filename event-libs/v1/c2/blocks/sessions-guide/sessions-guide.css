@@ -983,10 +983,7 @@
   gap: 0;
 }
 
-/* Groups time/title/badges in their own flex column (Figma) so their 8px gap stays fixed —
-   without this, .sg-live-card__body's own justify-content: space-between (desktop/tablet XL)
-   would dump any leftover vertical space into every gap, inflating this one as the card grows,
-   not just the gap before .sg-live-card__actions. Only rendered outside the mobile layout. */
+/* Own flex column so its 8px gap isn't inflated by .sg-live-card__body's space-between. */
 .sg-live-card__content {
   display: flex;
   flex-direction: column;
@@ -1408,7 +1405,7 @@
 
 .sg-card:is(:hover, :focus-within) .sg-card__title { color: var(--s2a-color-gray-900); }
 
-/* Desktop-only reveal on hover; see the 1280px+ block below for that treatment. */
+/* Revealed on hover at 1280px+ (below). */
 .sg-card__description {
   display: none;
 }
@@ -1879,7 +1876,7 @@
     border: 1px solid rgb(255 255 255 / 15%);
   }
 
-  /* Figma: fixed 192px bar, not a right-inset that stretches with the image. */
+  /* Fixed 192px bar, not a right-inset that stretches with the image. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__progress-row {
     top: auto;
     bottom: 13px;
@@ -1888,9 +1885,7 @@
     width: 192px;
   }
 
-  /* No gap here: .sg-live-card__content owns the fixed 8px gap between time/title/badges —
-     restating it here would let space-between add extra leftover space into it as the card
-     grows, not just into the gap before .sg-live-card__actions. */
+  /* No gap: .sg-live-card__content owns it, or space-between would inflate it here too. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__body {
     flex: none;
     width: 425px;
@@ -1898,8 +1893,7 @@
     justify-content: space-between;
   }
 
-  /* Figma (Tablet XL): the content block grows to fill the space above .sg-live-card__actions
-     and centers its own rows within that space, rather than sitting pinned to the top. */
+  /* Grows to fill the space above .sg-live-card__actions and centers its rows (Figma). */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__content {
     flex: 1 0 0;
     justify-content: center;
@@ -1915,7 +1909,7 @@
 
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__track-row { gap: 6px; }
 
-  /* Figma: 12px here, smaller than CategoryBadge's own un-sized (14px) default. */
+  /* Figma: 12px, overriding CategoryBadge's 14px default. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__meta .sg-category-badge__label {
     font-size: var(--s2a-font-size-xs, 12px);
   }
@@ -1934,8 +1928,7 @@
   /* Track colors can't be trusted against the dark hover fill — always go white. */
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
 
-  /* Figma: its own line above the title, not inline with the track badges — no divider,
-     and 12px (not the --sm 14px this class defaults to for other, inline usages). */
+  /* Own line above the title (Figma), 12px not the --sm 14px used elsewhere. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__content > .sg-live-card__time {
     font-size: var(--s2a-font-size-xs, 12px);
     color: var(--s2a-color-gray-700);
@@ -1945,8 +1938,7 @@
 
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
 
-  /* margin-top: 0 overrides the base (mobile-era) rule's 24px top margin — spacing above the
-     title is the body's own 8px flex gap now, per Figma, whether time renders above it or not. */
+  /* Overrides the base rule's 24px margin — spacing now comes from the body's flex gap. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__title {
     font-size: var(--s2a-font-size-2xl);
     color: #292929;
@@ -1955,8 +1947,7 @@
 
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__title { color: #fff; }
 
-  /* margin-top: 0 (was auto) — .sg-live-card__content now flex-grows to fill the space above
-     this row itself, so this row no longer needs its own margin to get there. */
+  /* .sg-live-card__content now grows to fill the space above, so this margin is unneeded. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__actions {
     gap: var(--s2a-spacing-sm);
     margin-top: 0;
@@ -1975,7 +1966,7 @@
     height: 12px;
   }
 
-  /* Button's own hover/press, layered on the light (card-not-hovered) black base. */
+  /* Hover/press on the light (card-not-hovered) black base. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--watch:hover {
     background: rgb(0 0 0 / 64%);
     border: 1px solid #000;
@@ -1991,8 +1982,7 @@
     color: #111;
   }
 
-  /* Button's own hover/press, layered on the dark (card-hovered) white base — hovering/pressing
-     the button always also satisfies the card's own :hover, so this is what's actually seen. */
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--watch:hover {
     background: rgb(255 255 255 / 64%);
     border: 1px solid #fff;
@@ -2018,9 +2008,7 @@
     height: 12px;
   }
 
-  /* Button's own hover/press (Figma "Button v2 — outlined"), same subtle-tint pattern as the
-     shared .sg-icon-btn--outlined system: a translucent tint of the base color, no color flip —
-     border and text/icon stay exactly as they are at rest. */
+  /* Figma outlined Button v2 — subtle tint only, no color flip (matches .sg-icon-btn--outlined). */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule-cta:hover {
     background: rgb(0 0 0 / 8%);
   }
@@ -2036,9 +2024,7 @@
     color: #fff;
   }
 
-  /* Same as the light-mode hover/press above, layered on the dark (card-hovered) white-bordered
-     base — hovering/pressing the button always also satisfies the card's own :hover, so this is
-     what's actually seen. Figma: rgba(255,255,255,0.12) hover, no color flip. */
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--schedule-cta:hover {
     background: rgb(255 255 255 / 12%);
   }
@@ -2055,8 +2041,7 @@
     color: #000;
   }
 
-  /* Button's own hover/press (Figma "IconButton v2"), layered on the light (card-not-hovered)
-     black-bordered base. Border stays black throughout — only the fill and icon color move. */
+  /* Figma IconButton v2, light base — border stays black, only fill/icon color move. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--favorite:hover {
     background: #f8f8f8;
   }
@@ -2077,9 +2062,7 @@
     border-color: #fff;
   }
 
-  /* Same as the light-mode hover/press above, layered on the dark (card-hovered) white-bordered
-     base — hovering/pressing the button always also satisfies the card's own :hover, so this is
-     what's actually seen. */
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--favorite:hover {
     background: rgb(255 255 255 / 12%);
   }
@@ -2423,11 +2406,8 @@
     max-width: 1156px;
   }
 
-  /* .sg-carousel__card-wrap has no explicit width, so a % width on .sg-live-card can't resolve
-     against it (content-sized flex item) — it shrink-wraps to the card's content instead of
-     holding the card at its intended cap. flex-basis: 100% gives it a definite size to clamp
-     against; max-width mirrors the card's own cap so the wrap can't render wider than it.
-     Widget cap here; full page's wider cap overrides below. */
+  /* No width of its own, so it shrink-wraps to content — flex-basis gives it a definite size
+     to clamp against. Widget cap here; full page's wider cap overrides below. */
   .sg-carousel-section--live .sg-carousel__card-wrap {
     flex: 0 0 100%;
     max-width: 1104px;
@@ -2455,7 +2435,7 @@
     border: 1px solid rgb(255 255 255 / 15%);
   }
 
-  /* Figma: fixed 192px bar, not a right-inset that stretches with the image. */
+  /* Fixed 192px bar, not a right-inset that stretches with the image. */
   .sg-live-card__progress-row {
     top: auto;
     bottom: 13px;
@@ -2464,16 +2444,13 @@
     width: 192px;
   }
 
-  /* No gap here: .sg-live-card__content owns the fixed 8px gap between time/title/badges —
-     restating it here would let space-between add extra leftover space into it as the card
-     grows, not just into the gap before .sg-live-card__actions. */
+  /* No gap: .sg-live-card__content owns it, or space-between would inflate it here too. */
   .sg-live-card__body {
     padding: var(--s2a-spacing-xl);
     justify-content: space-between;
   }
 
-  /* Figma (desktop): the content block grows to fill the space above .sg-live-card__actions and
-     centers its own rows within that space, rather than sitting pinned to the top. */
+  /* Grows to fill the space above .sg-live-card__actions and centers its rows (Figma). */
   .sg-live-card__content {
     flex: 1 0 0;
     justify-content: center;
@@ -2489,7 +2466,7 @@
 
   .sg-live-card__track-row { gap: 6px; }
 
-  /* Figma: 12px here, smaller than CategoryBadge's own un-sized (14px) default. */
+  /* Figma: 12px, overriding CategoryBadge's 14px default. */
   .sg-live-card__meta .sg-category-badge__label {
     font-size: var(--s2a-font-size-xs, 12px);
   }
@@ -2508,8 +2485,7 @@
   /* Track colors can't be trusted against the dark hover fill — always go white. */
   .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
 
-  /* Figma: its own line above the title, not inline with the track badges — no divider,
-     and 12px (not the --sm 14px this class defaults to for other, inline usages). */
+  /* Own line above the title (Figma), 12px not the --sm 14px used elsewhere. */
   .sg-live-card__content > .sg-live-card__time {
     font-size: var(--s2a-font-size-xs, 12px);
     color: var(--s2a-color-gray-700);
@@ -2519,8 +2495,7 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
 
-  /* margin-top: 0 overrides the base (mobile-era) rule's 24px top margin — spacing above the
-     title is the body's own 8px flex gap now, per Figma, whether time renders above it or not. */
+  /* Overrides the base rule's 24px margin — spacing now comes from the body's flex gap. */
   .sg-live-card__title {
     font-size: var(--s2a-font-size-3xl);
     color: #292929;
@@ -2534,8 +2509,7 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: #fff; }
 
-  /* margin-top: 0 overrides the base rule's 24px — .sg-live-card__content now flex-grows to fill
-     the space above this row itself, so this row no longer needs its own margin to get there. */
+  /* .sg-live-card__content now grows to fill the space above, so this margin is unneeded. */
   .sg-live-card__actions {
     gap: var(--s2a-spacing-sm);
     margin-top: 0;
@@ -2554,7 +2528,7 @@
     height: 12px;
   }
 
-  /* Button's own hover/press, layered on the light (card-not-hovered) black base. */
+  /* Hover/press on the light (card-not-hovered) black base. */
   .sg-live-card__btn--watch:hover {
     background: rgb(0 0 0 / 64%);
     border: 1px solid #000;
@@ -2570,8 +2544,7 @@
     color: #000;
   }
 
-  /* Button's own hover/press, layered on the dark (card-hovered) white base — hovering/pressing
-     the button always also satisfies the card's own :hover, so this is what's actually seen. */
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch:hover {
     background: rgb(255 255 255 / 64%);
     border: 1px solid #fff;
@@ -2597,9 +2570,7 @@
     height: 12px;
   }
 
-  /* Button's own hover/press (Figma "Button v2 — outlined"), same subtle-tint pattern as the
-     shared .sg-icon-btn--outlined system: a translucent tint of the base color, no color flip —
-     border and text/icon stay exactly as they are at rest. */
+  /* Figma outlined Button v2 — subtle tint only, no color flip (matches .sg-icon-btn--outlined). */
   .sg-live-card__btn--schedule-cta:hover {
     background: rgb(0 0 0 / 8%);
   }
@@ -2615,9 +2586,7 @@
     color: #fff;
   }
 
-  /* Same as the light-mode hover/press above, layered on the dark (card-hovered) white-bordered
-     base — hovering/pressing the button always also satisfies the card's own :hover, so this is
-     what's actually seen. Figma: rgba(255,255,255,0.12) hover, no color flip. */
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--schedule-cta:hover {
     background: rgb(255 255 255 / 12%);
   }
@@ -2637,8 +2606,7 @@
     color: #000;
   }
 
-  /* Button's own hover/press (Figma "IconButton v2"), layered on the light (card-not-hovered)
-     black-bordered base. Border stays black throughout — only the fill and icon color move. */
+  /* Figma IconButton v2, light base — border stays black, only fill/icon color move. */
   .sg-live-card__btn--favorite:hover {
     background: #f8f8f8;
   }
@@ -2659,9 +2627,7 @@
     border-color: #fff;
   }
 
-  /* Same as the light-mode hover/press above, layered on the dark (card-hovered) white-bordered
-     base — hovering/pressing the button always also satisfies the card's own :hover, so this is
-     what's actually seen. */
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite:hover {
     background: rgb(255 255 255 / 12%);
   }
@@ -2851,8 +2817,7 @@
 
   .sg-card:is(:hover, :focus-within) .sg-card__title { color: #fff; }
 
-  /* Still hidden at rest (base rule above) — room for this only exists once hover grows
-     min-height below. margin-top lives here (not on the title) since .sg-card__body has gap:0. */
+  /* margin-top here (not on the title) since .sg-card__body has gap: 0. */
   .sg-card__description {
     margin-top: var(--s2a-spacing-xs);
     font-size: 14px;

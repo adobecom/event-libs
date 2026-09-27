@@ -376,10 +376,8 @@
   border: 2px solid var(--s2a-color-gray-300);
 }
 
-/* Figma spec is 16px here; Share (same row) keeps the shared 20px IconButton size.
-   Compound selector (not just a descendant one) to outrank .sg-icon-btn--lg .sg-icon-btn__icon,
-   which this file's @import at the top of sessions-guide.css would otherwise lose to on
-   source order despite equal specificity. */
+/* Figma: 16px here (Share keeps the shared 20px). Compound selector needed to outrank
+   .sg-icon-btn--lg .sg-icon-btn__icon, which ties on specificity but loses on source order. */
 .sg-icon-btn--lg.sg-detail__icon-btn--favorite .sg-icon-btn__icon {
   width: 16px;
   height: 16px;

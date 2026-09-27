@@ -646,22 +646,18 @@
     gap: var(--s2a-spacing-lg, 24px);
   }
 
-  /* .sg-carousel__card-wrap has no explicit width, so a % width on .sg-live-card can't resolve
-     against it (content-sized flex item) — short titles shrink-wrap the whole card instead of
-     holding it at its intended cap. flex-basis: 100% gives it a definite size to clamp against. */
+  /* No width of its own, so short titles shrink-wrap the card below its intended cap. */
   .sb-carousel-section--also-live .sg-carousel__card-wrap {
     flex: 0 0 100%;
     max-width: 1156px;
   }
 
-  /* max-width only: border/border-radius now match sessions-guide.css's own desktop rule
-     (single source of truth — see MWPW-207192 consolidation) so aren't restated here. */
+  /* Border/radius match sessions-guide.css's own desktop rule; only max-width differs. */
   .sb-carousel-section--also-live .sg-live-card {
     max-width: 1156px;
   }
 
-  /* Compensates for this carousel's own <1280px compact-mode rules above (height:32px /
-     width:32px), which would otherwise still apply at this width without being restated. */
+  /* Overrides the <1280px compact-mode height above. */
   .sb-carousel-section--also-live .sg-live-card__btn { height: 40px; }
 
   .sb-carousel-section--also-live .sg-live-card__btn--watch { padding: 0 var(--s2a-spacing-lg, 24px); }
@@ -992,9 +988,7 @@
     overflow: hidden;
   }
 
-  /* .sg-card__description's hidden-at-rest/reveal-on-hover styling now lives in sessions-guide.css
-     as a single source of truth (unscoped, so it reaches this DOM too) — see MWPW-207192-style
-     consolidation elsewhere in this file. */
+  /* .sg-card__description styling now lives in sessions-guide.css. */
 }
 
 /* Repeats each 1280px+ selector at matching specificity so this wins the tie for 1441px+. */

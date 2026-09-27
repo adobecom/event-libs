@@ -198,8 +198,7 @@ export function LiveCard({
     </div>
   `;
 
-  // Figma (recommended + upcoming): time sits on its own line above the title, not inline
-  // with the track badges below it — same order the mobile layout already uses.
+  // Time sits above the title, not inline with the badges (Figma).
   const timeBlock = showTime && html`<p class="sg-live-card__time">${timeRange}</p>`;
 
   // New mobile layout (Figma 8463:87698): up to 2 badges stacked in a fixed-height block, so a
