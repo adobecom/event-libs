@@ -105,9 +105,6 @@
   flex-direction: column;
   min-height: 0;
   flex: 1 1 auto;
-
-  /* Bottom padding keeps a 24px gap below the list whether or not the show-more button is
-     rendered (the button is a sibling after the wrapper, shown only when there are >4 rows). */
   padding: 0 var(--s2a-spacing-md) var(--s2a-spacing-lg);
   overflow-y: auto;
   box-sizing: border-box;
@@ -478,9 +475,6 @@
 @media (min-width: 1024px) {
   .session-video-playlist-show-more {
     display: flex;
-
-    /* No top padding: the wrapper's 24px bottom padding already spaces the list from this
-       button. Bottom 24px is the block's bottom gap. */
     padding: 0 var(--s2a-spacing-md) var(--s2a-spacing-lg, 24px);
     align-self: flex-start;
     gap: var(--s2a-spacing-xs);
@@ -694,14 +688,8 @@
     line-height: var(--s2a-typography-line-height-title-6, 18px);
     letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
     text-overflow: ellipsis;
-    /* stylelint-disable value-no-vendor-prefix, declaration-block-no-duplicate-properties -- -webkit-box
-       enables -webkit-line-clamp; the later display: inline-block + fixed height caps the box to 2 lines. */
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
     display: inline-block;
     height: 36px;
-    /* stylelint-enable value-no-vendor-prefix, declaration-block-no-duplicate-properties */
   }
 
   .session-video-playlist-title,
