@@ -647,7 +647,7 @@
 
   .session-video-playlist-top {
     flex-wrap: nowrap;
-    padding: var(--s2a-spacing-xs) var(--s2a-spacing-md);
+    padding: 9px 16px 16px;
     cursor: pointer;
   }
 
@@ -678,6 +678,8 @@
     font-weight: var(--s2a-font-weight-eyebrow);
     line-height: var(--s2a-typography-line-height-eyebrow);
     letter-spacing: var(--s2a-typography-letter-spacing-eyebrow);
+    display: inline-block;
+    height: 26px;
   }
 
   .session-video-playlist-up-next-title {
@@ -687,10 +689,14 @@
     line-height: var(--s2a-typography-line-height-title-6, 18px);
     letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
     text-overflow: ellipsis;
-    /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+    /* stylelint-disable value-no-vendor-prefix, declaration-block-no-duplicate-properties -- -webkit-box
+       enables -webkit-line-clamp; the later display: inline-block + fixed height caps the box to 2 lines. */
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    display: inline-block;
+    height: 36px;
+    /* stylelint-enable value-no-vendor-prefix, declaration-block-no-duplicate-properties */
   }
 
   .session-video-playlist-title,
