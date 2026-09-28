@@ -376,7 +376,7 @@ const regHashCallbacks = {
     a.setAttribute('tabindex', -1);
 
     const profile = BlockMediator.get('imsProfile');
-    if (profile) {
+    if (profile !== undefined) {
       handleRSVPBtnBasedOnProfile(rsvpBtn, profile);
     } else {
       BlockMediator.subscribe('imsProfile', ({ newValue }) => {

@@ -1227,7 +1227,7 @@ export async function initFormBasedOnRSVPData(bp) {
 
   if (syncUIWithRSVPStatus()) return;
 
-  if (profile.account_type !== 'guest') {
+  if (profile && profile.account_type !== 'guest') {
     let existingAttendeeData = {};
     const attendeeResp = await getAttendee(getMetadata('event-id'));
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
@@ -1261,20 +1261,21 @@ export async function initFormBasedOnRSVPData(bp) {
   }
 }
 
-async function onProfile(bp, formData) {
+export async function onProfile(bp, formData) {
   const { block, eventHero } = bp;
   const profile = BlockMediator.get('imsProfile');
   const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
   let hasHandledProfile = false;
   const handleProfile = (resolvedProfile) => {
-    if (!resolvedProfile || hasHandledProfile) return;
+    if (resolvedProfile === undefined || hasHandledProfile) return;
     hasHandledProfile = true;
+    const profileForGuestGate = resolvedProfile ?? { account_type: 'guest' };
 
-    if (shouldForceGuestSignIn(resolvedProfile, allowGuestReg)
+    if (shouldForceGuestSignIn(profileForGuestGate, allowGuestReg)
       && /#rsvp-form.*/.test(window.location.hash)) {
       // TODO: also check for guestCheckout enablement for future iterations
       signIn(getSusiOptions(getConfig()));
-    } else if (resolvedProfile.rsvpTokenInvalid) {
+    } else if (resolvedProfile?.rsvpTokenInvalid) {
       // RSVP token has already been used, expired, or was revoked. Show a
       // general error and never build the form — the token is not reusable.
       eventHero.classList.remove('loading');
@@ -1313,7 +1314,7 @@ async function onProfile(bp, formData) {
     }
   };
 
-  if (profile) {
+  if (profile !== undefined) {
     handleProfile(profile);
   } else {
     const unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => {

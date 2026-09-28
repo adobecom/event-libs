@@ -3,6 +3,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { LIBS, setMetadata, setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
+import { dictionaryManager } from '../../../event-libs/v1/utils/dictionary-manager.js';
 import { registerHydrator, resetHydrators } from '../../../event-libs/v1/hydrate/hydrate.js';
 import repeatTemplate from '../../../event-libs/v1/hydrate/repeat-template.js';
 import {
@@ -187,6 +188,32 @@ describe('Content Update Script', () => {
     BlockMediator.set('rsvpData', null);
 
     expect(document.querySelector('a[href$="#rsvp-form-1"]').textContent).to.be.equal(buttonOriginalText);
+  });
+
+  it('redirects signed-out visitors to SUSI when guest registration is disabled', async () => {
+    document.body.innerHTML = body;
+    setMetadata('allow-guest-registration', 'false');
+    BlockMediator.set('imsProfile', null);
+    const signInSpy = sinon.spy();
+    const originalIMS = window.adobeIMS;
+    const dictionaryStub = sinon.stub(dictionaryManager, 'initialize').resolves();
+    window.adobeIMS = { signIn: signInSpy };
+
+    try {
+      decorateEvent(document);
+      const button = document.querySelector('a[href$="#rsvp-form-1"]');
+      await waitFor(() => button.dataset.rsvpInitialized === 'true', 1000);
+      const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+      button.dispatchEvent(clickEvent);
+
+      expect(clickEvent.defaultPrevented).to.equal(true);
+      expect(signInSpy.calledOnce).to.equal(true);
+      expect(signInSpy.firstCall.args[0].redirect_uri).to.include('#rsvp-form-1');
+    } finally {
+      dictionaryStub.restore();
+      window.adobeIMS = originalIMS;
+      BlockMediator.set('imsProfile', undefined);
+    }
   });
 });
 
