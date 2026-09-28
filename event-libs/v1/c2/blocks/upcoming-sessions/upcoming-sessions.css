@@ -316,11 +316,18 @@
   background: rgb(10 10 10 / 50%);
   border: 1px solid #505050;
   box-shadow: none;
+
+  /* Frosts whatever sits behind the card (the marquee's own background art) instead of
+     requiring a bespoke pre-blurred asset; see the >=1280px block, which turns this back off. */
+  backdrop-filter: blur(var(--s2a-blur-sm, 16px));
 }
 
 .upcoming-sessions.dark-card .sg-card:hover {
   background: #292929;
   box-shadow: none;
+
+  /* Background is opaque here, so there's nothing to blur through - skip the GPU cost. */
+  backdrop-filter: none;
 }
 
 .upcoming-sessions.dark-card .sg-card:focus-visible {
