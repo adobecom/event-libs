@@ -95,7 +95,7 @@
 }
 
 .featured-products-toggle {
-  margin-block: var(--s2a-spacing-8, 8px) var(--s2a-spacing-16, 16px);
+  margin-block-start: var(--s2a-spacing-8, 8px);
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
