@@ -105,7 +105,10 @@
   flex-direction: column;
   min-height: 0;
   flex: 1 1 auto;
-  padding: 0 var(--s2a-spacing-md);
+
+  /* Bottom padding keeps a 24px gap below the list whether or not the show-more button is
+     rendered (the button is a sibling after the wrapper, shown only when there are >4 rows). */
+  padding: 0 var(--s2a-spacing-md) var(--s2a-spacing-lg);
   overflow-y: auto;
   box-sizing: border-box;
 }
@@ -475,7 +478,10 @@
 @media (min-width: 1024px) {
   .session-video-playlist-show-more {
     display: flex;
-    padding: var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md);
+
+    /* No top padding: the wrapper's 24px bottom padding already spaces the list from this
+       button. Bottom 24px is the block's bottom gap. */
+    padding: 0 var(--s2a-spacing-md) var(--s2a-spacing-lg, 24px);
     align-items: center;
     align-self: flex-start;
     gap: var(--s2a-spacing-xs);
