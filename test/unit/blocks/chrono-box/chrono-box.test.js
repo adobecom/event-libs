@@ -158,4 +158,66 @@ describe('Chrono Box', () => {
       expect(host.contains(section)).to.equal(true);
     });
   });
+
+  [
+    ['v1', '../../../../event-libs/v1/blocks/chrono-box/chrono-box.js'],
+    ['c2', '../../../../event-libs/v1/c2/blocks/chrono-box/chrono-box.js'],
+  ].forEach(([label, modulePath]) => {
+    describe(`openModalFromPageHashAfterFragment (${label})`, () => {
+      let dispatched;
+      const onModalOpen = (e) => dispatched.push(e.detail.hash);
+      const { pathname, search } = window.location;
+
+      beforeEach(() => {
+        dispatched = [];
+        document.body.innerHTML = '';
+        document.head.innerHTML = '';
+        window.addEventListener('modal:open', onModalOpen);
+      });
+
+      afterEach(() => {
+        window.removeEventListener('modal:open', onModalOpen);
+        window.history.replaceState(null, '', `${pathname}${search}`);
+      });
+
+      it('does not dispatch modal:open when Milo already decorated the link as a modal', async () => {
+        const { openModalFromPageHashAfterFragment } = await import(modulePath);
+        const hash = `#rsvp-form-${label}-milo`;
+        window.history.replaceState(null, '', hash);
+        document.body.innerHTML = `<a class="modal link-block" data-modal-hash="${hash}" href="${hash}">RSVP</a>`;
+
+        await openModalFromPageHashAfterFragment();
+        expect(dispatched).to.deep.equal([]);
+      });
+
+      it('dispatches modal:open when the matching link is not a Milo modal link', async () => {
+        const { openModalFromPageHashAfterFragment } = await import(modulePath);
+        const hash = `#rsvp-form-${label}-plain`;
+        window.history.replaceState(null, '', hash);
+        document.body.innerHTML = `<a data-modal-hash="${hash}" href="${hash}">RSVP</a>`;
+
+        await openModalFromPageHashAfterFragment();
+        expect(dispatched).to.deep.equal([hash]);
+      });
+
+      it('does not dispatch modal:open when the dialog is already open', async () => {
+        const { openModalFromPageHashAfterFragment } = await import(modulePath);
+        const hash = `#rsvp-form-${label}-open`;
+        window.history.replaceState(null, '', hash);
+        document.body.innerHTML = `
+          <a data-modal-hash="${hash}" href="${hash}">RSVP</a>
+          <div class="dialog-modal" id="${hash.slice(1)}"></div>
+        `;
+
+        await openModalFromPageHashAfterFragment();
+        expect(dispatched).to.deep.equal([]);
+      });
+
+      it('does nothing without a URL hash', async () => {
+        const { openModalFromPageHashAfterFragment } = await import(modulePath);
+        await openModalFromPageHashAfterFragment();
+        expect(dispatched).to.deep.equal([]);
+      });
+    });
+  });
 });
