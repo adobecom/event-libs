@@ -53,7 +53,7 @@ const CLOSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" 
 // name stays "reminder" (it means something more specific: before the lead-time window).
 // Values double as dictionary keys/English fallbacks (dictionaryManager.getValue(key) returns
 // the key itself when unloaded/missing), same convention as sessions-hub.js's own copy.
-const STAGE_PILL_LABEL = { reminder: 'Upcoming', live: 'Live', 'on-demand': 'On-Demand' };
+const STAGE_PILL_LABEL = { reminder: 'Upcoming', live: 'Live', 'on-demand': 'On Demand' };
 
 let mounted = false;
 

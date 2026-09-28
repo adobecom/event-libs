@@ -350,8 +350,12 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
   height: 15px;
   padding: 0 4px;
   border-radius: 2px;
-  font-size: 12px;
-  font-weight: 400;
+  font-family: var(--s2a-font-family-adobe-clean, 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 

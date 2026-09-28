@@ -115,9 +115,9 @@ describe('notification-widget', () => {
     expect(row.querySelector('.swan-notif__title').textContent).to.equal('First');
   });
 
-  it('labels the on-demand stage pill "On-Demand"', () => {
+  it('labels the on-demand stage pill "On Demand"', () => {
     addEntry('RF-1', { stage: 'on-demand', title: 'First' });
-    expect(rows()[0].querySelector('.swan-notif__pill').textContent).to.equal('On-Demand');
+    expect(rows()[0].querySelector('.swan-notif__pill').textContent).to.equal('On Demand');
   });
 
   it('renders one row per stored entry, most recently updated first', () => {
