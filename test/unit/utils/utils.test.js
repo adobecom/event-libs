@@ -124,8 +124,6 @@ describe('shouldForceGuestSignIn', () => {
 });
 
 describe('isNonProdHost', () => {
-  // Shared gate for debug/test query params (?milolibs=, ?swanMountFallback=)
-  // — real prod domains must never match, or those overrides would work on adobe.com itself.
   it('rejects real production domains', () => {
     expect(isNonProdHost('www.adobe.com')).to.equal(false);
     expect(isNonProdHost('business.adobe.com')).to.equal(false);
@@ -148,15 +146,10 @@ describe('isNonProdHost', () => {
     expect(isNonProdHost('forge-replay-preprod.adobe.io')).to.equal(true);
   });
 
-  it('accepts the VPN-gated stage domain and its subdomains', () => {
-    expect(isNonProdHost('stage.adobe.com')).to.equal(true);
-    expect(isNonProdHost('business.stage.adobe.com')).to.equal(true);
-    expect(isNonProdHost('blog.stage.adobe.com')).to.equal(true);
-  });
-
-  it('rejects hosts that only resemble the stage domain', () => {
-    expect(isNonProdHost('stage.adobe.com.evil.com')).to.equal(false);
-    expect(isNonProdHost('notstage.adobe.com')).to.equal(false);
+  it('rejects stage.adobe.com and its subdomains (they serve Milo from /libs)', () => {
+    expect(isNonProdHost('stage.adobe.com')).to.equal(false);
+    expect(isNonProdHost('business.stage.adobe.com')).to.equal(false);
+    expect(isNonProdHost('www.stage.adobe.com')).to.equal(false);
   });
 });
 
