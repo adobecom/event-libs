@@ -148,7 +148,7 @@
 .upcoming-sessions .sg-card {
   background: var(--s2a-color-gray-50, #f8f8f8);
   border: none;
-  border-radius: var(--s2a-border-radius-md, 16px);
+  border-radius: var(--s2a-border-radius-sm, 8px);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -156,7 +156,7 @@
   position: relative;
   overflow: hidden;
   width: 255px;
-  min-height: 152px;
+  min-height: 168px;
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
   cursor: pointer;
@@ -211,6 +211,27 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   transition: color 0.2s;
+}
+
+/*
+ * Summary shown only on the expanded desktop hover/focus card (see the >=1280px block below);
+ * collapsed desktop and mobile/tablet cards never have room for it.
+ */
+.upcoming-sessions .sg-card__description {
+  display: none;
+  margin: 0;
+  font-family: 'Adobe Clean Spectrum VF', var(--body-font-family);
+  font-weight: var(--s2a-font-weight-adobe-clean-regular, 400);
+  font-size: var(--s2a-font-size-xs, 12px);
+  line-height: var(--s2a-font-line-height-xs, 18px);
+  color: var(--s2a-color-gray-600, #717171);
+}
+
+.upcoming-sessions .sg-category-badge__count {
+  font-size: var(--s2a-font-size-xs, 12px);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold, 700);
+  line-height: var(--s2a-font-line-height-2xs, 16px);
+  color: currentcolor;
 }
 
 .upcoming-sessions .sg-card__footer {
@@ -322,6 +343,10 @@
   gap: var(--s2a-spacing-2xs, 4px);
 }
 
+.upcoming-sessions.dark-card .sg-card__description {
+  color: #afafaf;
+}
+
 /*
  * sessions-guide.css defines unscoped `.sg-card:is(:hover, :focus-within) .sg-card__*` rules
  * that switch text to a near-black gray-900 on hover/focus. Those rules aren't namespaced to
@@ -350,8 +375,8 @@
   .upcoming-sessions .sg-card {
     flex-direction: row;
     align-items: stretch;
-    width: 379px;
-    min-height: 130px;
+    width: 375px;
+    min-height: 128px;
     padding: var(--s2a-spacing-lg, 24px);
     gap: var(--s2a-spacing-lg, 24px);
     border: var(--s2a-border-width-sm, 1px) solid transparent;
@@ -359,7 +384,7 @@
 
   .upcoming-sessions .sg-card:is(:hover, :focus-within) {
     width: 431px;
-    min-height: 128px;
+    min-height: 149px;
     background: #262626;
     border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -373,7 +398,7 @@
 
   .upcoming-sessions .sg-card.is-scheduled:is(:hover, :focus-within),
   .upcoming-sessions .sg-card.is-favorited:is(:hover, :focus-within) {
-    min-height: 128px;
+    min-height: 149px;
     background: #262626;
     border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -398,6 +423,14 @@
 
   .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__title {
     color: var(--s2a-color-gray-25, #fff);
+  }
+
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__description {
+    /* stylelint-disable-next-line value-no-vendor-prefix */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .upcoming-sessions .sg-card__footer {

@@ -373,6 +373,36 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-category-badge')).to.equal(null);
     });
 
+    it('renders a description paragraph when the payload supplies one', () => {
+      const card = buildCard(session({ description: 'Learn the fundamentals of Adobe Express.' }));
+      const description = card.querySelector('.sg-card__description');
+      expect(description).to.not.equal(null);
+      expect(description.textContent).to.equal('Learn the fundamentals of Adobe Express.');
+    });
+
+    it('omits the description paragraph entirely when the payload does not supply one (TEC homepage payload may not carry it yet)', () => {
+      const card = buildCard(session());
+      expect(card.querySelector('.sg-card__description')).to.equal(null);
+    });
+
+    it('renders a "+N" count on both the badge-row and footer badges when additionalTracks is present', () => {
+      const card = buildCard(session({ additionalTracks: ['3D & Immersive'] }));
+      const topCount = card.querySelector('.sg-card__badge-row .sg-category-badge__count');
+      const footerCount = card.querySelector('.sg-card__footer-badge .sg-category-badge__count');
+      expect(topCount.textContent).to.equal('+1');
+      expect(footerCount.textContent).to.equal('+1');
+    });
+
+    it('caps the additional-track count at 1 even if the payload sends more than one extra track', () => {
+      const card = buildCard(session({ additionalTracks: ['3D & Immersive', 'AI'] }));
+      expect(card.querySelector('.sg-category-badge__count').textContent).to.equal('+1');
+    });
+
+    it('omits the count entirely when there are no additional tracks', () => {
+      const card = buildCard(session());
+      expect(card.querySelector('.sg-category-badge__count')).to.equal(null);
+    });
+
     it('renders the schedule and favorite buttons unconditionally, not only on hover/scheduled/favorited', () => {
       const card = buildCard(session());
       expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
