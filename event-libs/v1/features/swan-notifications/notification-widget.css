@@ -359,9 +359,9 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
   white-space: nowrap;
 }
 
-.swan-notif__pill--live { background: #d31510; color: #fff; }
-.swan-notif__pill--reminder { background: #f68511; color: #000; }
-.swan-notif__pill--on-demand { background: var(--s2a-color-gray-600, #717171); color: #fff; }
+.swan-notif__pill--live { background: var(--s2a-color-brand-adobe-red, #eb1000); color: #fff; }
+.swan-notif__pill--reminder { background: #ddd; color: #000; }
+.swan-notif__pill--on-demand { background: var(--s2a-color-gray-1000, #000); color: #fff; }
 
 .swan-notif__empty {
   padding: 24px 20px;
