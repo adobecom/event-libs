@@ -646,8 +646,6 @@
 
   .session-video-playlist-top {
     flex-wrap: nowrap;
-
-    /* 9px top has no --s2a-spacing token (scale skips 8→12); exact Figma value for the collapsed bar. */
     padding: 9px var(--s2a-spacing-16) var(--s2a-spacing-16);
     cursor: pointer;
   }
