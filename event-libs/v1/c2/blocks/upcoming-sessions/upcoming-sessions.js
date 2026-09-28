@@ -62,8 +62,6 @@ function toIsoTimes(session) {
   };
 }
 
-// Builds "9:00am" from Intl parts: drops the blank literal before the dayPeriod (so there's no
-// space before am/pm) and lowercases AM/PM, while leaving any trailing " PST" timezone abbr untouched.
 function joinTimeParts(parts) {
   return parts.reduce((out, part, i) => {
     if (part.type === 'literal' && part.value.trim() === '' && parts[i + 1]?.type === 'dayPeriod') return out;
@@ -97,10 +95,6 @@ function primaryCategory(session) {
   return session.track || '';
 }
 
-// The TEC homepage payload may send additionalTracks the same way the full session-catalog does:
-// a multi-select field that, in practice, only ever holds one extra value (see sessions-guide's
-// resolveTrackBadge). Cap at 1 so a "+N" badge never shows more than what's actually meaningful,
-// and stay defensive since this payload's schema isn't guaranteed to include the field yet.
 function additionalTrackCount(session) {
   return (session.additionalTracks || []).slice(0, 1).length;
 }
@@ -189,12 +183,9 @@ export function buildCard(session) {
 
   const body = createTag('div', { class: 'sg-card__body' }, '', { parent: card });
 
-  // Title renders first so the track label follows it (Tablet/Mobile hierarchy: title, then track, then time/icons).
   // session.enTitle is attacker-influenced (decoded from a hash payload) - set via .textContent, not html.
   createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
-  // Only renders (desktop hover reveals it via CSS) when the payload supplies a description -
-  // this field isn't confirmed to exist in the TEC homepage payload yet, so degrade gracefully.
   if (session.description) {
     createTag('p', { class: 'sg-card__description' }, '', { parent: body }).textContent = session.description;
   }
