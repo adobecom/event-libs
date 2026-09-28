@@ -67,7 +67,7 @@ function InfoIcon() {
 
 const META_FIELD_DEFS = {
   mrStreamId: { label: 'Mobile Rider stream ID', placeholder: 'Mobile Rider stream ID (optional)' },
-  imageUrl: { label: 'Image', placeholder: 'Image URL (optional)', type: 'image' },
+  imageUrl: { label: 'Image', placeholder: 'Image URL', type: 'image' },
   watchDestination: {
     label: 'Watch destination', type: 'select', icon: GlobeIcon, options: WATCH_DESTINATION_OPTIONS,
   },
