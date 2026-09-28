@@ -983,6 +983,15 @@
   gap: 0;
 }
 
+/* Own flex column so its 8px gap isn't inflated by .sg-live-card__body's space-between. */
+.sg-live-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-xs);
+  width: 100%;
+  min-width: 0;
+}
+
 .sg-live-card__track {
   font-size: var(--s2a-font-size-sm);
   font-weight: 500;
@@ -1002,24 +1011,6 @@
   white-space: nowrap;
   margin: 0;
   transition: color 0.2s;
-}
-
-/* Divider between track and time (Figma meta row) — applies at every breakpoint, not just desktop. */
-.sg-live-card__time::before,
-.sg-live-card__track-extra::before {
-  content: '';
-  display: inline-block;
-  width: 1px;
-  height: 12px;
-  margin-right: var(--s2a-spacing-sm);
-  background: var(--s2a-color-gray-300);
-  vertical-align: middle;
-}
-
-/* Scoped to 1024px+: below that the hover fill stays #fff, where this lighter color would vanish. */
-@media (min-width: 1024px) {
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
 }
 
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: inherit; }
@@ -1080,16 +1071,7 @@
   line-height: var(--s2a-font-line-height-2xs);
 }
 
-.sg-live-card__time--mobile::before {
-  display: none;
-}
-
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
-
-/* Hidden mobile through regular tablet (<1024px) — re-shown at 1024px+ below. */
-.sg-live-card__desc {
-  display: none;
-}
 
 .sg-live-card__actions {
   display: flex;
@@ -1422,6 +1404,11 @@
 }
 
 .sg-card:is(:hover, :focus-within) .sg-card__title { color: var(--s2a-color-gray-900); }
+
+/* Revealed on hover at 1280px+ (below). */
+.sg-card__description {
+  display: none;
+}
 
 .sg-card__footer {
   display: none;
@@ -1885,34 +1872,47 @@
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__image {
     width: 425px;
     height: 240px;
-    border-radius: var(--s2a-border-radius-md);
-    border: none;
+    border-radius: 20px;
+    border: 1px solid rgb(255 255 255 / 15%);
   }
 
+  /* Fixed 192px bar, not a right-inset that stretches with the image. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__progress-row {
     top: auto;
     bottom: 13px;
     left: 27px;
-    right: 20px;
+    right: auto;
+    width: 192px;
   }
 
+  /* No gap: .sg-live-card__content owns it, or space-between would inflate it here too. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__body {
     flex: none;
     width: 425px;
     padding: var(--s2a-spacing-lg);
     justify-content: space-between;
-    gap: 2px;
+  }
+
+  /* Grows to fill the space above .sg-live-card__actions and centers its rows (Figma). */
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__content {
+    flex: 1 0 0;
+    justify-content: center;
   }
 
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__meta {
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
-    gap: var(--s2a-spacing-sm);
+    gap: var(--s2a-spacing-md);
     margin: 0;
   }
 
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__track-row { gap: 6px; }
+
+  /* Figma: 12px, overriding CategoryBadge's 14px default. */
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__meta .sg-category-badge__label {
+    font-size: var(--s2a-font-size-xs, 12px);
+  }
 
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__track {
     font-size: var(--s2a-font-size-sm);
@@ -1928,8 +1928,9 @@
   /* Track colors can't be trusted against the dark hover fill — always go white. */
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
 
-  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__time {
-    font-size: var(--s2a-font-size-sm);
+  /* Own line above the title (Figma), 12px not the --sm 14px used elsewhere. */
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__content > .sg-live-card__time {
+    font-size: var(--s2a-font-size-xs, 12px);
     color: var(--s2a-color-gray-700);
     white-space: nowrap;
     margin: 0;
@@ -1937,42 +1938,43 @@
 
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
 
+  /* Overrides the base rule's 24px margin — spacing now comes from the body's flex gap. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__title {
     font-size: var(--s2a-font-size-2xl);
-    color: #000;
+    color: #292929;
+    margin-top: 0;
   }
 
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__title { color: #fff; }
 
-  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__desc {
-    font-size: var(--s2a-font-size-sm);
-    color: var(--s2a-color-gray-600, #717171);
-    letter-spacing: -0.14px;
-    white-space: normal;
-    text-overflow: clip;
-
-    /* Reserved at 2 lines' height, same reasoning as .sg-live-card__title above. */
-    min-height: calc(2 * 1.2em);
-
-    /* stylelint-disable-next-line value-no-vendor-prefix */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__desc { color: #fff; }
-
+  /* .sg-live-card__content now grows to fill the space above, so this margin is unneeded. */
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__actions {
     gap: var(--s2a-spacing-sm);
-    margin-top: auto;
+    margin-top: 0;
   }
 
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--watch {
-    background: var(--s2a-color-gray-800);
+    background: #000;
     color: #fff;
     min-width: auto;
     padding: 0 var(--s2a-spacing-lg);
+  }
+
+  /* Figma's Button v2 "Icon Start" slot is 12px, smaller than IconPlay's own 20px default. */
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--watch svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Hover/press on the light (card-not-hovered) black base. */
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--watch:hover {
+    background: rgb(0 0 0 / 64%);
+    border: 1px solid #000;
+  }
+
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--watch:active {
+    background: #000;
+    border: 1px solid #000;
   }
 
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--watch {
@@ -1980,12 +1982,39 @@
     color: #111;
   }
 
-  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule-cta {
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--watch:hover {
+    background: rgb(255 255 255 / 64%);
+    border: 1px solid #fff;
+  }
+
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--watch:active {
     background: #fff;
+    border: 1px solid #fff;
+  }
+
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule-cta {
+    background: transparent;
+    backdrop-filter: blur(16px);
     border: 1px solid #000;
     color: #000;
     min-width: auto;
     padding: 0 var(--s2a-spacing-lg);
+  }
+
+  /* Figma's Button v2 "Icon Start" slot is 12px, smaller than IconCalendarPlus's own 20px default. */
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule-cta svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Figma outlined Button v2 — subtle tint only, no color flip (matches .sg-icon-btn--outlined). */
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule-cta:hover {
+    background: rgb(0 0 0 / 8%);
+  }
+
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule-cta:active {
+    background: rgb(0 0 0 / 12%);
   }
 
   /* The hover fill turns black here — flip to a white border/text so it stays visible. */
@@ -1995,12 +2024,31 @@
     color: #fff;
   }
 
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--schedule-cta:hover {
+    background: rgb(255 255 255 / 12%);
+  }
+
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--schedule-cta:active {
+    background: rgb(255 255 255 / 16%);
+  }
+
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--schedule { display: none; }
 
   .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--favorite {
     background: #fff;
     border: 1px solid #000;
     color: #000;
+  }
+
+  /* Figma IconButton v2, light base — border stays black, only fill/icon color move. */
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--favorite:hover {
+    background: #f8f8f8;
+  }
+
+  .sg-live-card:not(.sg-live-card--mobile) .sg-live-card__btn--favorite:active {
+    background: #000;
+    color: #fff;
   }
 
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--favorite {
@@ -2012,6 +2060,16 @@
   /* Declared later to win over the base rule's dark border, invisible against this black hover fill. */
   .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
     border-color: #fff;
+  }
+
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--favorite:hover {
+    background: rgb(255 255 255 / 12%);
+  }
+
+  .sg-live-card:not(.sg-live-card--mobile):is(:hover, :focus-within) .sg-live-card__btn--favorite:active {
+    background: #fff;
+    color: #000;
   }
 }
 
@@ -2348,12 +2406,14 @@
     max-width: 1156px;
   }
 
-  /* .sg-carousel__card-wrap has no explicit width, so a % width on .sg-live-card can't resolve
-     against it (content-sized flex item). flex-basis: 100% gives it a definite size to clamp
-     against; max-width mirrors the card's own cap so the wrap can't render wider than it.
-     Scoped to full page — the widget's smaller cap doesn't hit this. */
-  .sg-full-page .sg-carousel-section--live .sg-carousel__card-wrap {
+  /* No width of its own, so it shrink-wraps to content — flex-basis gives it a definite size
+     to clamp against. Widget cap here; full page's wider cap overrides below. */
+  .sg-carousel-section--live .sg-carousel__card-wrap {
     flex: 0 0 100%;
+    max-width: 1104px;
+  }
+
+  .sg-full-page .sg-carousel-section--live .sg-carousel__card-wrap {
     max-width: 1156px;
   }
 
@@ -2362,8 +2422,8 @@
   }
 
   .sg-live-card:is(:hover, :focus-within) {
-    background: #000;
-    border-color: #000;
+    background: var(--s2a-color-gray-900, #131313);
+    border-color: var(--s2a-color-gray-900, #131313);
   }
 
   /* Fixed, not auto (Figma: 560x316): an <img> with height:100% keeps its own aspect ratio,
@@ -2371,32 +2431,45 @@
   .sg-live-card__image {
     width: 560px;
     height: 316px;
-    border-radius: var(--s2a-border-radius-md);
-    border: none;
+    border-radius: 20px;
+    border: 1px solid rgb(255 255 255 / 15%);
   }
 
+  /* Fixed 192px bar, not a right-inset that stretches with the image. */
   .sg-live-card__progress-row {
     top: auto;
     bottom: 13px;
     left: 27px;
-    right: 20px;
+    right: auto;
+    width: 192px;
   }
 
+  /* No gap: .sg-live-card__content owns it, or space-between would inflate it here too. */
   .sg-live-card__body {
-    padding: var(--s2a-spacing-2xl);
+    padding: var(--s2a-spacing-xl);
     justify-content: space-between;
-    gap: 2px;
+  }
+
+  /* Grows to fill the space above .sg-live-card__actions and centers its rows (Figma). */
+  .sg-live-card__content {
+    flex: 1 0 0;
+    justify-content: center;
   }
 
   .sg-live-card__meta {
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
-    gap: var(--s2a-spacing-sm);
+    gap: var(--s2a-spacing-md);
     margin: 0;
   }
 
   .sg-live-card__track-row { gap: 6px; }
+
+  /* Figma: 12px, overriding CategoryBadge's 14px default. */
+  .sg-live-card__meta .sg-category-badge__label {
+    font-size: var(--s2a-font-size-xs, 12px);
+  }
 
   .sg-live-card__track {
     font-size: var(--s2a-font-size-sm);
@@ -2412,8 +2485,9 @@
   /* Track colors can't be trusted against the dark hover fill — always go white. */
   .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
 
-  .sg-live-card__time {
-    font-size: var(--s2a-font-size-sm);
+  /* Own line above the title (Figma), 12px not the --sm 14px used elsewhere. */
+  .sg-live-card__content > .sg-live-card__time {
+    font-size: var(--s2a-font-size-xs, 12px);
     color: var(--s2a-color-gray-700);
     white-space: nowrap;
     margin: 0;
@@ -2421,9 +2495,11 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
 
+  /* Overrides the base rule's 24px margin — spacing now comes from the body's flex gap. */
   .sg-live-card__title {
     font-size: var(--s2a-font-size-3xl);
-    color: #000;
+    color: #292929;
+    margin-top: 0;
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -2433,49 +2509,74 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: #fff; }
 
-  .sg-live-card__desc {
-    font-size: var(--s2a-font-size-md);
-    line-height: 1.2;
-    letter-spacing: -0.16px;
-    color: #000;
-    white-space: normal;
-    text-overflow: clip;
-
-    /* Reserved at 2 lines' height, same reasoning as .sg-live-card__title above. */
-    min-height: calc(2 * 1.2em);
-
-    /* Set explicitly: the 1024-1279px block's rule doesn't cascade up past its own max-width. */
-    /* stylelint-disable-next-line value-no-vendor-prefix */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__desc { color: #fff; }
-
+  /* .sg-live-card__content now grows to fill the space above, so this margin is unneeded. */
   .sg-live-card__actions {
     gap: var(--s2a-spacing-sm);
+    margin-top: 0;
   }
 
   .sg-live-card__btn--watch {
-    background: var(--s2a-color-gray-800);
+    background: #000;
     color: #fff;
     min-width: auto;
     padding: 0 var(--s2a-spacing-lg);
   }
 
+  /* Figma's Button v2 "Icon Start" slot is 12px, smaller than IconPlay's own 20px default. */
+  .sg-live-card__btn--watch svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Hover/press on the light (card-not-hovered) black base. */
+  .sg-live-card__btn--watch:hover {
+    background: rgb(0 0 0 / 64%);
+    border: 1px solid #000;
+  }
+
+  .sg-live-card__btn--watch:active {
+    background: #000;
+    border: 1px solid #000;
+  }
+
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
     background: #fff;
-    color: #111;
+    color: #000;
+  }
+
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch:hover {
+    background: rgb(255 255 255 / 64%);
+    border: 1px solid #fff;
+  }
+
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch:active {
+    background: #fff;
+    border: 1px solid #fff;
   }
 
   .sg-live-card__btn--schedule-cta {
-    background: #fff;
-    border: 2px solid #000;
+    background: transparent;
+    backdrop-filter: blur(16px);
+    border: 1px solid #000;
     color: #000;
     min-width: auto;
     padding: 0 var(--s2a-spacing-lg);
+  }
+
+  /* Figma's Button v2 "Icon Start" slot is 12px, smaller than IconCalendarPlus's own 20px default. */
+  .sg-live-card__btn--schedule-cta svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Figma outlined Button v2 — subtle tint only, no color flip (matches .sg-icon-btn--outlined). */
+  .sg-live-card__btn--schedule-cta:hover {
+    background: rgb(0 0 0 / 8%);
+  }
+
+  .sg-live-card__btn--schedule-cta:active {
+    background: rgb(0 0 0 / 12%);
   }
 
   /* The hover fill turns black here — flip to a white border/text so it stays visible. */
@@ -2485,15 +2586,34 @@
     color: #fff;
   }
 
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--schedule-cta:hover {
+    background: rgb(255 255 255 / 12%);
+  }
+
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--schedule-cta:active {
+    background: rgb(255 255 255 / 16%);
+  }
+
   /* Design shows only Watch now + Favorite on the desktop live card. */
   .sg-live-card__btn--schedule {
     display: none;
   }
 
   .sg-live-card__btn--favorite {
-    background: #fff;
-    border: 2px solid #000;
+    background: transparent;
+    border: 1px solid #000;
     color: #000;
+  }
+
+  /* Figma IconButton v2, light base — border stays black, only fill/icon color move. */
+  .sg-live-card__btn--favorite:hover {
+    background: #f8f8f8;
+  }
+
+  .sg-live-card__btn--favorite:active {
+    background: #000;
+    color: #fff;
   }
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {
@@ -2505,6 +2625,16 @@
   /* Declared later to win over the base rule's dark border, invisible against this black hover fill. */
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
     border-color: #fff;
+  }
+
+  /* On the dark (card-hovered) base — hovering the button also triggers the card's :hover. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite:hover {
+    background: rgb(255 255 255 / 12%);
+  }
+
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite:active {
+    background: #fff;
+    color: #000;
   }
 
   /* ── Time slot rows ────────────────────────────────────────── */
@@ -2687,6 +2817,23 @@
 
   .sg-card:is(:hover, :focus-within) .sg-card__title { color: #fff; }
 
+  /* margin-top here (not on the title) since .sg-card__body has gap: 0. */
+  .sg-card__description {
+    margin-top: var(--s2a-spacing-xs);
+    font-size: 14px;
+    line-height: 1.2;
+    letter-spacing: -0.14px;
+    color: var(--s2a-color-gray-500, #8f8f8f);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .sg-card:is(:hover, :focus-within) .sg-card__description {
+    display: block;
+  }
+
   .sg-card__footer {
     display: flex;
     align-items: flex-end;
@@ -2774,6 +2921,16 @@
     animation: sg-card-btn-reveal 0.22s ease both;
   }
 
+  /* Figma calls for a gray-900 outline at rest on both buttons; overrides the base
+     rule's near-invisible light-gray border-color (MWPW-207192). */
+  .sg-card:not(:hover, :focus-within).is-scheduled .sg-card__btn--favorite,
+  .sg-card:not(:hover, :focus-within).is-favorited .sg-card__btn--favorite,
+  .sg-card:not(:hover, :focus-within).is-scheduled .sg-card__btn--schedule,
+  .sg-card:not(:hover, :focus-within).is-favorited .sg-card__btn--schedule {
+    border-color: var(--s2a-color-gray-900, #131313);
+    color: var(--s2a-color-gray-900, #131313);
+  }
+
   .sg-card:not(:hover, :focus-within).is-scheduled:not(.is-favorited) .sg-card__btn--favorite,
   .sg-card:not(:hover, :focus-within).is-favorited:not(.is-scheduled) .sg-card__btn--schedule {
     display: none;
@@ -2781,6 +2938,47 @@
 
   .sg-card:not(:hover, :focus-within) .sg-card__btn--play {
     display: none;
+  }
+
+  /* Card hover always darkens to gray-900 (see .is-scheduled/.is-favorited:is(:hover...)
+     above); all three buttons become a solid white pill with a black icon so they read
+     clearly against it, per Figma (MWPW-207192). The button swaps between the
+     --outlined (unfavorited/unscheduled) and --solid (favorited/scheduled/play)
+     icon-button variants, so both are covered here; classes are repeated to outrank
+     each variant's own rule below, which would otherwise still win on `color` and
+     paint the icon white-on-white. */
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--favorite,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule,
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play {
+    background: #fff;
+    border-color: #fff;
+    color: #000;
+  }
+
+  /* Each variant also darkens further on its own :hover/:active — meant for buttons on a
+     light card, wrong once the card itself has gone dark. Neutralize both sub-states so
+     a directly-hovered/pressed button doesn't go dark-on-dark and hide its icon again. */
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--favorite:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule:hover:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play:hover:not(:disabled) {
+    background: rgb(255 255 255 / 64%);
+    border-color: #fff;
+  }
+
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--favorite:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule:active:not(:disabled),
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play:active:not(:disabled) {
+    background: #fff;
+    border-color: transparent;
   }
 
   @keyframes sg-card-heart-slide {

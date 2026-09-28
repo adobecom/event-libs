@@ -376,6 +376,13 @@
   border: 2px solid var(--s2a-color-gray-300);
 }
 
+/* Figma: 16px here (Share keeps the shared 20px). Compound selector needed to outrank
+   .sg-icon-btn--lg .sg-icon-btn__icon, which ties on specificity but loses on source order. */
+.sg-icon-btn--lg.sg-detail__icon-btn--favorite .sg-icon-btn__icon {
+  width: 16px;
+  height: 16px;
+}
+
 .sg-detail__icon-btn:disabled,
 .sg-detail__icon-btn.is-loading {
   opacity: 0.5;
