@@ -57,6 +57,12 @@
 
 .upcoming-sessions-track {
   display: flex;
+
+  /* Center (not flex-start/stretch) so every card shares the same horizontal midline: a
+     hovered/expanded card grows symmetrically up and down from that centerline instead of
+     stretching every sibling to match its taller height or growing downward only from a
+     shared top edge. */
+  align-items: center;
   gap: var(--s2a-spacing-md, 16px);
   overflow-x: auto;
   overflow-y: visible;
@@ -125,20 +131,6 @@
 .upcoming-sessions.dark-card .upcoming-sessions-arrow:hover,
 .section.dark .upcoming-sessions .upcoming-sessions-arrow:hover {
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
-}
-
-@media (min-width: 1280px) {
-  .upcoming-sessions-controls {
-    display: flex;
-    margin-right: var(--s2a-spacing-lg, 24px);
-    flex-shrink: 0;
-    align-items: center;
-    gap: var(--s2a-spacing-md, 16px);
-  }
-
-  .upcoming-sessions[data-few-sessions="true"] .upcoming-sessions-controls {
-    display: none;
-  }
 }
 
 .upcoming-sessions-arrow--prev {
@@ -318,12 +310,14 @@
   box-shadow: none;
 
   /* Frosts whatever sits behind the card (the marquee's own background art) instead of
-     requiring a bespoke pre-blurred asset; see the >=1280px block, which turns this back off. */
+     requiring a bespoke pre-blurred asset - applies at every breakpoint (see the >=1280px
+     block below, which keeps this same treatment for the desktop collapsed card). */
   backdrop-filter: blur(var(--s2a-blur-sm, 16px));
 }
 
 .upcoming-sessions.dark-card .sg-card:hover {
-  background: #292929;
+  background: #131313;
+  border-color: #505050;
   box-shadow: none;
 
   /* Background is opaque here, so there's nothing to blur through - skip the GPU cost. */
@@ -379,6 +373,18 @@
 /* stylelint-enable no-descending-specificity */
 
 @media (min-width: 1280px) {
+  .upcoming-sessions-controls {
+    display: flex;
+    margin-right: var(--s2a-spacing-lg, 24px);
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--s2a-spacing-md, 16px);
+  }
+
+  .upcoming-sessions[data-few-sessions="true"] .upcoming-sessions-controls {
+    display: none;
+  }
+
   .upcoming-sessions .sg-card {
     flex-direction: row;
     align-items: stretch;
@@ -422,11 +428,13 @@
     display: none;
   }
 
-  .upcoming-sessions .sg-card__title {
-    font-size: var(--s2a-font-size-lg, 18px);
-    line-height: 22px;
-    -webkit-line-clamp: 2;
-  }
+  /*
+   * No desktop-specific title override: the Figma spec for this card uses the same
+   * 16px/1.25 (20px) title metrics at every breakpoint, so the base rule's 2-line clamp
+   * (40px) already matches the 76px content budget the 128px/149px card heights assume.
+   * Bumping this to 18px/22px (as a prior version did) overflows a genuinely 2-line title
+   * past those heights.
+   */
 
   .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__title {
     color: var(--s2a-color-gray-25, #fff);
@@ -446,6 +454,7 @@
     justify-content: space-between;
     gap: var(--s2a-spacing-lg, 24px);
     margin-top: auto;
+    padding-top:0%;
   }
 
   .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__track {
@@ -480,7 +489,11 @@
     opacity: 0;
     pointer-events: none;
     align-items: center;
-    justify-content: space-between;
+
+    /* space-between would stretch the two icons to the full footer height on hover; flex-start
+       + the gap above keeps them a fixed 16px apart and aligned with the title's top edge,
+       instead of floating centered in the taller expanded card. */
+    justify-content: flex-start;
     transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
   }
 
@@ -503,11 +516,16 @@
   .upcoming-sessions.dark-card .sg-card.is-favorited {
     background: rgb(10 10 10 / 35%);
     border: 1px solid #505050;
-    backdrop-filter: none;
+
+    /* Same frosted-marquee treatment as mobile/tablet - see the base rule above. */
+    backdrop-filter: blur(var(--s2a-blur-sm, 16px));
   }
 
   .upcoming-sessions.dark-card .sg-card:hover {
-    background: #292929;
+    background: #131313;
+    border-color: #505050;
+
+    /* Background is opaque here, so there's nothing to blur through - skip the GPU cost. */
     backdrop-filter: none;
   }
   /* stylelint-enable no-descending-specificity */
