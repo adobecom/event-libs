@@ -165,10 +165,14 @@ describe('Chrono Box', () => {
   ].forEach(([label, modulePath]) => {
     describe(`openModalFromPageHashAfterFragment (${label})`, () => {
       let dispatched;
+      let originalRaf;
       const onModalOpen = (e) => dispatched.push(e.detail.hash);
       const { pathname, search } = window.location;
 
       beforeEach(() => {
+        // Headless/background tabs may throttle rAF indefinitely; use a timer instead.
+        originalRaf = window.requestAnimationFrame;
+        window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 0);
         dispatched = [];
         document.body.innerHTML = '';
         document.head.innerHTML = '';
@@ -176,6 +180,7 @@ describe('Chrono Box', () => {
       });
 
       afterEach(() => {
+        window.requestAnimationFrame = originalRaf;
         window.removeEventListener('modal:open', onModalOpen);
         window.history.replaceState(null, '', `${pathname}${search}`);
       });
