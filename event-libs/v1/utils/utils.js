@@ -461,7 +461,7 @@ export function getRsvpToken(searchParams) {
  * @returns {boolean} True if sign-in must be forced.
  */
 export function shouldForceGuestSignIn(profile, allowGuestReg) {
-  return Boolean(profile?.noProfile || profile?.account_type === 'guest')
+  return Boolean(profile === null || profile?.noProfile || profile?.account_type === 'guest')
     && !allowGuestReg
     && !profile?.rsvpToken;
 }
