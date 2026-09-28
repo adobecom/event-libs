@@ -1,5 +1,5 @@
 import {
-  createTag, loadStyle, getEventConfig, getFallbackLocale, getMetadata, isNonProdHost,
+  createTag, loadStyle, getEventConfig, getFallbackLocale, getMetadata,
 } from '../../utils/utils.js';
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
@@ -19,18 +19,8 @@ import { isGnavNotificationsEnabled } from './swan-config.js';
 // Preact render tree. Injected into `.feds-notifications-wrapper`, the dedicated placeholder
 // federal added for this widget (federal#203 / MWPW-207209) — rendered unconditionally right
 // before `.feds-utilities` in gnav's own template, the same pattern used for Brand
-// Concierge's `.feds-bc-wrapper`. Replaces an earlier stopgap that injected straight into
-// `#universal-nav`, UniversalNav's own rendered container, before federal owned a real slot.
-//
-// TEMPORARY — remove once federal#203/MWPW-207209 has shipped to every environment this
-// widget is tested against: `.feds-notifications-wrapper` doesn't exist in deployed gnav
-// markup until then, so `?swanMountFallback=true` in the URL opts back into the old
-// `#universal-nav` stopgap purely so the widget itself can still be exercised locally in
-// the meantime. Gated to non-prod hosts (isNonProdHost()) — this can't be triggered on a
-// real adobe.com page.
-const MOUNT_SELECTOR = isNonProdHost() && new URLSearchParams(window.location.search).get('swanMountFallback') === 'true'
-  ? '#universal-nav'
-  : '.feds-notifications-wrapper';
+// Concierge's `.feds-bc-wrapper`.
+const MOUNT_SELECTOR = '.feds-notifications-wrapper';
 
 // Real gnav bell glyph, supplied directly (not resolved via features/icons/icon-resolver.js)
 // for a closer look/feel match. Both light/dark source files share the same path (only their
@@ -260,9 +250,6 @@ function buildWidget(mount) {
   });
 
   wrapper.append(button, tooltip, panel, announcer);
-  // Prepend rather than append: `.feds-notifications-wrapper` is empty so order doesn't
-  // matter there, but the `?swanMountFallback=true` fallback mounts into `#universal-nav`
-  // alongside UNC's other icons, where this needs to land first to match the Figma order.
   mount.prepend(wrapper);
 
   // Cheap insurance for the life of the page: nothing today re-renders gnav's own template
@@ -350,9 +337,8 @@ export function mountNotificationWidget() {
   if (mounted) return;
   // Federal only renders `.feds-notifications-wrapper` when the page also carries
   // gnav-notifications=on — skip the wait entirely rather than timing out against an
-  // element that will never appear. The swanMountFallback dev path intentionally bypasses
-  // gnav altogether, so it keeps working regardless of this flag.
-  if (MOUNT_SELECTOR === '.feds-notifications-wrapper' && !isGnavNotificationsEnabled()) return;
+  // element that will never appear.
+  if (!isGnavNotificationsEnabled()) return;
   mounted = true;
 
   loadStyle(new URL('./notification-widget.css', import.meta.url).href);
