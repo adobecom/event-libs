@@ -482,7 +482,6 @@
     /* No top padding: the wrapper's 24px bottom padding already spaces the list from this
        button. Bottom 24px is the block's bottom gap. */
     padding: 0 var(--s2a-spacing-md) var(--s2a-spacing-lg, 24px);
-    align-items: center;
     align-self: flex-start;
     gap: var(--s2a-spacing-xs);
     width: fit-content;
