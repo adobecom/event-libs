@@ -80,7 +80,10 @@
   padding-inline: var(--s2a-spacing-lg);
 
   /* Cap and center the content column so copy doesn't hug the far-left edge on ultra-wide
-     screens (>1920px), mirroring Milo router-marquee's .rm-content-wrapper. */
+     screens (>1920px), mirroring Milo router-marquee's .rm-content-wrapper. border-box makes
+     max-width include the padding-inline, so the total box is exactly 1920px (not 1920 + padding)
+     and the bleeding media stays inside the viewport. */
+  box-sizing: border-box;
   width: 100%;
   max-width: 1920px;
   margin-inline: auto;
