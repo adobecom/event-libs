@@ -429,7 +429,7 @@
   .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__description {
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
     margin-top: -8px;
