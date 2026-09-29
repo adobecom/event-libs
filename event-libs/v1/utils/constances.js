@@ -189,8 +189,13 @@ export const FALLBACK_LOCALES = {
 };
 export const LATEST_VERSION = 'v1';
 export const PHONE_FIELD_RE = /phone/i;
-export const BACKEND_PHONE_RE = /^[+\d\s\-().]+$/;
-export const PHONE_PATTERN = BACKEND_PHONE_RE.source;
+// The DOM compiles an input's `pattern` attribute with the RegExp `v` flag, where `(`
+// and `)` are reserved inside a character class and must be escaped — an unescaped pair
+// throws "Invalid character in character class" and silently drops validation. Authoring
+// the pattern as a string keeps the escapes explicit and lets BACKEND_PHONE_RE derive
+// from it, so the DOM pattern and the JS check can never drift apart.
+export const PHONE_PATTERN = '^[+\\d\\s\\-\\(\\).]+$';
+export const BACKEND_PHONE_RE = new RegExp(PHONE_PATTERN);
 export const STANDARD_FIELD_MAX_LENGTHS = {
   firstName: 30,
   lastName: 30,
