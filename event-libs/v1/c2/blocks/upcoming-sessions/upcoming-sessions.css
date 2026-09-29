@@ -38,9 +38,13 @@
   }
 }
 
+/* At >=1920 both this block and the marquee cap their content at 1920px and center it, so the
+   marquee copy sits flush at the centered box's left edge (measured: no residual inset). Drop the
+   left padding here so the header/first card line up with "Welcome to MAX" instead of sitting a
+   full inset further right. Below 1920 the marquee is not capped, so the 86/124 insets still match. */
 @media (min-width: 1920px) {
   .upcoming-sessions--attached {
-    padding-left: 220px;
+    padding-left: 0;
   }
 }
 
