@@ -11,21 +11,12 @@
 
 .upcoming-sessions--attached {
   position: absolute;
-  bottom: 0;
-
-  /* Cap and center the carousel exactly like .event-marquee-foreground (same max-width +
-     auto inline margins) so its box always matches the marquee's, keeping the header/first card
-     aligned with the "Welcome to MAX" copy at every width. */
   left: 0;
   right: 0;
-  width: 100%;
-  max-width: 1920px;
-  margin-inline: auto;
+  bottom: 0;
   padding: 0 0 56px var(--s2a-spacing-lg);
 }
 
-/* Left padding scales with the marquee's content inset (event-marquee-foreground padding-inline)
-   at each breakpoint so the header/first card align with the "Welcome to MAX" copy. */
 @media (min-width: 1024px) {
   .upcoming-sessions--attached {
     padding-left: 86px;
@@ -38,8 +29,12 @@
   }
 }
 
+/* Cap and center the carousel at 1920px, mirroring the marquee foreground, so the header/first
+   card align with the "Welcome to MAX" copy on ultra-wide screens instead of drifting right. */
 @media (min-width: 1920px) {
   .upcoming-sessions--attached {
+    max-width: 1920px;
+    margin-inline: auto;
     padding-left: 220px;
   }
 }
