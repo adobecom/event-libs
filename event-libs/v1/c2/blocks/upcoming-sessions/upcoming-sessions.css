@@ -435,6 +435,7 @@
     overflow: hidden;
     max-height: 0;
     opacity: 0;
+    margin-top: -16px;
     transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1),
                 max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
                 margin-top 0.32s cubic-bezier(0.22, 1, 0.36, 1);
