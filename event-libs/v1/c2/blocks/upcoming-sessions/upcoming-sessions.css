@@ -29,13 +29,15 @@
   }
 }
 
-/* Cap and center the carousel at 1920px, mirroring the marquee foreground, so the header/first
-   card align with the "Welcome to MAX" copy on ultra-wide screens instead of drifting right. */
+/* Cap and center the carousel at 1920px, mirroring the marquee foreground. Measured: the marquee
+   copy lands flush at its centered 1920px box's left edge (its 220px padding-inline forms the
+   centering margin, not a content inset), so the carousel's box edge already matches it — drop the
+   left padding here so the header/first card line up with "Welcome to MAX". */
 @media (min-width: 1920px) {
   .upcoming-sessions--attached {
     max-width: 1920px;
     margin-inline: auto;
-    padding-left: 220px;
+    padding-left: 0;
   }
 }
 
