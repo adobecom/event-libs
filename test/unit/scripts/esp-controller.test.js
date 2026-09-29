@@ -795,8 +795,13 @@ describe('Adobe Event Service API', () => {
     });
 
     it('should catch an unexpected/synchronous error and report it to lana with the eventId', async () => {
-      BlockMediator.set('imsProfile', undefined);
-      sandbox.stub(window, 'fetch').onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      BlockMediator.set('imsProfile', { account_type: 'guest' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      // getEvent "succeeds" but returns no data body, and create-attendee succeeds,
+      // so the later `eventObj.data.isFull` read throws synchronously — a genuine
+      // unexpected error, not the (now-fixed) null-profile crash.
+      fetchStub.onCall(0).resolves({ json: () => undefined, ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
 
       const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
@@ -805,6 +810,22 @@ describe('Adobe Event Service API', () => {
       expect(result.status).to.equal('Unexpected Error');
       expect(lanaLogStub.calledOnce).to.equal(true);
       expect(lanaLogStub.firstCall.args[0]).to.include(eventId);
+    });
+
+    it('should treat a signed-out guest with no imsProfile (no rsvp token) as a guest and create the attendee', async () => {
+      // MWPW-209227: a signed-out guest visiting an event with allow-guest-registration
+      // enabled (no rsvp token) has a `null` imsProfile — this must still register
+      // via the guest create-attendee path instead of throwing before any POST fires.
+      BlockMediator.set('imsProfile', null);
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+      expect(result.ok).to.be.true;
+      expect(fetchStub.callCount).to.equal(3);
     });
   });
 

@@ -700,7 +700,10 @@ export async function unregisterFromSessionTime(sessionTimeId) {
 // compound helper functions
 export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToken = null) {
   try {
-    const profile = BlockMediator.get('imsProfile');
+    // A signed-out guest with no rsvp token still has a `null` imsProfile (see
+    // profile.js's captureProfile) — normalize it the same way events-form.js's
+    // onProfile gate does, so this always sees a guest, never crashes on `null`.
+    const profile = BlockMediator.get('imsProfile') ?? { account_type: 'guest' };
     const eventObj = await getEvent(eventId);
 
     if (!eventObj.ok) return { ok: false, error: 'Failed to get event' };
