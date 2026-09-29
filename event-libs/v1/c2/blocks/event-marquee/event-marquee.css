@@ -206,13 +206,24 @@
     max-width: 398px;
   }
 
+  /* The media bleeds to the viewport's right edge, independent of the capped 1920px content
+     column (mirrors Milo classic marquee's `.split .asset.bleed { position: absolute; right: 0 }`).
+     It is absolute inside the centred foreground, so `right` is offset by the negative centring
+     gutter ((100vw - 1920px) / 2) to reach the true viewport edge on ultra-wide screens; min(0px, ...)
+     keeps it at the foreground edge below 1920px where there is no gutter. */
   .event-marquee-bleed {
-    flex: 427 1 0%;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: min(0px, calc((100vw - 1920px) / -2));
+    width: 50vw;
     min-width: 0;
+    flex: none;
   }
 
   .event-marquee-bleed picture,
   .event-marquee-bleed > video {
+    width: 100%;
     height: 100%;
   }
 
