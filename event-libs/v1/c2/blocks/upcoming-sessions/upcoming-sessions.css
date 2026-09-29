@@ -14,6 +14,12 @@
   left: 0;
   right: 0;
   bottom: 0;
+
+  /* Cap and center the carousel so it doesn't hug the far-left edge on ultra-wide screens
+     (>1920px), matching the event-marquee content column above it. Auto inline margins center
+     the box within its left/right-anchored absolute position. */
+  max-width: 1920px;
+  margin-inline: auto;
   padding: 0 0 56px var(--s2a-spacing-lg);
 }
 
