@@ -63,6 +63,10 @@
   cursor: pointer;
 }
 
+.session-action[hidden] {
+  display: none;
+}
+
 .session-action:focus-visible {
   outline: 2px solid var(--s2a-color-gray-1000, #000);
   outline-offset: 2px;

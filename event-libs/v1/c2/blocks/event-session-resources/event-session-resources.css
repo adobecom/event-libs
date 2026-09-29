@@ -19,8 +19,13 @@
 
 .session-resources-empty {
   margin: 0;
-  color: var(--s2a-color-gray-1000, #000);
+  padding: var(--s2a-spacing-16, 16px);
+  border: 2px solid rgb(0 0 0 / 10%);
+  border-radius: var(--s2a-border-radius-16, 16px);
+  background: var(--s2a-color-gray-25, #fff);
+  color: var(--s2a-color-gray-600, #717171);
   font-size: var(--s2a-font-size-16, 1rem);
+  line-height: 24px;
 }
 
 .session-resources-list {
