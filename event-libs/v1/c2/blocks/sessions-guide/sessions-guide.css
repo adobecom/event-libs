@@ -2767,7 +2767,8 @@
     z-index: 2;
   }
 
-  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled,
+  /* :not(.sg-card--on-demand): don't reserve the removed schedule button's space (MWPW-208011). */
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled:not(.sg-card--on-demand),
   :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-favorited {
     flex-direction: row;
     width: 427px;
@@ -2791,10 +2792,42 @@
   }
 
   /* Restated: the resting .is-scheduled/.is-favorited rule ties on specificity and is later. */
-  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled:not(.sg-card--on-demand):is(:hover, :focus-within),
   :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
     background: var(--s2a-color-gray-900);
     min-height: 150px;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+    z-index: 2;
+  }
+
+  /* Restates plain-card desktop layout at 4-class specificity so on-demand cards aren't
+     shadowed by the base rule's .is-scheduled selector (MWPW-208011). */
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled.sg-card--on-demand:not(.is-favorited) {
+    flex-direction: row;
+    width: 379px;
+    min-height: 124px;
+    background: var(--s2a-color-gray-50);
+    border: none;
+    border-radius: var(--s2a-border-radius-md);
+    padding: var(--s2a-spacing-lg);
+    gap: 0;
+    box-shadow: none;
+    align-items: stretch;
+    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                min-height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.25s ease,
+                max-width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                margin 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                border-width 0.45s ease;
+  }
+
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled.sg-card--on-demand:not(.is-favorited):is(:hover, :focus-within) {
+    width: 427px;
+    min-height: 150px;
+    background: var(--s2a-color-gray-900);
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
     z-index: 2;
   }
@@ -2902,8 +2935,8 @@
   }
 
   .sg-card:is(:hover, :focus-within) .sg-card__actions,
-  .sg-card.is-scheduled .sg-card__actions,
-  .sg-card.is-favorited .sg-card__actions {
+  .sg-card.is-favorited .sg-card__actions,
+  .sg-card.is-scheduled:not(.sg-card--on-demand) .sg-card__actions {
     width: 48px;
     padding-left: var(--s2a-spacing-md);
     opacity: 1;
@@ -2923,15 +2956,15 @@
 
   /* Figma calls for a gray-900 outline at rest on both buttons; overrides the base
      rule's near-invisible light-gray border-color (MWPW-207192). */
-  .sg-card:not(:hover, :focus-within).is-scheduled .sg-card__btn--favorite,
+  .sg-card:not(:hover, :focus-within).is-scheduled:not(.sg-card--on-demand) .sg-card__btn--favorite,
   .sg-card:not(:hover, :focus-within).is-favorited .sg-card__btn--favorite,
-  .sg-card:not(:hover, :focus-within).is-scheduled .sg-card__btn--schedule,
+  .sg-card:not(:hover, :focus-within).is-scheduled:not(.sg-card--on-demand) .sg-card__btn--schedule,
   .sg-card:not(:hover, :focus-within).is-favorited .sg-card__btn--schedule {
     border-color: var(--s2a-color-gray-900, #131313);
     color: var(--s2a-color-gray-900, #131313);
   }
 
-  .sg-card:not(:hover, :focus-within).is-scheduled:not(.is-favorited) .sg-card__btn--favorite,
+  .sg-card:not(:hover, :focus-within).is-scheduled:not(.sg-card--on-demand):not(.is-favorited) .sg-card__btn--favorite,
   .sg-card:not(:hover, :focus-within).is-favorited:not(.is-scheduled) .sg-card__btn--schedule {
     display: none;
   }
