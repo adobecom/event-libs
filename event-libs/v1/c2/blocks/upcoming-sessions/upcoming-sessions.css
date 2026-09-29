@@ -147,6 +147,7 @@
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
   cursor: pointer;
+  will-change: width, min-height;
   transition: background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
@@ -197,7 +198,7 @@
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  transition: color 0.2s;
+  transition: color 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /*
@@ -235,7 +236,7 @@
   white-space: nowrap;
   flex-shrink: 0;
   line-height: 1.5;
-  transition: color 0.2s;
+  transition: color 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .upcoming-sessions .sg-card__footer-badge {
@@ -251,7 +252,7 @@
   text-overflow: ellipsis;
   min-width: 0;
   text-align: right;
-  transition: color 0.2s;
+  transition: color 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .upcoming-sessions .sg-card__actions {
@@ -426,12 +427,22 @@
     color: var(--s2a-color-gray-25, #fff);
   }
 
-  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__description {
+  .upcoming-sessions .sg-card__description {
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                margin-top 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__description {
+    max-height: 18px;
+    opacity: 1;
     margin-top: -8px;
   }
 
@@ -477,7 +488,7 @@
     pointer-events: none;
     align-items: center;
     justify-content: flex-start;
-    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   /* stylelint-disable-next-line no-descending-specificity */
