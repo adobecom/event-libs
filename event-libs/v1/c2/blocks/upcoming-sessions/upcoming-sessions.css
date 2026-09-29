@@ -13,14 +13,14 @@
   position: absolute;
   bottom: 0;
 
-  /* Cap and center the carousel so it doesn't hug the far-left edge on ultra-wide screens
-     (>1920px), keeping it aligned with the event-marquee content column above it. Centering via
-     left:50% + translateX matches the marquee's centered 1920px box exactly, so the header/first
-     card line up with the "Welcome to MAX" copy regardless of the positioned ancestor's box. */
-  left: 50%;
-  transform: translateX(-50%);
+  /* Cap and center the carousel exactly like .event-marquee-foreground (same max-width +
+     auto inline margins) so its box always matches the marquee's, keeping the header/first card
+     aligned with the "Welcome to MAX" copy at every width. */
+  left: 0;
+  right: 0;
   width: 100%;
   max-width: 1920px;
+  margin-inline: auto;
   padding: 0 0 56px var(--s2a-spacing-lg);
 }
 
@@ -38,13 +38,9 @@
   }
 }
 
-/* At >=1920 both this block and the marquee cap their content at 1920px and center it, so the
-   marquee copy sits flush at the centered box's left edge (measured: no residual inset). Drop the
-   left padding here so the header/first card line up with "Welcome to MAX" instead of sitting a
-   full inset further right. Below 1920 the marquee is not capped, so the 86/124 insets still match. */
 @media (min-width: 1920px) {
   .upcoming-sessions--attached {
-    padding-left: 0;
+    padding-left: 220px;
   }
 }
 
