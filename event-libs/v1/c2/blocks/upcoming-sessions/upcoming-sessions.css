@@ -29,15 +29,16 @@
   }
 }
 
-/* Cap and center the carousel at 1920px, mirroring the marquee foreground. Measured: the marquee
-   copy lands flush at its centered 1920px box's left edge (its 220px padding-inline forms the
-   centering margin, not a content inset), so the carousel's box edge already matches it — drop the
-   left padding here so the header/first card line up with "Welcome to MAX". */
+/* Cap and center the carousel at 1920px, mirroring the marquee foreground. The marquee copy needs
+   a 220px inset at exactly 1920px, but as the viewport widens the centering margin
+   ((100vw - 1920px) / 2) grows and the marquee's effective inset shrinks to 0. Match that: shrink
+   the carousel's left padding by the same margin so it tracks "Welcome to MAX" across the whole
+   range (220px at 1920 -> 0 by ~2360), clamped at 0 beyond. */
 @media (min-width: 1920px) {
   .upcoming-sessions--attached {
     max-width: 1920px;
     margin-inline: auto;
-    padding-left: 0;
+    padding-left: max(0px, 220px - (100vw - 1920px) / 2);
   }
 }
 
