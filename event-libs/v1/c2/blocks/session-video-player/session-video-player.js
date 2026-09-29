@@ -526,6 +526,16 @@ export default async function init(el) {
     const video = PLAYABLE_PHASES.includes(phase)
       ? resolveVideoForPhase(phase, sessionTimes, session)
       : null;
+    // TEMP DEBUG - DVR buffer diagnosis
+    // eslint-disable-next-line no-console
+    console.log('[svp] onPhase', {
+      insidePlaylist: isInsidePlaylistContainer(el),
+      phase,
+      video,
+      embeddedPhase,
+      hasPlaylist: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist,
+      mrDvrVideoId: session.mrDvrVideoId,
+    });
 
     if (video && phase === embeddedPhase) {
       return;
