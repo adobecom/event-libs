@@ -152,6 +152,8 @@
 /* ── Portal & Shell ──────────────────────────────────────── */
 
 .sg-portal {
+  position: relative;
+  z-index: 9;
   font-family: var(--body-font-family);
   color: var(--s2a-color-content-default);
   box-sizing: border-box;
