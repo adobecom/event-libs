@@ -23,6 +23,21 @@ function setRoutingData(card, entry) {
   if (endTimeMillis) card.dataset.endTimeUtc = new Date(endTimeMillis).toISOString();
 }
 
+// Mirrors Milo's decorateImageLinks: absolute *.aem.* / *.hlx.* URLs (e.g. an authored
+// https://main--<repo>--<org>.aem.live/media_x.png) load from the current origin instead.
+export function toRelativeMediaUrl(src) {
+  if (!src) return src;
+  try {
+    const url = new URL(src);
+    if (url.hostname.includes('.aem.') || url.hostname.includes('.hlx.')) {
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+    return src;
+  } catch {
+    return src;
+  }
+}
+
 const DEFAULT_CTA_TEXT = {
   prior: 'Learn more',
   during: 'Watch now',
@@ -74,7 +89,7 @@ function buildAuthoredCard(entry, cta) {
   const card = createTag('div', { class: 'event-card media-square' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
-    createTag('img', { src: entry.imageUrl, alt: '' }, '', { parent: mediaWrapper });
+    createTag('img', { src: toRelativeMediaUrl(entry.imageUrl), alt: '' }, '', { parent: mediaWrapper });
   }
 
   const contentWrapper = createTag('div', {}, '', { parent: card });
