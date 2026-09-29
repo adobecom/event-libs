@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import init, { formatSessionDateTime } from '../../../../../event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js';
+import init, { formatSessionDateTime, toRelativeMediaUrl } from '../../../../../event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js';
 
 function entry(overrides = {}) {
   return {
@@ -27,6 +27,22 @@ function buildBlock(config, { dark = false } = {}) {
   return el;
 }
 
+describe('toRelativeMediaUrl', () => {
+  it('strips the origin from aem/hlx hosts like Milo decorateImageLinks', () => {
+    expect(toRelativeMediaUrl('https://main--da-events-fg-pink--adobecom.aem.live/media_1.png?width=750#x'))
+      .to.equal('/media_1.png?width=750#x');
+    expect(toRelativeMediaUrl('https://main--repo--org.hlx.page/a/media_2.jpeg'))
+      .to.equal('/a/media_2.jpeg');
+  });
+
+  it('leaves other absolute, relative, and empty values unchanged', () => {
+    expect(toRelativeMediaUrl('https://example.com/image.jpg')).to.equal('https://example.com/image.jpg');
+    expect(toRelativeMediaUrl('/media_3.png')).to.equal('/media_3.png');
+    expect(toRelativeMediaUrl('')).to.equal('');
+    expect(toRelativeMediaUrl(undefined)).to.equal(undefined);
+  });
+});
+
 describe('featured-sessions', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -43,6 +59,16 @@ describe('featured-sessions', () => {
     expect(cards[0].querySelector('.card-description').textContent).to.equal(formatSessionDateTime(entry().sessionTime));
     expect(cards[0].querySelector('.card-cta').textContent).to.equal('Learn more');
     expect(cards[0].querySelector('.card-media picture')).to.exist;
+  });
+
+  it('loads aem.live config images from the current origin', async () => {
+    const el = buildBlock({ entries: [entry({ imageUrl: 'https://main--da-events-fg-pink--adobecom.aem.live/media_1.png' })] });
+    await init(el);
+
+    const img = el.querySelector('.card-media img');
+    expect(img.getAttribute('src')).to.not.include('aem.live');
+    expect(new URL(img.src).origin).to.equal(window.location.origin);
+    expect(new URL(img.src).pathname).to.equal('/media_1.png');
   });
 
   it('drops an entry with no imageUrl instead of rendering an imageless card', async () => {
