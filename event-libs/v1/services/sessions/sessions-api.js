@@ -144,6 +144,12 @@ export function getSessionIsOnline(session) {
   return hasFormatValue(extractCustomAttributeValues(session, 'Format'), FORMAT_ONLINE);
 }
 
+// Raw session-catalog shape stores the authored copy under the en-US localization, not a
+// top-level field.
+export function getSessionDescription(session) {
+  return session?.localizations?.['en-US']?.description || '';
+}
+
 const ADDITIONAL_TRACK_ATTRIBUTE_NAME = 'Additional Event Site Tracks';
 
 // All values, not just the first — the runtime treats these as real tracks.
