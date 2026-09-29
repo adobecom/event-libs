@@ -123,8 +123,9 @@ pre-event schedule button, and this fixes it, but IPOD is the wrong axis):
 
 The button is **not built at all** rather than built and withheld, so `renderSchedule()` never
 runs and never subscribes to the `scheduled` signal on a page that could not schedule anyway.
-Favorite and share are unaffected — both are state- and format-independent — and Watch now
-still appears if an unschedulable session goes `live`.
+Favorite and share are unaffected by this gate (share is hidden only on a pending pure IPOD
+session — see *In-person IPOD sessions*), and Watch now still appears if an unschedulable
+session goes `live`.
 
 ⚠️ Test sessions `1001` and `1002` declare `Online` in Format but have `virtualTime: false`,
 the only violations of the correlation above. They will still error on click; no client-side
@@ -170,10 +171,15 @@ A **pure in-person IPOD** session (`isInPersonIpodSession`) is handled specially
 `upcoming`/`live` eyebrow (no date, no `Live`) and has **no CTA** (no Watch now, no Add to schedule).
 The eyebrow is binary — `Available soon` until the recording is available to watch, then `On-demand`:
 
-| Recording available to watch? | Eyebrow | CTA | Closed captions |
-|---|---|---|---|
-| no | `Available soon` (`IPOD pending label`) | none | hidden |
-| yes | `On-demand` (`On-demand label`) | none | shown |
+| Recording available to watch? | Eyebrow | CTA | Closed captions | Share |
+|---|---|---|---|---|
+| no | `Available soon` (`IPOD pending label`) | none | hidden | hidden |
+| yes | `On-demand` (`On-demand label`) | none | shown | shown |
+
+Share is hidden while the recording is pending because there is nothing to watch at the shared
+link yet ([MWPW-209087](https://jira.corp.adobe.com/browse/MWPW-209087)). It is toggled with the
+`hidden` attribute (`.session-action[hidden]` restores `display: none` over `inline-flex`), so the
+DVR-unlock re-render reveals it without a reload.
 
 **"Available" matches the video player's render gate.** `hasPlayableVideo()` is true only when the
 session **has ended** *and* an embeddable recording exists — the same two conditions the player uses
@@ -279,8 +285,9 @@ Both start from a minimal `{ id }` session so the control renders immediately, t
 subscribe to `sessions` and swap in the real catalog object once it arrives (needed for
 `rfSessionId` / `rfCode`).
 
-**Share** (`share.js`) **always copies the link** and confirms with the shared
-`features/toast/toast.js` toast, reading the published `url` metadata and falling back to
+**Share** (`share.js`) is hidden on a pure in-person IPOD session until its recording is
+available (see *In-person IPOD sessions*). It **always copies the link** and confirms with the
+shared `features/toast/toast.js` toast, reading the published `url` metadata and falling back to
 `window.location.href`.
 
 It deliberately does **not** use `navigator.share`

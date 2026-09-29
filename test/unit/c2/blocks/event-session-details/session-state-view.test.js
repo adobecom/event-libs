@@ -572,6 +572,73 @@ describe('session-state-view', () => {
       expect(statusSlot.textContent).to.equal('On-demand');
     });
 
+    describe('Share visibility (MWPW-209087)', () => {
+      const shareBtn = () => {
+        const btn = document.createElement('button');
+        btn.className = 'session-action session-share';
+        document.body.append(btn);
+        return btn;
+      };
+      const endedWithRecording = (endMs, extraAttrs = []) => {
+        setMetadata('session-times', JSON.stringify([{
+          startTimeMillis: endMs - 60000,
+          endTimeMillis: endMs,
+          timezone: 'UTC',
+          videos: [{ provider: 'mpc', url: 'x', kind: 'onDemand' }],
+        }]));
+        setMetadata('custom-attributes', JSON.stringify([
+          { name: 'Format', values: [{ value: 'in-person' }, { value: 'on-demand-post-event' }] },
+          ...extraAttrs,
+        ]));
+      };
+
+      it('hides Share on an IPOD session with no video yet', () => {
+        ipodFormat();
+        soonLive();
+        const { statusSlot, primaryCtaSlot } = slots();
+        const shareEl = shareBtn();
+        mountSessionState({ statusSlot, primaryCtaSlot, shareEl });
+        expect(statusSlot.textContent).to.equal('Available soon');
+        expect(shareEl.hidden).to.be.true;
+      });
+
+      it('shows Share on an IPOD session once the video is available', () => {
+        endedWithRecording(Date.now() - 3600000);
+        const { statusSlot, primaryCtaSlot } = slots();
+        const shareEl = shareBtn();
+        mountSessionState({ statusSlot, primaryCtaSlot, shareEl });
+        expect(statusSlot.textContent).to.equal('On-demand');
+        expect(shareEl.hidden).to.be.false;
+      });
+
+      it('reveals Share when the DVR window unlocks, without a reload', async () => {
+        // Session ended just under 1h ago with a 1h DVR delay → unlocks ~200ms from now.
+        endedWithRecording(Date.now() - 3600000 + 200, [
+          { name: 'DVR Timing (in hours)', values: [{ value: '1' }] },
+        ]);
+        const { statusSlot, primaryCtaSlot } = slots();
+        const shareEl = shareBtn();
+        const stop = mountSessionState({ statusSlot, primaryCtaSlot, shareEl });
+        expect(shareEl.hidden).to.be.true;
+        expect(statusSlot.textContent).to.equal('Available soon');
+
+        await new Promise((r) => { setTimeout(r, 1000); });
+        expect(statusSlot.textContent).to.equal('On-demand');
+        expect(shareEl.hidden).to.be.false;
+        stop();
+      });
+
+      it('never hides Share on a non-IPOD session', () => {
+        setMetadata('session-id', 'sid');
+        onlineFormat();
+        soonLive();
+        const { statusSlot, primaryCtaSlot } = slots();
+        const shareEl = shareBtn();
+        mountSessionState({ statusSlot, primaryCtaSlot, shareEl });
+        expect(shareEl.hidden).to.be.false;
+      });
+    });
+
     it('does nothing without session-times', () => {
       const { statusSlot, primaryCtaSlot } = slots();
       mountSessionState({ statusSlot, primaryCtaSlot });
