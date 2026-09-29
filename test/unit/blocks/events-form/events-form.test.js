@@ -4,7 +4,7 @@ import { getValidCampaignIdFromUrl, resetCampaignMapCache } from '../../../../ev
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 import { stripTags } from '../../../../event-libs/v1/utils/sanitize-utils.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
-import { PHONE_FIELD_RE, PHONE_PATTERN, BACKEND_PHONE_RE, STANDARD_FIELD_MAX_LENGTHS } from '../../../../event-libs/v1/utils/constances.js';
+import { PHONE_FIELD_RE, PHONE_PATTERN, STANDARD_FIELD_MAX_LENGTHS } from '../../../../event-libs/v1/utils/constances.js';
 
 describe('Events Form', () => {
   let block;
@@ -381,10 +381,6 @@ describe('Events Form', () => {
       expect(regex.test('5551234567')).to.be.true;
     });
 
-    it('phone pattern is what BACKEND_PHONE_RE is built from, so the DOM and JS checks can never drift apart', () => {
-      expect(PHONE_PATTERN).to.equal(BACKEND_PHONE_RE.source);
-    });
-
     it('phone pattern compiles under the `v` flag the DOM uses for pattern attributes', () => {
       expect(() => new RegExp(PHONE_PATTERN, 'v')).to.not.throw();
     });
@@ -394,6 +390,7 @@ describe('Events Form', () => {
       // PHONE_PATTERN cannot silently redefine the contract it is supposed to be held to.
       // Escaping `(` and `)` is required for `v`-mode and does not widen or narrow the set.
       const backendSchemaRe = /^[+\d\s\-().]+$/;
+      const plainRegex = new RegExp(PHONE_PATTERN);
       const vRegex = new RegExp(PHONE_PATTERN, 'v');
       const samples = [
         '+1 (555) 123-4567', '555-123-4567', '+15551234567', '5551234567',
@@ -402,7 +399,7 @@ describe('Events Form', () => {
       ];
       samples.forEach((sample) => {
         const expected = backendSchemaRe.test(sample);
-        expect(BACKEND_PHONE_RE.test(sample)).to.equal(expected, `BACKEND_PHONE_RE mismatch for "${sample}"`);
+        expect(plainRegex.test(sample)).to.equal(expected, `plain-mode mismatch for "${sample}"`);
         expect(vRegex.test(sample)).to.equal(expected, `v-mode mismatch for "${sample}"`);
       });
     });

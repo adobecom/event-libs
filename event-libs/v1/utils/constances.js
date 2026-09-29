@@ -189,13 +189,11 @@ export const FALLBACK_LOCALES = {
 };
 export const LATEST_VERSION = 'v1';
 export const PHONE_FIELD_RE = /phone/i;
-// The DOM compiles an input's `pattern` attribute with the RegExp `v` flag, where `(`
-// and `)` are reserved inside a character class and must be escaped — an unescaped pair
-// throws "Invalid character in character class" and silently drops validation. Authoring
-// the pattern as a string keeps the escapes explicit and lets BACKEND_PHONE_RE derive
-// from it, so the DOM pattern and the JS check can never drift apart.
+// Single source of truth for phone validation; mirrors the backend PhoneNumberInput pattern.
+// Keep it a string, not a regex literal: the DOM compiles an input's `pattern` with the
+// RegExp `v` flag, where `(` and `)` inside a character class must be escaped, and ESLint's
+// no-useless-escape would strip exactly those escapes from a literal.
 export const PHONE_PATTERN = '^[+\\d\\s\\-\\(\\).]+$';
-export const BACKEND_PHONE_RE = new RegExp(PHONE_PATTERN);
 export const STANDARD_FIELD_MAX_LENGTHS = {
   firstName: 30,
   lastName: 30,
