@@ -2767,9 +2767,7 @@
     z-index: 2;
   }
 
-  /* :not(.sg-card--on-demand): once a scheduled session goes on demand, SessionCard.js stops
-     rendering the schedule button, but the stale .is-scheduled flag (kept for "My sessions"
-     bookkeeping) must not keep reserving the schedule button's width (MWPW-208011). */
+  /* :not(.sg-card--on-demand): don't reserve the removed schedule button's space (MWPW-208011). */
   :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled:not(.sg-card--on-demand),
   :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-favorited {
     flex-direction: row;
@@ -2802,12 +2800,8 @@
     z-index: 2;
   }
 
-  /* Excluding .is-scheduled above (MWPW-208011) leaves on-demand-only cards with no
-     desktop-width rule that beats the base (mobile, no-media-query) ".sg-card.is-scheduled"
-     rule's 255px/column values on specificity (3 classes there vs. 2 on the plain ".sg-card"
-     desktop rule above) — restate the plain-card desktop layout at matching (4-class)
-     specificity so it isn't shadowed by the stale bookkeeping class. Favorited on-demand
-     cards are unaffected: the un-excluded ".is-favorited" rule already outranks the base rule. */
+  /* Restates plain-card desktop layout at 4-class specificity so on-demand cards aren't
+     shadowed by the base rule's .is-scheduled selector (MWPW-208011). */
   :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card.is-scheduled.sg-card--on-demand:not(.is-favorited) {
     flex-direction: row;
     width: 379px;
