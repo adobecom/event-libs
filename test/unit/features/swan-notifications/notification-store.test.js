@@ -1,9 +1,13 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import {
   notifications, getEntry, getEntries, upsertEntry, removeEntry, markRead, markAllRead, pruneStale, dismissEntry,
+  setNotificationScope, notificationsReady, setSessionScheduled,
+  batchNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotificationScope, LOCAL_STATE_PREFIX, TEST_SCOPE } from './mocks/notification-scope.js';
 
-const LOCAL_STATE_KEY = 'swan-notification-state-v3';
+const LOCAL_STATE_KEY = `${LOCAL_STATE_PREFIX}RF-1:entry`;
 
 // This module is a real singleton (its `state`/`notifications` signal live for the whole
 // browser session), so tests reset it through its own public API rather than relying on
@@ -16,10 +20,11 @@ function clearStore() {
 
 describe('notification-store', () => {
   beforeEach(() => {
-    clearStore();
+    resetNotificationScope();
   });
 
   afterEach(() => {
+    sinon.restore();
     clearStore();
     window.localStorage.removeItem(LOCAL_STATE_KEY);
   });
@@ -149,6 +154,7 @@ describe('notification-store', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
       removeEntry('RF-1');
       expect(getEntry('RF-1')).to.equal(undefined);
+      expect(getEntries()).to.have.lengthOf(0);
     });
 
     it('no-ops for an rfCode that was never stored', () => {
@@ -195,7 +201,8 @@ describe('notification-store', () => {
       upsertEntry('RF-1', { stage: 'on-demand', title: 'Old' });
       const fourDaysMs = 4 * 24 * 60 * 60 * 1000;
       pruneStale(Date.now() + fourDaysMs, 3);
-      expect(getEntry('RF-1')).to.equal(undefined);
+      expect(getEntry('RF-1').expired).to.equal(true);
+      expect(getEntries()).to.have.lengthOf(0);
     });
 
     it('keeps an on-demand entry younger than persistTillDays', () => {
@@ -221,8 +228,9 @@ describe('notification-store', () => {
       upsertEntry('RF-2', { stage: 'live', title: 'Stuck live' });
       const twentyDaysMs = 20 * 24 * 60 * 60 * 1000;
       pruneStale(Date.now() + twentyDaysMs, 3, 14);
-      expect(getEntry('RF-1')).to.equal(undefined);
-      expect(getEntry('RF-2')).to.equal(undefined);
+      expect(getEntry('RF-1').expired).to.equal(true);
+      expect(getEntry('RF-2').expired).to.equal(true);
+      expect(getEntries()).to.have.lengthOf(0);
     });
 
     it('falls back to a 14-day expiration window for a non-numeric expirationDays', () => {
@@ -242,39 +250,109 @@ describe('notification-store', () => {
     it('respects an explicit 0 as "prune immediately", rather than treating it as missing', () => {
       upsertEntry('RF-1', { stage: 'on-demand', title: 'Old' });
       pruneStale(Date.now() + 1, 0);
-      expect(getEntry('RF-1')).to.equal(undefined);
+      expect(getEntry('RF-1').expired).to.equal(true);
+      expect(getEntries()).to.have.lengthOf(0);
     });
   });
 
   describe('persistence', () => {
-    it('persists writes to localStorage under the v3 key', () => {
+    it('persists writes to a scoped per-entry v4 key', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
       const stored = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY));
-      expect(stored['RF-1'].title).to.equal('First');
+      expect(stored.title).to.equal('First');
+    });
+
+    it('persists read and dismissal separately from entry content', () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      dismissEntry('RF-1');
+      markRead('RF-1');
+      expect(localStorage.getItem(`${LOCAL_STATE_PREFIX}RF-1:live:dismissed`)).to.equal('true');
+      expect(localStorage.getItem(`${LOCAL_STATE_PREFIX}RF-1:live:read`)).to.equal('true');
+      setNotificationScope(null, null, null);
+      setNotificationScope(...TEST_SCOPE);
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      expect(getEntry('RF-1').read).to.equal(true);
+      expect(notificationsReady.value).to.equal(false);
+    });
+
+    it('isolates events, attendees and environments, including identical rfCodes', () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'Original' });
+      dismissEntry('RF-1');
+      [
+        ['another-event', TEST_SCOPE[1], TEST_SCOPE[2]],
+        [TEST_SCOPE[0], 'another-attendee', TEST_SCOPE[2]],
+        [TEST_SCOPE[0], TEST_SCOPE[1], 'another-environment'],
+      ].forEach((scope) => {
+        setNotificationScope(...scope);
+        expect(getEntries()).to.have.lengthOf(0);
+        upsertEntry('RF-1', { stage: 'live', title: 'Other' });
+      });
+      setNotificationScope(...TEST_SCOPE);
+      expect(getEntry('RF-1').title).to.equal('Original');
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+    });
+
+    it('does not hydrate an unowned legacy v3 map or expose entries after logout', () => {
+      localStorage.setItem('swan-notification-state-v3', JSON.stringify({ 'RF-1': { stage: 'live', title: 'Legacy' } }));
+      setNotificationScope(null, null, null);
+      expect(getEntries()).to.have.lengthOf(0);
+      setNotificationScope(...TEST_SCOPE);
+      expect(getEntries()).to.have.lengthOf(0);
+      localStorage.removeItem('swan-notification-state-v3');
+    });
+
+    it('keeps unschedule tombstones hidden until a fresh schedule explicitly restores membership', () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      setSessionScheduled('RF-1', false);
+      upsertEntry('RF-1', { stage: 'live', title: 'Stale tab' });
+      expect(getEntries()).to.have.lengthOf(0);
+      expect(getEntry('RF-1').unscheduled).to.equal(true);
+      setSessionScheduled('RF-1', true);
+      upsertEntry('RF-1', { stage: 'live', title: 'Rescheduled' });
+      expect(getEntry('RF-1').title).to.equal('Rescheduled');
+    });
+
+    it('retries temporarily failed dismissal writes rather than losing them on scope changes', () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      const writes = sinon.stub(Storage.prototype, 'setItem').throws(new Error('quota exceeded'));
+      dismissEntry('RF-1');
+      setNotificationScope(null, null, null);
+      setNotificationScope(...TEST_SCOPE);
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      writes.restore();
+      batchNotifications(() => {});
+      expect(localStorage.getItem(`${LOCAL_STATE_PREFIX}RF-1:live:dismissed`)).to.equal('true');
+      setNotificationScope(null, null, null);
+      setNotificationScope(...TEST_SCOPE);
+      expect(getEntry('RF-1').dismissed).to.equal(true);
     });
   });
 
   describe('cross-tab sync (storage event)', () => {
     // The real browser never fires `storage` in the same tab that made the write — this
     // dispatches it manually to simulate another tab's write landing in this one.
-    function simulateOtherTabWrite(newState) {
+    async function simulateOtherTabWrite(newState) {
+      Object.entries(newState).forEach(([rfCode, entry]) => {
+        localStorage.setItem(`${LOCAL_STATE_PREFIX}${encodeURIComponent(rfCode)}:entry`, JSON.stringify(entry));
+      });
       window.dispatchEvent(new StorageEvent('storage', {
         key: LOCAL_STATE_KEY,
         newValue: JSON.stringify(newState),
       }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
-    it('adopts state written by another tab', () => {
-      simulateOtherTabWrite({ 'RF-1': {
+    it('adopts state written by another tab', async () => {
+      await simulateOtherTabWrite({ 'RF-1': {
         stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 1,
       } });
       expect(getEntry('RF-1').title).to.equal('From another tab');
     });
 
-    it('notifies subscribers when another tab writes', () => {
+    it('notifies subscribers when another tab writes', async () => {
       const seen = [];
       const unsubscribe = notifications.subscribe((entries) => seen.push(entries.length));
-      simulateOtherTabWrite({ 'RF-1': {
+      await simulateOtherTabWrite({ 'RF-1': {
         stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 1,
       } });
       unsubscribe();
@@ -289,6 +367,7 @@ describe('notification-store', () => {
 
     it('resets to empty state rather than throwing on a corrupt cross-tab write', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
+      localStorage.setItem(LOCAL_STATE_KEY, '{not-json');
       expect(() => window.dispatchEvent(new StorageEvent('storage', {
         key: LOCAL_STATE_KEY, newValue: '{not-json',
       }))).to.not.throw();
@@ -301,6 +380,7 @@ describe('notification-store', () => {
       // and the very next line (Object.values(state)) would throw instead.
       upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
       ['null', '42', '"just a string"', '[]'].forEach((newValue) => {
+        localStorage.setItem(LOCAL_STATE_KEY, newValue);
         expect(() => window.dispatchEvent(new StorageEvent('storage', {
           key: LOCAL_STATE_KEY, newValue,
         }))).to.not.throw();
@@ -309,12 +389,94 @@ describe('notification-store', () => {
       expect(() => markRead('anything')).to.not.throw();
     });
 
-    it('lets a subsequent local upsert generate a seq higher than anything adopted cross-tab', () => {
-      simulateOtherTabWrite({ 'RF-1': {
+    it('lets a subsequent local upsert generate a seq higher than anything adopted cross-tab', async () => {
+      await simulateOtherTabWrite({ 'RF-1': {
         stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 100,
       } });
       upsertEntry('RF-2', { stage: 'live', title: 'Mine, written after' });
       expect(getEntry('RF-2').seq).to.be.above(100);
+    });
+
+    it('reads current storage instead of resurrecting a dismissal from a queued stale event', () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'Mine' });
+      const staleEntry = localStorage.getItem(LOCAL_STATE_KEY);
+      dismissEntry('RF-1');
+      window.dispatchEvent(new StorageEvent('storage', { key: LOCAL_STATE_KEY, newValue: staleEntry }));
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      expect(notifications.value[0].dismissed).to.equal(true);
+    });
+
+    it('never overwrites another entry or same-stage dismissal when writing from stale memory', () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'Mine' });
+      localStorage.setItem(`${LOCAL_STATE_PREFIX}RF-1:live:dismissed`, 'true');
+      // No storage event has reached this tab yet.
+      localStorage.setItem(`${LOCAL_STATE_PREFIX}RF-2:entry`, JSON.stringify({
+        stage: 'live', title: 'Other tab', updatedAt: Date.now(), seq: 100,
+      }));
+      upsertEntry('RF-3', { stage: 'live', title: 'Local write' });
+      upsertEntry('RF-1', { stage: 'live', title: 'Refreshed' });
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      expect(getEntry('RF-2').title).to.equal('Other tab');
+      expect(getEntries()).to.have.lengthOf(3);
+    });
+
+    it('does not downgrade a stage advanced by another tab before its storage event arrives', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
+      localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify({
+        stage: 'live', title: 'Other tab', updatedAt: Date.now(), seq: 100,
+      }));
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Stale reminder' });
+      expect(getEntry('RF-1').stage).to.equal('live');
+    });
+
+    it('preserves dismissal and concurrent entries across independent tab stores', async () => {
+      const otherTab = await import(`../../../../event-libs/v1/features/swan-notifications/notification-store.js?tab=${Math.random()}`);
+      otherTab.setNotificationScope(...TEST_SCOPE);
+      upsertEntry('RF-1', { stage: 'live', title: 'Mine' });
+      otherTab.getEntry('RF-1');
+      dismissEntry('RF-1');
+      otherTab.upsertEntry('RF-2', { stage: 'live', title: 'Other tab' });
+      otherTab.markRead('RF-1');
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      expect(getEntry('RF-1').read).to.equal(true);
+      expect(getEntry('RF-2').title).to.equal('Other tab');
+      expect(otherTab.getEntry('RF-1').dismissed).to.equal(true);
+      otherTab.setNotificationScope(null, null, null);
+    });
+
+    it('reads only the target entry and flags for each single-entry lookup', () => {
+      for (let index = 0; index < 100; index += 1) {
+        upsertEntry(`RF-${index}`, { stage: 'live', title: `Session ${index}` });
+      }
+      const keys = sinon.spy(Storage.prototype, 'key');
+      const reads = sinon.spy(Storage.prototype, 'getItem');
+      for (let index = 0; index < 100; index += 1) getEntry(`RF-${index}`);
+      expect(keys.callCount).to.equal(0);
+      expect(reads.callCount).to.equal(300);
+    });
+
+    it('coalesces a burst of read events and publishes only an effective state change', async () => {
+      for (let index = 0; index < 100; index += 1) {
+        upsertEntry(`RF-${index}`, { stage: 'live', title: `Session ${index}` });
+        localStorage.setItem(`${LOCAL_STATE_PREFIX}RF-${index}:live:read`, 'true');
+      }
+      const seen = [];
+      const unsubscribe = notifications.subscribe((entries) => seen.push(entries));
+      const keys = sinon.spy(Storage.prototype, 'key');
+      const keyCount = localStorage.length;
+      for (let index = 0; index < 100; index += 1) {
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: `${LOCAL_STATE_PREFIX}RF-${index}:live:read`, newValue: 'true',
+        }));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(seen).to.have.lengthOf(2);
+      expect(seen[1].every((entry) => entry.read)).to.equal(true);
+      expect(keys.callCount).to.equal(keyCount);
+      window.dispatchEvent(new StorageEvent('storage', { key: LOCAL_STATE_KEY, newValue: '{}' }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(seen).to.have.lengthOf(2);
+      unsubscribe();
     });
   });
 });

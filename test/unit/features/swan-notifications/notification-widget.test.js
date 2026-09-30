@@ -1,13 +1,10 @@
 import { expect } from '@esm-bundle/chai';
 import { mountNotificationWidget, normalizeTimeCasing } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
 import {
-  getEntries, removeEntry, upsertEntry,
+  getEntries, removeEntry, upsertEntry, setNotificationsReady,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotificationScope } from './mocks/notification-scope.js';
 import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
-
-function clearStore() {
-  getEntries().forEach((entry) => removeEntry(entry.rfCode));
-}
 
 // Same-origin, genuinely loadable asset — unlike an https://example.com/... URL (blocked by
 // the test harness's no-external-network rule), this actually loads, so tests using it exercise
@@ -70,7 +67,7 @@ describe('notification-widget', () => {
   });
 
   beforeEach(() => {
-    clearStore();
+    resetNotificationScope('-widget');
     panel().hidden = true;
   });
 
@@ -100,6 +97,33 @@ describe('notification-widget', () => {
 
   it('hides the "Important" section header when there are no notifications', () => {
     expect(sectionTitle().hidden).to.equal(true);
+  });
+
+  it('never flashes cached counts before the schedule is successfully reconciled', () => {
+    setNotificationsReady(false);
+    addEntry('RF-1', { stage: 'live', title: 'Cached' });
+    addEntry('RF-2', { stage: 'live', title: 'Dismissed' });
+    expect(rows()).to.have.lengthOf(0);
+    expect(badge().hidden).to.equal(true);
+    expect(announcer().textContent).to.equal('');
+    removeEntry('RF-2');
+    setNotificationsReady(true);
+    expect(rows().map((row) => row.dataset.rfcode)).to.deep.equal(['RF-1']);
+    expect(badge().textContent).to.equal('1');
+    expect(announcer().textContent).to.equal('');
+  });
+
+  it('does not mark hidden cached entries read before readiness, but reads them when the open panel receives them', () => {
+    setNotificationsReady(false);
+    addEntry('RF-1', { stage: 'live', title: 'Cached' });
+    bell().click();
+    expect(rows()).to.have.lengthOf(0);
+    expect(getEntries()[0].read).to.equal(false);
+    setNotificationsReady(true);
+    expect(rows()).to.have.lengthOf(1);
+    expect(getEntries()[0].read).to.equal(true);
+    expect(badge().hidden).to.equal(true);
+    bell().click();
   });
 
   it('shows the "Important" section header once there is at least one notification', () => {

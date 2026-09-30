@@ -8,7 +8,7 @@ import {
   sessions, sessionsStatus, liveStreamActiveIds, getEventApiConfig,
 } from '../../utils/session-store.js';
 import { getNowMs, isPostEvent } from '../../utils/session-state.js';
-import { logError } from '../../utils/lana-log.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
 // Shared toast copy for gated actions, used by both runSessionAction's failures and checkViewAccess.
 export function showAuthToast({ eventConfig, actionLabel }) {
@@ -30,18 +30,26 @@ export async function runSessionAction(actionFn, {
     await actionFn();
     if (successMessage) showToast({ message: successMessage, variant: successVariant });
   } catch (err) {
-    if (err.reason === 'auth-required' || err.reason === 'registration-required') {
+    if (err.reason === 'auth-changed') {
+      logWarning('sessions-guide', `${actionLabel} cancelled after an attendee change`);
+    } else if (err.reason === 'auth-required' || err.reason === 'registration-required') {
       showAuthToast({ eventConfig, actionLabel });
       // Blurs the triggering button so a hover-styled card doesn't look stuck via :focus-within.
       onBlocked?.();
     } else if (err.reason === 'conflict') {
-      const { conflict, incoming } = err.meta;
+      const { conflict, incoming, generation } = err.meta;
       showConflictModal({
         existing: conflict,
         incoming,
         onConfirm: async (keep) => {
           if (keep.id === incoming.id) {
-            await resolveScheduleConflict(conflict, incoming);
+            try {
+              await resolveScheduleConflict(conflict, incoming, generation);
+            } catch (conflictErr) {
+              if (conflictErr.reason !== 'auth-changed') throw conflictErr;
+              logWarning('sessions-guide', 'conflict resolution cancelled after an attendee change');
+              return;
+            }
             showToast({ message: 'Schedule updated', variant: 'positive' });
           }
         },
@@ -57,11 +65,11 @@ export async function runSessionAction(actionFn, {
 
 // Thin, pre-labeled wrappers so every schedule/favorite call site shares the same success copy.
 export function toggleScheduleWithFeedback(session, {
-  eventConfig, isScheduled, onBlocked,
+  eventConfig, isScheduled, onBlocked, generation,
 }) {
   // Inverted: allowing double booking means suppressing the conflict modal.
   return runSessionAction(
-    () => toggleScheduleAction(session, { showConflictModal: !getAllowDoubleBooking() }),
+    () => toggleScheduleAction(session, { showConflictModal: !getAllowDoubleBooking(), generation }),
     {
       eventConfig,
       actionLabel: 'add to your schedule',
@@ -73,10 +81,10 @@ export function toggleScheduleWithFeedback(session, {
 }
 
 export function toggleFavoriteWithFeedback(session, {
-  eventConfig, isFavorited, onBlocked,
+  eventConfig, isFavorited, onBlocked, generation,
 }) {
   return runSessionAction(
-    () => toggleFavoriteAction(session),
+    () => toggleFavoriteAction(session, { generation }),
     {
       eventConfig,
       actionLabel: 'favorite',

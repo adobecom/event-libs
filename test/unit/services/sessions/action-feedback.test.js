@@ -7,7 +7,7 @@ import { SessionActionError } from '../../../../event-libs/v1/services/sessions/
 import { toasts } from '../../../../event-libs/v1/features/toast/toast.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
 import {
-  auth, sessions, sessionsStatus, liveStreamActiveIds, scheduled, pendingActions,
+  auth, sessions, sessionsStatus, liveStreamActiveIds, scheduled, pendingActions, SessionAuthChangedError,
 } from '../../../../event-libs/v1/utils/session-store.js';
 
 describe('services/sessions/action-feedback', () => {
@@ -38,6 +38,14 @@ describe('services/sessions/action-feedback', () => {
   it('shows nothing when the action resolves without a successMessage', async () => {
     await runSessionAction(() => Promise.resolve(), { eventConfig, actionLabel: 'add to schedule' });
     expect(toasts.value).to.have.lengthOf(0);
+  });
+
+  it('logs an account-change cancellation without showing success or network-error feedback', async () => {
+    await runSessionAction(async () => { throw new SessionAuthChangedError(); }, {
+      eventConfig, actionLabel: 'add to schedule', successMessage: 'Added to schedule',
+    });
+    expect(toasts.value).to.have.lengthOf(0);
+    expect(loggedMessages[0]).to.include('cancelled after an attendee change');
   });
 
   it('shows the same register-or-sign-in toast for auth-required and registration-required', async () => {

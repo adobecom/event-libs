@@ -3,8 +3,9 @@ import {
   notifySessionScheduled, notifySessionUnscheduled, reconcileSwanNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/swan-notifications-feds.js';
 import {
-  getEntry, getEntries, removeEntry, markRead, dismissEntry,
+  getEntry, getEntries, removeEntry, markRead, dismissEntry, upsertEntry, notifications,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotificationScope } from './mocks/notification-scope.js';
 
 // now + offsetMs, as an ISO string — startOffsetMs/endOffsetMs are negative for "in the past".
 function iso(offsetMs) {
@@ -35,7 +36,7 @@ function clearStore() {
 // as the router calls it once feds mode is already selected.
 describe('swan-notifications-feds', () => {
   beforeEach(() => {
-    clearStore();
+    resetNotificationScope('-feds');
   });
 
   afterEach(() => {
@@ -65,7 +66,8 @@ describe('swan-notifications-feds', () => {
       const session = makeSession('RF-103', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
       notifySessionScheduled(session);
       notifySessionUnscheduled(session);
-      expect(getEntry('RF-103')).to.equal(undefined);
+      expect(getEntry('RF-103').unscheduled).to.equal(true);
+      expect(getEntries()).to.have.lengthOf(0);
     });
 
     it('no-ops on unschedule when there is no known entry for the session', () => {
@@ -139,8 +141,9 @@ describe('swan-notifications-feds', () => {
       const session = makeSession('RF-orphan', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
       notifySessionScheduled(session);
 
-      reconcileSwanNotifications(() => [], () => new Set(), () => true);
-      expect(getEntry('RF-orphan')).to.equal(undefined);
+      reconcileSwanNotifications(() => [], () => new Set(), () => true, { refreshSchedule: true });
+      expect(getEntry('RF-orphan').unscheduled).to.equal(true);
+      expect(getEntries()).to.have.lengthOf(0);
     });
 
     it('does NOT treat an empty schedule as orphaning everything when the schedule is not yet known', () => {
@@ -216,6 +219,77 @@ describe('swan-notifications-feds', () => {
       expect(getEntry(rfCode).stage).to.equal('live');
       expect(getEntry(rfCode).dismissed).to.equal(false);
       expect(getEntry(rfCode).read).to.equal(false);
+    });
+
+    it('does not recreate expired on-demand notifications on subsequent ticks', () => {
+      const session = makeSession('RF-expired', {
+        startOffsetMs: -5 * 24 * 60 * MIN, endOffsetMs: -4 * 24 * 60 * MIN,
+      });
+
+      notifySessionScheduled(session);
+      for (let tick = 0; tick < 5; tick += 1) {
+        reconcileSwanNotifications(() => [session], () => new Set([session.id]), () => true);
+        expect(getEntries()).to.have.lengthOf(0);
+      }
+    });
+
+    it('expires cached reminder/live entries when reloaded after the on-demand cutoff', () => {
+      ['reminder', 'live'].forEach((stage) => {
+        const session = makeSession(`RF-expired-${stage}`, {
+          startOffsetMs: -5 * 24 * 60 * MIN, endOffsetMs: -4 * 24 * 60 * MIN,
+        });
+        upsertEntry(session.rfCode, { stage, title: 'Cached before the session ended' });
+        for (let tick = 0; tick < 5; tick += 1) {
+          reconcileSwanNotifications(() => [session], () => new Set([session.id]), () => true);
+          expect(getEntry(session.rfCode).expired).to.equal(true);
+          expect(getEntries()).to.have.lengthOf(0);
+        }
+      });
+    });
+
+    it('does not orphan another tab\'s newly scheduled entry using a stale ticker snapshot', () => {
+      const session = makeSession('RF-other-tab', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      notifySessionScheduled(session);
+      dismissEntry(session.rfCode);
+      for (let tick = 0; tick < 5; tick += 1) {
+        reconcileSwanNotifications(() => [session], () => new Set(), () => true);
+      }
+      expect(getEntry(session.rfCode).dismissed).to.equal(true);
+    });
+
+    it('does not recreate a session unscheduled in another tab from a stale scheduled set', () => {
+      const session = makeSession('RF-unscheduled-other-tab', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      notifySessionScheduled(session);
+      notifySessionUnscheduled(session);
+      for (let tick = 0; tick < 5; tick += 1) {
+        reconcileSwanNotifications(() => [session], () => new Set([session.id]), () => true);
+      }
+      expect(getEntries()).to.have.lengthOf(0);
+      notifySessionScheduled(session);
+      expect(getEntry(session.rfCode).stage).to.equal('live');
+    });
+
+    it('publishes only the final state when a reconcile advances several sessions and removes several orphans', () => {
+      const sessions = ['first', 'second'].map((id) => makeSession(`RF-${id}`, {
+        startOffsetMs: 2 * MIN, endOffsetMs: 30 * MIN,
+      }));
+      sessions.forEach((session) => notifySessionScheduled(session));
+      upsertEntry('RF-orphan-a', { stage: 'live', title: 'Orphan A' });
+      upsertEntry('RF-orphan-b', { stage: 'live', title: 'Orphan B' });
+      const liveSessions = sessions.map((session) => ({
+        ...session, startTimeUtc: iso(-MIN),
+      }));
+      const seen = [];
+      const unsubscribe = notifications.subscribe((entries) => seen.push(entries));
+      reconcileSwanNotifications(
+        () => liveSessions, () => new Set(sessions.map((session) => session.id)),
+        () => true, { refreshSchedule: true },
+      );
+      unsubscribe();
+      expect(seen).to.have.lengthOf(2);
+      expect(seen[0]).to.have.lengthOf(4);
+      expect(seen[1]).to.have.lengthOf(2);
+      expect(seen[1].every((entry) => entry.stage === 'live')).to.equal(true);
     });
   });
 });

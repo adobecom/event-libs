@@ -3,6 +3,7 @@ import {
   notifySessionScheduled, notifySessionUnscheduled, reconcileSwanNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/swan-notifications.js';
 import { getEntry, getEntries, removeEntry } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotificationScope } from './mocks/notification-scope.js';
 
 const STATE_KEY = 'swan-notification-state-v2';
 
@@ -35,6 +36,7 @@ function clearStore() {
 // module; each module's own stage-machine behavior is covered in its own test file
 // (swan-notifications-feds.test.js, swan-notifications-unc.test.js).
 describe('swan-notifications (mode router)', () => {
+  beforeEach(() => resetNotificationScope('-router'));
   afterEach(() => {
     setMeta('swan-notifications');
     delete window.UniversalNav;

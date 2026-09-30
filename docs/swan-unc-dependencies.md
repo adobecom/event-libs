@@ -201,6 +201,47 @@ sized for a multi-day conference; icon currently hardcoded to an empty string â€
 default asset URL has been set yet) in
 [`swan-config.js`](../event-libs/v1/features/swan-notifications/swan-config.js).
 
+### FEDS persistence and dismissal
+
+FEDS uses `swan-notification-state-v4:` keys scoped by the Tier 1 event ID, signed-in
+IMS `userId`, and RainFocus API URL. The scope is selected before hydration; signing
+out or switching accounts hides the previous attendee's notifications immediately.
+The bell does not display cached rows or counts until a successful `myData` response
+has been reconciled. A failed request or missing RF token is **not** an empty schedule
+and must not erase dismissal state.
+
+The primary da-events registration API memoizes its result for the page without exposing
+IMS ownership, potentially before this feature initializes. FEDS therefore uses the
+identity-specific JWT exchange and `myData` response for authentication/registration
+instead of accepting that unowned cached result. Other modes keep their existing auth
+path. In-flight actions, delayed card clicks, and conflict confirmations are cancelled
+on identity changes instead of continuing against the new attendee.
+
+Each session has its own entry key. Read and dismissal markers are separate keys for
+each stage, so another tab's content update cannot overwrite those actions. Storage
+events read the latest persisted values, not their potentially stale `newValue`.
+Reconciliation publishes one final list per pass; queued storage-event bursts are
+coalesced, and unchanged state does not rebuild the widget. Temporary storage-write
+failures are logged and retried during reconciliation and scope changes. If browser
+storage remains unavailable through a page reload, in-memory fallback actions cannot
+survive that reload.
+Reminder, live, and on-demand are distinct stages: dismissal survives repeated ticks
+and reloads at the same stage; a genuine stage advance intentionally surfaces an
+unread notification again.
+
+Only a fresh successful schedule response performs orphan cleanup. Ticker snapshots
+must not delete sessions added in another tab. Unscheduling stores a hidden tombstone
+so an older tab cannot recreate the notification; a fresh schedule response or an
+explicit successful re-add can clear it. Display expiry also retains a hidden stage
+guard. On-demand eligibility ends three days after the session's end, rather than
+three days after its latest local write, preventing expiry/recreation loops.
+
+**Rollout:** the unscoped v3 map is left untouched but is not imported into v4: its
+event and attendee ownership cannot be established safely. Previously read/dismissed
+v3 notifications can therefore appear once during the transition. Subsequent actions
+persist in the scoped v4 keys. UNC's v2 tracking and engine-owned persistence are
+unchanged.
+
 ## Verifying the chain end-to-end
 
 1. Confirm the page's gnav has `universal-nav` metadata with the notifications component

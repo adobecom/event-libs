@@ -4,7 +4,9 @@ import {
   isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs,
 } from '../utils/time.js';
 import { isDvrPending } from '../../../../utils/session-state.js';
-import { scheduled, favorited, pendingActions, getEventApiConfig } from '../../../../utils/session-store.js';
+import {
+  scheduled, favorited, pendingActions, getEventApiConfig, getSessionAuthGeneration,
+} from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { setSessionParam, sessionParamValue, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
@@ -90,6 +92,7 @@ export function SessionCard({
 
   async function handleSchedule(e) {
     e.stopPropagation();
+    const generation = getSessionAuthGeneration();
     // Captured now — e.currentTarget is nulled out once the event finishes dispatching,
     // but onBlocked fires later, after the (possibly rejected) action settles.
     const btn = e.currentTarget;
@@ -97,19 +100,20 @@ export function SessionCard({
       e,
       activeView === 'my-sessions' && isScheduled,
       () => toggleScheduleWithFeedback(session, {
-        eventConfig: guideConfig, isScheduled, onBlocked: () => btn.blur(),
+        eventConfig: guideConfig, isScheduled, onBlocked: () => btn.blur(), generation,
       }),
     );
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
+    const generation = getSessionAuthGeneration();
     const btn = e.currentTarget;
     await withDismissAnimation(
       e,
       activeView === 'my-favorites' && isFavorited,
       () => toggleFavoriteWithFeedback(session, {
-        eventConfig: guideConfig, isFavorited, onBlocked: () => btn.blur(),
+        eventConfig: guideConfig, isFavorited, onBlocked: () => btn.blur(), generation,
       }),
     );
   }

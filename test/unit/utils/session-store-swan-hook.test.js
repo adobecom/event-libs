@@ -3,6 +3,7 @@ import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import {
   getEntry, getEntries, removeEntry,
 } from '../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotificationScope } from '../features/swan-notifications/mocks/notification-scope.js';
 
 // session-store.js holds module-level singleton state that @web/test-runner does not
 // reliably reset between test files sharing a worker session — cache-bust the import
@@ -33,6 +34,7 @@ describe('session-store: toggleSchedule keeps the local SWAN notification store 
   let originalFetch;
 
   before(async () => {
+    resetNotificationScope('-session-hook');
     originalFetch = window.fetch;
     window.fetch = async (url) => {
       if (typeof url === 'string' && url.includes('session-catalog')) {

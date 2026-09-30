@@ -1,173 +1,296 @@
-import { signal } from '../../deps/htm-preact.js';
+import { signal, batch } from '../../deps/htm-preact.js';
 import { getNowMs } from '../../utils/session-state.js';
 import { logError } from '../../utils/lana-log.js';
 
-// Single local store: doubles as "what stage is currently registered" (SWAN's own
-// forward-only stage guard, see swan-notifications.js) and the notification widget's
-// render data — there's no external engine left to keep in sync with, so one
-// localStorage-backed map is enough. v2 -> v3: dropped `campaignId` (no more per-stage
-// rule ids to track/delete against an engine), added the display fields the widget needs
-// (title/times/actionUrl/iconUrl/read/updatedAt/seq).
-const LOCAL_STATE_KEY = 'swan-notification-state-v3';
+const LOCAL_STATE_PREFIX = 'swan-notification-state-v4:';
+const STAGE_DISPLAY_PRIORITY = { live: 0, reminder: 1, 'on-demand': 2 };
+const STAGE_RANK = { reminder: 1, live: 2, 'on-demand': 3 };
 
-function readLocalState() {
+let scopePrefix = null;
+let state = {};
+let sequence = 0;
+let storageTimer = null;
+let published = '[]';
+let mutationDepth = 0;
+let syncPending = false;
+const pendingWrites = new Map();
+
+export const notifications = signal([]);
+export const notificationsReady = signal(false);
+
+function entryKey(rfCode) {
+  return `${scopePrefix}${encodeURIComponent(rfCode)}:entry`;
+}
+
+function flagKey(rfCode, stage, flag) {
+  return `${scopePrefix}${encodeURIComponent(rfCode)}:${stage}:${flag}`;
+}
+
+function storageKeys(prefix) {
+  return [...new Set([
+    ...Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index)),
+    ...pendingWrites.keys(),
+  ])].filter((key) => key?.startsWith(prefix));
+}
+
+function read(key) {
+  return pendingWrites.has(key) ? pendingWrites.get(key) : window.localStorage.getItem(key);
+}
+
+function toList() {
+  return Object.entries(state)
+    .filter(([, entry]) => !entry.unscheduled && !entry.expired)
+    .map(([rfCode, entry]) => ({ ...entry, rfCode }))
+    .sort((a, b) => (STAGE_DISPLAY_PRIORITY[a.stage] ?? 99) - (STAGE_DISPLAY_PRIORITY[b.stage] ?? 99)
+      || b.seq - a.seq);
+}
+
+function sync() {
+  if (mutationDepth) {
+    syncPending = true;
+    return;
+  }
+  sequence = Math.max(sequence, ...Object.values(state).map((entry) => entry.seq || 0));
+  const entries = toList();
+  const serialized = JSON.stringify(entries);
+  if (serialized === published) return;
+  published = serialized;
+  notifications.value = entries;
+}
+
+function readEntry(rfCode) {
+  const raw = read(entryKey(rfCode));
+  if (raw === null) return undefined;
   try {
-    return JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
+    const entry = JSON.parse(raw);
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)
+      || (!entry.unscheduled && !STAGE_RANK[entry.stage])) {
+      throw new Error('invalid notification entry');
+    }
+    return {
+      ...entry,
+      read: read(flagKey(rfCode, entry.stage, 'read')) === 'true',
+      dismissed: read(flagKey(rfCode, entry.stage, 'dismissed')) === 'true',
+    };
   } catch (err) {
-    logError('notification-store', 'local state was corrupt, resetting', err);
-    return {};
+    logError('notification-store', 'ignoring corrupt notification entry', err);
+    return undefined;
   }
 }
 
-function writeLocalState(state) {
+function refreshEntry(rfCode) {
+  if (!scopePrefix) return undefined;
   try {
-    window.localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(state));
+    const entry = readEntry(rfCode);
+    if (entry) {
+      state[rfCode] = entry;
+      sequence = Math.max(sequence, entry.seq || 0);
+    } else {
+      delete state[rfCode];
+    }
+    return entry;
   } catch (err) {
+    logError('notification-store', 'failed to read notification entry', err);
+    return state[rfCode];
+  }
+}
+
+function refreshState() {
+  if (!scopePrefix) return;
+  try {
+    const next = {};
+    storageKeys(scopePrefix).filter((key) => key.endsWith(':entry')).forEach((key) => {
+      try {
+        const rfCode = decodeURIComponent(key.slice(scopePrefix.length, -':entry'.length));
+        const entry = readEntry(rfCode);
+        if (entry) next[rfCode] = entry;
+      } catch (err) {
+        logError('notification-store', 'ignoring corrupt notification entry', err);
+      }
+    });
+    state = next;
+  } catch (err) {
+    logError('notification-store', 'failed to read local state', err);
+  }
+}
+
+function write(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+    pendingWrites.delete(key);
+  } catch (err) {
+    pendingWrites.set(key, value);
     logError('notification-store', 'failed to persist local state', err);
   }
 }
 
-// Live always sorts above Upcoming/On-Demand regardless of recency, matching legacy SWAN
-// 1.0's resortSwanNotifications() — a live session shouldn't get buried under an on-demand
-// entry that merely happened to update more recently.
-const STAGE_DISPLAY_PRIORITY = { live: 0, reminder: 1, 'on-demand': 2 };
-
-function toList(state) {
-  return Object.entries(state)
-    .map(([rfCode, entry]) => ({ rfCode, ...entry }))
-    .sort((a, b) => {
-      const priorityDiff = (STAGE_DISPLAY_PRIORITY[a.stage] ?? 99) - (STAGE_DISPLAY_PRIORITY[b.stage] ?? 99);
-      if (priorityDiff !== 0) return priorityDiff;
-      // `seq`, not `updatedAt`, breaks ties — several entries can share the same
-      // Date.now() millisecond (e.g. a reconcile pass touching multiple sessions back to
-      // back), which would otherwise make ordering effectively random across ties.
-      return b.seq - a.seq;
-    });
+function retryPendingWrites() {
+  pendingWrites.forEach((value, key) => write(key, value));
 }
 
-let state = readLocalState();
-let sequence = Math.max(0, ...Object.values(state).map((entry) => entry.seq || 0));
-
-// The widget's sole data source — a plain Preact signal, no CustomEvent plumbing needed
-// since it's imported directly by both swan-notifications.js's write path (via
-// notification-display.js) and notification-widget.js's render path, matching
-// features/toast/toast.js's existing signal-driven pattern.
-export const notifications = signal(toList(state));
-
-function persistAndSync() {
-  writeLocalState(state);
-  notifications.value = toList(state);
+export function batchNotifications(callback) {
+  retryPendingWrites();
+  return batch(() => {
+    mutationDepth += 1;
+    try {
+      return callback();
+    } finally {
+      mutationDepth -= 1;
+      if (!mutationDepth && syncPending) {
+        syncPending = false;
+        sync();
+      }
+    }
+  });
 }
 
-// Cross-tab sync: a `storage` event fires in every OTHER tab of the same origin whenever one
-// tab writes this key (never in the tab that made the write), so read/dismiss actions taken
-// in one tab reflect live in any other open tab, without a page reload. Free with the
-// existing localStorage writes — no BroadcastChannel needed.
+// No unscoped hydration: the legacy v3 map has no reliable event/attendee ownership.
+export function setNotificationScope(eventId, userId, environment) {
+  const next = eventId && userId && environment
+    ? `${LOCAL_STATE_PREFIX}${encodeURIComponent(JSON.stringify([eventId, userId, environment]))}:`
+    : null;
+  if (next === scopePrefix) return;
+  retryPendingWrites();
+  clearTimeout(storageTimer);
+  storageTimer = null;
+  notificationsReady.value = false;
+  scopePrefix = next;
+  state = {};
+  sequence = 0;
+  refreshState();
+  sync();
+}
+
+export function setNotificationsReady(ready) {
+  const next = !!scopePrefix && ready;
+  if (next !== notificationsReady.value) notificationsReady.value = next;
+}
+
+// A queued StorageEvent's newValue may predate this tab's own dismissal. Always read
+// current storage instead. Separate entry/flag keys prevent unrelated writes, or a
+// stage refresh in another tab, from overwriting read/dismiss actions.
 window.addEventListener('storage', (e) => {
-  if (e.key !== LOCAL_STATE_KEY) return;
-  try {
-    const parsed = JSON.parse(e.newValue || '{}');
-    // JSON.parse('null')/('42')/('"x"') all succeed without throwing — only a genuine
-    // object is a valid state shape; anything else would otherwise crash every later
-    // Object.values(state)/state[rfCode] access for the rest of the page session.
-    state = (parsed && typeof parsed === 'object') ? parsed : {};
-  } catch (err) {
-    logError('notification-store', 'cross-tab storage event carried corrupt state, resetting', err);
-    state = {};
-  }
-  sequence = Math.max(0, ...Object.values(state).map((entry) => entry.seq || 0));
-  notifications.value = toList(state);
+  if (!scopePrefix || (e.storageArea && e.storageArea !== window.localStorage)) return;
+  if (e.key !== null && !e.key.startsWith(scopePrefix)) return;
+  if (storageTimer !== null) return;
+  storageTimer = setTimeout(() => {
+    storageTimer = null;
+    refreshState();
+    sync();
+  }, 0);
 });
 
 export function getEntry(rfCode) {
-  return state[rfCode];
+  return refreshEntry(rfCode);
 }
 
 export function getEntries() {
-  return notifications.value;
+  refreshState();
+  return toList();
 }
 
-// Marks unread again whenever the stage actually advances (a genuinely new thing to show
-// the attendee), but leaves an already-read entry's read flag alone on a no-op re-write.
-// Same rule for `dismissed`: a stage advance is worth surfacing again even if the attendee
-// dismissed it at its previous stage (e.g. dismissed the reminder, then it goes live).
 export function upsertEntry(rfCode, entry) {
-  const prev = state[rfCode];
+  if (!scopePrefix) throw new Error('notification scope is not initialized');
+  const prev = getEntry(rfCode);
+  if (prev?.unscheduled || STAGE_RANK[prev?.stage] > STAGE_RANK[entry.stage]) return;
   const stageChanged = !prev || prev.stage !== entry.stage;
   sequence += 1;
-  state = {
-    ...state,
-    [rfCode]: {
-      ...prev,
-      ...entry,
-      read: stageChanged ? false : (prev?.read ?? false),
-      dismissed: stageChanged ? false : (prev?.dismissed ?? false),
-      updatedAt: getNowMs(),
-      seq: sequence,
-    },
+  const next = {
+    ...prev,
+    ...entry,
+    read: stageChanged ? false : (prev?.read ?? false),
+    dismissed: stageChanged ? false : (prev?.dismissed ?? false),
+    expired: stageChanged ? false : (prev?.expired ?? false),
+    updatedAt: getNowMs(),
+    seq: sequence,
   };
-  persistAndSync();
+  state = { ...state, [rfCode]: next };
+  write(entryKey(rfCode), JSON.stringify(next));
+  sync();
 }
 
 export function removeEntry(rfCode) {
-  if (!(rfCode in state)) return;
+  if (!scopePrefix) return;
+  try {
+    storageKeys(`${scopePrefix}${encodeURIComponent(rfCode)}:`)
+      .forEach((key) => {
+        window.localStorage.removeItem(key);
+        pendingWrites.delete(key);
+      });
+  } catch (err) {
+    logError('notification-store', 'failed to remove local state', err);
+  }
   const next = { ...state };
   delete next[rfCode];
   state = next;
-  persistAndSync();
+  sync();
 }
 
-// User-initiated dismiss: unlike removeEntry (used for orphan cleanup, where the session is
-// truly gone from the schedule), this keeps the entry — just hidden from the widget — so
-// swan-notifications.js's forward-only stage guard still has something to compare against.
-// Without this, a still-scheduled session's next reconcile tick would see no existing entry
-// at all and recreate it as unread, resurrecting a dismissal within one ~15s ticker cycle.
+// Keep an unschedule tombstone so a different tab's stale scheduled set cannot
+// recreate the entry. Only a successful fresh schedule or explicit add clears it.
+export function setSessionScheduled(rfCode, isScheduled) {
+  const existing = getEntry(rfCode);
+  if (isScheduled) {
+    if (existing?.unscheduled) removeEntry(rfCode);
+    return;
+  }
+  if (!scopePrefix || existing?.unscheduled) return;
+  const next = { unscheduled: true, updatedAt: getNowMs() };
+  state = { ...state, [rfCode]: next };
+  write(entryKey(rfCode), JSON.stringify(next));
+  sync();
+}
+
+function setFlag(rfCode, flag) {
+  const entry = getEntry(rfCode);
+  if (!entry || entry.unscheduled || entry[flag]) return;
+  state = { ...state, [rfCode]: { ...entry, [flag]: true } };
+  write(flagKey(rfCode, entry.stage, flag), 'true');
+  sync();
+}
+
 export function dismissEntry(rfCode) {
-  if (!state[rfCode] || state[rfCode].dismissed) return;
-  state = { ...state, [rfCode]: { ...state[rfCode], dismissed: true } };
-  persistAndSync();
+  setFlag(rfCode, 'dismissed');
 }
 
 export function markRead(rfCode) {
-  if (!state[rfCode] || state[rfCode].read) return;
-  state = { ...state, [rfCode]: { ...state[rfCode], read: true } };
-  persistAndSync();
+  setFlag(rfCode, 'read');
 }
 
 export function markAllRead() {
-  const unreadRfCodes = Object.keys(state).filter((rfCode) => !state[rfCode].read);
-  if (!unreadRfCodes.length) return;
-  const next = { ...state };
-  unreadRfCodes.forEach((rfCode) => { next[rfCode] = { ...next[rfCode], read: true }; });
-  state = next;
-  persistAndSync();
+  batchNotifications(() => getEntries().forEach((entry) => markRead(entry.rfCode)));
 }
 
-function daysToMs(days, fallbackDays) {
-  // `|| fallbackDays` would treat an explicit 0 (prune immediately) as falsy and silently
-  // substitute the fallback instead — only a genuinely invalid value should fall back.
+export function expireEntry(rfCode) {
+  const entry = getEntry(rfCode);
+  if (!entry || entry.expired || entry.unscheduled) return;
+  const next = { ...entry, expired: true };
+  state = { ...state, [rfCode]: next };
+  write(entryKey(rfCode), JSON.stringify(next));
+  sync();
+}
+
+export function daysToMs(days, fallbackDays) {
   const n = Number(days);
-  const effectiveDays = Number.isFinite(n) && n >= 0 ? n : fallbackDays;
-  return effectiveDays * 24 * 60 * 60 * 1000;
+  return (Number.isFinite(n) && n >= 0 ? n : fallbackDays) * 24 * 60 * 60 * 1000;
 }
 
-// Drops on-demand entries older than persistTillDays so the panel doesn't accumulate forever,
-// plus a stage-independent safety-net wipe at expirationDays (mirroring legacy SWAN 1.0's
-// event-wide notifExpirationDate) for any entry — reminder or live included — that never gets
-// reconciled further, e.g. a session whose catalog record silently stops updating.
 export function pruneStale(now, persistTillDays, expirationDays) {
   const onDemandMaxAgeMs = daysToMs(persistTillDays, 3);
   const allStageMaxAgeMs = daysToMs(expirationDays, 14);
-  const staleRfCodes = Object.entries(state)
-    .filter(([, entry]) => {
-      const age = now - entry.updatedAt;
-      if (entry.stage === 'on-demand' && age > onDemandMaxAgeMs) return true;
-      return age > allStageMaxAgeMs;
-    })
-    .map(([rfCode]) => rfCode);
-  if (!staleRfCodes.length) return;
-  const next = { ...state };
-  staleRfCodes.forEach((rfCode) => { delete next[rfCode]; });
-  state = next;
-  persistAndSync();
+  // Unscheduled tombstones stay until a fresh schedule can confirm membership.
+  const staleEntries = getEntries().filter((entry) => {
+    const anchor = Number.isFinite(entry.endTimeMs) ? entry.endTimeMs : entry.updatedAt;
+    if (entry.stage === 'on-demand' && now - anchor > onDemandMaxAgeMs) return true;
+    return now - entry.updatedAt > allStageMaxAgeMs;
+  });
+  if (!staleEntries.length) return;
+  staleEntries.forEach((entry) => {
+    // Retain the stage guard even after display expiry, including the safety-net
+    // expiry of a live/reminder entry whose catalog record stopped updating.
+    const next = { ...entry, expired: true };
+    state = { ...state, [entry.rfCode]: next };
+    write(entryKey(entry.rfCode), JSON.stringify(next));
+  });
+  sync();
 }
