@@ -794,6 +794,13 @@
   }
 }
 
+/* Milo's section z-index: 3 traps the panel below the nav; lift it while open. */
+@media (max-width: 1279px) {
+  .section.rounded-corners-top:has(.sg-filter-panel) {
+    z-index: 11;
+  }
+}
+
 @keyframes sg-filter-in {
   from { opacity: 0; }
   to   { opacity: 1; }
