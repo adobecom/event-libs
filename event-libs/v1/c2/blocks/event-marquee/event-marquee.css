@@ -255,8 +255,9 @@
     padding-top: var(--s2a-layout-xl);
     padding-inline: 220px;
     gap: var(--s2a-layout-sm);
+    padding-left: max(0px, 220px - (100vw - 1920px) / 2);
   }
-
+  
   .event-marquee-text {
     flex: 664 1 0%;
     max-width: 664px;
