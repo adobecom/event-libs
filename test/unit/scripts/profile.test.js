@@ -58,15 +58,58 @@ describe('Profile Functions', () => {
     expect(profile).to.deep.equal({ name: 'IMS User' });
   });
 
-  it('should return null when the user is signed out', async () => {
+  it('should return a guest profile for a guest IMS token', async () => {
+    const getProfileStub = sinon.stub().rejects(new Error('guest account does not have a profile'));
     window.adobeIMS = {
       isSignedInUser: () => false,
-      getProfile: () => Promise.resolve({ name: 'IMS User' }),
+      getAccessToken: () => ({ token: 'guest-token', isGuestToken: true }),
+      getProfile: getProfileStub,
     };
 
     const profile = await getProfile();
 
-    expect(profile).to.equal(null);
+    expect(profile).to.deep.equal({ account_type: 'guest' });
+    expect(getProfileStub.called).to.be.false;
+  });
+
+  it('should return noProfile when IMS has no credential', async () => {
+    window.adobeIMS = {
+      isSignedInUser: () => false,
+      getAccessToken: () => null,
+      getProfile: () => Promise.reject(new Error('please login before getting the profile')),
+    };
+
+    const profile = await getProfile();
+
+    expect(profile).to.deep.equal({ noProfile: true });
+  });
+
+  it('should never resolve to null', async () => {
+    window.adobeIMS = {
+      isSignedInUser: () => true,
+      getAccessToken: () => ({ token: 'user-token' }),
+      getProfile: () => Promise.resolve(null),
+    };
+
+    const profile = await getProfile();
+
+    expect(profile).to.deep.equal({ noProfile: true });
+  });
+
+  it('should capture a guest profile without fetching attendee data', async () => {
+    window.adobeIMS = {
+      isSignedInUser: () => false,
+      getAccessToken: () => ({ token: 'guest-token', isGuestToken: true }),
+      getProfile: () => Promise.reject(new Error('guest account does not have a profile')),
+    };
+    const fetchStub = sinon.stub(window, 'fetch');
+
+    lazyCaptureProfile();
+    await clock.tickAsync(50);
+
+    expect(BlockMediator.get('imsProfile')).to.deep.equal({ account_type: 'guest' });
+    expect(BlockMediator.get('rsvpData')).to.be.undefined;
+    expect(fetchStub.called).to.be.false;
   });
 
   it('lazyCapture resolves synchronously when adobeIMS is already available', async () => {
@@ -92,13 +135,17 @@ describe('Profile Functions', () => {
     lazyCaptureProfile();
 
     await clock.tick(8000);
-    // Signed-out user: getProfile() resolves to null, so imsProfile is set to null.
-    window.adobeIMS = { isSignedInUser: () => false, getProfile: () => Promise.resolve(null) };
+    // Signed-out visitor with a guest token: imsProfile resolves to a guest profile, not null.
+    window.adobeIMS = {
+      isSignedInUser: () => false,
+      getAccessToken: () => ({ token: 'guest-token', isGuestToken: true }),
+      getProfile: () => Promise.reject(new Error('guest account does not have a profile')),
+    };
 
     await clock.tick(3000);
     const profile = await getProfile();
-    expect(profile).to.equal(null);
-    expect(BlockMediator.get('imsProfile')).to.equal(null);
+    expect(profile).to.deep.equal({ account_type: 'guest' });
+    expect(BlockMediator.get('imsProfile')).to.deep.equal({ account_type: 'guest' });
   });
 
   it('should return early when there is no event-id', async () => {
