@@ -46,6 +46,28 @@ Confirmed on this codebase — 103 issues across 34 files at time of setup:
 - Subjective/human metrics (e.g. "code understandability" survey) —
   out of scope for any static tool
 
+## Report now includes Sonar Keys
+
+Each issue in `sonar/sonar-report.md` is annotated with its SonarSource
+RSPEC rule key (e.g. `S3776` for cognitive-complexity). This package
+does not expose severity (Blocker/Critical/Major/Minor) directly —
+only ESLint's own `error`/`warning` levels, which we've set uniformly
+to `error`.
+
+### Where to check severity for a given Sonar Key
+
+Look up the rule key on SonarSource's public rule catalog:
+
+- `https://rules.sonarsource.com/javascript/RSPEC-<number>` (e.g.
+  `https://rules.sonarsource.com/javascript/RSPEC-3776`)
+
+Each rule page lists its default severity and the Clean Code quality
+dimension it impacts (Maintainability / Reliability / Security). This
+same information is also visible directly inside a real SonarQube or
+SonarCloud instance under the rule's detail view in the Quality
+Profile — that's the canonical source since severity can be
+overridden per project's Quality Profile on a real server.
+
 ## Why not the official SonarLint product?
 
 - SonarLint is fundamentally an **IDE plugin**, not a headless CLI tool

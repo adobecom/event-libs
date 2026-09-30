@@ -5,9 +5,21 @@ import { spawnSync } from 'child_process';
 import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import sonarjs from 'eslint-plugin-sonarjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
+
+// Build a ruleId -> Sonar RSPEC key (e.g. "S3776") lookup from the plugin's
+// own rule metadata, so the report can reference SonarSource's rule catalog
+// (severity is looked up there — see sonar/README.md).
+const sonarKeyByRuleId = {};
+Object.entries(sonarjs.rules).forEach(([shortName, rule]) => {
+  const url = rule?.meta?.docs?.url || '';
+  const match = url.match(/RSPEC[-/](S\d+)|rspec\/(S\d+)/);
+  const key = match && (match[1] || match[2]);
+  if (key) sonarKeyByRuleId[`sonarjs/${shortName}`] = key;
+});
 
 // shell: false so the '**' glob is left intact for ESLint's own glob engine
 // instead of being (incorrectly) expanded by /bin/sh, which lacks globstar.
@@ -41,9 +53,10 @@ files.forEach((f) => f.messages.forEach((m) => {
 let out = '# Sonar-style Code Quality Report\n\n';
 out += `Generated via \`npm run lint:sonar\` (eslint-plugin-sonarjs) on ${new Date().toISOString().slice(0, 10)}.\n\n`;
 out += `- Files scanned: ${data.length}\n- Files with issues: ${files.length}\n- Total issues: ${total}\n\n`;
-out += '## Issues by rule\n\n| Rule | Count |\n|---|---|\n';
+out += '## Issues by rule\n\n| Rule | Sonar Key | Count |\n|---|---|---|\n';
 Object.entries(byRule).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
-  out += `| \`${k}\` | ${v} |\n`;
+  const sonarKey = sonarKeyByRuleId[k] || '—';
+  out += `| \`${k}\` | ${sonarKey} | ${v} |\n`;
 });
 
 out += '\n## Issues by file\n\n';
@@ -51,7 +64,8 @@ files.forEach((f) => {
   const rel = path.relative(repoRoot, f.filePath);
   out += `### \`${rel}\`\n\n`;
   f.messages.forEach((m) => {
-    out += `- L${m.line}:${m.column} \`${m.ruleId}\` — ${m.message}\n`;
+    const sonarKey = sonarKeyByRuleId[m.ruleId] || '—';
+    out += `- L${m.line}:${m.column} \`${m.ruleId}\` (${sonarKey}) — ${m.message}\n`;
   });
   out += '\n';
 });
