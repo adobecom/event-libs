@@ -78,7 +78,8 @@ export function formatSessionDateTime(sessionTime) {
     const endLabel = digitsOf(endParts) + endMeridiem;
     const tzAbbr = endParts.find((part) => part.type === 'timeZoneName')?.value || '';
 
-    return `${dateStr}, ${startLabel}–${endLabel}${tzAbbr ? ` ${tzAbbr}` : ''}`;
+    const tzSuffix = tzAbbr ? ` ${tzAbbr}` : '';
+    return `${dateStr}, ${startLabel}–${endLabel}${tzSuffix}`;
   } catch (error) {
     logError('featured-sessions', 'date/time format failed', error);
     return '';

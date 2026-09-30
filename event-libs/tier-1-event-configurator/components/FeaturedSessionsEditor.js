@@ -232,7 +232,7 @@ export default function FeaturedSessionsEditor({
     if (node) {
       node.style.transition = 'transform 0.15s ease';
       node.style.transform = '';
-      setTimeout(() => { if (node) node.style.transition = ''; }, 160);
+      setTimeout(() => { node.style.transition = ''; }, 160);
     }
     const finalIndex = orderRef.current.indexOf(info.sessionId);
     if (finalIndex !== info.startIndex) {
