@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { mountNotificationWidget } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
 import { upsertEntry, getEntries, removeEntry } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from './mocks/notification-store.js';
 
 function setMeta(name, content) {
   document.head.querySelector(`meta[name="${name}"]`)?.remove();
@@ -31,6 +32,7 @@ describe('notification-widget: mount retry after a failed wait', () => {
   });
 
   it('resets its mounted guard on a timed-out wait, so a later call can still succeed', async () => {
+    await resetNotifications();
     const clock = sinon.useFakeTimers();
     setMeta('gnav-notifications', 'on');
     mountNotificationWidget();

@@ -1,8 +1,10 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
+import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 import {
   getEntry, getEntries, removeEntry,
 } from '../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from '../features/swan-notifications/mocks/notification-store.js';
 
 // session-store.js holds module-level singleton state that @web/test-runner does not
 // reliably reset between test files sharing a worker session — cache-bust the import
@@ -33,6 +35,7 @@ describe('session-store: toggleSchedule keeps the local SWAN notification store 
   let originalFetch;
 
   before(async () => {
+    await resetNotifications();
     originalFetch = window.fetch;
     window.fetch = async (url) => {
       if (typeof url === 'string' && url.includes('session-catalog')) {
@@ -49,7 +52,8 @@ describe('session-store: toggleSchedule keeps the local SWAN notification store 
     meta.content = 'feds';
     document.head.appendChild(meta);
 
-    setMetadata('tier-1-event-config', JSON.stringify({}));
+    setMetadata('tier-1-event-config', JSON.stringify({ eventId: 'test-session-hook' }));
+    BlockMediator.set('imsProfile', { userId: 'test-session-hook-attendee', account_type: 'type1' });
     initSessionState();
     await waitForSessionsReady();
   });
@@ -58,6 +62,7 @@ describe('session-store: toggleSchedule keeps the local SWAN notification store 
     window.fetch = originalFetch;
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
     document.head.querySelector('meta[name="swan-notifications"]')?.remove();
+    BlockMediator.set('imsProfile', undefined);
     clearStore();
   });
 

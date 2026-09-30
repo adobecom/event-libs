@@ -1,6 +1,11 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
+import {
+  upsertEntry, dismissEntry, getEntry, notificationsReady, setNotificationsReady,
+} from '../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from '../features/swan-notifications/mocks/notification-store.js';
 
 // session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
 // @web/test-runner does not reliably reset between test files sharing a worker session —
@@ -22,9 +27,15 @@ function waitForSessionsReady() {
 
 describe('session-store: myData fetch failure settles isRegistered instead of hanging forever', () => {
   let originalFetch;
+  let clock;
 
   before(async () => {
     originalFetch = window.fetch;
+    clock = sinon.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    await resetNotifications();
+    setNotificationsReady(false);
+    upsertEntry('RF-dismissed', { stage: 'live', title: 'Dismissed before refresh' });
+    dismissEntry('RF-dismissed');
     window.fetch = async (url) => {
       if (url.includes('/jwt')) {
         return { ok: true, status: 200, json: async () => ({ rfAuthToken: 'exchanged-token' }) };
@@ -40,7 +51,8 @@ describe('session-store: myData fetch failure settles isRegistered instead of ha
 
     BlockMediator.set('imsProfile', { first_name: 'Test', account_type: 'type1', userId: 'user-4' });
 
-    setMetadata('tier-1-event-config', JSON.stringify({ rfApiUrl: 'https://mock.example/api' }));
+    setMetadata('swan-notifications', 'feds');
+    setMetadata('tier-1-event-config', JSON.stringify({ eventId: 'test-fetch-failed', rfApiUrl: 'https://mock.example/api' }));
     initSessionState();
     await waitForSessionsReady();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -50,9 +62,17 @@ describe('session-store: myData fetch failure settles isRegistered instead of ha
     window.fetch = originalFetch;
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
     BlockMediator.set('imsProfile', undefined);
+    document.head.querySelector('meta[name="swan-notifications"]')?.remove();
+    clock.restore();
   });
 
   it('settles isRegistered to null (checked, unknown) rather than leaving it undefined forever', () => {
     expect(auth.value.isRegistered).to.be.null;
+  });
+
+  it('does not delete dismissals or expose cached counts on ticks after a failed schedule fetch', async () => {
+    await clock.tickAsync(45_000);
+    expect(getEntry('RF-dismissed').dismissed).to.equal(true);
+    expect(notificationsReady.value).to.equal(false);
   });
 });
