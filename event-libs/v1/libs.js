@@ -96,11 +96,9 @@ export const eventsDelayedActions = async () => {
   }
 };
 
-// Unlike eventsDelayedActions, this must run on any page (no event-id required) --
-// consumer sites should call it unconditionally, independent of event-specific
-// decoration.
-export const initMiloSiteRedesignOverride = async () => {
-  if (getMetadata('override-milo-ace1209') !== 'true') return;
-  const { default: init } = await import('./features/milo-site-redesign-override/index.js');
-  return init();
-};
+/**
+ * @deprecated No-op. Milo main now ships bento-stack natively (adobecom/milo#6836).
+ * Kept only so consumers (da-events) that still import it don't break; remove once
+ * they drop the call. See docs/mwpw-205501-bento-stack-override.md.
+ */
+export const initMiloSiteRedesignOverride = async () => {};
