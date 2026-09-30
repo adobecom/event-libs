@@ -1,9 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 import { mountNotificationWidget, normalizeTimeCasing } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
 import {
-  getEntries, removeEntry, upsertEntry, setNotificationsReady,
+  getEntries, removeEntry, upsertEntry, setNotificationsReady, flushNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
-import { resetNotificationScope } from './mocks/notification-scope.js';
+import { resetNotifications } from './mocks/notification-store.js';
 import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
 
 // Same-origin, genuinely loadable asset — unlike an https://example.com/... URL (blocked by
@@ -66,8 +66,8 @@ describe('notification-widget', () => {
     document.head.querySelector('meta[name="gnav-notifications"]')?.remove();
   });
 
-  beforeEach(() => {
-    resetNotificationScope('-widget');
+  beforeEach(async () => {
+    await resetNotifications();
     panel().hidden = true;
   });
 
@@ -151,6 +151,13 @@ describe('notification-widget', () => {
     expect(titles).to.deep.equal(['Second', 'First']);
   });
 
+  it('renders and counts notifications from different events in the same inbox', () => {
+    addEntry('RF-event-a', { eventId: 'event-a', stage: 'live', title: 'Event A' });
+    addEntry('RF-event-b', { eventId: 'event-b', stage: 'live', title: 'Event B' });
+    expect(rows()).to.have.lengthOf(2);
+    expect(badge().textContent).to.equal('2');
+  });
+
   it('labels each row with its stage pill', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     addEntry('RF-2', { stage: 'live', title: 'Second' });
@@ -182,6 +189,31 @@ describe('notification-widget', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     rows()[0].click();
     expect(getEntries().find((e) => e.rfCode === 'RF-1').read).to.equal(true);
+  });
+
+  it('persists the read marker before navigating away from an activated notification', async () => {
+    const originalUrl = location.href;
+    addEntry('RF-1', { stage: 'live', title: 'First', actionUrl: `${location.pathname}${location.search}#notification-read` });
+    await flushNotifications();
+    let release;
+    let acquired = false;
+    const blocker = navigator.locks.request('swan-notification-state-v3', async () => {
+      acquired = true;
+      await new Promise((resolve) => { release = resolve; });
+    });
+    await waitFor(() => acquired);
+    try {
+      rows()[0].click();
+      expect(location.href).to.equal(originalUrl);
+      release();
+      await blocker;
+      await waitFor(() => location.hash === '#notification-read');
+      const stored = JSON.parse(localStorage.getItem('swan-notification-state-v3'));
+      expect(stored['RF-1'].read).to.equal(true);
+    } finally {
+      release();
+      history.replaceState(null, '', originalUrl);
+    }
   });
 
   it('marks the entry read on Enter/Space, not just a mouse click', () => {

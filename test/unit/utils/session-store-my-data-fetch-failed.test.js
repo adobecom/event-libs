@@ -3,8 +3,9 @@ import sinon from 'sinon';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 import {
-  setNotificationScope, upsertEntry, dismissEntry, getEntry, notificationsReady,
+  upsertEntry, dismissEntry, getEntry, notificationsReady, setNotificationsReady,
 } from '../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from '../features/swan-notifications/mocks/notification-store.js';
 
 // session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
 // @web/test-runner does not reliably reset between test files sharing a worker session —
@@ -31,7 +32,8 @@ describe('session-store: myData fetch failure settles isRegistered instead of ha
   before(async () => {
     originalFetch = window.fetch;
     clock = sinon.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    setNotificationScope('test-fetch-failed', 'user-4', 'https://mock.example/api');
+    await resetNotifications();
+    setNotificationsReady(false);
     upsertEntry('RF-dismissed', { stage: 'live', title: 'Dismissed before refresh' });
     dismissEntry('RF-dismissed');
     window.fetch = async (url) => {
@@ -61,7 +63,6 @@ describe('session-store: myData fetch failure settles isRegistered instead of ha
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
     BlockMediator.set('imsProfile', undefined);
     document.head.querySelector('meta[name="swan-notifications"]')?.remove();
-    setNotificationScope(null, null, null);
     clock.restore();
   });
 

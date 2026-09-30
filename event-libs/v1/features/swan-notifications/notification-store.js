@@ -1,56 +1,49 @@
 import { signal, batch } from '../../deps/htm-preact.js';
 import { getNowMs } from '../../utils/session-state.js';
-import { logError } from '../../utils/lana-log.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 
-const LOCAL_STATE_PREFIX = 'swan-notification-state-v3:';
+const LOCAL_STATE_KEY = 'swan-notification-state-v3';
 const STAGE_DISPLAY_PRIORITY = { live: 0, reminder: 1, 'on-demand': 2 };
 const STAGE_RANK = { reminder: 1, live: 2, 'on-demand': 3 };
 
-let scopePrefix = null;
-let state = {};
-let sequence = 0;
-let storageTimer = null;
-let published = '[]';
+function readLocalState() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('invalid notification state');
+    }
+    return Object.fromEntries(Object.entries(parsed).filter(([, entry]) => {
+      if (entry && typeof entry === 'object' && !Array.isArray(entry)) return true;
+      logWarning('notification-store', 'ignoring an invalid notification entry');
+      return false;
+    }));
+  } catch (err) {
+    logError('notification-store', 'failed to read local state', err);
+    return null;
+  }
+}
+
+let state = readLocalState() || {};
 let mutationDepth = 0;
-let syncPending = false;
-const pendingWrites = new Map();
-
-export const notifications = signal([]);
-export const notificationsReady = signal(false);
-
-function entryKey(rfCode) {
-  return `${scopePrefix}${encodeURIComponent(rfCode)}:entry`;
-}
-
-function flagKey(rfCode, stage, flag) {
-  return `${scopePrefix}${encodeURIComponent(rfCode)}:${stage}:${flag}`;
-}
-
-function storageKeys(prefix) {
-  return [...new Set([
-    ...Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index)),
-    ...pendingWrites.keys(),
-  ])].filter((key) => key?.startsWith(prefix));
-}
-
-function read(key) {
-  return pendingWrites.has(key) ? pendingWrites.get(key) : window.localStorage.getItem(key);
-}
+let storageTimer = null;
+let flushPromise = null;
+let warnedAboutLocks = false;
+const pendingMutations = [];
+const removedRfCodes = new Set();
 
 function toList() {
   return Object.entries(state)
-    .filter(([, entry]) => !entry.unscheduled && !entry.expired)
     .map(([rfCode, entry]) => ({ ...entry, rfCode }))
     .sort((a, b) => (STAGE_DISPLAY_PRIORITY[a.stage] ?? 99) - (STAGE_DISPLAY_PRIORITY[b.stage] ?? 99)
-      || b.seq - a.seq);
+      || (b.seq || 0) - (a.seq || 0));
 }
 
+export const notifications = signal(toList());
+export const notificationsReady = signal(false);
+let published = JSON.stringify(notifications.value);
+
 function sync() {
-  if (mutationDepth) {
-    syncPending = true;
-    return;
-  }
-  sequence = Math.max(sequence, ...Object.values(state).map((entry) => entry.seq || 0));
+  if (mutationDepth) return;
   const entries = toList();
   const serialized = JSON.stringify(entries);
   if (serialized === published) return;
@@ -58,195 +51,165 @@ function sync() {
   notifications.value = entries;
 }
 
-function readEntry(rfCode) {
-  const raw = read(entryKey(rfCode));
-  if (raw === null) return undefined;
-  try {
-    const entry = JSON.parse(raw);
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)
-      || (!entry.unscheduled && !STAGE_RANK[entry.stage])) {
-      throw new Error('invalid notification entry');
-    }
-    return {
-      ...entry,
-      read: read(flagKey(rfCode, entry.stage, 'read')) === 'true',
-      dismissed: read(flagKey(rfCode, entry.stage, 'dismissed')) === 'true',
-    };
-  } catch (err) {
-    logError('notification-store', 'ignoring corrupt notification entry', err);
-    return undefined;
-  }
-}
-
-function refreshEntry(rfCode) {
-  if (!scopePrefix) return undefined;
-  try {
-    const entry = readEntry(rfCode);
-    if (entry) {
-      state[rfCode] = entry;
-      sequence = Math.max(sequence, entry.seq || 0);
-    } else {
-      delete state[rfCode];
-    }
-    return entry;
-  } catch (err) {
-    logError('notification-store', 'failed to read notification entry', err);
-    return state[rfCode];
-  }
+function adopt(next) {
+  // A different tab can remove an entry while this page still has it scheduled.
+  // Remember the removal only for this page lifetime, not as persisted tombstones.
+  Object.keys(state).filter((rfCode) => !(rfCode in next)).forEach((rfCode) => removedRfCodes.add(rfCode));
+  state = next;
 }
 
 function refreshState() {
-  if (!scopePrefix) return;
+  const persisted = readLocalState();
+  if (!persisted) return;
+  adopt(pendingMutations.reduce((next, mutate) => mutate(next), persisted));
+}
+
+function persistPending() {
+  const persisted = readLocalState();
+  if (!persisted) return false;
+  const next = pendingMutations.reduce((value, mutate) => mutate(value), persisted);
   try {
-    const next = {};
-    storageKeys(scopePrefix).filter((key) => key.endsWith(':entry')).forEach((key) => {
-      try {
-        const rfCode = decodeURIComponent(key.slice(scopePrefix.length, -':entry'.length));
-        const entry = readEntry(rfCode);
-        if (entry) next[rfCode] = entry;
-      } catch (err) {
-        logError('notification-store', 'ignoring corrupt notification entry', err);
-      }
-    });
-    state = next;
+    if (JSON.stringify(next) !== JSON.stringify(persisted)) {
+      window.localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(next));
+    }
+    pendingMutations.length = 0;
+    adopt(next);
+    sync();
+    return true;
   } catch (err) {
-    logError('notification-store', 'failed to read local state', err);
+    logError('notification-store', 'failed to persist local state; will retry', err);
+    return false;
   }
 }
 
-function write(key, value) {
+export async function flushNotifications() {
+  if (flushPromise) return flushPromise;
+  if (!pendingMutations.length) return true;
+  // All supporting tabs serialize read-modify-write of the existing single map.
+  // Without Web Locks, retain the original synchronous persistence as a fallback.
+  if (!navigator.locks?.request) {
+    if (!warnedAboutLocks) {
+      logWarning('notification-store', 'Web Locks unavailable; concurrent tab writes cannot be serialized');
+      warnedAboutLocks = true;
+    }
+    return persistPending();
+  }
+  flushPromise = (async () => {
+    let saved;
+    do {
+      saved = await navigator.locks.request(LOCAL_STATE_KEY, persistPending);
+    } while (saved && pendingMutations.length);
+    return saved;
+  })();
   try {
-    window.localStorage.setItem(key, value);
-    pendingWrites.delete(key);
+    return await flushPromise;
   } catch (err) {
-    pendingWrites.set(key, value);
-    logError('notification-store', 'failed to persist local state', err);
+    logError('notification-store', 'failed to acquire the notification storage lock; will retry', err);
+    return false;
+  } finally {
+    flushPromise = null;
   }
 }
 
-function retryPendingWrites() {
-  pendingWrites.forEach((value, key) => write(key, value));
+function mutateState(mutate) {
+  if (!mutationDepth) refreshState();
+  const next = mutate(state);
+  if (next === state) return;
+  pendingMutations.push(mutate);
+  adopt(next);
+  sync();
+  if (!mutationDepth) flushNotifications();
 }
 
 export function batchNotifications(callback) {
-  retryPendingWrites();
+  if (!mutationDepth) refreshState();
   return batch(() => {
     mutationDepth += 1;
     try {
       return callback();
     } finally {
       mutationDepth -= 1;
-      if (!mutationDepth && syncPending) {
-        syncPending = false;
+      if (!mutationDepth) {
         sync();
+        flushNotifications();
       }
     }
   });
 }
 
-// Hydrate only after the event and attendee scope is known.
-export function setNotificationScope(eventId, userId, environment) {
-  const next = eventId && userId && environment
-    ? `${LOCAL_STATE_PREFIX}${encodeURIComponent(JSON.stringify([eventId, userId, environment]))}:`
-    : null;
-  if (next === scopePrefix) return;
-  retryPendingWrites();
-  clearTimeout(storageTimer);
-  storageTimer = null;
-  notificationsReady.value = false;
-  scopePrefix = next;
-  state = {};
-  sequence = 0;
-  refreshState();
-  sync();
-}
-
 export function setNotificationsReady(ready) {
-  const next = !!scopePrefix && ready;
-  if (next !== notificationsReady.value) notificationsReady.value = next;
+  if (ready !== notificationsReady.value) notificationsReady.value = ready;
 }
 
-// A queued StorageEvent's newValue may predate this tab's own dismissal. Always read
-// current storage instead. Separate entry/flag keys prevent unrelated writes, or a
-// stage refresh in another tab, from overwriting read/dismiss actions.
 window.addEventListener('storage', (e) => {
-  if (!scopePrefix || (e.storageArea && e.storageArea !== window.localStorage)) return;
-  if (e.key !== null && !e.key.startsWith(scopePrefix)) return;
+  if (e.storageArea && e.storageArea !== window.localStorage) return;
+  if (e.key !== null && e.key !== LOCAL_STATE_KEY) return;
   if (storageTimer !== null) return;
   storageTimer = setTimeout(() => {
     storageTimer = null;
+    // newValue can be an older queued snapshot than the value now in storage.
     refreshState();
     sync();
   }, 0);
 });
 
 export function getEntry(rfCode) {
-  return refreshEntry(rfCode);
+  if (!mutationDepth) refreshState();
+  return state[rfCode];
 }
 
 export function getEntries() {
-  refreshState();
+  if (!mutationDepth) refreshState();
   return toList();
 }
 
+export function allowNotification(rfCode) {
+  removedRfCodes.delete(rfCode);
+}
+
+export function wasNotificationRemoved(rfCode) {
+  return removedRfCodes.has(rfCode);
+}
+
 export function upsertEntry(rfCode, entry) {
-  if (!scopePrefix) throw new Error('notification scope is not initialized');
-  const prev = getEntry(rfCode);
-  if (prev?.unscheduled || STAGE_RANK[prev?.stage] > STAGE_RANK[entry.stage]) return;
-  const stageChanged = !prev || prev.stage !== entry.stage;
-  sequence += 1;
-  const next = {
-    ...prev,
-    ...entry,
-    read: stageChanged ? false : (prev?.read ?? false),
-    dismissed: stageChanged ? false : (prev?.dismissed ?? false),
-    expired: stageChanged ? false : (prev?.expired ?? false),
-    updatedAt: getNowMs(),
-    seq: sequence,
-  };
-  state = { ...state, [rfCode]: next };
-  write(entryKey(rfCode), JSON.stringify(next));
-  sync();
+  const now = getNowMs();
+  const expectedExisting = !!getEntry(rfCode);
+  allowNotification(rfCode);
+  mutateState((current) => {
+    const prev = current[rfCode];
+    // An advancement computed before another tab's removal must not recreate it.
+    if ((expectedExisting && !prev) || STAGE_RANK[prev?.stage] > STAGE_RANK[entry.stage]) return current;
+    const stageChanged = !prev || prev.stage !== entry.stage;
+    const sequence = Math.max(0, ...Object.values(current).map((value) => value.seq || 0)) + 1;
+    return {
+      ...current,
+      [rfCode]: {
+        ...prev,
+        ...entry,
+        read: stageChanged ? false : (prev?.read ?? false),
+        dismissed: stageChanged ? false : (prev?.dismissed ?? false),
+        updatedAt: now,
+        seq: sequence,
+      },
+    };
+  });
 }
 
 export function removeEntry(rfCode) {
-  if (!scopePrefix) return;
-  try {
-    storageKeys(`${scopePrefix}${encodeURIComponent(rfCode)}:`)
-      .forEach((key) => {
-        window.localStorage.removeItem(key);
-        pendingWrites.delete(key);
-      });
-  } catch (err) {
-    logError('notification-store', 'failed to remove local state', err);
-  }
-  const next = { ...state };
-  delete next[rfCode];
-  state = next;
-  sync();
-}
-
-// Keep an unschedule tombstone so a different tab's stale scheduled set cannot
-// recreate the entry. Only a successful fresh schedule or explicit add clears it.
-export function setSessionScheduled(rfCode, isScheduled) {
-  const existing = getEntry(rfCode);
-  if (isScheduled) {
-    if (existing?.unscheduled) removeEntry(rfCode);
-    return;
-  }
-  if (!scopePrefix || existing?.unscheduled) return;
-  const next = { unscheduled: true, updatedAt: getNowMs() };
-  state = { ...state, [rfCode]: next };
-  write(entryKey(rfCode), JSON.stringify(next));
-  sync();
+  mutateState((current) => {
+    if (!(rfCode in current)) return current;
+    const next = { ...current };
+    delete next[rfCode];
+    return next;
+  });
 }
 
 function setFlag(rfCode, flag) {
-  const entry = getEntry(rfCode);
-  if (!entry || entry.unscheduled || entry[flag]) return;
-  state = { ...state, [rfCode]: { ...entry, [flag]: true } };
-  write(flagKey(rfCode, entry.stage, flag), 'true');
-  sync();
+  mutateState((current) => {
+    const entry = current[rfCode];
+    if (!entry || entry[flag]) return current;
+    return { ...current, [rfCode]: { ...entry, [flag]: true } };
+  });
 }
 
 export function dismissEntry(rfCode) {
@@ -261,15 +224,6 @@ export function markAllRead() {
   batchNotifications(() => getEntries().forEach((entry) => markRead(entry.rfCode)));
 }
 
-export function expireEntry(rfCode) {
-  const entry = getEntry(rfCode);
-  if (!entry || entry.expired || entry.unscheduled) return;
-  const next = { ...entry, expired: true };
-  state = { ...state, [rfCode]: next };
-  write(entryKey(rfCode), JSON.stringify(next));
-  sync();
-}
-
 export function daysToMs(days, fallbackDays) {
   const n = Number(days);
   return (Number.isFinite(n) && n >= 0 ? n : fallbackDays) * 24 * 60 * 60 * 1000;
@@ -278,19 +232,16 @@ export function daysToMs(days, fallbackDays) {
 export function pruneStale(now, persistTillDays, expirationDays) {
   const onDemandMaxAgeMs = daysToMs(persistTillDays, 3);
   const allStageMaxAgeMs = daysToMs(expirationDays, 14);
-  // Unscheduled tombstones stay until a fresh schedule can confirm membership.
-  const staleEntries = getEntries().filter((entry) => {
-    const anchor = Number.isFinite(entry.endTimeMs) ? entry.endTimeMs : entry.updatedAt;
-    if (entry.stage === 'on-demand' && now - anchor > onDemandMaxAgeMs) return true;
-    return now - entry.updatedAt > allStageMaxAgeMs;
+  mutateState((current) => {
+    const staleRfCodes = Object.keys(current).filter((rfCode) => {
+      const entry = current[rfCode];
+      const anchor = Number.isFinite(entry.endTimeMs) ? entry.endTimeMs : entry.updatedAt;
+      if (now - anchor > onDemandMaxAgeMs && (entry.stage === 'on-demand' || Number.isFinite(entry.endTimeMs))) return true;
+      return now - entry.updatedAt > allStageMaxAgeMs;
+    });
+    if (!staleRfCodes.length) return current;
+    const next = { ...current };
+    staleRfCodes.forEach((rfCode) => { delete next[rfCode]; });
+    return next;
   });
-  if (!staleEntries.length) return;
-  staleEntries.forEach((entry) => {
-    // Retain the stage guard even after display expiry, including the safety-net
-    // expiry of a live/reminder entry whose catalog record stopped updating.
-    const next = { ...entry, expired: true };
-    state = { ...state, [entry.rfCode]: next };
-    write(entryKey(entry.rfCode), JSON.stringify(next));
-  });
-  sync();
 }

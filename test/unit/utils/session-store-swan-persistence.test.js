@@ -2,8 +2,9 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 import {
-  setNotificationScope, getEntry, upsertEntry, dismissEntry, notificationsReady,
+  getEntry, upsertEntry, dismissEntry, notificationsReady, setNotificationsReady,
 } from '../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from '../features/swan-notifications/mocks/notification-store.js';
 import { stopSessionStateTicker } from '../../../event-libs/v1/services/sessions/session-state-ticker.js';
 
 const EVENT_ID = 'test-notification-persistence';
@@ -78,11 +79,11 @@ describe('session-store: FEDS preserves cached dismissals until the schedule is 
     ['swan-notifications', 'tier-1-event-config'].forEach((name) => {
       document.head.querySelector(`meta[name="${name}"]`)?.remove();
     });
-    setNotificationScope(null, null, null);
   });
 
   it('hides cached counts during loading and preserves same-stage dismissal after primary-auth reconciliation', async () => {
-    setNotificationScope(EVENT_ID, 'test-attendee', API_URL);
+    await resetNotifications();
+    setNotificationsReady(false);
     upsertEntry(RF_CODE, { stage: 'live', title: 'Previously dismissed' });
     dismissEntry(RF_CODE);
     BlockMediator.set('imsProfile', { userId: 'test-attendee', account_type: 'type1' });

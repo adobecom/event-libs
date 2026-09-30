@@ -7,7 +7,7 @@ import { getRelativeTime, createTemplatedDateRange } from '../../utils/date-time
 import { getNowMs } from '../../utils/session-state.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
 import {
-  notifications, notificationsReady, markRead, markAllRead, dismissEntry, getEntries,
+  notifications, notificationsReady, markRead, markAllRead, dismissEntry, getEntries, flushNotifications,
 } from './notification-store.js';
 import { STAGE_COPY } from './swan-payload.js';
 import { waitForElement } from './gnav-wait.js';
@@ -156,8 +156,9 @@ function renderRow(entry, locale, timezone, onDismiss) {
   body.append(createTag('p', { class: 'swan-notif__time' }, getRelativeTime(entry.updatedAt, locale, getNowMs())));
   row.append(body);
 
-  function activate() {
+  async function activate() {
     markRead(entry.rfCode);
+    await flushNotifications();
     if (entry.actionUrl) window.location.href = entry.actionUrl;
   }
   row.addEventListener('click', activate);

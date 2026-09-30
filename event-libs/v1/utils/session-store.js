@@ -14,7 +14,6 @@ import {
 } from '../features/swan-notifications/swan-notifications.js';
 import { getSwanMode } from '../features/swan-notifications/swan-config.js';
 import { mountNotificationWidget } from '../features/swan-notifications/notification-widget.js';
-import { setNotificationScope } from '../features/swan-notifications/notification-store.js';
 import { logError, logWarning } from './lana-log.js';
 
 // Preact reads `.value` directly; non-Preact code uses `.subscribe()`/`.peek()`.
@@ -95,10 +94,6 @@ function syncAuth() {
     isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
     userFirstName: profile?.first_name ?? null,
   };
-  if (getSwanMode() === 'feds') {
-    const userId = auth.value.isLoggedIn ? (profile.userId || null) : null;
-    setNotificationScope(eventApiConfig.eventId, userId, eventApiConfig.apiUrl);
-  }
   // Gated on real login: an anonymous visitor's bell would render empty. Idempotent, so
   // re-firing on later profile updates is harmless. unc mode uses gnav's own bell instead.
   if (auth.value.isLoggedIn && getSwanMode() === 'feds') mountNotificationWidget();
