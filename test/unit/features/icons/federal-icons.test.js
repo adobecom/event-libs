@@ -194,6 +194,45 @@ describe('federal-icons — id collisions across inlined SVGs', () => {
   });
 });
 
+describe('federal-icons — concurrent callers share one in-flight fetch', () => {
+  let fetchSpy;
+  let fresh;
+
+  beforeEach(async () => {
+    // Fresh module instance so the per-namespace cache starts empty.
+    fresh = await import(`../../../../event-libs/v1/features/icons/federal-icons.js?t=${Math.random()}`);
+    fresh.setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+    fetchSpy = sinon.spy(window, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.restore();
+  });
+
+  it('fetches a track icon once when many cards request it in the same tick', async () => {
+    const svgs = await Promise.all([1, 2, 3].map(() => fresh.fetchFederalTrackIcon('branding')));
+    const brandingCalls = fetchSpy.getCalls().filter(({ args }) => String(args[0]).endsWith('/branding.svg'));
+    expect(brandingCalls).to.have.lengthOf(1);
+    expect(svgs.every((svg) => svg?.classList.contains('icon-federal-branding'))).to.equal(true);
+    expect(new Set(svgs).size).to.equal(3);
+  });
+
+  it('still gives each concurrent caller its own namespaced ids', async () => {
+    const [first, second] = await Promise.all([
+      fresh.fetchFederalProductIcon('frame-io-64'),
+      fresh.fetchFederalProductIcon('frame-io-64'),
+    ]);
+    expect(fetchSpy.callCount).to.equal(1);
+    expect(first.querySelector('clipPath').id).to.not.equal(second.querySelector('clipPath').id);
+  });
+
+  it('shares a concurrent miss too, without re-fetching', async () => {
+    const results = await Promise.all([1, 2].map(() => fresh.fetchFederalTrackIcon('not-a-track-icon')));
+    expect(results).to.deep.equal([null, null]);
+    expect(fetchSpy.callCount).to.equal(1);
+  });
+});
+
 describe('federal-icons — non-ok HTTP responses are reported to lana', () => {
   let fetchStub;
   let lanaLogStub;

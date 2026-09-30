@@ -67,23 +67,25 @@ async function fetchSvgFrom(url) {
 // Shared shape for all three federal namespaces below: cache (misses too, since federal has
 // no manifest and a miss would otherwise re-fetch every render), fetch, tag, optional
 // per-namespace transform, then a freshly id-namespaced clone per call.
+// The in-flight promise is cached (not the resolved SVG) so concurrent callers — e.g. many
+// cards mounting in the same tick — share one fetch/parse instead of each missing the cache.
 function createFederalIconFetcher(buildUrl, { transform } = {}) {
   const cache = new Map();
-  return async function fetchIcon(iconName) {
-    if (!iconName) return null;
-    if (cache.has(iconName)) {
-      const cached = cache.get(iconName);
-      return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
-    }
 
+  const loadMaster = async (iconName) => {
     const svg = await fetchSvgFrom(buildUrl(iconName));
     if (svg) {
       svg.classList.add('icon-federal', `icon-federal-${iconName}`);
       transform?.(svg);
     }
+    return svg;
+  };
 
-    cache.set(iconName, svg);
-    return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
+  return async function fetchIcon(iconName) {
+    if (!iconName) return null;
+    if (!cache.has(iconName)) cache.set(iconName, loadMaster(iconName));
+    const master = await cache.get(iconName);
+    return master ? namespaceSvgIds(master.cloneNode(true)) : null;
   };
 }
 
