@@ -71,6 +71,61 @@ describe('featured-sessions', () => {
     expect(new URL(img.src).pathname).to.equal('/media_1.png');
   });
 
+  it('never fetches the raw, unoptimized config image', async () => {
+    const rawUrl = `${window.location.origin}/featured-sessions-eager-check-${Date.now()}.png`;
+    const el = buildBlock({ entries: [entry({ imageUrl: rawUrl })] });
+    await init(el);
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+    const fetched = performance.getEntriesByType('resource').map(({ name }) => name);
+    expect(fetched).to.not.include(rawUrl);
+    expect(el.querySelector('.card-media picture')).to.exist;
+  });
+
+  it('attaches the cards only after the event-card and event-carousel CSS have loaded', async () => {
+    document.head.querySelectorAll('link[href$="/event-card.css"], link[href$="/event-carousel.css"]')
+      .forEach((link) => link.remove());
+
+    const el = buildBlock({ entries: [entry()] });
+    const sheetsAtAttach = [];
+    const observer = new MutationObserver(() => {
+      if (sheetsAtAttach.length || !el.querySelector('.event-card')) return;
+      ['event-card.css', 'event-carousel.css'].forEach((file) => {
+        sheetsAtAttach.push(!!document.head.querySelector(`link[href$="/${file}"]`)?.sheet);
+      });
+    });
+    observer.observe(el, { childList: true, subtree: true });
+
+    await init(el);
+    observer.disconnect();
+
+    expect(sheetsAtAttach).to.deep.equal([true, true]);
+  });
+
+  it('waits for a still-loading stylesheet <link> another block already inserted', async () => {
+    const cardCssHref = new URL('/event-libs/v1/c2/blocks/event-card/event-card.css', window.location.href).href;
+    document.head.querySelectorAll('link[href$="/event-card.css"]').forEach((link) => link.remove());
+    // No rel, so it never actually loads and its .sheet stays null until we fire 'load'.
+    const pending = document.createElement('link');
+    pending.href = cardCssHref;
+    document.head.append(pending);
+
+    const el = buildBlock({ entries: [entry()] });
+    const done = init(el);
+    try {
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      expect(!!el.querySelector('.event-card'), 'cards attached before CSS loaded').to.equal(false);
+      expect(document.head.querySelectorAll(`link[href="${cardCssHref}"]`).length).to.equal(1);
+    } finally {
+      pending.dispatchEvent(new Event('load'));
+      await done;
+      pending.remove();
+    }
+
+    expect(!!el.querySelector('.event-card')).to.equal(true);
+  });
+
   it('drops an entry with no imageUrl instead of rendering an imageless card', async () => {
     const el = buildBlock({
       entries: [entry(), entry({ sessionId: 'session-2', enTitle: 'No Image Session', imageUrl: '' })],

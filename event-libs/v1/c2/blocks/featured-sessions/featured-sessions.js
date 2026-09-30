@@ -1,8 +1,36 @@
-import { createTag } from '../../../utils/utils.js';
+import { createTag, loadStyle } from '../../../utils/utils.js';
 import { logError } from '../../../utils/lana-log.js';
 import { safeUrl } from '../sessions-guide/utils/url.js';
 import initEventCard from '../event-card/event-card.js';
 import initEventCarousel from '../event-carousel/event-carousel.js';
+
+// Same hrefs event-card.js/event-carousel.js pass to loadStyle(), so loadLink() dedupes them.
+const DEPENDENT_CSS_URLS = [
+  new URL('../event-card/event-card.css', import.meta.url).href,
+  new URL('../event-carousel/event-carousel.css', import.meta.url).href,
+];
+
+// Upper bound when reusing a <link> another block inserted: a failed stylesheet never gets a
+// .sheet and its error event may already have fired, so waiting on it alone could hang.
+const EXISTING_STYLE_TIMEOUT_MS = 3000;
+
+function whenStyleLoaded(href) {
+  return new Promise((resolve) => {
+    const existing = document.head.querySelector(`link[href="${href}"]`);
+    // loadLink() reports 'noop' for an existing <link> even while it's still loading.
+    if (existing && !existing.sheet) {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', resolve, { once: true });
+      setTimeout(resolve, EXISTING_STYLE_TIMEOUT_MS);
+      return;
+    }
+    loadStyle(href, resolve);
+  });
+}
+
+function loadDependentStyles() {
+  return Promise.all(DEPENDENT_CSS_URLS.map(whenStyleLoaded));
+}
 
 function setRoutingData(card, entry) {
   if (entry.sessionId) card.dataset.sessionId = entry.sessionId;
@@ -35,6 +63,14 @@ export function toRelativeMediaUrl(src) {
     return src;
   } catch {
     return src;
+  }
+}
+
+function toAbsoluteMediaUrl(src) {
+  try {
+    return new URL(toRelativeMediaUrl(src), window.location.href).href;
+  } catch {
+    return '';
   }
 }
 
@@ -88,8 +124,12 @@ export function formatSessionDateTime(sessionTime) {
 function buildAuthoredCard(entry, cta) {
   const card = createTag('div', { class: 'event-card media-square' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
-  if (entry.imageUrl) {
-    createTag('img', { src: toRelativeMediaUrl(entry.imageUrl), alt: '' }, '', { parent: mediaWrapper });
+  // Hand event-card.js the image URL as text rather than an <img src>: setting src on even
+  // a detached <img> starts an eager, full-size fetch that event-card.js then discards for
+  // its own lazy, width-optimized <picture>.
+  const imageUrl = entry.imageUrl ? toAbsoluteMediaUrl(entry.imageUrl) : '';
+  if (imageUrl) {
+    createTag('div', {}, '', { parent: mediaWrapper }).textContent = imageUrl;
   }
 
   const contentWrapper = createTag('div', {}, '', { parent: card });
@@ -125,6 +165,8 @@ export default async function init(el) {
     return;
   }
 
+  const stylesLoaded = loadDependentStyles();
+
   el.innerHTML = '';
   el.setAttribute('role', 'region');
   el.setAttribute('aria-label', 'Featured Sessions');
@@ -133,15 +175,20 @@ export default async function init(el) {
   const cards = entries.map((entry) => buildAuthoredCard(entry, config.cta));
   cards.forEach((card) => track.append(card));
 
-  const marker = createTag('div', { class: 'event-carousel' });
-  el.append(marker, track);
-
-  await Promise.all(cards.map((card) => initEventCard(card)));
+  // Hydrate the cards off-DOM and attach them only once their CSS is in, so they never paint
+  // unstyled. event-card.js builds the card (and drops imageless ones) synchronously, before
+  // its session-routing import, so that import doesn't need to hold up the attach.
+  const cardInits = cards.map((card) => initEventCard(card));
+  await stylesLoaded;
 
   if (!track.children.length) {
     el.remove();
+    await Promise.all(cardInits);
     return;
   }
 
-  await initEventCarousel(marker);
+  const marker = createTag('div', { class: 'event-carousel' });
+  el.append(marker, track);
+
+  await Promise.all([...cardInits, initEventCarousel(marker)]);
 }

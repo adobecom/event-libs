@@ -31,7 +31,8 @@ falls back to a built-in default ("Learn more" / "Watch now" / "Watch on-demand"
 
 For each entry, `init()` builds the same "pre-hydration" DOM shape
 `event-card.js`'s own `init()` already expects from hand-authored markup (a media
-wrapper with an `<img>`, a content wrapper with title/description/CTA `<p>`s), always
+wrapper holding the image URL as text, a content wrapper with title/description/CTA
+`<p>`s), always
 with the `media-square` (1:1) variant class, sets the session-routing `data-*`
 attributes (`data-session-id`, `data-mr-stream-id`, `data-watch-url`,
 `data-session-url`, `data-start-time-utc`, `data-end-time-utc`), then calls
@@ -39,6 +40,13 @@ attributes (`data-session-id`, `data-mr-stream-id`, `data-watch-url`,
 `session-routing.js` wiring verbatim. An entry with no `imageUrl` is dropped by
 `event-card.js`'s own existing rule ("a card with no image is not a valid authored
 card"), with no special-casing needed here.
+
+The image URL is passed as text rather than as an `<img src>` on purpose: setting `src`
+starts a fetch even on a detached `<img>`, so each card would eagerly download the
+original, full-size image only for `event-card.js` to discard it in favour of its own
+lazy, width-optimized `<picture>`. Absolute `*.aem.*`/`*.hlx.*` URLs are first rewritten
+to the current origin (`toRelativeMediaUrl()`), then resolved to an absolute URL so
+`event-card.js` can build an optimized picture from it.
 
 The description `<p>` (which `event-card.js` turns into `.card-description`) is the
 session's date/time, not its track — `formatSessionDateTime()` builds
@@ -76,3 +84,20 @@ Because this bypasses Milo's normal per-block CSS auto-load (the marker is built
 programmatically, not scanned from authored content), `event-carousel.js`'s own
 `init()` loads its stylesheet itself — the same reasoning `mobile-rider.js` uses for
 its own selfInit case in `event-marquee.js`.
+
+## Stylesheet loading
+
+`event-card.js` and `event-carousel.js` each call `loadStyle()` for their own CSS but
+don't wait for it, and Milo only awaits this block's own `featured-sessions.css`. To
+avoid painting unstyled cards (and the layout shift when their CSS lands), `init()`
+starts loading both stylesheets up front (same hrefs, so `loadLink()` dedupes them),
+hydrates the cards off-DOM in parallel, and appends the track and carousel marker only
+once both stylesheets have settled. It doesn't wait on the cards' `session-routing.js`
+import: `event-card.js` builds each card (and drops imageless ones) synchronously before
+that import. A stylesheet that fails to load resolves too, so a CSS error never leaves
+the block empty.
+
+If another block already inserted one of these `<link>`s and it's still loading,
+`loadLink()` would report `'noop'` straight away, so `init()` instead waits on that
+link's own `load`/`error` — capped at 3s, since a link that already failed never gets a
+`.sheet` and won't fire again.
