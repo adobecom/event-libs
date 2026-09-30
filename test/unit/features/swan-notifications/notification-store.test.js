@@ -256,7 +256,7 @@ describe('notification-store', () => {
   });
 
   describe('persistence', () => {
-    it('persists writes to a scoped per-entry v4 key', () => {
+    it('persists writes to a scoped per-entry v3 key', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
       const stored = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY));
       expect(stored.title).to.equal('First');
@@ -292,8 +292,8 @@ describe('notification-store', () => {
       expect(getEntry('RF-1').dismissed).to.equal(true);
     });
 
-    it('does not hydrate an unowned legacy v3 map or expose entries after logout', () => {
-      localStorage.setItem('swan-notification-state-v3', JSON.stringify({ 'RF-1': { stage: 'live', title: 'Legacy' } }));
+    it('does not hydrate unscoped state or expose entries after logout', () => {
+      localStorage.setItem('swan-notification-state-v3', JSON.stringify({ 'RF-1': { stage: 'live', title: 'Unscoped' } }));
       setNotificationScope(null, null, null);
       expect(getEntries()).to.have.lengthOf(0);
       setNotificationScope(...TEST_SCOPE);

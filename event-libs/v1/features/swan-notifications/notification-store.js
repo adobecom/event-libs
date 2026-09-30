@@ -2,7 +2,7 @@ import { signal, batch } from '../../deps/htm-preact.js';
 import { getNowMs } from '../../utils/session-state.js';
 import { logError } from '../../utils/lana-log.js';
 
-const LOCAL_STATE_PREFIX = 'swan-notification-state-v4:';
+const LOCAL_STATE_PREFIX = 'swan-notification-state-v3:';
 const STAGE_DISPLAY_PRIORITY = { live: 0, reminder: 1, 'on-demand': 2 };
 const STAGE_RANK = { reminder: 1, live: 2, 'on-demand': 3 };
 
@@ -144,7 +144,7 @@ export function batchNotifications(callback) {
   });
 }
 
-// No unscoped hydration: the legacy v3 map has no reliable event/attendee ownership.
+// Hydrate only after the event and attendee scope is known.
 export function setNotificationScope(eventId, userId, environment) {
   const next = eventId && userId && environment
     ? `${LOCAL_STATE_PREFIX}${encodeURIComponent(JSON.stringify([eventId, userId, environment]))}:`

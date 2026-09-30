@@ -203,7 +203,7 @@ default asset URL has been set yet) in
 
 ### FEDS persistence and dismissal
 
-FEDS uses `swan-notification-state-v4:` keys scoped by the Tier 1 event ID, signed-in
+FEDS uses `swan-notification-state-v3:` keys scoped by the Tier 1 event ID, signed-in
 IMS `userId`, and RainFocus API URL. The scope is selected before hydration; signing
 out or switching accounts hides the previous attendee's notifications immediately.
 The bell does not display cached rows or counts until a successful `myData` response
@@ -236,11 +236,8 @@ explicit successful re-add can clear it. Display expiry also retains a hidden st
 guard. On-demand eligibility ends three days after the session's end, rather than
 three days after its latest local write, preventing expiry/recreation loops.
 
-**Rollout:** the unscoped v3 map is left untouched but is not imported into v4: its
-event and attendee ownership cannot be established safely. Previously read/dismissed
-v3 notifications can therefore appear once during the transition. Subsequent actions
-persist in the scoped v4 keys. UNC's v2 tracking and engine-owned persistence are
-unchanged.
+The scoped format replaces the unpublished v3 implementation; no production schema
+migration is needed. UNC's v2 tracking and engine-owned persistence are unchanged.
 
 ## Verifying the chain end-to-end
 
