@@ -1,0 +1,98 @@
+{
+  "S2589": {
+    "severity": "MAJOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S5869": {
+    "severity": "MAJOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S2245": {
+    "severity": "MAJOR",
+    "softwareQuality": "SECURITY",
+    "impactSeverity": "MEDIUM",
+    "type": "VULNERABILITY"
+  },
+  "S3626": {
+    "severity": "MINOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "LOW",
+    "type": "CODE_SMELL"
+  },
+  "S3358": {
+    "severity": "MAJOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S1854": {
+    "severity": "MAJOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S4624": {
+    "severity": "MAJOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S3972": {
+    "severity": "CRITICAL",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "HIGH",
+    "type": "CODE_SMELL"
+  },
+  "S5843": {
+    "severity": "MAJOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S3735": {
+    "severity": "CRITICAL",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "HIGH",
+    "type": "CODE_SMELL"
+  },
+  "S1135": {
+    "severity": "INFO",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "INFO",
+    "type": "CODE_SMELL"
+  },
+  "S2486": {
+    "severity": "MINOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "LOW",
+    "type": "CODE_SMELL"
+  },
+  "S8786": {
+    "severity": "MAJOR",
+    "softwareQuality": "RELIABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S1134": {
+    "severity": "MAJOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S1871": {
+    "severity": "MAJOR",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "MEDIUM",
+    "type": "CODE_SMELL"
+  },
+  "S3776": {
+    "severity": "CRITICAL",
+    "softwareQuality": "MAINTAINABILITY",
+    "impactSeverity": "HIGH",
+    "type": "CODE_SMELL"
+  }
+}

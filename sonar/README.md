@@ -46,21 +46,26 @@ Confirmed on this codebase — 103 issues across 34 files at time of setup:
 - Subjective/human metrics (e.g. "code understandability" survey) —
   out of scope for any static tool
 
-## Report now includes Sonar Keys
+## Report now includes Sonar Keys and severity
 
 Each issue in `sonar/sonar-report.md` is annotated with its SonarSource
-RSPEC rule key (e.g. `S3776` for cognitive-complexity). This package
-does not expose severity (Blocker/Critical/Major/Minor) directly —
-only ESLint's own `error`/`warning` levels, which we've set uniformly
-to `error`.
+RSPEC rule key (e.g. `S3776`) **and** a severity classification
+(`BLOCKER`/`CRITICAL`/`MAJOR`/`MINOR`/`INFO`), and the report is sorted
+and summarized by severity. `eslint-plugin-sonarjs` itself doesn't
+ship severity data, so the generator script
+(`scripts/generate-sonar-report.js`) fetches it per rule key from
+SonarSource's public demo instance REST API and caches the result in
+`sonar/severity-cache.json` (committed, so subsequent runs and CI
+don't need network access for already-seen rules, and the report
+still generates — just without severity — if the API is unreachable).
 
-### Where to check severity for a given Sonar Key
+### Where the severity data comes from
 
 ⚠️ `rules.sonarsource.com` (SonarSource's old public rule catalog) was
 **decommissioned in early 2026** — links to it no longer resolve.
 
-Working alternative — SonarSource's public demo instance REST API
-(no login required), querying by rule key (`<lang>:<sonarKey>`):
+The generator script queries SonarSource's public demo instance REST
+API instead (no login required), by rule key (`<lang>:<sonarKey>`):
 
 ```
 https://next.sonarqube.com/sonarqube/api/rules/show?key=javascript:S3776
@@ -68,7 +73,8 @@ https://next.sonarqube.com/sonarqube/api/rules/show?key=javascript:S3776
 
 Returns JSON including the legacy `severity` field (e.g. `CRITICAL`)
 and the newer Clean Code `impacts` array (e.g.
-`{"softwareQuality":"MAINTAINABILITY","severity":"HIGH"}`).
+`{"softwareQuality":"MAINTAINABILITY","severity":"HIGH"}`) — both are
+cached per rule key in `sonar/severity-cache.json`.
 
 To browse the same thing visually in an actual browser (it's a JS
 app, so a plain fetch won't render it, but a real browser will):
@@ -81,6 +87,11 @@ This same information is also visible directly inside your own
 SonarQube/SonarCloud instance, if you have one, under the rule's
 detail view in the Quality Profile — that's the canonical source
 since severity can be overridden per project's Quality Profile.
+
+⚠️ Caveat: this is SonarSource's *public demo* instance, not an
+official rule-metadata API with a support contract — it's best-effort
+and could change without notice. The cache file exists specifically
+to reduce reliance on it staying up.
 
 ## Why not the official SonarLint product?
 
