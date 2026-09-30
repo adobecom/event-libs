@@ -98,6 +98,7 @@ export function MyFavoritesView() {
             title="Live sessions"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
             formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
+            resetKey=${activeDay}
           />
         </div>
       `}

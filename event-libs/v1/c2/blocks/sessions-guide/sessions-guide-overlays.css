@@ -376,6 +376,13 @@
   border: 2px solid var(--s2a-color-gray-300);
 }
 
+/* Figma: 16px here (Share keeps the shared 20px). Compound selector needed to outrank
+   .sg-icon-btn--lg .sg-icon-btn__icon, which ties on specificity but loses on source order. */
+.sg-icon-btn--lg.sg-detail__icon-btn--favorite .sg-icon-btn__icon {
+  width: 16px;
+  height: 16px;
+}
+
 .sg-detail__icon-btn:disabled,
 .sg-detail__icon-btn.is-loading {
   opacity: 0.5;
@@ -450,6 +457,7 @@
   letter-spacing: 0.16px;
   color: var(--s2a-color-content-default);
   margin: 0;
+  white-space: pre-line;
 }
 
 .sg-detail__more-icon {
@@ -783,6 +791,13 @@
 @media (max-width: 767px) {
   .sg-filter-panel {
     --sg-filter-panel-pad: var(--s2a-spacing-lg);
+  }
+}
+
+/* Milo's section z-index: 3 traps the panel below the nav; lift it while open. */
+@media (max-width: 1279px) {
+  .section.rounded-corners-top:has(.sg-filter-panel) {
+    z-index: 11;
   }
 }
 

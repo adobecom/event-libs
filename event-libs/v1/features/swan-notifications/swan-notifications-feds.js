@@ -7,8 +7,11 @@
 // and notification-widget.js for what actually renders these entries.
 import { getSwanConfig } from './swan-config.js';
 import { calculateSessionTimes, buildNotificationEntry } from './swan-payload.js';
-import { upsertNotification, removeNotification } from './notification-display.js';
-import { getEntry, getEntries, pruneStale } from './notification-store.js';
+import { upsertNotification } from './notification-display.js';
+import {
+  getEntry, getEntries, pruneStale, daysToMs, removeEntry, setNotificationsReady,
+  batchNotifications, allowNotification, wasNotificationRemoved,
+} from './notification-store.js';
 import { getNowMs } from '../../utils/session-state.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
 
@@ -40,15 +43,26 @@ function applyStage(session, swanConfig, now) {
   }
   const stage = desiredStage(timingProperties, now);
   if (!stage) return;
+  // Expiry is anchored to session time, not the last write: deleting an expired
+  // entry must not make the next tick eligible to create it again.
+  if (stage === 'on-demand'
+    && now - timingProperties.triggerOnDemandBadgeTime > daysToMs(swanConfig.localNotificationPersistTillDays, 3)) {
+    removeEntry(session.rfCode);
+    return;
+  }
   const existing = getEntry(session.rfCode);
+  if (wasNotificationRemoved(session.rfCode)) return;
   if (existing && STAGE_RANK[existing.stage] >= STAGE_RANK[stage]) return;
 
-  upsertNotification(session.rfCode, buildNotificationEntry(session, stage, swanConfig));
+  const entry = buildNotificationEntry(session, stage, swanConfig);
+  if (swanConfig.eventId) entry.eventId = swanConfig.eventId;
+  upsertNotification(session.rfCode, entry);
 }
 
 export function notifySessionScheduled(session) {
   if (!session?.rfCode) return;
   try {
+    allowNotification(session.rfCode);
     applyStage(session, getSwanConfig(), getNowMs());
   } catch (err) {
     logError('swan-notifications-feds', `notifySessionScheduled failed for ${session.rfCode}`, err);
@@ -58,7 +72,7 @@ export function notifySessionScheduled(session) {
 export function notifySessionUnscheduled(session) {
   if (!session?.rfCode) return;
   try {
-    removeNotification(session.rfCode);
+    removeEntry(session.rfCode);
   } catch (err) {
     logError('swan-notifications-feds', `notifySessionUnscheduled failed for ${session.rfCode}`, err);
   }
@@ -68,18 +82,17 @@ export function notifySessionUnscheduled(session) {
 // matching session-state-ticker.js's/poller.js's existing convention, so this module has no
 // dependency on session-store.js and can't form a circular import.
 //
-// This whole pass is synchronous end to end (no await point anywhere in it), so two calls
-// can never interleave and race the same localStorage write.
-//
-// isScheduleKnown gates orphan cleanup only: session-state-ticker.js's onTick fires once
+// isScheduleKnown gates rendering: session-state-ticker.js's onTick fires once
 // immediately and synchronously as soon as the session catalog loads, which can (and does,
 // in practice) happen before session-store.js's own separate myData fetch has resolved and
 // populated the real scheduled set — an empty getScheduled() at that moment is indistinguishable
 // from "genuinely nothing scheduled" otherwise, and every previously-persisted entry would be
 // wiped out as "orphaned," only to reappear moments later marked unread again once the real
-// schedule loads and re-creates them. Stage progression for whatever *is* in getScheduled() is
-// still safe to run regardless — it's a no-op when the set is empty, never destructive.
-export function reconcileSwanNotifications(getSessions, getScheduled, isScheduleKnown) {
+// schedule loads and re-creates them. Cleanup runs only against a fresh authoritative
+// schedule, never a ticker's increasingly stale tab-local snapshot.
+export function reconcileSwanNotifications(getSessions, getScheduled, isScheduleKnown, {
+  refreshSchedule = false,
+} = {}) {
   try {
     const swanConfig = getSwanConfig();
     const now = getNowMs();
@@ -90,16 +103,22 @@ export function reconcileSwanNotifications(getSessions, getScheduled, isSchedule
       // check) can't be reconciled — skip rather than throw.
       .filter(Boolean);
     const scheduledRfCodes = new Set(scheduledSessions.map((s) => s.rfCode));
+    const catalogRfCodes = new Set([...sessionsById.values()].map((session) => session.rfCode));
 
-    scheduledSessions.forEach((session) => applyStage(session, swanConfig, now));
-
-    if (isScheduleKnown?.()) {
-      getEntries()
-        .filter((entry) => !scheduledRfCodes.has(entry.rfCode))
-        .forEach((entry) => removeNotification(entry.rfCode));
-    }
-
-    pruneStale(now, swanConfig.localNotificationPersistTillDays, swanConfig.notificationExpirationDays);
+    batchNotifications(() => {
+      if (refreshSchedule && isScheduleKnown?.()) {
+        scheduledSessions.forEach((session) => allowNotification(session.rfCode));
+        getEntries()
+          .filter((entry) => !scheduledRfCodes.has(entry.rfCode)
+            && (entry.eventId
+              ? entry.eventId === swanConfig.eventId
+              : catalogRfCodes.has(entry.rfCode)))
+          .forEach((entry) => removeEntry(entry.rfCode));
+      }
+      scheduledSessions.forEach((session) => applyStage(session, swanConfig, now));
+      pruneStale(now, swanConfig.localNotificationPersistTillDays, swanConfig.notificationExpirationDays);
+    });
+    if (isScheduleKnown?.()) setNotificationsReady(true);
   } catch (err) {
     logError('swan-notifications-feds', 'reconcile failed', err);
   }

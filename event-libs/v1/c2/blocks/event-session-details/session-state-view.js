@@ -172,7 +172,7 @@ function renderWatchNow() {
 }
 
 export function mountSessionState({
-  statusSlot, primaryCtaSlot, ccEl, statusLabels = DEFAULT_STATUS_LABELS,
+  statusSlot, primaryCtaSlot, ccEl, shareEl, statusLabels = DEFAULT_STATUS_LABELS,
 }) {
   const slots = getAllSessionTimes();
 
@@ -183,7 +183,10 @@ export function mountSessionState({
     let ipodTimer = null;
     const renderIpod = () => {
       if (statusSlot) statusSlot.replaceChildren(renderStatus(null, slots[0], statusLabels));
-      if (ccEl) ccEl.hidden = !hasPlayableVideo();
+      const available = hasPlayableVideo();
+      if (ccEl) ccEl.hidden = !available;
+      // Nothing to share until the recording unlocks.
+      if (shareEl) shareEl.hidden = !available;
       // Re-render at the DVR unlock so "Available soon" flips to "On-demand" without a reload.
       const now = getNowMs();
       const unlockMs = dvrAvailableAtMs(ipodSession, getEventStartMs());

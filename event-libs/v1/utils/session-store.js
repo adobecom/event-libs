@@ -48,8 +48,7 @@ let realAuthConfirmed = false;
 let rfAuthToken = null;
 let rfAuthTokenStarted = false;
 let rfAuthTokenSettled = false;
-// True once `scheduled` reflects a real (fetched or never-coming) answer, not just its empty
-// initial value — gates SWAN's orphan cleanup so empty doesn't mean "nothing scheduled" early.
+// Only a successful myData response is authoritative for notification cleanup.
 let scheduleKnown = false;
 // True once the real isRegistered has landed, so loadMyData()'s fallback can't overwrite it.
 let realRegistrationKnown = false;
@@ -109,7 +108,6 @@ function syncAuth() {
   } else {
     // Not logged in (or no userId) is itself a final answer, not "still don't know."
     rfAuthTokenSettled = true;
-    scheduleKnown = true;
     maybeLoadMyData();
   }
 }
@@ -153,12 +151,13 @@ async function loadMyData() {
     });
     scheduleKnown = true;
     // Reconcile now rather than waiting for the next ticker interval.
-    reconcileSwanNotifications(() => sessions.value, () => scheduled.value, () => scheduleKnown);
+    reconcileSwanNotifications(
+      () => sessions.value, () => scheduled.value, () => scheduleKnown, { refreshSchedule: true },
+    );
   } catch (err) {
     logError('session-store,my-data', 'myData fetch failed', err);
     // A failed fetch is still a final answer — isRegistered must not stay undefined.
     if (!realRegistrationKnown) auth.value = { ...auth.value, isRegistered: null };
-    scheduleKnown = true;
   }
 }
 
@@ -173,7 +172,6 @@ function maybeLoadMyData() {
     // null, not undefined, so isAuthResolved() doesn't spin forever.
     logWarning('session-store,my-data', 'no RF auth token — skipping myData, falling back for registration status');
     if (!realRegistrationKnown) auth.value = { ...auth.value, isRegistered: null };
-    scheduleKnown = true;
     return;
   }
   loadMyData();

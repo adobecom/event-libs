@@ -2,12 +2,14 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { upsertNotification, removeNotification } from '../../../../event-libs/v1/features/swan-notifications/notification-display.js';
 import { getEntry, getEntries, removeEntry } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from './mocks/notification-store.js';
 
 function clearStore() {
   getEntries().forEach((entry) => removeEntry(entry.rfCode));
 }
 
 describe('notification-display', () => {
+  beforeEach(resetNotifications);
   afterEach(() => {
     clearStore();
     sinon.restore();

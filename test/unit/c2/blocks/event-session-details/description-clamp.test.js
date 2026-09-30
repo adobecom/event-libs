@@ -20,6 +20,28 @@ describe('Description "More" Clamp', () => {
     expect(renderDescriptionClamp()).to.be.null;
   });
 
+  it('keeps plain-text line breaks and renders them via pre-line', () => {
+    setMetadata('event-details', 'Intro line.\n\nKey takeaways:\\n- One\r\n- Two');
+    const body = renderDescriptionClamp().querySelector('.session-description-text');
+    expect(body.classList.contains('is-plain-text')).to.be.true;
+    expect(body.textContent).to.equal('Intro line.\n\nKey takeaways:\n- One\n- Two');
+  });
+
+  it('renders plain text literally rather than parsing it as HTML', () => {
+    setMetadata('event-details', 'Use a < b & c > d');
+    const body = renderDescriptionClamp().querySelector('.session-description-text');
+    expect(body.textContent).to.equal('Use a < b & c > d');
+    expect(body.children.length).to.equal(0);
+  });
+
+  it('renders authored HTML as markup without the plain-text modifier', () => {
+    setMetadata('event-details', 'Intro<br>Line two with <strong>bold</strong>');
+    const body = renderDescriptionClamp().querySelector('.session-description-text');
+    expect(body.classList.contains('is-plain-text')).to.be.false;
+    expect(body.querySelector('br')).to.exist;
+    expect(body.querySelector('strong').textContent).to.equal('bold');
+  });
+
   it('starts collapsed and the toggle flips expanded state + label', () => {
     setMetadata('event-details', 'Long description text.');
     const el = renderDescriptionClamp();

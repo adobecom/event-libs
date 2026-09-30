@@ -67,17 +67,19 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
 
 .swan-notif__badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: -2px;
+  right: -2px;
+  box-sizing: border-box;
   min-width: 16px;
   height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
+  padding: 0 2px;
+  border: 2px solid var(--s2a-color-gray-25, #fff);
+  border-radius: 999px;
   background: var(--s2a-color-red-900, #d73220);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 12px;
   text-align: center;
 }
 
@@ -350,14 +352,18 @@ header.global-navigation:has(.feds-popup.is-open:not(.small-menu)) .swan-notif__
   height: 15px;
   padding: 0 4px;
   border-radius: 2px;
-  font-size: 12px;
-  font-weight: 400;
+  font-family: var(--s2a-font-family-adobe-clean, 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
-.swan-notif__pill--live { background: #d31510; color: #fff; }
-.swan-notif__pill--reminder { background: #f68511; color: #000; }
-.swan-notif__pill--on-demand { background: var(--s2a-color-gray-600, #717171); color: #fff; }
+.swan-notif__pill--live { background: var(--s2a-color-brand-adobe-red, #eb1000); color: #fff; }
+.swan-notif__pill--reminder { background: #ddd; color: #000; }
+.swan-notif__pill--on-demand { background: var(--s2a-color-gray-1000, #000); color: #fff; }
 
 .swan-notif__empty {
   padding: 24px 20px;

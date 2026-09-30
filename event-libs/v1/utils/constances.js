@@ -189,8 +189,11 @@ export const FALLBACK_LOCALES = {
 };
 export const LATEST_VERSION = 'v1';
 export const PHONE_FIELD_RE = /phone/i;
-export const BACKEND_PHONE_RE = /^[+\d\s\-().]+$/;
-export const PHONE_PATTERN = BACKEND_PHONE_RE.source;
+// Single source of truth for phone validation; mirrors the backend PhoneNumberInput pattern.
+// Keep it a string, not a regex literal: the DOM compiles an input's `pattern` with the
+// RegExp `v` flag, where `(` and `)` inside a character class must be escaped, and ESLint's
+// no-useless-escape would strip exactly those escapes from a literal.
+export const PHONE_PATTERN = '^[+\\d\\s\\-\\(\\).]+$';
 export const STANDARD_FIELD_MAX_LENGTHS = {
   firstName: 30,
   lastName: 30,
