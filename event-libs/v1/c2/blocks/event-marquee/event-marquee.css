@@ -58,7 +58,11 @@
   :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
     top: calc(var(--s2a-spacing-3xl) + var(--s2a-spacing-xl));
     bottom: auto;
-    right: max(0px, calc((100vw - 1920px) / 2));
+
+    /* Pin to the centered 1920px content box's right edge (subtract the centring gutter
+       (100vw - 1920px) / 2 from the viewport right), plus a fixed inset so the button doesn't
+       touch the very edge. Clamped so it never goes off-screen below 1920px. */
+    right: calc(max(0px, (100vw - 1920px) / 2) + var(--s2a-spacing-xl));
   }
 }
 
