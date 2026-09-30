@@ -554,7 +554,18 @@ export default async function init(el) {
           BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
           window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
         }
-        if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
+        const nowWinning = isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist);
+        // TEMP DEBUG - DVR->ON_DEMAND swap diagnosis
+        // eslint-disable-next-line no-console
+        console.log('[svp] phase-change transition', {
+          insidePlaylist: isInsidePlaylistContainer(el),
+          previousPhase,
+          phase,
+          nowWinning,
+          isHidden: el.classList.contains('session-video-hidden'),
+          hasExistingPlayer: !!el.querySelector('.mobile-rider, .milo-video'),
+        });
+        if (nowWinning) {
           preconnectVideoProvider(video.provider);
           loadVideoPlayer(el, sessionId, video);
         }
