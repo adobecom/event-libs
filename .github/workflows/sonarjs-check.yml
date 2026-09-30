@@ -1,0 +1,24 @@
+name: SonarJS Code Quality
+on:
+  pull_request:
+    branches:
+      - dev
+    types: [opened, synchronize, reopened]
+jobs:
+  sonarjs:
+    name: Running sonarjs quality check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run sonarjs check
+      run: npm run lint:sonar

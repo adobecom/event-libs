@@ -61,7 +61,9 @@ if (!existsSync(sonarDir)) mkdirSync(sonarDir);
 writeFileSync(path.join(sonarDir, 'sonar-report.md'), out);
 console.log(`sonar/sonar-report.md updated: ${total} issues across ${files.length} files.`);
 
-// Surface the human-readable eslint output too (non-zero exit is expected).
-spawnSync('npx', ['eslint', '--config', 'eslint.sonar.config.js', 'event-libs/**/*.js'], {
+// Surface the human-readable eslint output and propagate its exit code so
+// CI (and local runs) fail when sonarjs issues are present.
+const readable = spawnSync('npx', ['eslint', '--config', 'eslint.sonar.config.js', 'event-libs/**/*.js'], {
   cwd: repoRoot, stdio: 'inherit', shell: false,
 });
+process.exitCode = readable.status ?? 0;
