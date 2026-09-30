@@ -194,6 +194,42 @@ describe('federal-icons — id collisions across inlined SVGs', () => {
   });
 });
 
+// MWPW-209382: Adobe Aqua rendered without its clipped petal art. Its clip-path is declared
+// in an inline <style> (.st2 { clip-path: url(#clippath-1) }), which the id rewrite missed,
+// and its generic .stN classes leak page-wide once inlined.
+describe('federal-icons — <style>-declared references and classes', () => {
+  before(() => {
+    setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+  });
+
+  it('rewrites url(#id) references inside <style> to the new id', async () => {
+    const svg = await fetchFederalProductIcon('projectaqua-appicon-64');
+    const clipId = svg.querySelector('clipPath').id;
+    expect(clipId).to.match(/^clippath-1-fedicon\d+$/);
+    expect(svg.querySelector('style').textContent).to.include(`url(#${clipId})`);
+    expect(svg.querySelector('style').textContent).to.not.include('url(#clippath-1)');
+  });
+
+  it('namespaces <style> classes and the elements using them, keeping unrelated classes', async () => {
+    const svg = await fetchFederalProductIcon('projectaqua-appicon-64');
+    const styleText = svg.querySelector('style').textContent;
+    const path = svg.querySelector('path');
+    const [st4, other] = path.getAttribute('class').split(' ');
+    expect(st4).to.match(/^st4-fedicon\d+$/);
+    expect(other).to.equal('keep-me');
+    expect(styleText).to.include(`.${st4}`);
+    expect(styleText).to.include('opacity: 0.5');
+    expect(styleText).to.not.match(/\.st\d\s*\{/);
+  });
+
+  it('gives two clones of a <style> icon independent class names', async () => {
+    const first = await fetchFederalProductIcon('projectaqua-appicon-64');
+    const second = await fetchFederalProductIcon('projectaqua-appicon-64');
+    expect(first.querySelector('g').getAttribute('class'))
+      .to.not.equal(second.querySelector('g').getAttribute('class'));
+  });
+});
+
 describe('federal-icons — concurrent callers share one in-flight fetch', () => {
   let fetchSpy;
   let fresh;
