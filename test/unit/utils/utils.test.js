@@ -2,8 +2,35 @@ import { expect } from '@esm-bundle/chai';
 
 import {
   getValidCampaignIdFromUrl, resolveRoutedCampaignId, resetCampaignMapCache, getRsvpToken,
-  shouldForceGuestSignIn, safeUrl, isNonProdHost,
+  shouldForceGuestSignIn, safeUrl, isNonProdHost, normalizeMultilineText,
 } from '../../../event-libs/v1/utils/utils.js';
+
+describe('normalizeMultilineText', () => {
+  it('returns an empty string for empty input', () => {
+    expect(normalizeMultilineText(undefined)).to.equal('');
+    expect(normalizeMultilineText('')).to.equal('');
+  });
+
+  it('keeps real newlines and unifies CRLF / CR', () => {
+    expect(normalizeMultilineText('a\r\nb\rc\nd')).to.equal('a\nb\nc\nd');
+  });
+
+  it('converts literal "\\n" / "\\r\\n" escapes to newlines', () => {
+    expect(normalizeMultilineText('Intro\\n\\nKey takeaways:\\r\\n- One')).to.equal('Intro\n\nKey takeaways:\n- One');
+  });
+
+  it('turns real and literal tabs into spaces', () => {
+    expect(normalizeMultilineText('a\tb\\tc')).to.equal('a b c');
+  });
+
+  it('drops trailing spaces before a break, caps blank lines at one, and trims', () => {
+    expect(normalizeMultilineText('  a   \n\n\n\nb  ')).to.equal('a\n\nb');
+  });
+
+  it('leaves single-line copy untouched', () => {
+    expect(normalizeMultilineText('How do you embrace new technology?')).to.equal('How do you embrace new technology?');
+  });
+});
 
 function mockCampaignMap(rules) {
   window.fetch = async (url) => {
