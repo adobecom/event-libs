@@ -797,7 +797,9 @@
    position: relative, which creates a stacking context that traps this panel's
    z-index: 200 below the global nav's sticky z-index: 10, no matter how high we
    push it here. Lift that ancestor above the nav only while the takeover panel
-   (mobile/tablet) is open so it can't be covered by or overlap the nav. */
+   (mobile/tablet) is open so it can't be covered by or overlap the nav.
+   :has() is already relied on elsewhere in this codebase (e.g. event-marquee,
+   session-broadcast), so no fallback is needed for supported browsers. */
 @media (max-width: 1279px) {
   .section.rounded-corners-top:has(.sg-filter-panel) {
     z-index: 11;
