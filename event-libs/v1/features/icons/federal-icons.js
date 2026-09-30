@@ -20,28 +20,57 @@ function resolveFederalRoot() {
   return PROD_ROOT;
 }
 
-// Rewrites cloned SVG ids per instance to avoid id collisions between inlined icons.
+// Rewrites cloned SVG ids and <style> classes per instance, since inlined icons share one
+// document and Illustrator exports reuse generic names (clippath-1, .st0) across icons.
 let nextSvgIdSuffix = 0;
+
+const URL_REF_RE = /url\(\s*['"]?#([^'")\s]+)['"]?\s*\)/g;
+const CLASS_SELECTOR_RE = /\.(-?[_a-zA-Z][\w-]*)/g;
 
 function namespaceSvgIds(svg) {
   const idEls = [...svg.querySelectorAll('[id]')];
-  if (!idEls.length) return svg;
+  const styleEls = [...svg.querySelectorAll('style')];
+  if (!idEls.length && !styleEls.length) return svg;
 
   nextSvgIdSuffix += 1;
   const suffix = `-fedicon${nextSvgIdSuffix}`;
   const idMap = new Map(idEls.map((el) => [el.id, `${el.id}${suffix}`]));
   idEls.forEach((el) => { el.id = idMap.get(el.id); });
 
+  const rewriteUrlRefs = (text) => text.replace(
+    URL_REF_RE,
+    (match, id) => (idMap.has(id) ? `url(#${idMap.get(id)})` : match),
+  );
+
+  // Only selectors (text before each "{") are scanned for classes, so values like
+  // url(foo.svg) or 0.5 are never mistaken for class names.
+  const classMap = new Map();
+  styleEls.forEach((styleEl) => {
+    styleEl.textContent = rewriteUrlRefs(styleEl.textContent).replace(
+      /([^{}]+)\{/g,
+      (match, selector) => `${selector.replace(CLASS_SELECTOR_RE, (m, cls) => {
+        if (!classMap.has(cls)) classMap.set(cls, `${cls}${suffix}`);
+        return `.${classMap.get(cls)}`;
+      })}{`,
+    );
+  });
+
   // Covers every id-referencing attribute (url(#id), href/xlink:href) rather than a fixed allowlist.
   svg.querySelectorAll('*').forEach((el) => {
     [...el.attributes].forEach(({ name, value }) => {
-      const urlMatch = value.match(/^url\(#(.+)\)$/);
-      if (urlMatch && idMap.has(urlMatch[1])) {
-        el.setAttribute(name, `url(#${idMap.get(urlMatch[1])})`);
+      if (name === 'class') {
+        if (classMap.size) {
+          el.setAttribute(name, value.split(/\s+/).map((cls) => classMap.get(cls) || cls).join(' '));
+        }
         return;
       }
       if (/^(xlink:)?href$/.test(name) && value.startsWith('#') && idMap.has(value.slice(1))) {
         el.setAttribute(name, `#${idMap.get(value.slice(1))}`);
+        return;
+      }
+      if (value.includes('url(')) {
+        const rewritten = rewriteUrlRefs(value);
+        if (rewritten !== value) el.setAttribute(name, rewritten);
       }
     });
   });
