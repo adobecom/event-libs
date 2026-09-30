@@ -2,7 +2,7 @@
 // Runs the local Sonar-style (eslint-plugin-sonarjs) check and regenerates
 // sonar-report.md at the repo root. Invoked via `npm run lint:sonar`.
 import { spawnSync } from 'child_process';
-import { writeFileSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -56,8 +56,10 @@ files.forEach((f) => {
   out += '\n';
 });
 
-writeFileSync(path.join(repoRoot, 'sonar-report.md'), out);
-console.log(`sonar-report.md updated: ${total} issues across ${files.length} files.`);
+const sonarDir = path.join(repoRoot, 'sonar');
+if (!existsSync(sonarDir)) mkdirSync(sonarDir);
+writeFileSync(path.join(sonarDir, 'sonar-report.md'), out);
+console.log(`sonar/sonar-report.md updated: ${total} issues across ${files.length} files.`);
 
 // Surface the human-readable eslint output too (non-zero exit is expected).
 spawnSync('npx', ['eslint', '--config', 'eslint.sonar.config.js', 'event-libs/**/*.js'], {
