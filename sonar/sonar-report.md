@@ -3,8 +3,8 @@
 Generated via `npm run lint:sonar` (eslint-plugin-sonarjs) on 2026-09-30.
 
 - Files scanned: 223
-- Files with issues: 34
-- Total issues: 103
+- Files with issues: 32
+- Total issues: 101
 
 ## Issues by rule
 
@@ -12,11 +12,11 @@ Generated via `npm run lint:sonar` (eslint-plugin-sonarjs) on 2026-09-30.
 |---|---|
 | `sonarjs/cognitive-complexity` | 30 |
 | `sonarjs/no-nested-conditional` | 28 |
-| `sonarjs/no-nested-template-literals` | 10 |
 | `sonarjs/super-linear-regex` | 9 |
+| `sonarjs/no-nested-template-literals` | 9 |
 | `sonarjs/pseudo-random` | 6 |
 | `sonarjs/no-ignored-exceptions` | 5 |
-| `sonarjs/no-gratuitous-expressions` | 4 |
+| `sonarjs/no-gratuitous-expressions` | 3 |
 | `sonarjs/fixme-tag` | 3 |
 | `sonarjs/duplicates-in-character-class` | 1 |
 | `sonarjs/no-same-line-conditional` | 1 |
@@ -46,10 +46,6 @@ Generated via `npm run lint:sonar` (eslint-plugin-sonarjs) on 2026-09-30.
 ### `event-libs/session-guide-configurator/components/SwimlaneOrderEditor.js`
 
 - L137:30 `sonarjs/no-gratuitous-expressions` — This always evaluates to truthy. Consider refactoring this code.
-
-### `event-libs/tier-1-event-configurator/components/FeaturedSessionsEditor.js`
-
-- L235:30 `sonarjs/no-gratuitous-expressions` — This always evaluates to truthy. Consider refactoring this code.
 
 ### `event-libs/tier-1-event-configurator/pages/ConfigEditor.js`
 
@@ -97,10 +93,6 @@ Generated via `npm run lint:sonar` (eslint-plugin-sonarjs) on 2026-09-30.
 - L1644:49 `sonarjs/cognitive-complexity` — Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.
 - L1731:8 `sonarjs/no-nested-conditional` — Extract this nested ternary operation into an independent statement.
 - L1761:16 `sonarjs/cognitive-complexity` — Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed.
-
-### `event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js`
-
-- L81:61 `sonarjs/no-nested-template-literals` — Refactor this code to not use nested template literals.
 
 ### `event-libs/v1/c2/blocks/mobile-rider/mobile-rider.js`
 
