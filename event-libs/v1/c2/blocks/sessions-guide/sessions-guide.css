@@ -159,6 +159,14 @@
   box-sizing: border-box;
 }
 
+/* .sg-portal's own z-index creates a stacking context that otherwise traps
+   .sg-drawer/.sg-header (z-index: 50/60) below the global nav's z-index: 10,
+   no matter how high those inner values go. Lift the whole portal above the
+   nav while the drawer is actually open (not just present + inert). */
+.sg-portal:has(.sg-drawer:not([inert])) {
+  z-index: 11;
+}
+
 .sg-portal *,
 .sg-portal *::before,
 .sg-portal *::after {
