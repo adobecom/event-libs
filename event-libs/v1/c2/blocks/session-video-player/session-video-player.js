@@ -554,6 +554,10 @@ export default async function init(el) {
           BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
           window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
         }
+        // The winning instance can flip between phases: DVR_BUFFER has no playlist (outside
+        // instance wins), ON_DEMAND renders the playlist (inside instance wins). Re-evaluate and
+        // act on both directions so the swap is clean — otherwise the now-losing DVR player stays
+        // visible and the now-winning MPC loads into a still-hidden container.
         const nowWinning = isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist);
         // TEMP DEBUG - DVR->ON_DEMAND swap diagnosis
         // eslint-disable-next-line no-console
@@ -566,8 +570,14 @@ export default async function init(el) {
           hasExistingPlayer: !!el.querySelector('.mobile-rider, .milo-video'),
         });
         if (nowWinning) {
+          el.classList.remove('session-video-hidden');
           preconnectVideoProvider(video.provider);
           loadVideoPlayer(el, sessionId, video);
+        } else {
+          el.querySelector('.mobile-rider')?.remove();
+          el.querySelector('.milo-video')?.remove();
+          delete el.dataset.embedded;
+          hideLosingInstance(el);
         }
       }
       return;
