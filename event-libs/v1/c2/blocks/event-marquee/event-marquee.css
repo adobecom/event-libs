@@ -58,6 +58,7 @@
   :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
     top: calc(var(--s2a-spacing-3xl) + var(--s2a-spacing-xl));
     bottom: auto;
+    right: max(0px, calc((100vw - 1920px) / 2));
   }
 }
 
