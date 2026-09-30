@@ -457,6 +457,7 @@
   letter-spacing: 0.16px;
   color: var(--s2a-color-content-default);
   margin: 0;
+  white-space: pre-line;
 }
 
 .sg-detail__more-icon {

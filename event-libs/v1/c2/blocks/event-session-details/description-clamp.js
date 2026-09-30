@@ -1,8 +1,20 @@
-import { createTag, getMetadata } from '../../../utils/utils.js';
+import { createTag, getMetadata, normalizeMultilineText } from '../../../utils/utils.js';
 
 const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+const HTML_TAG = /<\/?[a-z][^>]*>/i;
+
 let instances = 0;
+
+// Authored HTML keeps its own structure; plain text keeps its line breaks via `pre-line`.
+function createDescriptionBody(raw, id) {
+  if (HTML_TAG.test(raw)) {
+    return createTag('p', { class: 'session-description-text', id }, raw);
+  }
+  const body = createTag('p', { class: 'session-description-text is-plain-text', id });
+  body.textContent = normalizeMultilineText(raw);
+  return body;
+}
 
 export function renderDescriptionClamp(doc = document) {
   const text = (getMetadata('event-details', doc) || '').trim();
@@ -11,7 +23,7 @@ export function renderDescriptionClamp(doc = document) {
   const el = createTag('div', { class: 'session-description' });
   instances += 1;
   const textId = `session-description-text-${instances}`;
-  const body = createTag('p', { class: 'session-description-text', id: textId }, text);
+  const body = createDescriptionBody(text, textId);
 
   const toggle = createTag('button', {
     class: 'session-description-toggle',

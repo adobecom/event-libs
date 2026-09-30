@@ -341,6 +341,14 @@ Reads the full session abstract from the `event-details` metadata — **not** th
 The description collapses to `--desc-lines` (6) via a native `line-clamp`, with a Show
 more/less toggle. No character-count truncation — line-based, so it stays responsive.
 
+**Line breaks.** Plain-text metadata is run through `normalizeMultilineText()` (CRLF and
+literal `\n` / `\t` escapes → real newlines / spaces), set via `textContent`, and rendered
+with `white-space: pre-line` (`.is-plain-text`), so authored paragraph and list breaks show
+as soon as the metadata carries them. Metadata containing HTML tags is rendered as markup
+instead, without `pre-line`. The Sessions Guide detail overlay and Session Broadcast info
+panel apply the same normalization (in `sessions-api.js`) and `pre-line` rule to catalog
+descriptions.
+
 The clamp's **automatic ellipsis is the affordance**. It replaced an earlier
 gradient-fade-to-card: fading otherwise-legible text pushes it under the 4.5:1 contrast
 minimum (WCAG 1.4.3), while the ellipsis renders at full contrast. Same `-webkit-box` +
