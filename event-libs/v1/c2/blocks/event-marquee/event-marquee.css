@@ -40,9 +40,6 @@
   object-fit: cover;
 }
 
-/* Milo's video block wraps the ambient video in a `.video-container` that defaults to
-   `width: fit-content; margin: auto`, which shrinks it and stops the background filling the
-   screen. Force it full-bleed here (matching router-marquee's full-width background video). */
 .event-marquee-background .video-container {
   width: 100%;
   height: 100%;
@@ -58,10 +55,6 @@
   :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
     top: calc(var(--s2a-spacing-3xl) + var(--s2a-spacing-xl));
     bottom: auto;
-
-    /* Pin to the centered 1920px content box's right edge (subtract the centring gutter
-       (100vw - 1920px) / 2 from the viewport right), plus a fixed inset so the button doesn't
-       touch the very edge. Clamped so it never goes off-screen below 1920px. */
     right: calc(max(0px, (100vw - 1920px) / 2) + var(--s2a-spacing-xl));
   }
 }
@@ -83,11 +76,6 @@
   padding-top: 128px;
   padding-bottom: var(--s2a-spacing-2xl);
   padding-inline: var(--s2a-spacing-lg);
-
-  /* Cap and center the content column so copy doesn't hug the far-left edge on ultra-wide
-     screens (>1920px), mirroring Milo router-marquee's .rm-content-wrapper. border-box makes
-     max-width include the padding-inline, so the total box is exactly 1920px (not 1920 + padding)
-     and the bleeding media stays inside the viewport. */
   box-sizing: border-box;
   width: 100%;
   max-width: 1920px;
@@ -257,7 +245,7 @@
     gap: var(--s2a-layout-sm);
     padding-left: max(0px, 220px - (100vw - 1920px) / 2);
   }
-  
+
   .event-marquee-text {
     flex: 664 1 0%;
     max-width: 664px;
