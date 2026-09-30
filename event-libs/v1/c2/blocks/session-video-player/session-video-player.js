@@ -395,6 +395,17 @@ async function watchYouTubePlayback(sessionId, iframe) {
   }
 }
 
+// Dispose the MobileRider VideoJS instance (stored globally as window.__mr_player) before its DOM
+// is removed. Without this, the orphaned player keeps firing events (userActive -> createPlayerWidget)
+// against detached nodes and throws "Cannot read properties of null (reading 'appendChild')".
+function removeMobileRiderPlayer(el) {
+  const rider = el.querySelector('.mobile-rider');
+  if (!rider) return;
+  try { window.__mr_player?.dispose?.(); } catch (e) { /* already disposed or mid-teardown */ }
+  window.__mr_player = null;
+  rider.remove();
+}
+
 async function loadMobileRiderPlayer(el, video) {
   const { default: initMobileRider } = await import('../mobile-rider/mobile-rider.js');
   el.querySelector('.milo-video')?.remove();
@@ -419,7 +430,7 @@ function loadVideoPlayer(el, sessionId, video) {
 
   // A prior phase may have mounted the MobileRider DVR player; always clear it before mounting the
   // iframe so a DVR_BUFFER → ON_DEMAND swap replaces the old player rather than stacking beside it.
-  el.querySelector('.mobile-rider')?.remove();
+  removeMobileRiderPlayer(el);
 
   const authoredMiloVideo = el.querySelector('.milo-video');
   if (authoredMiloVideo) {
@@ -574,7 +585,7 @@ export default async function init(el) {
           preconnectVideoProvider(video.provider);
           loadVideoPlayer(el, sessionId, video);
         } else {
-          el.querySelector('.mobile-rider')?.remove();
+          removeMobileRiderPlayer(el);
           el.querySelector('.milo-video')?.remove();
           delete el.dataset.embedded;
           hideLosingInstance(el);
@@ -586,7 +597,7 @@ export default async function init(el) {
     // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player and
     // re-announce the phase so the playlist (if it had rendered for ON_DEMAND) can hide itself.
     if (embeddedPhase !== null && !PLAYABLE_PHASES.includes(phase)) {
-      el.querySelector('.mobile-rider')?.remove();
+      removeMobileRiderPlayer(el);
       el.querySelector('.milo-video')?.remove();
       delete el.dataset.embedded;
       embeddedPhase = null;
