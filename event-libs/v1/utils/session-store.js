@@ -51,9 +51,6 @@ let rfAuthTokenStarted = false;
 let rfAuthTokenSettled = false;
 // Only a successful myData response is authoritative for notification cleanup.
 let scheduleKnown = false;
-let notificationUserId = null;
-let authGeneration = 0;
-let registrationStarted = false;
 // True once the real isRegistered has landed, so loadMyData()'s fallback can't overwrite it.
 let realRegistrationKnown = false;
 // Whether resolveRegistrationAndAuth() or the legacy jwt exchange owns auth this load.
@@ -77,16 +74,13 @@ function defaultRfApiUrlForEnv() {
 async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
-  const generation = authGeneration;
   try {
     const data = await fetchAuthToken(clientId, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
-    if (generation !== authGeneration) return;
     rfAuthToken = data?.rfAuthToken ?? data?.token ?? data?.jwt ?? data?.authToken ?? null;
     if (!rfAuthToken) logWarning('session-store,rf-auth-token', 'jwt exchange returned no recognizable token field');
   } catch (err) {
     logError('session-store,rf-auth-token', 'jwt exchange failed', err);
   }
-  if (generation !== authGeneration) return;
   rfAuthTokenSettled = true;
   maybeLoadMyData();
 }
@@ -103,24 +97,6 @@ function syncAuth() {
   };
   if (getSwanMode() === 'feds') {
     const userId = auth.value.isLoggedIn ? (profile.userId || null) : null;
-    if (notificationUserId !== userId) {
-      notificationUserId = userId;
-      authGeneration += 1;
-      scheduleKnown = false;
-      scheduled.value = new Set();
-      favorited.value = new Set();
-      pendingActions.value = new Set();
-      rfAuthToken = null;
-      rfAuthTokenStarted = false;
-      rfAuthTokenSettled = false;
-      myDataAttempted = false;
-      registrationStarted = false;
-      realRegistrationKnown = false;
-      // The primary promise is memoized independently by da-events, without IMS
-      // ownership. FEDS must obtain identity-specific credentials even on first use.
-      useEventsApiForAuth = false;
-      auth.value = { ...auth.value, isRegistered: undefined };
-    }
     setNotificationScope(eventApiConfig.eventId, userId, eventApiConfig.apiUrl);
   }
   // Gated on real login: an anonymous visitor's bell would render empty. Idempotent, so
@@ -128,7 +104,6 @@ function syncAuth() {
   if (auth.value.isLoggedIn && getSwanMode() === 'feds') mountNotificationWidget();
 
   if (useEventsApiForAuth) {
-    if (!registrationStarted) resolveRegistrationAndAuth();
     // Auth is resolveRegistrationAndAuth()'s job; just let myData run if it's ready.
     maybeLoadMyData();
     return;
@@ -145,13 +120,8 @@ function syncAuth() {
 // Primary auth path: real isRegistered + RF token from da-events' registration-cache.js,
 // replacing the jwt exchange above. Falls back to it if no token comes back either way.
 async function resolveRegistrationAndAuth() {
-  if (registrationStarted) return;
-  if (getSwanMode() === 'feds' && !notificationUserId) return;
-  registrationStarted = true;
-  const generation = authGeneration;
   try {
     const { isRegistered, authToken } = await window.events.getRegistrationDetails();
-    if (generation !== authGeneration) return;
     realRegistrationKnown = true;
     auth.value = { ...auth.value, isRegistered };
     if (authToken) {
@@ -163,7 +133,6 @@ async function resolveRegistrationAndAuth() {
   } catch (err) {
     logError('session-store,registration-cache', 'window.events.getRegistrationDetails failed', err);
   }
-  if (generation !== authGeneration) return;
   useEventsApiForAuth = false;
   syncAuth();
 }
@@ -176,10 +145,8 @@ function mapToSessionIds(entries, idField, matchField) {
 
 // isRegistered here is a weaker fallback than resolveRegistrationAndAuth()'s — see realRegistrationKnown.
 async function loadMyData() {
-  const generation = authGeneration;
   try {
     const data = await fetchMyData(rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
-    if (generation !== authGeneration) return;
     batch(() => {
       scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode'));
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
@@ -194,7 +161,6 @@ async function loadMyData() {
     );
   } catch (err) {
     logError('session-store,my-data', 'myData fetch failed', err);
-    if (generation !== authGeneration) return;
     // A failed fetch is still a final answer — isRegistered must not stay undefined.
     if (!realRegistrationKnown) auth.value = { ...auth.value, isRegistered: null };
   }
@@ -298,7 +264,7 @@ export function initSessionState() {
   }
 
   mountToast();
-  useEventsApiForAuth = getSwanMode() !== 'feds' && !!window.events?.getRegistrationDetails;
+  useEventsApiForAuth = !!window.events?.getRegistrationDetails;
   syncAuth();
   BlockMediator.subscribe('imsProfile', syncAuth);
   loadSessions();
@@ -320,26 +286,7 @@ function setPending(id, isPending) {
   else removeFromSet(pendingActions, id);
 }
 
-export class SessionAuthChangedError extends Error {
-  constructor() {
-    super('Session action cancelled because the signed-in attendee changed');
-    this.name = 'SessionAuthChangedError';
-    this.reason = 'auth-changed';
-  }
-}
-
-export function getSessionAuthGeneration() {
-  return authGeneration;
-}
-
-export function assertSessionAuthGeneration(generation) {
-  if (generation === authGeneration) return;
-  logWarning('session-store,action', 'cancelled an action started by a previous attendee');
-  throw new SessionAuthChangedError();
-}
-
 export async function toggleSchedule(session) {
-  const generation = authGeneration;
   const isScheduled = scheduled.value.has(session.id);
   setPending(session.id, true);
   try {
@@ -349,11 +296,9 @@ export async function toggleSchedule(session) {
       await addSession(session.rfCode, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     }
   } catch (err) {
-    if (generation === authGeneration) setPending(session.id, false);
-    assertSessionAuthGeneration(generation);
+    setPending(session.id, false);
     throw err;
   }
-  assertSessionAuthGeneration(generation);
   // Batched so components reading both `scheduled` and `pendingActions` re-render once.
   batch(() => {
     if (isScheduled) removeFromSet(scheduled, session.id);
@@ -366,18 +311,15 @@ export async function toggleSchedule(session) {
 }
 
 export async function toggleFavorite(session) {
-  const generation = authGeneration;
   const isFavorited = favorited.value.has(session.id);
   setPending(session.id, true);
   try {
     // Favoriting keys on rfSessionId, not rfCode — sessionTimeId is left empty.
     await toggleSessionInterest('', session.rfSessionId, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
   } catch (err) {
-    if (generation === authGeneration) setPending(session.id, false);
-    assertSessionAuthGeneration(generation);
+    setPending(session.id, false);
     throw err;
   }
-  assertSessionAuthGeneration(generation);
   batch(() => {
     if (isFavorited) removeFromSet(favorited, session.id);
     else addToSet(favorited, session.id);

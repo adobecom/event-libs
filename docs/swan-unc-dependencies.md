@@ -204,18 +204,12 @@ default asset URL has been set yet) in
 ### FEDS persistence and dismissal
 
 FEDS uses `swan-notification-state-v3:` keys scoped by the Tier 1 event ID, signed-in
-IMS `userId`, and RainFocus API URL. The scope is selected before hydration; signing
-out or switching accounts hides the previous attendee's notifications immediately.
+IMS `userId`, and RainFocus API URL. The scope is selected from the existing authenticated
+profile before hydration; this does not change registration, authentication, or session
+card actions.
 The bell does not display cached rows or counts until a successful `myData` response
 has been reconciled. A failed request or missing RF token is **not** an empty schedule
 and must not erase dismissal state.
-
-The primary da-events registration API memoizes its result for the page without exposing
-IMS ownership, potentially before this feature initializes. FEDS therefore uses the
-identity-specific JWT exchange and `myData` response for authentication/registration
-instead of accepting that unowned cached result. Other modes keep their existing auth
-path. In-flight actions, delayed card clicks, and conflict confirmations are cancelled
-on identity changes instead of continuing against the new attendee.
 
 Each session has its own entry key. Read and dismissal markers are separate keys for
 each stage, so another tab's content update cannot overwrite those actions. Storage

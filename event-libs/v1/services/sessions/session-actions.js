@@ -1,6 +1,6 @@
 import {
   auth, sessions, scheduled, pendingActions, liveStreamActiveIds, toggleSchedule, toggleFavorite,
-  getEventApiConfig, getSessionAuthGeneration, assertSessionAuthGeneration, SessionAuthChangedError,
+  getEventApiConfig,
 } from '../../utils/session-store.js';
 import { isPostEvent, getNowMs } from '../../utils/session-state.js';
 import { RfAccessError } from './rainfocus.js';
@@ -38,47 +38,38 @@ export function assertAuthorized() {
   if (isRegistered !== true) throw new SessionActionError('registration-required');
 }
 
-export async function toggleScheduleAction(session, {
-  showConflictModal = false, generation = getSessionAuthGeneration(),
-} = {}) {
-  assertSessionAuthGeneration(generation);
+export async function toggleScheduleAction(session, { showConflictModal = false } = {}) {
   assertAuthorized();
   if (pendingActions.value.has(session.id)) return;
 
   const isScheduled = scheduled.value.has(session.id);
   if (!isScheduled && showConflictModal) {
     const conflict = findScheduleConflict(session, sessions.value, scheduled.value);
-    if (conflict) throw new SessionActionError('conflict', { conflict, incoming: session, generation });
+    if (conflict) throw new SessionActionError('conflict', { conflict, incoming: session });
   }
 
   try {
     await toggleSchedule(session);
   } catch (err) {
-    if (err instanceof SessionAuthChangedError) throw err;
     // RF can still reject as unregistered even if our own check passed.
     if (err instanceof RfAccessError) throw new SessionActionError('registration-required');
     throw new SessionActionError('network', { cause: err });
   }
 }
 
-export async function toggleFavoriteAction(session, { generation = getSessionAuthGeneration() } = {}) {
-  assertSessionAuthGeneration(generation);
+export async function toggleFavoriteAction(session) {
   assertAuthorized();
   if (pendingActions.value.has(session.id)) return;
 
   try {
     await toggleFavorite(session);
   } catch (err) {
-    if (err instanceof SessionAuthChangedError) throw err;
     throw new SessionActionError('network', { cause: err });
   }
 }
 
 // toggleSchedule toggles by current state, so drop+add reuses it without bespoke swap logic.
-export async function resolveScheduleConflict(conflict, incoming, generation = getSessionAuthGeneration()) {
-  assertSessionAuthGeneration(generation);
-  assertAuthorized();
+export async function resolveScheduleConflict(conflict, incoming) {
   await toggleSchedule(conflict);
-  assertSessionAuthGeneration(generation);
   await toggleSchedule(incoming);
 }

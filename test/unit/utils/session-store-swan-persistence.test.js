@@ -2,46 +2,38 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 import {
-  setNotificationScope, getEntry, getEntries, upsertEntry, dismissEntry, notificationsReady,
+  setNotificationScope, getEntry, upsertEntry, dismissEntry, notificationsReady,
 } from '../../../event-libs/v1/features/swan-notifications/notification-store.js';
 import { stopSessionStateTicker } from '../../../event-libs/v1/services/sessions/session-state-ticker.js';
 
-const EVENT_ID = 'test-auth-persistence';
+const EVENT_ID = 'test-notification-persistence';
 const API_URL = 'https://mock.example/api';
 const RF_CODE = 'S001TIME';
 
-function profile(userId) {
-  return { userId, first_name: 'Test', account_type: 'type1' };
-}
-
-async function settle() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function waitForMyData(pending, userId) {
+async function waitFor(predicate) {
   const deadline = Date.now() + 2000;
-  while (!pending.has(userId) && Date.now() < deadline) {
+  while (!predicate() && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  expect(pending.has(userId), `myData request for ${userId}`).to.equal(true);
+  expect(predicate()).to.equal(true);
 }
 
-describe('session-store: FEDS persistence follows the authenticated attendee', () => {
+describe('session-store: FEDS preserves cached dismissals until the schedule is known', () => {
   let originalFetch;
   let originalEvents;
-  const pendingMyData = new Map();
-  let resolveAdd;
+  let resolveMyData;
+  let jwtCalled = false;
 
   before(() => {
     originalFetch = window.fetch;
     originalEvents = window.events;
-    delete window.events;
+    window.events = {
+      getRegistrationDetails: async () => ({ isRegistered: true, authToken: 'primary-token' }),
+    };
     window.fetch = async (url) => {
-      const parsed = new URL(url, location.origin);
-      if (parsed.pathname.endsWith('/jwt')) {
-        return {
-          ok: true, json: async () => ({ rfAuthToken: parsed.searchParams.get('clientId') }),
-        };
+      if (url.includes('/jwt')) {
+        jwtCalled = true;
+        throw new Error('the existing primary auth path should be retained');
       }
       if (url.includes('session-catalog')) {
         return {
@@ -59,20 +51,17 @@ describe('session-store: FEDS persistence follows the authenticated attendee', (
           }),
         };
       }
-      if (parsed.pathname.endsWith('/myData')) {
+      if (url.includes('/myData')) {
+        expect(url).to.include('rfAuthToken=primary-token');
         return new Promise((resolve) => {
-          const userId = parsed.searchParams.get('rfAuthToken');
-          pendingMyData.set(userId, (mySchedule) => {
-            pendingMyData.delete(userId);
-            resolve({
-              ok: true, json: async () => ({ mySchedule, sessionInterests: [], loggedInUser: { firstName: 'Test' } }),
-            });
+          resolveMyData = () => resolve({
+            ok: true,
+            json: async () => ({
+              mySchedule: [{ sessionTimeID: RF_CODE }],
+              sessionInterests: [],
+              loggedInUser: { firstName: 'Test' },
+            }),
           });
-        });
-      }
-      if (parsed.pathname.endsWith('/addSession')) {
-        return new Promise((resolve) => {
-          resolveAdd = () => resolve({ ok: true, json: async () => ({ responseCode: '0' }) });
         });
       }
       throw new Error(`unexpected request: ${url}`);
@@ -85,58 +74,27 @@ describe('session-store: FEDS persistence follows the authenticated attendee', (
     window.fetch = originalFetch;
     window.events = originalEvents;
     stopSessionStateTicker();
-    BlockMediator.set('imsProfile', null);
+    BlockMediator.set('imsProfile', undefined);
     ['swan-notifications', 'tier-1-event-config'].forEach((name) => {
       document.head.querySelector(`meta[name="${name}"]`)?.remove();
     });
     setNotificationScope(null, null, null);
   });
 
-  it('gates cached counts, discards old-user responses and mutations, and restores dismissals on re-login', async () => {
-    setNotificationScope(EVENT_ID, 'user-a', API_URL);
-    upsertEntry(RF_CODE, { stage: 'live', title: 'Dismissed by A' });
+  it('hides cached counts during loading and preserves same-stage dismissal after primary-auth reconciliation', async () => {
+    setNotificationScope(EVENT_ID, 'test-attendee', API_URL);
+    upsertEntry(RF_CODE, { stage: 'live', title: 'Previously dismissed' });
     dismissEntry(RF_CODE);
-    BlockMediator.set('imsProfile', profile('user-a'));
+    BlockMediator.set('imsProfile', { userId: 'test-attendee', account_type: 'type1' });
     const store = await import(`../../../event-libs/v1/utils/session-store.js?persistence=${Math.random()}`);
     store.initSessionState();
-    await waitForMyData(pendingMyData, 'user-a');
+    await waitFor(() => !!resolveMyData);
     expect(notificationsReady.value).to.equal(false);
     expect(getEntry(RF_CODE).dismissed).to.equal(true);
-
-    BlockMediator.set('imsProfile', profile('user-b'));
-    await waitForMyData(pendingMyData, 'user-b');
-    expect(getEntries()).to.have.lengthOf(0);
-    expect(notificationsReady.value).to.equal(false);
-    pendingMyData.get('user-a')([{ sessionTimeID: RF_CODE }]);
-    await settle();
-    expect(store.scheduled.value.size).to.equal(0);
-    expect(notificationsReady.value).to.equal(false);
-
-    pendingMyData.get('user-b')([]);
-    await settle();
-    expect(notificationsReady.value).to.equal(true);
-    const session = store.sessions.value[0];
-    const add = store.toggleSchedule(session);
-    let cancelled;
-    const cancelledAdd = add.catch((err) => { cancelled = err; });
-    BlockMediator.set('imsProfile', null);
-    expect(notificationsReady.value).to.equal(false);
-    expect(getEntries()).to.have.lengthOf(0);
-    resolveAdd();
-    await cancelledAdd;
-    expect(cancelled).to.be.instanceOf(store.SessionAuthChangedError);
-    expect(store.scheduled.value.size).to.equal(0);
-    expect(store.pendingActions.value.size).to.equal(0);
-    expect(getEntries()).to.have.lengthOf(0);
-
-    BlockMediator.set('imsProfile', profile('user-a'));
-    await waitForMyData(pendingMyData, 'user-a');
+    resolveMyData();
+    await waitFor(() => notificationsReady.value);
+    expect(store.scheduled.value.has('s-001')).to.equal(true);
     expect(getEntry(RF_CODE).dismissed).to.equal(true);
-    expect(notificationsReady.value).to.equal(false);
-    pendingMyData.get('user-a')([{ sessionTimeID: RF_CODE }]);
-    await settle();
-    expect(store.scheduled.value.has(session.id)).to.equal(true);
-    expect(notificationsReady.value).to.equal(true);
-    expect(getEntry(RF_CODE).dismissed).to.equal(true);
+    expect(jwtCalled).to.equal(false);
   });
 });
