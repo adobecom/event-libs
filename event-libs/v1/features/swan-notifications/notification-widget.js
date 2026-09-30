@@ -7,7 +7,7 @@ import { getRelativeTime, createTemplatedDateRange } from '../../utils/date-time
 import { getNowMs } from '../../utils/session-state.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
 import {
-  notifications, markRead, markAllRead, dismissEntry, getEntries,
+  notifications, notificationsReady, markRead, markAllRead, dismissEntry, getEntries, flushNotifications,
 } from './notification-store.js';
 import { STAGE_COPY } from './swan-payload.js';
 import { waitForElement } from './gnav-wait.js';
@@ -43,7 +43,7 @@ const CLOSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" 
 // name stays "reminder" (it means something more specific: before the lead-time window).
 // Values double as dictionary keys/English fallbacks (dictionaryManager.getValue(key) returns
 // the key itself when unloaded/missing), same convention as sessions-hub.js's own copy.
-const STAGE_PILL_LABEL = { reminder: 'Upcoming', live: 'Live', 'on-demand': 'On-Demand' };
+const STAGE_PILL_LABEL = { reminder: 'Upcoming', live: 'Live', 'on-demand': 'On Demand' };
 
 let mounted = false;
 
@@ -156,8 +156,9 @@ function renderRow(entry, locale, timezone, onDismiss) {
   body.append(createTag('p', { class: 'swan-notif__time' }, getRelativeTime(entry.updatedAt, locale, getNowMs())));
   row.append(body);
 
-  function activate() {
+  async function activate() {
     markRead(entry.rfCode);
+    await flushNotifications();
     if (entry.actionUrl) window.location.href = entry.actionUrl;
   }
   row.addEventListener('click', activate);
@@ -265,12 +266,6 @@ function buildWidget(mount) {
     button.setAttribute('aria-expanded', 'false');
     document.removeEventListener('click', onOutsideClick);
     document.removeEventListener('keydown', onKeydown);
-    // Closing, not opening, is "having seen" the list — marking read on open would clear
-    // the unread dot/tint before the attendee ever actually saw it (both happen
-    // synchronously, in the same tick, before the browser paints). This still clears the
-    // badge for entries never individually clicked, just one interaction later; markAllRead()
-    // itself no-ops (no signal write) when nothing is unread.
-    markAllRead();
   }
 
   function onOutsideClick(e) {
@@ -294,6 +289,7 @@ function buildWidget(mount) {
     button.setAttribute('aria-expanded', 'true');
     document.addEventListener('click', onOutsideClick);
     document.addEventListener('keydown', onKeydown);
+    if (notificationsReady.value) markAllRead();
   }
 
   button.addEventListener('click', (e) => {
@@ -325,16 +321,27 @@ function buildWidget(mount) {
   // whatever's already in the store (e.g. unread entries persisted from an earlier visit),
   // which must never be announced as "new" on this first call.
   let previousUnreadCount = null;
-  notifications.subscribe((entries) => {
+  function updateList() {
     // Dismissed entries stay in the store (so the stage guard in swan-notifications.js can
     // still see them) but must never render or count toward the badge/announcer.
-    const visibleEntries = entries.filter((entry) => !entry.dismissed);
+    const visibleEntries = notificationsReady.value
+      ? notifications.value.filter((entry) => !entry.dismissed) : [];
     const unreadCount = renderList(sectionTitle, list, badge, visibleEntries, locale, timezone, dismissAndRefocus);
+    if (!notificationsReady.value) {
+      previousUnreadCount = null;
+      announcer.textContent = '';
+      return;
+    }
     if (previousUnreadCount !== null && unreadCount > previousUnreadCount) {
       const key = unreadCount === 1 ? '{count} new notification' : '{count} new notifications';
       announcer.textContent = dictionaryManager.getValue(key).replace('{count}', unreadCount);
     }
     previousUnreadCount = unreadCount;
+  }
+  notifications.subscribe(updateList);
+  notificationsReady.subscribe((ready) => {
+    if (ready && !panel.hidden) markAllRead();
+    updateList();
   });
 }
 

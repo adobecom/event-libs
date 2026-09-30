@@ -8,7 +8,9 @@ import {
 } from './data-utils.js';
 import { ENV_MAP, sessionCatalogHost } from './constances.js';
 import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
-import { logError, logWarning } from './lana-log.js';
+import {
+  logError, logWarning, logCritical, logInfo,
+} from './lana-log.js';
 
 export const getCaasTags = (() => {
   let cache;
@@ -263,7 +265,11 @@ export async function getEventAttendee(eventId) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/me`, options);
 
     if (!response.ok) {
-      logError('esp-controller,get-event-attendee', `Failed to get attendee for event ${eventId}`, response);
+      if (response.status === 404) {
+        logInfo('esp-controller,get-event-attendee', `No attendee record yet for event ${eventId}`);
+      } else {
+        logError('esp-controller,get-event-attendee', `Failed to get attendee for event ${eventId}`, response);
+      }
       let textResp;
       try {
         textResp = await response.text();
@@ -294,7 +300,11 @@ export async function getAttendee(eventId) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
-      logError('esp-controller,get-attendee', `Failed to get attendee details for event ${eventId}`, response);
+      if (response.status === 404) {
+        logInfo('esp-controller,get-attendee', `No attendee record yet for event ${eventId}`);
+      } else {
+        logError('esp-controller,get-attendee', `Failed to get attendee details for event ${eventId}`, response);
+      }
       let textResp;
       try {
         textResp = await response.text();
@@ -335,14 +345,14 @@ export async function createAttendee(eventId, attendeeData, rsvpToken = null) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
 
     if (!response.ok) {
+      logCritical('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
       const error = await parseFailureBody(response);
-      logError('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
       return { ok: response.ok, status: response.status, error };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, error);
+    logCritical('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -361,14 +371,14 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
 
     if (!response.ok) {
+      logCritical('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
       const error = await parseFailureBody(response);
-      logError('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
       return { ok: response.ok, status: response.status, error };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, error);
+    logCritical('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -385,14 +395,14 @@ export async function updateAttendee(eventId, attendeeData) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
+      logCritical('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
       const error = await parseFailureBody(response);
-      logError('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
       return { ok: response.ok, status: response.status, error };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, error);
+    logCritical('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -413,12 +423,12 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     }
 
     if (!response.ok) {
-      logError('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, response);
+      logCritical('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, response);
       let textResp;
       try {
         textResp = await response.text();
       } catch (e) {
-        logError('esp-controller,delete-attendee', `Failed to parse response text for attendee ${attendeeId ?? 'me'} on event ${eventId}`, e);
+        logCritical('esp-controller,delete-attendee', `Failed to parse response text for attendee ${attendeeId ?? 'me'} on event ${eventId}`, e);
       }
 
       return {
@@ -431,7 +441,7 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     if (response.status === 204) return { ok: true, data: { status: 204, attendeeDeleted: true } };
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, error);
+    logCritical('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -465,6 +475,8 @@ export async function getCampaign(eventId, campaignId) {
 // registration (and consumption) happens via the normal attendee endpoints
 // (createAttendee / addAttendeeToEvent above), with the token threaded through
 // as auth instead of a separate submission endpoint.
+const RSVP_TOKEN_INVALID_STATUSES = [401, 404, 409, 410];
+
 export async function validateRsvpToken(eventId, token) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -475,13 +487,17 @@ export async function validateRsvpToken(eventId, token) {
     const data = await response.json();
 
     if (!response.ok) {
-      logError('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, response);
+      if (RSVP_TOKEN_INVALID_STATUSES.includes(response.status)) {
+        logInfo('esp-controller,validate-rsvp-token', `RSVP token not usable for event ${eventId}`, response);
+      } else {
+        logCritical('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, response);
+      }
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    logError('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, error);
+    logCritical('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -660,13 +676,13 @@ export async function registerForSessionTime(sessionTimeId, attendeeId, registra
     const data = await response.json();
 
     if (!response.ok) {
-      logError('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, response);
+      logCritical('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, response);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    logError('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, error);
+    logCritical('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -685,14 +701,14 @@ export async function unregisterFromSessionTime(sessionTimeId) {
     );
 
     if (!response.ok) {
-      logError('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, response);
+      logCritical('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, response);
       return { ok: false, status: response.status };
     }
 
     if (response.status === 204) return { ok: true };
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, error);
+    logCritical('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -768,7 +784,7 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
     // server-side in one step.
     return await addAttendeeToEvent(eventId, eventAttendeePayload, rsvpToken);
   } catch (error) {
-    logError('esp-controller,get-and-create-and-add-attendee', `Unexpected error submitting RSVP for event ${eventId} (campaignId=${attendeeData?.campaignId ?? 'none'})`, error);
+    logCritical('esp-controller,get-and-create-and-add-attendee', `Unexpected error submitting RSVP for event ${eventId} (campaignId=${attendeeData?.campaignId ?? 'none'})`, error);
     return { ok: false, status: 'Unexpected Error', error: error.message };
   }
 }

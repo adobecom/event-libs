@@ -275,7 +275,10 @@
   line-clamp: unset;
 }
 
-.sb-info__desc { margin: 0; }
+.sb-info__desc {
+  margin: 0;
+  white-space: pre-line;
+}
 
 .sb-info__view-all {
   grid-area: viewall;
@@ -646,80 +649,23 @@
     gap: var(--s2a-spacing-lg, 24px);
   }
 
-  .sb-carousel-section--also-live .sg-live-card {
-    width: 100%;
+  /* No width of its own, so short titles shrink-wrap the card below its intended cap. */
+  .sb-carousel-section--also-live .sg-carousel__card-wrap {
+    flex: 0 0 100%;
     max-width: 1156px;
-    border: 4px solid var(--s2a-color-background-default, #fff);
-    border-radius: 20px;
   }
 
-  .sb-carousel-section--also-live .sg-live-card__image {
-    width: 560px;
-    height: 316px;
-    aspect-ratio: auto;
-    border: 1px solid rgb(255 255 255 / 15%);
-    border-radius: 16px;
+  /* Border/radius match sessions-guide.css's own desktop rule; only max-width differs. */
+  .sb-carousel-section--also-live .sg-live-card {
+    max-width: 1156px;
   }
 
-  .sb-carousel-section--also-live .sg-live-card__progress-row {
-    top: auto;
-    bottom: 13px;
-    left: 27px;
-    right: auto;
-    width: 192px;
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__body {
-    flex: 1;
-    width: auto;
-    padding: var(--s2a-spacing-xl, 32px);
-    gap: var(--s2a-spacing-xs, 8px);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__title {
-    order: 1;
-    margin: auto 0 0;
-    font-family: var(--s2a-font-family-heading);
-    font-size: var(--s2a-font-size-3xl, 32px);
-    font-weight: var(--s2a-font-weight-heading, 900);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__meta {
-    order: 2;
-    justify-content: flex-start;
-    gap: var(--s2a-spacing-md, 16px);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__meta .sg-category-badge__label {
-    font-size: var(--s2a-font-size-xs, 12px);
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__actions {
-    order: 3;
-    margin-top: auto;
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__desc { display: none; }
-
+  /* Overrides the <1280px compact-mode height above. */
   .sb-carousel-section--also-live .sg-live-card__btn { height: 40px; }
 
   .sb-carousel-section--also-live .sg-live-card__btn--watch { padding: 0 var(--s2a-spacing-lg, 24px); }
 
-  .sb-carousel-section--also-live .sg-live-card__btn--watch svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__btn--favorite {
-    width: 40px;
-    border-width: 1px;
-    background: transparent;
-  }
-
-  .sb-carousel-section--also-live .sg-live-card__btn--favorite svg {
-    width: 14px;
-    height: 14px;
-  }
+  .sb-carousel-section--also-live .sg-live-card__btn--favorite { width: 40px; }
 
   /* Placed last for stylelint's ascending-specificity order. */
   .sb-carousel-section--also-live .sg-live-card__meta .sg-icon svg {
@@ -768,9 +714,6 @@
 }
 
 .sb-carousel-section--up-next .sg-card__badge-row { margin-bottom: var(--s2a-spacing-sm); }
-
-/* Desktop-only reveal; see the 1280px+ block below for the hover treatment. */
-.sb-carousel-section--up-next .sg-card__description { display: none; }
 
 /* Replicates the frosted-glass/light treatment since SessionCard.js hardcodes IconButton's dark-card context. */
 .sb-carousel-section--up-next .sg-card__btn--schedule,
@@ -1048,25 +991,7 @@
     overflow: hidden;
   }
 
-  /* Desktop-only, hidden at rest too - room for this only exists once hover grows min-height below. */
-  .sb-carousel-section--up-next .sg-card__description {
-    display: none;
-
-    /* margin-top lives here (not on the title) since .sg-card__body has gap:0. */
-    margin-top: var(--s2a-spacing-xs, 8px);
-    font-size: 14px;
-    line-height: 1.2;
-    letter-spacing: -0.14px;
-    color: var(--s2a-color-gray-500, #8f8f8f);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-  }
-
-  .sb-carousel-section--up-next .sg-card:is(:hover, :focus-within) .sg-card__description {
-    display: block;
-  }
+  /* .sg-card__description styling now lives in sessions-guide.css. */
 }
 
 /* Repeats each 1280px+ selector at matching specificity so this wins the tie for 1441px+. */

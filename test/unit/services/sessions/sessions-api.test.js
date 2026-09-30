@@ -5,7 +5,7 @@ import {
   mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, invalidFormatReason, isMissingFormat,
   ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, getProductAttributeId, sessionPageUrlForEnv, parseDvrDelayHours,
-  getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes,
+  getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes, getSessionDescription,
   reportDroppedSessions, fetchSessions,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 import { setEventServiceEnvOverride } from '../../../../event-libs/v1/utils/utils.js';
@@ -1054,6 +1054,16 @@ describe('services/sessions/sessions-api', () => {
   });
 
   describe('normalizeSessions', () => {
+    it('normalizes description line breaks (CRLF, literal \\n, tabs) to "\\n"', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1', description: 'Intro\r\n\r\nKey takeaways:\\n-\tOne' }]);
+      expect(normalized.description).to.equal('Intro\n\nKey takeaways:\n- One');
+    });
+
+    it('defaults description to an empty string', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1' }]);
+      expect(normalized.description).to.equal('');
+    });
+
     it('defaults resources/mrStreamId to [] / null when the raw session provides neither', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: ['Designer'] }]);
       expect(normalized.resources).to.deep.equal([]);
@@ -1294,6 +1304,19 @@ describe('additional event site tracks', () => {
   it('still returns primary tracks when no session has additional ones', () => {
     const sessions = [{ customAttributes: [customAttr('Primary Event Site Track', [selectValue('Design')])] }];
     expect(extractDistinctAllTracks(sessions)).to.deep.equal(['Design']);
+  });
+});
+
+describe('getSessionDescription', () => {
+  it('reads the en-US localization description', () => {
+    const session = { localizations: { 'en-US': { description: 'Testing test test' } } };
+    expect(getSessionDescription(session)).to.equal('Testing test test');
+  });
+
+  it('returns an empty string when the localization or description is absent', () => {
+    expect(getSessionDescription({ localizations: {} })).to.equal('');
+    expect(getSessionDescription({})).to.equal('');
+    expect(getSessionDescription(null)).to.equal('');
   });
 });
 

@@ -201,6 +201,47 @@ sized for a multi-day conference; icon currently hardcoded to an empty string â€
 default asset URL has been set yet) in
 [`swan-config.js`](../event-libs/v1/features/swan-notifications/swan-config.js).
 
+### FEDS persistence and dismissal
+
+FEDS keeps the site-wide inbox in one `swan-notification-state-v3` localStorage key,
+using the existing rfCode-to-entry JSON map. Existing QA entries, including their
+`read` and `dismissed` flags, are read directly without migration or reset. No event,
+attendee, or API-URL scope is required to hydrate the map or display its entries.
+The bell does not display cached rows or counts until a successful `myData` response
+has been reconciled. A failed request or missing RF token is **not** an empty schedule
+and must not erase dismissal state.
+
+Writes apply pending changes to the latest map while holding an origin-wide Web Lock,
+so cooperating tabs cannot overwrite another tab's dismissal with an old whole-map
+snapshot. Browsers without Web Locks retain synchronous read-before-write persistence
+and log that simultaneous cross-tab writes cannot be serialized. Storage events read
+the latest persisted values, not their potentially stale `newValue`.
+Notification activation waits for its read marker to be persisted before navigation.
+Reconciliation publishes one final list per pass; queued storage-event bursts are
+coalesced, and unchanged state does not rebuild the widget. Temporary storage-write
+failures are logged and retried during reconciliation and subsequent actions. If browser
+storage remains unavailable through a page reload, in-memory fallback actions cannot
+survive that reload.
+Reminder, live, and on-demand are distinct stages: dismissal survives repeated ticks
+and reloads at the same stage; a genuine stage advance intentionally surfaces an
+unread notification again.
+
+Only a fresh successful schedule response performs orphan cleanup. New entries include
+an optional `eventId` identifying their owner, not a display filter: notifications
+from all events remain in the same inbox. Cleanup removes only current-event entries,
+or existing entries without ownership whose rfCode belongs to the current catalog.
+Unowned entries absent from that catalog are retained rather than guessed to be orphans.
+Ticker snapshots must not delete sessions added in another tab.
+
+Unscheduling and expiry delete entries normally, without persisted tombstones. A
+page-local removal guard prevents a stale scheduled set from recreating entries
+removed during that page visit; fresh schedule data or an explicit successful re-add
+clears the guard. On-demand eligibility ends three days after the session's end, rather than
+three days after its latest local write, preventing expiry/recreation loops.
+
+The v3 storage key and entry format remain compatible. UNC's v2 tracking, authentication
+paths, and SessionCard/action behavior are unchanged.
+
 ## Verifying the chain end-to-end
 
 1. Confirm the page's gnav has `universal-nav` metadata with the notifications component

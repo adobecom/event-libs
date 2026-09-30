@@ -44,7 +44,7 @@ export default async function init(el) {
   // mountSessionState may return a teardown (clears the IPOD re-render timer and unsubscribes the
   // MobileRider poll for livestreamed sessions); run it when the block is detached to avoid leaks.
   const stopSessionState = mountSessionState({
-    statusSlot, primaryCtaSlot, ccEl: closedCaption, statusLabels,
+    statusSlot, primaryCtaSlot, ccEl: closedCaption, shareEl: share, statusLabels,
   });
   if (stopSessionState) onElementDetached(el, stopSessionState);
 

@@ -14,11 +14,16 @@
   font-size: var(--s2a-font-size-16, 1rem);
   line-height: 1.3;
   line-clamp: var(--desc-lines);
+  text-wrap: pretty;
 
   /* stylelint-disable-next-line value-no-vendor-prefix -- Safari needs -webkit-box for line clamp */
   display: -webkit-box;
   -webkit-line-clamp: var(--desc-lines);
   -webkit-box-orient: vertical;
+}
+
+.session-description-text.is-plain-text {
+  white-space: pre-line;
 }
 
 .session-description.is-expanded .session-description-text {

@@ -44,6 +44,7 @@ export function isGnavNotificationsEnabled() {
 export function getSwanConfig() {
   const tierOneConfig = parseTierOneEventConfig();
   return {
+    eventId: tierOneConfig?.eventId || getMetadata('event-id') || null,
     eventName: tierOneConfig?.backendEventTitle || tierOneConfig?.eventName || 'Event',
     upcomingOffsetMinutes: DEFAULT_UPCOMING_OFFSET_MINUTES,
     defaultNotificationIconUrl: DEFAULT_NOTIFICATION_ICON_URL,

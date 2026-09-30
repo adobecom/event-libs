@@ -34,7 +34,7 @@ export function TrackRow({ track, sessions }) {
               class=${'sg-time-row__card-wrap' + (dismissingIds.has(s.id) ? ' sg-time-row__card-wrap--collapsing' : '')}
               key=${s.id}
               inert=${i < offset || i > lastVisible ? true : undefined}
-            ><${SessionCard} session=${s} forceOnDemand=${true} /></div>`)}
+            ><${SessionCard} session=${s} forceOnDemand=${true} showDescription=${true} /></div>`)}
           </div>
         </div>
         <button

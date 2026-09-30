@@ -1,13 +1,10 @@
 import { expect } from '@esm-bundle/chai';
 import { mountNotificationWidget, normalizeTimeCasing } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
 import {
-  getEntries, removeEntry, upsertEntry,
+  getEntries, removeEntry, upsertEntry, setNotificationsReady, flushNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from './mocks/notification-store.js';
 import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
-
-function clearStore() {
-  getEntries().forEach((entry) => removeEntry(entry.rfCode));
-}
 
 // Same-origin, genuinely loadable asset — unlike an https://example.com/... URL (blocked by
 // the test harness's no-external-network rule), this actually loads, so tests using it exercise
@@ -69,8 +66,8 @@ describe('notification-widget', () => {
     document.head.querySelector('meta[name="gnav-notifications"]')?.remove();
   });
 
-  beforeEach(() => {
-    clearStore();
+  beforeEach(async () => {
+    await resetNotifications();
     panel().hidden = true;
   });
 
@@ -102,6 +99,33 @@ describe('notification-widget', () => {
     expect(sectionTitle().hidden).to.equal(true);
   });
 
+  it('never flashes cached counts before the schedule is successfully reconciled', () => {
+    setNotificationsReady(false);
+    addEntry('RF-1', { stage: 'live', title: 'Cached' });
+    addEntry('RF-2', { stage: 'live', title: 'Dismissed' });
+    expect(rows()).to.have.lengthOf(0);
+    expect(badge().hidden).to.equal(true);
+    expect(announcer().textContent).to.equal('');
+    removeEntry('RF-2');
+    setNotificationsReady(true);
+    expect(rows().map((row) => row.dataset.rfcode)).to.deep.equal(['RF-1']);
+    expect(badge().textContent).to.equal('1');
+    expect(announcer().textContent).to.equal('');
+  });
+
+  it('does not mark hidden cached entries read before readiness, but reads them when the open panel receives them', () => {
+    setNotificationsReady(false);
+    addEntry('RF-1', { stage: 'live', title: 'Cached' });
+    bell().click();
+    expect(rows()).to.have.lengthOf(0);
+    expect(getEntries()[0].read).to.equal(false);
+    setNotificationsReady(true);
+    expect(rows()).to.have.lengthOf(1);
+    expect(getEntries()[0].read).to.equal(true);
+    expect(badge().hidden).to.equal(true);
+    bell().click();
+  });
+
   it('shows the "Important" section header once there is at least one notification', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     expect(sectionTitle().hidden).to.equal(false);
@@ -115,9 +139,9 @@ describe('notification-widget', () => {
     expect(row.querySelector('.swan-notif__title').textContent).to.equal('First');
   });
 
-  it('labels the on-demand stage pill "On-Demand"', () => {
+  it('labels the on-demand stage pill "On Demand"', () => {
     addEntry('RF-1', { stage: 'on-demand', title: 'First' });
-    expect(rows()[0].querySelector('.swan-notif__pill').textContent).to.equal('On-Demand');
+    expect(rows()[0].querySelector('.swan-notif__pill').textContent).to.equal('On Demand');
   });
 
   it('renders one row per stored entry, most recently updated first', () => {
@@ -125,6 +149,13 @@ describe('notification-widget', () => {
     addEntry('RF-2', { stage: 'live', title: 'Second' });
     const titles = rows().map((row) => row.querySelector('.swan-notif__title').textContent);
     expect(titles).to.deep.equal(['Second', 'First']);
+  });
+
+  it('renders and counts notifications from different events in the same inbox', () => {
+    addEntry('RF-event-a', { eventId: 'event-a', stage: 'live', title: 'Event A' });
+    addEntry('RF-event-b', { eventId: 'event-b', stage: 'live', title: 'Event B' });
+    expect(rows()).to.have.lengthOf(2);
+    expect(badge().textContent).to.equal('2');
   });
 
   it('labels each row with its stage pill', () => {
@@ -160,6 +191,31 @@ describe('notification-widget', () => {
     expect(getEntries().find((e) => e.rfCode === 'RF-1').read).to.equal(true);
   });
 
+  it('persists the read marker before navigating away from an activated notification', async () => {
+    const originalUrl = location.href;
+    addEntry('RF-1', { stage: 'live', title: 'First', actionUrl: `${location.pathname}${location.search}#notification-read` });
+    await flushNotifications();
+    let release;
+    let acquired = false;
+    const blocker = navigator.locks.request('swan-notification-state-v3', async () => {
+      acquired = true;
+      await new Promise((resolve) => { release = resolve; });
+    });
+    await waitFor(() => acquired);
+    try {
+      rows()[0].click();
+      expect(location.href).to.equal(originalUrl);
+      release();
+      await blocker;
+      await waitFor(() => location.hash === '#notification-read');
+      const stored = JSON.parse(localStorage.getItem('swan-notification-state-v3'));
+      expect(stored['RF-1'].read).to.equal(true);
+    } finally {
+      release();
+      history.replaceState(null, '', originalUrl);
+    }
+  });
+
   it('marks the entry read on Enter/Space, not just a mouse click', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     rows()[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
@@ -176,22 +232,14 @@ describe('notification-widget', () => {
     expect(bell().getAttribute('aria-expanded')).to.equal('false');
   });
 
-  it('keeps entries unread while the panel is open the first time, so the dot is actually visible', () => {
-    addEntry('RF-1', { stage: 'reminder', title: 'First' });
-    bell().click();
-    expect(rows()[0].classList.contains('swan-notif__row--unread')).to.equal(true);
-    expect(badge().hidden).to.equal(false);
-  });
-
-  it('clears the badge on close, even for rows never individually clicked', () => {
+  it('clears the badge and marks all entries read when the panel opens', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     addEntry('RF-2', { stage: 'reminder', title: 'Second' });
     expect(badge().hidden).to.equal(false);
     bell().click();
-    expect(badge().hidden).to.equal(false); // still unread while open — see the test above
-    bell().click(); // closes
     expect(badge().hidden).to.equal(true);
     expect(getEntries().every((entry) => entry.read)).to.equal(true);
+    expect(rows().every((row) => !row.classList.contains('swan-notif__row--unread'))).to.equal(true);
   });
 
   it('closes the panel on an outside click', () => {

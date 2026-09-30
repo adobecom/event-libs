@@ -12,12 +12,6 @@
   box-sizing: border-box;
 }
 
-@media (min-width: 1024px) {
-  .mobile-rider {
-    max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
-  }
-}
-
 .mobile-rider .mobile-rider-container {
   position: relative;
   width: 100%;
@@ -293,19 +287,19 @@
   line-height: 1;
 }
 
-@media (min-width: 1024px) {
-  .mobile-rider .mobile-rider-container {
-    border-radius: var(--s2a-border-radius-24, 24px);
-    overflow: hidden;
-  }
+.mobile-rider .mobile-rider-container {
+  border-radius: var(--s2a-border-radius-16, 16px);
+  overflow: hidden;
+}
 
+@media (min-width: 1024px) {
   /* Figma: the description is constrained to roughly the left half of the bar, not full width. */
   .mobile-rider .mobile-rider-info-bar-description {
     max-width: 60%;
   }
 
   .mobile-rider-player:has(.mobile-rider-info-bar) .mobile-rider-container {
-    border-radius: var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px) 0 0;
+    border-radius: var(--s2a-border-radius-16, 16px) var(--s2a-border-radius-16, 16px) 0 0;
   }
 }
 
