@@ -29,11 +29,12 @@ export function OnDemandView() {
   const recommended = getOnDemandRecommendedSessions(onDemandRaw, state.guideConfig?.recommendedSessions);
   const available = filterSessions(onDemandRaw, activeFilters, searchQuery);
   const byTrack = groupByTrack(available, state.guideConfig?.swimlaneOrder);
+  const noResults = byTrack.length === 0 && hasActiveSearchOrFilters(activeFilters, searchQuery);
 
   return html`
     <div class="sg-view sg-view--on-demand">
       <h3 class="sg-upcoming-title">On-demand</h3>
-      ${recommended.length > 0 && html`
+      ${recommended.length > 0 && !noResults && html`
         <div class="sg-carousel-section sg-carousel-section--recommended">
           <${Carousel}
             sessions=${recommended}
@@ -44,7 +45,7 @@ export function OnDemandView() {
       `}
       ${byTrack.map(([track, trackSessions, label]) => html`<${TrackRow} key=${track} track=${label} sessions=${trackSessions} />`)}
       ${byTrack.length === 0 && (
-        hasActiveSearchOrFilters(activeFilters, searchQuery)
+        noResults
           ? html`<${NoResultsFound} />`
           : html`<div class="sg-empty" role="status" aria-live="polite">Sessions will be available on demand after the event.</div>`
       )}

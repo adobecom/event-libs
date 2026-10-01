@@ -39,6 +39,13 @@ const PAST_SESSION = {
   mrStreamId: null, thumbnailUrl: null,
 };
 
+const LIVE_NOW_SESSION = {
+  id: 'l-1', title: 'Live now', description: '', primaryTrack: 'Design',
+  startTimeUtc: h(-0.25), endTimeUtc: h(0.25),
+  inPerson: false, sessionPageUrl: '/l-1',
+  mrStreamId: null, thumbnailUrl: null,
+};
+
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
   title: '', filterCategories: [], theme: 'dark', registerUrl: '/register-test',
@@ -152,8 +159,17 @@ describe('MySessionsView', () => {
     });
     const View = buildMySessionsView(preact, store);
     const html = View({});
-    expect(html).to.include('No results found');
+    expect(html).to.include('No results match your current selection.');
     expect(html).to.not.include('sg-my-sessions__empty');
+  });
+
+  it('shows the Live carousel normally, and hides it when search matches nothing', () => {
+    const base = { sessionList: [LIVE_NOW_SESSION], scheduledIds: new Set(['l-1']) };
+    const View = buildMySessionsView(preact, makeStore(base));
+    expect(View({})).to.include('sg-carousel-section--live');
+    const html = buildMySessionsView(preact, makeStore({ ...base, searchQuery: 'nonexistent term' }))({});
+    expect(html).to.not.include('sg-carousel-section--live');
+    expect(html).to.include('No results match your current selection.');
   });
 
   it('shows "No results found" instead of the default empty state when a filter excludes every scheduled session', () => {
@@ -164,7 +180,7 @@ describe('MySessionsView', () => {
     });
     const View = buildMySessionsView(preact, store);
     const html = View({});
-    expect(html).to.include('No results found');
+    expect(html).to.include('No results match your current selection.');
     expect(html).to.not.include('sg-my-sessions__empty');
   });
 });

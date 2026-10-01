@@ -47,9 +47,13 @@ export function LiveUpcomingView() {
     ? groupByStartTime(filterSessions(previouslyAiredRaw, activeFilters, searchQuery))
     : [];
 
+  // Live/Recommended ignore search + filters, but hide along with everything else on zero results.
+  const noResults = timeSlots.length === 0 && previouslyAiredSlots.length === 0
+    && hasActiveSearchOrFilters(activeFilters, searchQuery);
+
   return html`
     <div class="sg-view sg-view--live-upcoming">
-      ${live.length > 0 && html`
+      ${live.length > 0 && !noResults && html`
         <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
@@ -61,7 +65,7 @@ export function LiveUpcomingView() {
           />
         </div>
       `}
-      ${recommended.length > 0 && html`
+      ${recommended.length > 0 && !noResults && html`
         <div class="sg-carousel-section sg-carousel-section--recommended">
           <${Carousel}
             sessions=${recommended}
@@ -79,8 +83,7 @@ export function LiveUpcomingView() {
           ${previouslyAiredSlots.map((slot) => html`<${TimeSlotRow} key=${slot[0].startTimeUtc} sessions=${slot} forceOnDemand=${true} />`)}
         `}
         ${timeSlots.length === 0 && previouslyAiredSlots.length === 0 && (() => {
-          // Live/Recommended are exempt from search + filters, so "no results" still takes priority here.
-          if (hasActiveSearchOrFilters(activeFilters, searchQuery)) return html`<${NoResultsFound} />`;
+          if (noResults) return html`<${NoResultsFound} />`;
           if (!live.length && !recommended.length) {
             return html`<div class="sg-empty" role="status" aria-live="polite">No sessions scheduled for this day.</div>`;
           }

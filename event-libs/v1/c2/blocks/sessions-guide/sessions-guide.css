@@ -762,7 +762,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--s2a-spacing-lg);
+  gap: var(--s2a-spacing-md);
   padding: var(--s2a-spacing-4xl) var(--s2a-spacing-lg);
   text-align: center;
   color: var(--s2a-color-content-default);
@@ -771,10 +771,36 @@
 
 .sg-empty--no-results p {
   margin: 0;
+  max-width: 60ch;
 }
 
 .sg-empty__title {
+  font-family: var(--heading-font-family);
+  font-weight: var(--s2a-font-weight-adobe-clean-display-black);
+  font-size: var(--s2a-font-size-lg);
+  line-height: var(--s2a-font-line-height-18, 18px);
+  letter-spacing: var(--s2a-font-letter-spacing-neg-0-2, -0.2px);
+}
+
+.sg-empty__reset {
+  min-height: 40px;
+  padding: var(--s2a-spacing-xs) var(--s2a-spacing-lg);
+  border: var(--s2a-border-width-sm) solid var(--s2a-color-border-knockout, #000);
+  border-radius: var(--s2a-border-radius-round);
+  background: transparent;
+  color: inherit;
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-size: var(--s2a-font-size-sm);
+  line-height: var(--s2a-font-line-height-18, 18px);
+  cursor: pointer;
+}
+
+.sg-empty__reset:hover { background: var(--s2a-color-background-subtle); }
+
+[data-theme="dark"] .sg-empty__reset,
+.sg-portal[data-theme="dark"] .sg-empty__reset {
+  border-color: var(--s2a-color-transparent-white-16);
 }
 
 /* ── Carousel ────────────────────────────────────────────── */
