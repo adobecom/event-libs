@@ -440,7 +440,7 @@
   overflow-y: auto;
 }
 
-/* tabindex="-1" is only a Back-to-top landing target, so the UA focus ring here is noise. */
+/* tabindex="-1" is only a programmatic landing target (Back-to-top, Reset all), so the UA focus ring here is noise. */
 .sg-body-scroll:focus,
 .sg-body-scroll:focus-visible {
   outline: none;
@@ -774,6 +774,13 @@
   max-width: 60ch;
 }
 
+.sg-empty__message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2a-spacing-md);
+}
+
 .sg-empty__title {
   font-family: var(--heading-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
@@ -796,7 +803,14 @@
   cursor: pointer;
 }
 
-.sg-empty__reset:hover { background: var(--s2a-color-background-subtle); }
+.sg-empty__reset:hover {
+  background: var(--s2a-color-background-subtle);
+}
+
+.sg-empty__reset:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 2px;
+}
 
 [data-theme="dark"] .sg-empty__reset,
 .sg-portal[data-theme="dark"] .sg-empty__reset {
@@ -3181,6 +3195,12 @@
 .sg-full-page__body {
   flex: 1;
   padding: var(--s2a-spacing-lg) 0;
+}
+
+/* Programmatic focus target (Reset all), same as .sg-body-scroll. */
+.sg-full-page__body:focus,
+.sg-full-page__body:focus-visible {
+  outline: none;
 }
 
 @media (max-width: 767px) {
