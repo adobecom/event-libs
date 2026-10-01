@@ -278,6 +278,8 @@ sheet or pressing Escape also dismisses it, without dismissing individual
 notifications. Native modal behavior keeps background controls inert and contains
 keyboard focus. Dismissal restores bell focus and the page's previous scroll
 styles. Opening, closing and snap-back motion respect reduced-motion preferences.
+Page scrolling is locked on the document root only. Leaving body overflow unchanged
+keeps sticky navigation pinned to the viewport and preserves the current scroll position.
 Crossing the breakpoint while open switches modal behavior without clearing the inbox.
 A gnav re-render closes the removed dialog and releases its scroll lock; the
 reinserted bell can open it again normally.

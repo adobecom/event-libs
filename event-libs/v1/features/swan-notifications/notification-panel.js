@@ -23,16 +23,15 @@ export function bindNotificationPanel(panel, button, header, onOpen) {
   }
 
   function lockScroll() {
-    const elements = [document.documentElement, document.body];
-    const previous = elements.map((el) => ({
-      value: el.style.getPropertyValue('overflow'),
-      priority: el.style.getPropertyPriority('overflow'),
-    }));
-    elements.forEach((el) => el.style.setProperty('overflow', 'hidden'));
-    restoreScroll = () => elements.forEach((el, i) => {
-      if (previous[i].value) el.style.setProperty('overflow', previous[i].value, previous[i].priority);
-      else el.style.removeProperty('overflow');
-    });
+    // Body overflow creates a scroll container that breaks the sticky navigation.
+    const root = document.documentElement;
+    const value = root.style.getPropertyValue('overflow');
+    const priority = root.style.getPropertyPriority('overflow');
+    root.style.setProperty('overflow', 'hidden');
+    restoreScroll = () => {
+      if (value) root.style.setProperty('overflow', value, priority);
+      else root.style.removeProperty('overflow');
+    };
   }
 
   function stopDrag() {

@@ -336,6 +336,7 @@ describe('notification-widget', function widgetTests() {
       mountPoint.replaceChildren();
       await waitFor(() => !!bell());
       expect(panel().hidden).to.equal(true);
+      expect(document.documentElement.style.overflow).to.equal('');
       expect(document.body.style.overflow).to.equal('');
       bell().click();
       expect(panel().matches(':modal')).to.equal(true);
@@ -392,6 +393,7 @@ describe('notification-widget', function widgetTests() {
       pointer(document, 'pointerup', 370);
       expect(panel().hidden).to.equal(true);
       expect(getEntries()[0].dismissed).to.equal(false);
+      expect(document.documentElement.style.overflow).to.equal('');
       expect(document.activeElement).to.equal(bell());
     });
 
@@ -439,18 +441,59 @@ describe('notification-widget', function widgetTests() {
       expect(panel().getBoundingClientRect().top).to.equal(212);
     });
 
+    it('keeps sticky navigation visible and the page position unchanged when opened after scrolling', async () => {
+      const navigation = document.createElement('header');
+      navigation.className = 'global-navigation';
+      navigation.style.cssText = 'position: sticky; top: 0; height: 80px';
+      const originalBodyStyle = document.body.style.cssText;
+      const originalScrollPosition = { x: window.scrollX, y: window.scrollY };
+      document.body.style.minHeight = '2500px';
+      document.body.style.margin = '0';
+      navigation.append(mountPoint);
+      document.body.prepend(navigation);
+      try {
+        window.scrollTo(0, 600);
+        await waitFor(() => window.scrollY === 600);
+        expect(navigation.getBoundingClientRect().top).to.equal(0);
+        bell().click();
+        expect(panel().matches(':modal')).to.equal(true);
+        expect(navigation.getBoundingClientRect().top).to.equal(0);
+        expect(window.scrollY).to.equal(600);
+        expect(document.documentElement.style.overflow).to.equal('hidden');
+        expect(document.body.style.overflow).to.equal('');
+        await sendKeys({ press: 'PageDown' });
+        expect(window.scrollY).to.equal(600);
+        bell().click();
+        expect(panel().hidden).to.equal(true);
+        expect(document.documentElement.style.overflow).to.equal('');
+        expect(navigation.getBoundingClientRect().top).to.equal(0);
+        expect(window.scrollY).to.equal(600);
+      } finally {
+        if (panel().open) {
+          panel().dispatchEvent(new Event('cancel', { cancelable: true }));
+          await waitFor(() => panel().hidden);
+        }
+        document.body.append(mountPoint);
+        navigation.remove();
+        document.body.style.cssText = originalBodyStyle;
+        window.scrollTo(originalScrollPosition.x, originalScrollPosition.y);
+      }
+    });
+
     it('locks page scrolling and restores the exact original styles after Escape', async () => {
       document.documentElement.style.setProperty('overflow', 'auto', 'important');
-      document.body.style.overflow = 'scroll';
+      document.body.style.setProperty('overflow', 'scroll', 'important');
       try {
         bell().click();
         expect(document.documentElement.style.overflow).to.equal('hidden');
-        expect(document.body.style.overflow).to.equal('hidden');
+        expect(document.body.style.overflow).to.equal('scroll');
+        expect(document.body.style.getPropertyPriority('overflow')).to.equal('important');
         await sendKeys({ press: 'Escape' });
         expect(panel().hidden).to.equal(true);
         expect(document.documentElement.style.overflow).to.equal('auto');
         expect(document.documentElement.style.getPropertyPriority('overflow')).to.equal('important');
         expect(document.body.style.overflow).to.equal('scroll');
+        expect(document.body.style.getPropertyPriority('overflow')).to.equal('important');
         expect(document.activeElement).to.equal(bell());
       } finally {
         if (panel().open) {
@@ -480,11 +523,13 @@ describe('notification-widget', function widgetTests() {
       await waitFor(() => !panel().matches(':modal'));
       expect(panel().open).to.equal(true);
       expect(panel().getBoundingClientRect().width).to.equal(400);
+      expect(document.documentElement.style.overflow).to.equal('');
       expect(document.body.style.overflow).to.equal('');
       await setViewport({ width: 899, height: 956 });
       await waitFor(() => panel().matches(':modal'));
       expect(panel().getBoundingClientRect().width).to.equal(899);
-      expect(document.body.style.overflow).to.equal('hidden');
+      expect(document.documentElement.style.overflow).to.equal('hidden');
+      expect(document.body.style.overflow).to.equal('');
     });
 
     it('slides in from below and waits for slide-out before closing; rapid reopen cancels the exit', async () => {
@@ -507,6 +552,7 @@ describe('notification-widget', function widgetTests() {
       bell().click();
       await waitFor(() => panel().hidden);
       expect(panel().open).to.equal(false);
+      expect(document.documentElement.style.overflow).to.equal('');
       expect(document.body.style.overflow).to.equal('');
     });
 
@@ -520,6 +566,7 @@ describe('notification-widget', function widgetTests() {
       panel().getAnimations()[0].onfinish = null;
       await waitFor(() => panel().hidden);
       expect(panel().open).to.equal(false);
+      expect(document.documentElement.style.overflow).to.equal('');
       expect(document.body.style.overflow).to.equal('');
     });
 
@@ -533,6 +580,7 @@ describe('notification-widget', function widgetTests() {
       await setViewport({ width: 900, height: 956 });
       await waitFor(() => panel().hidden);
       expect(panel().matches(':modal')).to.equal(false);
+      expect(document.documentElement.style.overflow).to.equal('');
       expect(document.body.style.overflow).to.equal('');
     });
 
@@ -548,7 +596,8 @@ describe('notification-widget', function widgetTests() {
       staleFinish();
       expect(panel().open).to.equal(true);
       expect(panel().hidden).to.equal(false);
-      expect(document.body.style.overflow).to.equal('hidden');
+      expect(document.documentElement.style.overflow).to.equal('hidden');
+      expect(document.body.style.overflow).to.equal('');
     });
   });
 
