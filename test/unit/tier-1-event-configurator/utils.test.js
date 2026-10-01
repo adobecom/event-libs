@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  extractTrackIconSlug, extractProductIconSlug, syncIconConfigWithCatalog,
+  extractTrackIconSlug, extractProductIconSlug, syncIconConfigWithCatalog, buildSessionAuthorEntry,
 } from '../../../event-libs/tier-1-event-configurator/utils.js';
 
 describe('tier-1-event-configurator/utils extractTrackIconSlug', () => {
@@ -179,5 +179,56 @@ describe('tier-1-event-configurator/utils syncIconConfigWithCatalog', () => {
     expect(result.config.trackIcons).to.deep.equal({});
     expect(result.config.overrideTrackIcons.byText).to.deep.equal({});
     expect(result.config.products).to.deep.equal({});
+  });
+});
+
+describe('tier-1-event-configurator/utils buildSessionAuthorEntry', () => {
+  function selectValue(label) {
+    return { valueId: `${label.toLowerCase()}-id`, label, value: label.toLowerCase(), ordinal: 0 };
+  }
+
+  function customAttr(name, values) {
+    return { name, values };
+  }
+
+  function baseSession(overrides = {}) {
+    return {
+      sessionId: 'session-1',
+      sessionCode: 'OS100',
+      externalSessionId: 'rf-123',
+      enTitle: 'Test Session',
+      url: 'https://example.com/session',
+      customAttributes: [
+        customAttr('Primary Event Site Track', [selectValue('Branding')]),
+      ],
+      ...overrides,
+    };
+  }
+
+  it('includes additionalTracks when the session has any', () => {
+    const session = baseSession({
+      customAttributes: [
+        customAttr('Primary Event Site Track', [selectValue('Branding')]),
+        customAttr('Additional Event Site Tracks', [selectValue('Video')]),
+      ],
+    });
+    const entry = buildSessionAuthorEntry(session, [], {});
+    expect(entry.additionalTracks).to.deep.equal(['Video']);
+  });
+
+  it('omits additionalTracks when the session has none', () => {
+    const entry = buildSessionAuthorEntry(baseSession(), [], {});
+    expect(entry).to.not.have.property('additionalTracks');
+  });
+
+  it('includes the description from the en-US localization when present', () => {
+    const session = baseSession({ localizations: { 'en-US': { description: 'A great session' } } });
+    const entry = buildSessionAuthorEntry(session, [], {});
+    expect(entry.description).to.equal('A great session');
+  });
+
+  it('omits description when the session has none', () => {
+    const entry = buildSessionAuthorEntry(baseSession(), [], {});
+    expect(entry).to.not.have.property('description');
   });
 });

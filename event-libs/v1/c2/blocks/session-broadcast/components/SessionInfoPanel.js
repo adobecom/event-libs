@@ -101,12 +101,10 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
         </button>
       </div>
       ${actions}
-      ${expanded && html`
-        <div class="sb-info__meta">
-          <${CategoryBadge} session=${session} hideCount=${true} />
-          ${durationLabel && html`<span class="sb-info__time">${durationLabel}</span>`}
-        </div>
-      `}
+      <div class="sb-info__meta">
+        <${CategoryBadge} session=${session} hideCount=${true} />
+        ${expanded && durationLabel && html`<span class="sb-info__time">${durationLabel}</span>`}
+      </div>
       ${session.description && html`
         <div class=${'sb-info__desc-wrap' + (expanded ? ' is-expanded' : '')} id="sb-info-desc">
           <p class="sb-info__desc">${session.description}</p>

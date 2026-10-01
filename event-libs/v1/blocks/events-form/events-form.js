@@ -1,7 +1,7 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getRsvpInvalidSubmissionMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getRsvpInvalidSubmissionMessage, getRsvpDeclinedMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN, STANDARD_FIELD_MAX_LENGTHS } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
@@ -411,6 +411,21 @@ function showSuccessMsgFirstScreen(bp) {
     bp.rsvpSuccessScreen?.classList.remove('hidden');
     bp.rsvpSuccessScreen?.querySelector('.first-screen')?.classList.remove('hidden');
   }
+}
+
+function showDeclinedMessage(bp) {
+  clearForm(bp.form);
+  bp.form.classList.add('hidden');
+  bp.eventHero.classList.add('hidden');
+
+  if (bp.formContainer.querySelector('.rsvp-declined-msg')) return;
+
+  (async () => {
+    await dictionaryManager.initialize();
+    const msg = getRsvpDeclinedMessage(dictionaryManager);
+    const error = createTag('p', { class: 'error rsvp-declined-msg' }, msg);
+    bp.formContainer.append(error);
+  })();
 }
 
 function eventFormSendAnalytics(bp, view) {
@@ -933,12 +948,14 @@ async function addConsentSuite(form) {
   }
 }
 
-export function addTerms(form, terms) {
+export function addTerms(form, terms, hasConsentSuite = false) {
   if (!terms || terms.textContent === '') return;
   const submitWrapper = form.querySelector('.events-form-submit-wrapper');
   const termsWrapper = createTag('div', { class: 'field-wrapper events-form-full-width event-terms-wrapper field-group-wrapper' });
   const cell = terms.querySelector(':scope > div') || terms;
-  const termsContent = cell.querySelectorAll(':scope > p, :scope > ul, :scope > ol');
+  // The consent suite owns the consent line (authored as a list); skip it here to avoid a duplicate.
+  const selector = hasConsentSuite ? ':scope > p' : ':scope > p, :scope > ul, :scope > ol';
+  const termsContent = cell.querySelectorAll(selector);
 
   termsContent.forEach((el) => {
     termsWrapper.append(el);
@@ -946,7 +963,7 @@ export function addTerms(form, terms) {
 
   terms.remove();
 
-  submitWrapper.before(termsWrapper);
+  if (termsWrapper.children.length) submitWrapper.before(termsWrapper);
 }
 
 export function getRsvpConfigFromMeta() {
@@ -1097,13 +1114,15 @@ async function createForm(bp, formData) {
     formEl.append(fieldWrapper);
   });
 
-  addTerms(formEl, terms);
-
   const profile = BlockMediator.get('imsProfile');
   const showConsentForGuest = profile?.account_type === 'guest'
     && (getMetadata('allow-guest-registration') === 'true' || Boolean(profile?.rsvpToken));
   const forceConsent = getMetadata('force-consent-collection') === 'true';
-  if (showConsentForGuest || forceConsent) await addConsentSuite(formEl);
+  const hasConsentSuite = showConsentForGuest || forceConsent;
+
+  addTerms(formEl, terms, hasConsentSuite);
+
+  if (hasConsentSuite) await addConsentSuite(formEl);
 
   formEl.addEventListener('input', () => applyRules(formEl, rules));
   applyRules(formEl, rules);
@@ -1189,6 +1208,10 @@ export async function initFormBasedOnRSVPData(bp) {
   const profile = BlockMediator.get('imsProfile');
   let confirmationViewTracked = false;
   const syncUIWithRSVPStatus = (rsvpData = BlockMediator.get('rsvpData')) => {
+    if (rsvpData?.registrationStatus === 'declined') {
+      showDeclinedMessage(bp);
+      return true;
+    }
     if (!VALID_REGISTRATION_STATUS.includes(rsvpData?.registrationStatus)) return false;
     showSuccessMsgFirstScreen(bp);
     if (!confirmationViewTracked) {
@@ -1204,7 +1227,7 @@ export async function initFormBasedOnRSVPData(bp) {
 
   if (syncUIWithRSVPStatus()) return;
 
-  if (profile.account_type !== 'guest') {
+  if (profile && profile.account_type !== 'guest') {
     let existingAttendeeData = {};
     const attendeeResp = await getAttendee(getMetadata('event-id'));
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
@@ -1238,20 +1261,21 @@ export async function initFormBasedOnRSVPData(bp) {
   }
 }
 
-async function onProfile(bp, formData) {
+export async function onProfile(bp, formData) {
   const { block, eventHero } = bp;
   const profile = BlockMediator.get('imsProfile');
   const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
   let hasHandledProfile = false;
   const handleProfile = (resolvedProfile) => {
-    if (!resolvedProfile || hasHandledProfile) return;
+    if (resolvedProfile === undefined || hasHandledProfile) return;
     hasHandledProfile = true;
+    const profileForGuestGate = resolvedProfile ?? { account_type: 'guest' };
 
-    if (shouldForceGuestSignIn(resolvedProfile, allowGuestReg)
+    if (shouldForceGuestSignIn(profileForGuestGate, allowGuestReg)
       && /#rsvp-form.*/.test(window.location.hash)) {
       // TODO: also check for guestCheckout enablement for future iterations
       signIn(getSusiOptions(getConfig()));
-    } else if (resolvedProfile.rsvpTokenInvalid) {
+    } else if (resolvedProfile?.rsvpTokenInvalid) {
       // RSVP token has already been used, expired, or was revoked. Show a
       // general error and never build the form — the token is not reusable.
       eventHero.classList.remove('loading');
@@ -1290,7 +1314,7 @@ async function onProfile(bp, formData) {
     }
   };
 
-  if (profile) {
+  if (profile !== undefined) {
     handleProfile(profile);
   } else {
     const unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => {

@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds, sessionGuideRequest,
@@ -69,6 +70,225 @@ describe('upcoming-sessions', () => {
     pendingActions.value = new Set();
     liveStreamActiveIds.value = new Set();
     sessionGuideRequest.value = null;
+  });
+
+  afterEach(() => {
+    document.querySelectorAll('.upcoming-sessions').forEach((el) => {
+      el._upcomingSessionsCleanup?.();
+    });
+  });
+
+  describe('state timers', () => {
+    const maxDelay = 2_147_483_647;
+    let clock;
+    let timeoutSpy;
+
+    beforeEach(() => {
+      clock = sinon.useFakeTimers({
+        now: Date.now(),
+        toFake: ['Date', 'setTimeout', 'clearTimeout'],
+      });
+      timeoutSpy = sinon.spy(window, 'setTimeout');
+    });
+
+    afterEach(() => {
+      document.querySelectorAll('.upcoming-sessions').forEach((el) => {
+        el._upcomingSessionsCleanup?.();
+      });
+      sinon.restore();
+      clock.restore();
+    });
+
+    function buildTimedBlock(delay) {
+      const startTimeMillis = Date.now() + delay;
+      return buildBlock([session({
+        sessionTime: {
+          startTimeMillis,
+          endTimeMillis: startTimeMillis + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      })]);
+    }
+
+    [maxDelay - 1, maxDelay, maxDelay + 1].forEach((delay) => {
+      it(`removes a session only at its start with a ${delay} ms wait at the timer boundary`, async () => {
+        const el = buildTimedBlock(delay);
+        await init(el);
+
+        expect(timeoutSpy.lastCall.args[1]).to.equal(Math.min(delay, maxDelay));
+        expect(clock.countTimers()).to.equal(1);
+        clock.tick(delay - 1);
+
+        const card = el.querySelector('.upcoming-sessions-card');
+        expect(card).to.exist;
+        expect(card.classList.contains('upcoming-sessions-card--rotating-out')).to.equal(false);
+        expect(clock.countTimers()).to.equal(1);
+        if (delay > maxDelay) expect(timeoutSpy.lastCall.args[1]).to.equal(1);
+
+        clock.tick(1);
+        expect(card.classList.contains('upcoming-sessions-card--rotating-out')).to.equal(true);
+        clock.tick(350);
+        expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+        expect(clock.countTimers()).to.equal(0);
+      });
+    });
+
+    [40, 62].forEach((days) => {
+      it(`keeps a session ${days} days away visible through capped waits until its start`, async () => {
+        const delay = days * 86_400_000;
+        const startTimeMillis = Date.now() + delay;
+        const el = buildBlock([session({
+          sessionTime: {
+            startTimeMillis,
+            endTimeMillis: startTimeMillis + 3_600_000,
+            timezone: 'America/Los_Angeles',
+          },
+        })]);
+        await init(el);
+
+        expect(timeoutSpy.lastCall.args[1]).to.equal(maxDelay);
+        clock.tick(maxDelay);
+        expect(el.querySelector('.upcoming-sessions-card')).to.exist;
+        expect(timeoutSpy.lastCall.args[1]).to.equal(Math.min(delay - maxDelay, maxDelay));
+
+        clock.tick(delay - maxDelay - 1);
+        expect(el.querySelector('.upcoming-sessions-card')).to.exist;
+        clock.tick(351);
+        expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+        expect(clock.countTimers()).to.equal(0);
+      });
+    });
+
+    it('uses the actual remaining wait for a session starting within the timer limit', async () => {
+      const el = buildBlock([session()]);
+      await init(el);
+
+      expect(timeoutSpy.lastCall.args[1]).to.equal(60_000);
+      clock.tick(59_999);
+      expect(el.querySelector('.upcoming-sessions-card')).to.exist;
+      clock.tick(351);
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+    });
+
+    it('recalculates the remaining wait from the current clock when a capped callback runs late', async () => {
+      const delay = 40 * 86_400_000;
+      const lateness = 2 * 86_400_000;
+      const el = buildTimedBlock(delay);
+      await init(el);
+
+      clock.setSystemTime(Date.now() + lateness);
+      clock.tick(maxDelay);
+
+      expect(timeoutSpy.lastCall.args[1]).to.equal(delay - maxDelay - lateness);
+      expect(clock.countTimers()).to.equal(1);
+      const card = el.querySelector('.upcoming-sessions-card');
+      expect(card.classList.contains('upcoming-sessions-card--rotating-out')).to.equal(false);
+
+      clock.tick(delay - maxDelay - lateness);
+      expect(card.classList.contains('upcoming-sessions-card--rotating-out')).to.equal(true);
+      clock.tick(350);
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('drops a session rather than rescheduling when a capped callback runs after its start', async () => {
+      const delay = 40 * 86_400_000;
+      const el = buildTimedBlock(delay);
+      await init(el);
+
+      clock.setSystemTime(Date.now() + delay);
+      clock.tick(maxDelay);
+
+      expect(el.querySelector('.upcoming-sessions-card')
+        .classList.contains('upcoming-sessions-card--rotating-out')).to.equal(true);
+      clock.tick(350);
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('removes only the session that starts while keeping a far-future session scheduled', async () => {
+      const startTimeMillis = Date.now() + 40 * 86_400_000;
+      const el = buildBlock([
+        session({ sessionId: 'near-session' }),
+        session({
+          sessionId: 'far-session',
+          sessionTime: {
+            startTimeMillis,
+            endTimeMillis: startTimeMillis + 3_600_000,
+            timezone: 'America/Los_Angeles',
+          },
+        }),
+      ]);
+      await init(el);
+      expect(clock.countTimers()).to.equal(2);
+
+      clock.tick(60_700);
+
+      expect(el.querySelector('[data-session-id="near-session"]')).to.not.exist;
+      expect(el.querySelector('[data-session-id="far-session"]')).to.exist;
+      expect(clock.countTimers()).to.equal(1);
+      favorited.value = new Set(['far-session']);
+      expect(el.querySelector('[data-session-id="near-session"]')).to.not.exist;
+      expect(el.querySelector('[data-session-id="far-session"]')).to.exist;
+    });
+
+    it('cancels the replacement timer during re-decoration without creating duplicate timers', async () => {
+      const delay = 40 * 86_400_000;
+      const el = buildTimedBlock(delay);
+      await init(el);
+      clock.tick(maxDelay);
+      const replacementTimer = timeoutSpy.lastCall.returnValue;
+      const clearSpy = sinon.spy(window, 'clearTimeout');
+
+      await init(el);
+
+      expect(clearSpy.calledWith(replacementTimer)).to.equal(true);
+      expect(timeoutSpy.lastCall.args[1]).to.equal(delay - maxDelay);
+      expect(clock.countTimers()).to.equal(1);
+      clock.tick(delay - maxDelay + 350);
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('cancels the rescheduled timer during cleanup', async () => {
+      const startTimeMillis = Date.now() + 40 * 86_400_000;
+      const el = buildBlock([session({
+        sessionTime: {
+          startTimeMillis,
+          endTimeMillis: startTimeMillis + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      })]);
+      await init(el);
+      clock.tick(maxDelay);
+      expect(clock.countTimers()).to.equal(1);
+
+      el._upcomingSessionsCleanup();
+
+      expect(clock.countTimers()).to.equal(0);
+      clock.tick(40 * 86_400_000);
+      expect(el.querySelector('.upcoming-sessions-card')).to.exist;
+    });
+
+    it('rechecks elapsed time and clears the capped timer when the tab becomes visible', async () => {
+      const startTimeMillis = Date.now() + 40 * 86_400_000;
+      const el = buildBlock([session({
+        sessionTime: {
+          startTimeMillis,
+          endTimeMillis: startTimeMillis + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      })]);
+      await init(el);
+      sinon.stub(document, 'visibilityState').get(() => 'visible');
+
+      clock.setSystemTime(startTimeMillis);
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+      clock.tick(350);
+      expect(clock.countTimers()).to.equal(0);
+    });
   });
 
   describe('init(el)', () => {
@@ -275,7 +495,7 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-card__title').textContent).to.equal('Intro to Adobe Express');
     });
 
-    it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone, with a lowercase am/pm', () => {
+    it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone, with a lowercase am/pm joined by an en dash and no space before am/pm', () => {
       const startMillis = Date.parse('2026-08-12T17:00:00.000Z');
       const card = buildCard(session({
         sessionTime: {
@@ -284,16 +504,23 @@ describe('upcoming-sessions', () => {
           timezone: 'America/Los_Angeles',
         },
       }));
-      const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
       const endMillis = startMillis + 60 * 60_000;
-      const lowercaseMeridiem = (time) => time.replace(/\b(AM|PM)\b/, (m) => m.toLowerCase());
-      const start = lowercaseMeridiem(new Date(startMillis).toLocaleTimeString('en-US', timeOptions));
-      const end = lowercaseMeridiem(
-        new Date(endMillis).toLocaleTimeString('en-US', { ...timeOptions, timeZoneName: 'short' }),
-      );
-      expect(card.querySelector('.sg-card__time').textContent).to.equal(`${start} - ${end}`);
-      expect(card.querySelector('.sg-card__time').textContent).to.match(/\b(am|pm)\b/);
+      const partsFor = (millis, withTimeZone) => new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        ...(withTimeZone ? { timeZoneName: 'short' } : {}),
+      }).formatToParts(new Date(millis));
+      const join = (parts) => parts.reduce((out, part, i) => {
+        if (part.type === 'literal' && part.value.trim() === '' && parts[i + 1]?.type === 'dayPeriod') return out;
+        return out + (part.type === 'dayPeriod' ? part.value.toLowerCase() : part.value);
+      }, '');
+      const start = join(partsFor(startMillis, false));
+      const end = join(partsFor(endMillis, true));
+      expect(card.querySelector('.sg-card__time').textContent).to.equal(`${start}–${end}`);
+      expect(card.querySelector('.sg-card__time').textContent).to.match(/(am|pm)\b/);
       expect(card.querySelector('.sg-card__time').textContent).to.not.match(/\b(AM|PM)\b/);
+      expect(card.querySelector('.sg-card__time').textContent).to.not.match(/ (am|pm)\b/);
+      expect(card.querySelector('.sg-card__time').textContent).to.not.match(/\d [-–] \d/);
     });
 
     it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {
@@ -343,6 +570,16 @@ describe('upcoming-sessions', () => {
       expect(footer.querySelector('.sg-card__time')).to.not.equal(null);
     });
 
+    it('renders the title before the badge-row so Tablet/Mobile shows title, then track, then time/icons', () => {
+      const card = buildCard(session());
+      const body = card.querySelector('.sg-card__body');
+      const children = [...body.children];
+      const titleIndex = children.findIndex((n) => n.classList.contains('sg-card__title'));
+      const badgeRowIndex = children.findIndex((n) => n.classList.contains('sg-card__badge-row'));
+      expect(titleIndex).to.be.greaterThan(-1);
+      expect(badgeRowIndex).to.be.greaterThan(titleIndex);
+    });
+
     it('renders no badge (not a mainstage fallback) when the track has no icon config match', () => {
       // No built-in defaults, and 'mainstage' isn't specially guaranteed to exist either
       // (see tier-1-event-config.js/upcoming-sessions.js) — no config, no badge.
@@ -354,6 +591,36 @@ describe('upcoming-sessions', () => {
     it('omits the badge entirely when there is no track at all', () => {
       const card = buildCard(session({ track: '' }));
       expect(card.querySelector('.sg-category-badge')).to.equal(null);
+    });
+
+    it('renders a description paragraph when the payload supplies one', () => {
+      const card = buildCard(session({ description: 'Learn the fundamentals of Adobe Express.' }));
+      const description = card.querySelector('.sg-card__description');
+      expect(description).to.not.equal(null);
+      expect(description.textContent).to.equal('Learn the fundamentals of Adobe Express.');
+    });
+
+    it('omits the description paragraph entirely when the payload does not supply one (TEC homepage payload may not carry it yet)', () => {
+      const card = buildCard(session());
+      expect(card.querySelector('.sg-card__description')).to.equal(null);
+    });
+
+    it('renders a "+N" count on both the badge-row and footer badges when additionalTracks is present', () => {
+      const card = buildCard(session({ additionalTracks: ['3D & Immersive'] }));
+      const topCount = card.querySelector('.sg-card__badge-row .sg-category-badge__count');
+      const footerCount = card.querySelector('.sg-card__footer-badge .sg-category-badge__count');
+      expect(topCount.textContent).to.equal('+1');
+      expect(footerCount.textContent).to.equal('+1');
+    });
+
+    it('caps the additional-track count at 1 even if the payload sends more than one extra track', () => {
+      const card = buildCard(session({ additionalTracks: ['3D & Immersive', 'AI'] }));
+      expect(card.querySelector('.sg-category-badge__count').textContent).to.equal('+1');
+    });
+
+    it('omits the count entirely when there are no additional tracks', () => {
+      const card = buildCard(session());
+      expect(card.querySelector('.sg-category-badge__count')).to.equal(null);
     });
 
     it('renders the schedule and favorite buttons unconditionally, not only on hover/scheduled/favorited', () => {

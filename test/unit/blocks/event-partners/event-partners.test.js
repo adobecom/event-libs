@@ -80,6 +80,57 @@ describe('Sponsors Module', () => {
       expect(links[1].title).to.equal('Partner 2');
     });
 
+    it('should render partners sorted by ordinal rather than metadata array order', () => {
+      setMetadata('show-sponsors', 'true');
+      setMetadata('sponsors', JSON.stringify([
+        {
+          name: 'Partner 2',
+          image: { imageUrl: 'https://example.com/image2.jpg', altText: 'Partner 2' },
+          link: 'https://example.com/partner2',
+          ordinal: 1,
+        },
+        {
+          name: 'Partner 1',
+          image: { imageUrl: 'https://example.com/image1.jpg', altText: 'Partner 1' },
+          link: 'https://example.com/partner1',
+          ordinal: 0,
+        },
+      ]));
+
+      const el = document.querySelector('.event-partners');
+      init(el);
+
+      const container = el.querySelector('.event-partners-container');
+      const logos = container.querySelectorAll('.logo img');
+      expect(logos[0].alt).to.equal('Partner 1');
+      expect(logos[1].alt).to.equal('Partner 2');
+    });
+
+    it('should place partners without an ordinal after partners that have one', () => {
+      setMetadata('show-sponsors', 'true');
+      setMetadata('sponsors', JSON.stringify([
+        {
+          name: 'No Ordinal',
+          image: { imageUrl: 'https://example.com/image3.jpg', altText: 'No Ordinal' },
+          link: 'https://example.com/partner3',
+        },
+        {
+          name: 'Partner 1',
+          image: { imageUrl: 'https://example.com/image1.jpg', altText: 'Partner 1' },
+          link: 'https://example.com/partner1',
+          ordinal: 0,
+        },
+      ]));
+
+      const el = document.querySelector('.event-partners');
+      init(el);
+
+      const container = el.querySelector('.event-partners-container');
+      const logos = container.querySelectorAll('.logo img');
+      expect(logos[0].alt).to.equal('Partner 1');
+      expect(logos[1].alt).to.equal('No Ordinal');
+    });
+
     it('should add "single" class if there is only one partner', () => {
       setMetadata('show-sponsors', 'true');
       setMetadata('sponsors', JSON.stringify([

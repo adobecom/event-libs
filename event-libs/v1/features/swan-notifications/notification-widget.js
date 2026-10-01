@@ -1,12 +1,13 @@
 import {
-  createTag, loadStyle, getEventConfig, getFallbackLocale, getMetadata, isNonProdHost,
+  createTag, loadStyle, getEventConfig, getFallbackLocale, getMetadata,
 } from '../../utils/utils.js';
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getRelativeTime, createTemplatedDateRange } from '../../utils/date-time-helper.js';
 import { getNowMs } from '../../utils/session-state.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
 import {
-  notifications, markRead, markAllRead, dismissEntry, getEntries,
+  notifications, notificationsReady, markRead, markAllRead, dismissEntry, getEntries, flushNotifications,
 } from './notification-store.js';
 import { STAGE_COPY } from './swan-payload.js';
 import { waitForElement } from './gnav-wait.js';
@@ -18,18 +19,8 @@ import { isGnavNotificationsEnabled } from './swan-config.js';
 // Preact render tree. Injected into `.feds-notifications-wrapper`, the dedicated placeholder
 // federal added for this widget (federal#203 / MWPW-207209) — rendered unconditionally right
 // before `.feds-utilities` in gnav's own template, the same pattern used for Brand
-// Concierge's `.feds-bc-wrapper`. Replaces an earlier stopgap that injected straight into
-// `#universal-nav`, UniversalNav's own rendered container, before federal owned a real slot.
-//
-// TEMPORARY — remove once federal#203/MWPW-207209 has shipped to every environment this
-// widget is tested against: `.feds-notifications-wrapper` doesn't exist in deployed gnav
-// markup until then, so `?swanMountFallback=true` in the URL opts back into the old
-// `#universal-nav` stopgap purely so the widget itself can still be exercised locally in
-// the meantime. Gated to non-prod hosts (isNonProdHost()) — this can't be triggered on a
-// real adobe.com page.
-const MOUNT_SELECTOR = isNonProdHost() && new URLSearchParams(window.location.search).get('swanMountFallback') === 'true'
-  ? '#universal-nav'
-  : '.feds-notifications-wrapper';
+// Concierge's `.feds-bc-wrapper`.
+const MOUNT_SELECTOR = '.feds-notifications-wrapper';
 
 // Real gnav bell glyph, supplied directly (not resolved via features/icons/icon-resolver.js)
 // for a closer look/feel match. Both light/dark source files share the same path (only their
@@ -52,7 +43,7 @@ const CLOSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" 
 // name stays "reminder" (it means something more specific: before the lead-time window).
 // Values double as dictionary keys/English fallbacks (dictionaryManager.getValue(key) returns
 // the key itself when unloaded/missing), same convention as sessions-hub.js's own copy.
-const STAGE_PILL_LABEL = { reminder: 'Upcoming', live: 'Live', 'on-demand': 'On-Demand' };
+const STAGE_PILL_LABEL = { reminder: 'Upcoming', live: 'Live', 'on-demand': 'On Demand' };
 
 let mounted = false;
 
@@ -68,35 +59,54 @@ function resolveTimezone() {
   return getMetadata('event-type') === 'InPerson' ? getMetadata('timezone') : null;
 }
 
-// SESSION_ICON_FALLBACK is the placeholder's initial (and, absent a track icon, final)
-// content. When the session has a track icon, fetchFederalTrackIcon resolves it in the
-// background and swaps it in — but only if it actually resolves to something and the
-// placeholder is still on the page (renderList() rebuilds the whole <ul> on every store
-// change, so a slow fetch can easily outlive the row it was meant for).
-function renderTrackIconPlaceholder(entry) {
-  const placeholder = createTag('span', { class: 'swan-notif__icon swan-notif__icon--placeholder', 'aria-hidden': 'true' }, SESSION_ICON_FALLBACK);
-  if (entry.trackIconName) {
-    fetchFederalTrackIcon(entry.trackIconName).then((svg) => {
-      if (!svg || !placeholder.isConnected) return;
-      svg.setAttribute('width', '28');
-      svg.setAttribute('height', '28');
-      placeholder.replaceChildren(svg);
-    });
-  }
-  return placeholder;
+function renderMaxBadge() {
+  return createTag('span', { class: 'swan-notif__icon swan-notif__icon--placeholder', 'aria-hidden': 'true' }, SESSION_ICON_FALLBACK);
 }
 
-// entry.iconUrl only says a thumbnail was authored, not that it will actually load — a 404
-// or CORS failure would otherwise leave a broken-image glyph in place forever. Falling back
-// to the same track-icon/SESSION_ICON_FALLBACK chain here, rather than a bare placeholder,
-// means a broken thumbnail degrades exactly like having no thumbnail at all.
-function renderThumbnail(entry) {
-  if (!entry.iconUrl) return renderTrackIconPlaceholder(entry);
-  const img = createTag('img', { class: 'swan-notif__icon', src: entry.iconUrl, alt: '' });
-  img.addEventListener('error', () => {
-    if (img.isConnected) img.replaceWith(renderTrackIconPlaceholder(entry));
-  }, { once: true });
-  return img;
+// Priority is track icon, then the session's own thumbnail, then the MAX badge as a last
+// resort — a track icon wins even over a thumbnail that's already loaded, since
+// fetchFederalTrackIcon is always attempted whenever entry.trackIconName is set, regardless
+// of entry.iconUrl. `current` tracks whichever element is actually on the page right now, so
+// a resolved track icon always replaces it (thumbnail or badge), and a stale event (a late
+// <img> error after the track icon already won, or either firing after renderList() rebuilds
+// the whole <ul> for a different render) can never clobber whatever's already showing.
+function renderIcon(entry) {
+  let current = entry.iconUrl
+    ? createTag('img', { class: 'swan-notif__icon', src: entry.iconUrl, alt: '' })
+    : renderMaxBadge();
+
+  if (entry.iconUrl) {
+    const img = current;
+    img.addEventListener('error', () => {
+      if (current !== img || !img.isConnected) return;
+      const badge = renderMaxBadge();
+      img.replaceWith(badge);
+      current = badge;
+    }, { once: true });
+  }
+
+  if (entry.trackIconName) {
+    fetchFederalTrackIcon(entry.trackIconName).then((svg) => {
+      if (!svg || !current.isConnected) return;
+      svg.setAttribute('width', '28');
+      svg.setAttribute('height', '28');
+      const trackTile = createTag('span', { class: 'swan-notif__icon swan-notif__icon--placeholder', 'aria-hidden': 'true' }, svg);
+      current.replaceWith(trackTile);
+      current = trackTile;
+    });
+  }
+
+  return current;
+}
+
+// createTemplatedDateRange() is shared (and reachable from CMS-authored templates), so the
+// reminder line's time styling is fixed up here instead of in date-time-helper.js. Drops a
+// leading zero on the hour and lowercases the meridiem — the hour rule is anchored to a
+// H:MM colon pattern so it can't touch the {dd} day-of-month number (e.g. "06").
+export function normalizeTimeCasing(dateRangeStr) {
+  return dateRangeStr
+    .replace(/\b0(\d:\d{2})/g, '$1')
+    .replace(/\s(AM|PM)\b/gi, (_match, meridiem) => meridiem.toLowerCase());
 }
 
 // Three lines per the Figma spec (node 9690:20849): category kicker + stage pill, then the
@@ -115,7 +125,7 @@ function renderRow(entry, locale, timezone, onDismiss) {
   });
 
   row.append(createTag('span', { class: 'swan-notif__dot', 'aria-hidden': 'true' }));
-  row.append(renderThumbnail(entry));
+  row.append(renderIcon(entry));
 
   const body = createTag('div', { class: 'swan-notif__body' });
 
@@ -133,21 +143,22 @@ function renderRow(entry, locale, timezone, onDismiss) {
   body.append(title);
 
   if (entry.stage === 'reminder') {
-    const startTime = createTemplatedDateRange(
+    const startTime = normalizeTimeCasing(createTemplatedDateRange(
       entry.startTimeMs,
       entry.endTimeMs,
       locale,
-      '{ddd}, {LLL} {dd} · {timeRange} {timeZone}',
+      '{LLL} {dd}, {timeRange} {timeZone}',
       timezone,
-    );
+    ));
     if (startTime) body.append(createTag('p', { class: 'swan-notif__time' }, startTime));
   }
 
   body.append(createTag('p', { class: 'swan-notif__time' }, getRelativeTime(entry.updatedAt, locale, getNowMs())));
   row.append(body);
 
-  function activate() {
+  async function activate() {
     markRead(entry.rfCode);
+    await flushNotifications();
     if (entry.actionUrl) window.location.href = entry.actionUrl;
   }
   row.addEventListener('click', activate);
@@ -212,6 +223,11 @@ function buildWidget(mount) {
   badge.hidden = true;
   button.append(badge);
 
+  const tooltip = createTag('span', { class: 'swan-notif__tooltip', 'aria-hidden': 'true' });
+  tooltip.hidden = true;
+  tooltip.append(createTag('span', { class: 'swan-notif__tooltip-tip' }));
+  tooltip.append(createTag('span', { class: 'swan-notif__tooltip-label' }, dictionaryManager.getValue('Notifications')));
+
   // data-lenis-prevent: milo's Lenis smooth-scroll instance (loaded on foundation=c2 pages)
   // hijacks wheel/touch events at the document level; this attribute is Lenis's own
   // documented escape hatch for a nested scrollable region, already used the same way by
@@ -234,10 +250,7 @@ function buildWidget(mount) {
     class: 'swan-notif__sr-only', role: 'status', 'aria-live': 'polite',
   });
 
-  wrapper.append(button, panel, announcer);
-  // Prepend rather than append: `.feds-notifications-wrapper` is empty so order doesn't
-  // matter there, but the `?swanMountFallback=true` fallback mounts into `#universal-nav`
-  // alongside UNC's other icons, where this needs to land first to match the Figma order.
+  wrapper.append(button, tooltip, panel, announcer);
   mount.prepend(wrapper);
 
   // Cheap insurance for the life of the page: nothing today re-renders gnav's own template
@@ -253,12 +266,6 @@ function buildWidget(mount) {
     button.setAttribute('aria-expanded', 'false');
     document.removeEventListener('click', onOutsideClick);
     document.removeEventListener('keydown', onKeydown);
-    // Closing, not opening, is "having seen" the list — marking read on open would clear
-    // the unread dot/tint before the attendee ever actually saw it (both happen
-    // synchronously, in the same tick, before the browser paints). This still clears the
-    // badge for entries never individually clicked, just one interaction later; markAllRead()
-    // itself no-ops (no signal write) when nothing is unread.
-    markAllRead();
   }
 
   function onOutsideClick(e) {
@@ -269,11 +276,20 @@ function buildWidget(mount) {
     if (e.key === 'Escape') closePanel();
   }
 
+  function closeOtherGnavPopups() {
+    document.querySelectorAll('header.global-navigation [aria-expanded="true"]').forEach((trigger) => {
+      if (wrapper.contains(trigger)) return;
+      trigger.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   function openPanel() {
+    closeOtherGnavPopups();
     panel.hidden = false;
     button.setAttribute('aria-expanded', 'true');
     document.addEventListener('click', onOutsideClick);
     document.addEventListener('keydown', onKeydown);
+    if (notificationsReady.value) markAllRead();
   }
 
   button.addEventListener('click', (e) => {
@@ -305,16 +321,27 @@ function buildWidget(mount) {
   // whatever's already in the store (e.g. unread entries persisted from an earlier visit),
   // which must never be announced as "new" on this first call.
   let previousUnreadCount = null;
-  notifications.subscribe((entries) => {
+  function updateList() {
     // Dismissed entries stay in the store (so the stage guard in swan-notifications.js can
     // still see them) but must never render or count toward the badge/announcer.
-    const visibleEntries = entries.filter((entry) => !entry.dismissed);
+    const visibleEntries = notificationsReady.value
+      ? notifications.value.filter((entry) => !entry.dismissed) : [];
     const unreadCount = renderList(sectionTitle, list, badge, visibleEntries, locale, timezone, dismissAndRefocus);
+    if (!notificationsReady.value) {
+      previousUnreadCount = null;
+      announcer.textContent = '';
+      return;
+    }
     if (previousUnreadCount !== null && unreadCount > previousUnreadCount) {
       const key = unreadCount === 1 ? '{count} new notification' : '{count} new notifications';
       announcer.textContent = dictionaryManager.getValue(key).replace('{count}', unreadCount);
     }
     previousUnreadCount = unreadCount;
+  }
+  notifications.subscribe(updateList);
+  notificationsReady.subscribe((ready) => {
+    if (ready && !panel.hidden) markAllRead();
+    updateList();
   });
 }
 
@@ -322,9 +349,8 @@ export function mountNotificationWidget() {
   if (mounted) return;
   // Federal only renders `.feds-notifications-wrapper` when the page also carries
   // gnav-notifications=on — skip the wait entirely rather than timing out against an
-  // element that will never appear. The swanMountFallback dev path intentionally bypasses
-  // gnav altogether, so it keeps working regardless of this flag.
-  if (MOUNT_SELECTOR === '.feds-notifications-wrapper' && !isGnavNotificationsEnabled()) return;
+  // element that will never appear.
+  if (!isGnavNotificationsEnabled()) return;
   mounted = true;
 
   loadStyle(new URL('./notification-widget.css', import.meta.url).href);
@@ -334,7 +360,7 @@ export function mountNotificationWidget() {
   // buildWidget() calls dictionaryManager.getValue() synchronously regardless of whether this
   // has resolved yet; it just falls back to the English key text until it has.
   dictionaryManager.initialize().catch((err) => {
-    window.lana?.log(`[notification-widget] dictionary failed to load, using fallback copy: ${err.message}`);
+    logError('notification-widget', 'dictionary failed to load, using fallback copy', err);
   });
 
   waitForElement(MOUNT_SELECTOR).then((mount) => {
@@ -345,7 +371,7 @@ export function mountNotificationWidget() {
       // appear. session-store.js's syncAuth() re-invokes this on every imsProfile change,
       // giving this a real retry path rather than needing its own polling loop.
       mounted = false;
-      window.lana?.log('[notification-widget] gnav notifications placeholder never appeared — bell not mounted, will retry on next call');
+      logWarning('notification-widget', 'gnav notifications placeholder never appeared — bell not mounted, will retry on next call');
       return;
     }
     buildWidget(mount);

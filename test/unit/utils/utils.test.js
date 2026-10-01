@@ -2,8 +2,35 @@ import { expect } from '@esm-bundle/chai';
 
 import {
   getValidCampaignIdFromUrl, resolveRoutedCampaignId, resetCampaignMapCache, getRsvpToken,
-  shouldForceGuestSignIn, safeUrl, isNonProdHost,
+  shouldForceGuestSignIn, safeUrl, isNonProdHost, normalizeMultilineText,
 } from '../../../event-libs/v1/utils/utils.js';
+
+describe('normalizeMultilineText', () => {
+  it('returns an empty string for empty input', () => {
+    expect(normalizeMultilineText(undefined)).to.equal('');
+    expect(normalizeMultilineText('')).to.equal('');
+  });
+
+  it('keeps real newlines and unifies CRLF / CR', () => {
+    expect(normalizeMultilineText('a\r\nb\rc\nd')).to.equal('a\nb\nc\nd');
+  });
+
+  it('converts literal "\\n" / "\\r\\n" escapes to newlines', () => {
+    expect(normalizeMultilineText('Intro\\n\\nKey takeaways:\\r\\n- One')).to.equal('Intro\n\nKey takeaways:\n- One');
+  });
+
+  it('turns real and literal tabs into spaces', () => {
+    expect(normalizeMultilineText('a\tb\\tc')).to.equal('a b c');
+  });
+
+  it('drops trailing spaces before a break, caps blank lines at one, and trims', () => {
+    expect(normalizeMultilineText('  a   \n\n\n\nb  ')).to.equal('a\n\nb');
+  });
+
+  it('leaves single-line copy untouched', () => {
+    expect(normalizeMultilineText('How do you embrace new technology?')).to.equal('How do you embrace new technology?');
+  });
+});
 
 function mockCampaignMap(rules) {
   window.fetch = async (url) => {
@@ -114,15 +141,16 @@ describe('shouldForceGuestSignIn', () => {
     expect(shouldForceGuestSignIn({ account_type: 'type3' }, false)).to.equal(false);
   });
 
-  it('does not force sign-in when profile is null/undefined', () => {
-    expect(shouldForceGuestSignIn(null, false)).to.equal(false);
+  it('forces sign-in for a resolved signed-out profile', () => {
+    expect(shouldForceGuestSignIn(null, false)).to.equal(true);
+  });
+
+  it('does not force sign-in when profile is still unresolved', () => {
     expect(shouldForceGuestSignIn(undefined, false)).to.equal(false);
   });
 });
 
 describe('isNonProdHost', () => {
-  // Shared gate for debug/test query params (?milolibs=, ?swanMountFallback=)
-  // — real prod domains must never match, or those overrides would work on adobe.com itself.
   it('rejects real production domains', () => {
     expect(isNonProdHost('www.adobe.com')).to.equal(false);
     expect(isNonProdHost('business.adobe.com')).to.equal(false);
@@ -137,6 +165,18 @@ describe('isNonProdHost', () => {
   it('accepts local dev hosts', () => {
     expect(isNonProdHost('localhost')).to.equal(true);
     expect(isNonProdHost('local.adobe.com')).to.equal(true);
+  });
+
+  it('accepts Forge render origins', () => {
+    expect(isNonProdHost('milo-core-prod.adobe.io')).to.equal(true);
+    expect(isNonProdHost('forge-replay-dev.adobe.io')).to.equal(true);
+    expect(isNonProdHost('forge-replay-preprod.adobe.io')).to.equal(true);
+  });
+
+  it('rejects stage.adobe.com and its subdomains (they serve Milo from /libs)', () => {
+    expect(isNonProdHost('stage.adobe.com')).to.equal(false);
+    expect(isNonProdHost('business.stage.adobe.com')).to.equal(false);
+    expect(isNonProdHost('www.stage.adobe.com')).to.equal(false);
   });
 });
 

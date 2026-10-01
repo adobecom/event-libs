@@ -2,25 +2,21 @@ import BlockMediator from '../deps/block-mediator.min.js';
 import { getEventAttendee, validateRsvpToken } from './esp-controller.js';
 import { getMetadata, getRsvpToken, waitForAdobeIMS } from './utils.js';
 
+/**
+ * Resolves the visitor's profile from IMS. Always resolves to an object so `imsProfile`
+ * consumers can keep treating `undefined` as "not resolved yet":
+ * - signed-in user: the full IMS profile
+ * - guest IMS token: `{ account_type: 'guest' }`
+ * - no IMS credential: `{ noProfile: true }`
+ */
 export async function getProfile() {
-  const { feds, adobeProfile, fedsConfig, adobeIMS } = window;
-
-  const getUserProfile = () => {
-    if (fedsConfig?.universalNav) {
-      return feds?.services?.universalnav?.interface?.adobeProfile?.getUserProfile()
-          || adobeProfile?.getUserProfile();
-    }
-
-    return (
-      feds?.services?.profile?.interface?.adobeProfile?.getUserProfile()
-      || adobeProfile?.getUserProfile()
-      || adobeIMS?.getProfile()
-    );
-  };
-
-  const profile = await getUserProfile();
-
-  return profile;
+  if (!window.adobeIMS) await waitForAdobeIMS();
+  const { adobeIMS } = window;
+  if (!adobeIMS) return { noProfile: true };
+  if (adobeIMS.isSignedInUser?.()) return (await adobeIMS.getProfile()) || { noProfile: true };
+  // imslib's getProfile() rejects for guest tokens, so derive the guest type from the token.
+  if (adobeIMS.getAccessToken?.()?.isGuestToken) return { account_type: 'guest' };
+  return { noProfile: true };
 }
 
 export async function lazyCaptureProfile() {

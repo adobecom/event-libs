@@ -5,7 +5,7 @@ import {
   mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, invalidFormatReason, isMissingFormat,
   ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, getProductAttributeId, sessionPageUrlForEnv, parseDvrDelayHours,
-  getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes,
+  getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes, getSessionDescription,
   reportDroppedSessions, fetchSessions,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 import { setEventServiceEnvOverride } from '../../../../event-libs/v1/utils/utils.js';
@@ -978,6 +978,21 @@ describe('services/sessions/sessions-api', () => {
       expect(max25.contentCategory).to.deep.equal(['How To']);
     });
 
+    // RainFocus casing drifts across sessions (e.g. "Primary event site track"); the attribute
+    // name match is case-insensitive so the track still resolves.
+    it('matches custom-attribute names case-insensitively', () => {
+      const [session] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'lowercase-track',
+          customAttributes: [
+            ONLINE_FORMAT,
+            customAttr('Primary event site track', [selectValue('Creator', 'creator')]),
+          ],
+        }],
+      });
+      expect(session.primaryTrack).to.equal('Creator');
+    });
+
     it('leaves additionalTracks/trackOverride empty for a MAX25-shaped session with neither field', () => {
       expect(max25.additionalTracks).to.deep.equal([]);
       expect(max25.trackOverride).to.equal('');
@@ -1039,6 +1054,16 @@ describe('services/sessions/sessions-api', () => {
   });
 
   describe('normalizeSessions', () => {
+    it('normalizes description line breaks (CRLF, literal \\n, tabs) to "\\n"', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1', description: 'Intro\r\n\r\nKey takeaways:\\n-\tOne' }]);
+      expect(normalized.description).to.equal('Intro\n\nKey takeaways:\n- One');
+    });
+
+    it('defaults description to an empty string', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1' }]);
+      expect(normalized.description).to.equal('');
+    });
+
     it('defaults resources/mrStreamId to [] / null when the raw session provides neither', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: ['Designer'] }]);
       expect(normalized.resources).to.deep.equal([]);
@@ -1282,6 +1307,19 @@ describe('additional event site tracks', () => {
   });
 });
 
+describe('getSessionDescription', () => {
+  it('reads the en-US localization description', () => {
+    const session = { localizations: { 'en-US': { description: 'Testing test test' } } };
+    expect(getSessionDescription(session)).to.equal('Testing test test');
+  });
+
+  it('returns an empty string when the localization or description is absent', () => {
+    expect(getSessionDescription({ localizations: {} })).to.equal('');
+    expect(getSessionDescription({})).to.equal('');
+    expect(getSessionDescription(null)).to.equal('');
+  });
+});
+
 describe('fetchSessions CDN routing (MWPW-206486)', () => {
   let sandbox;
 
@@ -1306,20 +1344,20 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.equal('https://events-platform-prod-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
   });
 
-  it('falls back to the origin ESP host on stage, which has no CDN', async () => {
+  it('fetches from the stage CDN domain on stage', async () => {
     setEventServiceEnvOverride('stage');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('events-service-platform-stage.adobe.io');
+    expect(url).to.equal('https://events-platform-stage-cdn.aws125.adobeitc.com/v1/events/event-1/session-catalog');
   });
 
-  it('falls back to the origin ESP host on dev, which has no CDN', async () => {
+  it('fetches from the dev CDN domain on dev', async () => {
     setEventServiceEnvOverride('dev');
     const fetchStub = stubEmptyCatalog();
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
-    expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io');
+    expect(url).to.equal('https://events-platform-dev-cdn.aws125.adobeitc.com/v1/events/event-1/session-catalog');
   });
 
   it('falls back to the origin ESP host on local, which has no CDN', async () => {
@@ -1330,7 +1368,7 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io');
   });
 
-  // dev/local/stage/dev02/stage02 have no CDN — fall back to origin ESP.
+  // local/dev02/stage02 have no CDN — fall back to origin ESP.
   it('falls back to the origin ESP host on dev02, which has no CDN', async () => {
     setEventServiceEnvOverride('dev02');
     const fetchStub = stubEmptyCatalog();

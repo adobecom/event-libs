@@ -24,8 +24,8 @@ const session = (overrides = {}) => ({
   ...overrides,
 });
 
-const phase = (s, { eventStartMs = EVENT_START, liveIds = new Set(), wasActive = false } = {}) => getPlaybackPhase(s, {
-  nowMs: NOW, eventStartMs, liveStreamActiveIds: liveIds, streamWasEverActive: wasActive,
+const phase = (s, { eventStartMs = EVENT_START, liveIds = new Set() } = {}) => getPlaybackPhase(s, {
+  nowMs: NOW, eventStartMs, liveStreamActiveIds: liveIds,
 });
 
 describe('classifySessionPlayback — identity + DVR gate, not Format', () => {
@@ -79,7 +79,7 @@ describe('simulivePhase — premieres on schedule, flips to on-demand at the sch
   });
 });
 
-describe('livePhase — poll-driven live, eventStart-anchored DVR', () => {
+describe('livePhase — poll-driven live, sessionEnd-anchored DVR', () => {
   const live = (overrides) => session({ mrStreamId: 'mr-1', dvrDelayHours: 5, ...overrides });
 
   it('is PRE_EVENT before the scheduled start', () => {
@@ -96,26 +96,21 @@ describe('livePhase — poll-driven live, eventStart-anchored DVR', () => {
     expect(phase(s, { liveIds: new Set(['mr-1']) })).to.equal(PLAYBACK_PHASE.WATCH_LIVE);
   });
 
-  it('stays WATCH_LIVE when the stream was never active and now is still inside the scheduled window ("not live yet")', () => {
-    // Broadcast hasn't started/connected yet: poll empty, never seen active, now < end.
-    // Must NOT jump to DVR — the player renders nothing while we wait for the stream.
+  it('is DVR_BUFFER when the poll reports inactive inside the window (poll is authoritative — no "waiting for stream" grace)', () => {
+    // First land during the live window, poll says not active → we do NOT hold on WATCH_LIVE;
+    // resolve DVR/on-demand from the timings. Here sessionEnd(future) + 5h is still ahead → DVR.
     const s = live({ endTimeUtc: new Date(NOW + HOUR).toISOString() });
-    expect(phase(s, { liveIds: new Set(), wasActive: false })).to.equal(PLAYBACK_PHASE.WATCH_LIVE);
+    expect(phase(s, { liveIds: new Set() })).to.equal(PLAYBACK_PHASE.DVR_BUFFER);
   });
 
-  it('is DVR_BUFFER when the stream WAS active and then went inactive (real live→ended), before the DVR window elapses', () => {
-    const s = live({ endTimeUtc: new Date(NOW + HOUR).toISOString() });
-    // Stream aired and dropped (wasActive) → DVR even though we are still inside the scheduled window.
-    expect(phase(s, { liveIds: new Set(), wasActive: true })).to.equal(PLAYBACK_PHASE.DVR_BUFFER);
-  });
-
-  it('is DVR_BUFFER for a late arrival: scheduled window has passed and now < eventStart + dvrDelayHours', () => {
-    // end is in the past (window over) so even without witnessing the stream active, DVR applies.
+  it('is DVR_BUFFER for a late arrival: scheduled window has passed and now < sessionEnd + dvrDelayHours', () => {
+    // end is in the past (window over) but sessionEnd(−0.5h) + 5h is still future, so DVR applies.
     expect(phase(live())).to.equal(PLAYBACK_PHASE.DVR_BUFFER);
   });
 
-  it('is ON_DEMAND once now >= eventStart + dvrDelayHours', () => {
-    const s = live({ dvrDelayHours: 1 }); // eventStart + 1h = NOW - 1h → elapsed
+  it('is ON_DEMAND once now >= sessionEnd + dvrDelayHours', () => {
+    // sessionEnd = NOW − 2h, + 1h delay = NOW − 1h → elapsed.
+    const s = live({ endTimeUtc: new Date(NOW - 2 * HOUR).toISOString(), dvrDelayHours: 1 });
     expect(phase(s)).to.equal(PLAYBACK_PHASE.ON_DEMAND);
   });
 
@@ -144,15 +139,16 @@ describe('nextPhaseBoundaryMs — the clock boundaries the shared watcher schedu
     expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(end);
   });
 
-  it('includes the DVR-availability gate (eventStart + dvrDelayHours) as a boundary', () => {
+  it('includes the DVR-availability gate (sessionEnd + dvrDelayHours) as a boundary', () => {
     const eventStartMs = NOW - HOUR;
+    const sessionEnd = NOW - 2 * HOUR;
     const s = session({
       startTimeUtc: new Date(NOW - 3 * HOUR).toISOString(),
-      endTimeUtc: new Date(NOW - 2 * HOUR).toISOString(),
+      endTimeUtc: new Date(sessionEnd).toISOString(),
       dvrDelayHours: 5,
     });
-    // Only future boundary is eventStart + 5h (= NOW + 4h); start/end are in the past.
-    expect(nextPhaseBoundaryMs(s, { nowMs: NOW, eventStartMs })).to.equal(eventStartMs + 5 * HOUR);
+    // Only future boundary is sessionEnd + 5h (= NOW + 3h); start/end are in the past.
+    expect(nextPhaseBoundaryMs(s, { nowMs: NOW, eventStartMs })).to.equal(sessionEnd + 5 * HOUR);
   });
 
   it('returns null once every boundary is in the past (fully settled)', () => {
@@ -164,13 +160,24 @@ describe('nextPhaseBoundaryMs — the clock boundaries the shared watcher schedu
     expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(null);
   });
 
-  it('ignores the DVR gate when eventStartMs is unknown', () => {
+  it('anchors the DVR gate on sessionEnd even when eventStartMs is unknown', () => {
+    const sessionEnd = NOW - 2 * HOUR;
     const s = session({
       startTimeUtc: new Date(NOW - 3 * HOUR).toISOString(),
-      endTimeUtc: new Date(NOW - 2 * HOUR).toISOString(),
+      endTimeUtc: new Date(sessionEnd).toISOString(),
       dvrDelayHours: 5,
     });
-    // No eventStartMs → DVR gate can't be computed → no future boundary.
+    // No eventStartMs, but sessionEnd is present, so the gate = sessionEnd + 5h (= NOW + 3h).
+    expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(sessionEnd + 5 * HOUR);
+  });
+
+  it('ignores the DVR gate when there is no sessionEnd and no eventStartMs', () => {
+    const s = session({
+      startTimeUtc: '',
+      endTimeUtc: '',
+      dvrDelayHours: 5,
+    });
+    // Neither anchor available → DVR gate can't be computed → no future boundary.
     expect(nextPhaseBoundaryMs(s, { nowMs: NOW })).to.equal(null);
   });
 });

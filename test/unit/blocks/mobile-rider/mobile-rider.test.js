@@ -1054,12 +1054,14 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
       const bar = el.querySelector('.mobile-rider-info-bar');
       const toggle = el.querySelector('.mobile-rider-info-bar-toggle');
-      const panel = el.querySelector('.mobile-rider-info-bar-panel');
+      // The toggle now controls the description (the only thing it expands/collapses); category
+      // and actions are always visible in the collapsed state.
+      const controlled = el.querySelector('.mobile-rider-info-bar-description');
       expect(bar.getAttribute('role')).to.equal('region');
       expect(bar.getAttribute('aria-label')).to.equal('Session info');
       expect(toggle.getAttribute('daa-ll')).to.equal('Session-Info-Toggle');
-      expect(toggle.getAttribute('aria-controls')).to.equal(panel.id);
-      expect(panel.id).to.be.a('string').that.is.not.empty;
+      expect(toggle.getAttribute('aria-controls')).to.equal(controlled.id);
+      expect(controlled.id).to.be.a('string').that.is.not.empty;
     });
 
     it('opens the Session Guide detail view for this session when View all details is clicked', async () => {

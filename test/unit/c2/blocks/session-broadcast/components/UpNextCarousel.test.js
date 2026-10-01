@@ -16,4 +16,8 @@ describe('UpNextCarousel', () => {
     const out = UpNextCarousel({ sessions: [SESSION] });
     expect(out).to.include('sb-carousel-section--up-next');
   });
+
+  it('renders without throwing now that pageByGroup is passed to Carousel', () => {
+    expect(() => UpNextCarousel({ sessions: [SESSION] })).to.not.throw();
+  });
 });

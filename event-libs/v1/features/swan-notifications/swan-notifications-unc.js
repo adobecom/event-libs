@@ -9,6 +9,8 @@
 import { getSwanConfig } from './swan-config.js';
 import { calculateSessionTimes, buildStageCampaignRule } from './swan-payload.js';
 import { registerReminderRule, deleteReminderRule } from './unc-client.js';
+import { logError, logWarning } from '../../utils/lana-log.js';
+import { getNowMs } from '../../utils/session-state.js';
 
 // Per-rfCode: which single stage's rule is currently registered/active, and its campaignId
 // (needed to delete it once superseded). v2 because the shape changed from the previous
@@ -23,7 +25,7 @@ function readLocalState() {
   try {
     return JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
   } catch (err) {
-    window.lana?.log(`[swan-notifications] local state was corrupt, resetting: ${err.message}`);
+    logError('swan-notifications-unc', 'local state was corrupt, resetting', err);
     return {};
   }
 }
@@ -32,7 +34,7 @@ function writeLocalState(state) {
   try {
     window.localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(state));
   } catch (err) {
-    window.lana?.log(`[swan-notifications] failed to persist local state: ${err.message}`);
+    logError('swan-notifications-unc', 'failed to persist local state', err);
   }
 }
 
@@ -60,7 +62,7 @@ async function applyStage(session, swanConfig, now, state) {
   if (!Number.isFinite(timingProperties.triggerNotificationTime)
     || !Number.isFinite(timingProperties.triggerLiveBadgeTime)
     || !Number.isFinite(timingProperties.triggerOnDemandBadgeTime)) {
-    window.lana?.log(`[swan-notifications] session ${session.rfCode} has invalid start/end timestamps — skipping`);
+    logWarning('swan-notifications-unc', `session ${session.rfCode} has invalid start/end timestamps — skipping`);
     return;
   }
   const stage = desiredStage(timingProperties, now);
@@ -74,7 +76,7 @@ async function applyStage(session, swanConfig, now, state) {
 
   const registered = await registerReminderRule(campaignId, campaignRule);
   if (!registered) {
-    window.lana?.log(`[swan-notifications] failed to apply stage "${stage}" for ${session.rfCode} — will retry next reconcile`);
+    logWarning('swan-notifications-unc', `failed to apply stage "${stage}" for ${session.rfCode} — will retry next reconcile`);
     return;
   }
   if (existing?.campaignId) await deleteReminderRule(existing.campaignId);
@@ -86,10 +88,10 @@ export async function notifySessionScheduled(session) {
   if (!session?.rfCode) return;
   try {
     const state = readLocalState();
-    await applyStage(session, getSwanConfig(), Date.now(), state);
+    await applyStage(session, getSwanConfig(), getNowMs(), state);
     writeLocalState(state);
   } catch (err) {
-    window.lana?.log(`[swan-notifications] notifySessionScheduled failed for ${session.rfCode}: ${err.message}`);
+    logError('swan-notifications-unc', `notifySessionScheduled failed for ${session.rfCode}`, err);
   }
 }
 
@@ -102,7 +104,7 @@ export async function notifySessionUnscheduled(session) {
     delete state[session.rfCode];
     writeLocalState(state);
   } catch (err) {
-    window.lana?.log(`[swan-notifications] notifySessionUnscheduled failed for ${session.rfCode}: ${err.message}`);
+    logError('swan-notifications-unc', `notifySessionUnscheduled failed for ${session.rfCode}`, err);
   }
 }
 
@@ -128,7 +130,7 @@ export async function reconcileSwanNotifications(getSessions, getScheduled) {
   reconcileInFlight = true;
   try {
     const swanConfig = getSwanConfig();
-    const now = Date.now();
+    const now = getNowMs();
     const sessionsById = new Map(getSessions().map((s) => [s.id, s]));
     const scheduledSessions = [...getScheduled()]
       .map((id) => sessionsById.get(id))
@@ -153,7 +155,7 @@ export async function reconcileSwanNotifications(getSessions, getScheduled) {
 
     writeLocalState(state);
   } catch (err) {
-    window.lana?.log(`[swan-notifications] reconcile failed: ${err.message}`);
+    logError('swan-notifications-unc', 'reconcile failed', err);
   } finally {
     reconcileInFlight = false;
   }

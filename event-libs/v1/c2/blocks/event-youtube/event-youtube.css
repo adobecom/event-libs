@@ -108,6 +108,12 @@ lite-youtube .lty-playbtn:focus {
   left: 0;
   top: 0;
   position: absolute;
+  border: none;
+}
+
+.lenis.lenis-smooth .event-youtube .youtube-chat-container iframe,
+.lenis.lenis-smooth .event-youtube .youtube-video-container iframe {
+  pointer-events: auto;
 }
 
 @media screen and (min-width: 1200px) {

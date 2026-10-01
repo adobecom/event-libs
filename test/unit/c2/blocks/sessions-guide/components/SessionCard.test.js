@@ -302,8 +302,11 @@ describe('SessionCard', () => {
   describe('AVAILABLE SOON vs ON DEMAND (DVR delay)', () => {
     const HOUR = 60 * 60 * 1000;
     // 5 hours before "now" at test-run time, so the two cases below only need to vary
-    // dvrDelayHours against one fixed, real eventStartMs rather than mocking the clock.
+    // dvrDelayHours against one fixed, real event start (fallback) rather than mocking the clock.
     const eventStartMs = Date.now() - 5 * HOUR;
+    // Unlock now anchors on the session END; a recent end lets the pending case put
+    // sessionEnd + dvrHours in the future.
+    const sessionEndUtc = new Date(Date.now() - 5 * HOUR).toISOString();
 
     before(() => {
       const meta = document.head.querySelector('meta[name="tier-1-event-config"]');
@@ -312,17 +315,21 @@ describe('SessionCard', () => {
       initSessionState();
     });
 
-    it('shows AVAILABLE SOON while now is before eventStart + dvrDelayHours', () => {
-      // availableAt = eventStartMs + 10h = 5h from now.
-      const pending = { ...ONDEMAND_SESSION, id: 'session-pending', dvrDelayHours: 10 };
+    it('shows AVAILABLE SOON while now is before sessionEnd + dvrDelayHours', () => {
+      // availableAt = sessionEnd(now-5h) + 10h = 5h from now.
+      const pending = {
+        ...ONDEMAND_SESSION, id: 'session-pending', endTimeUtc: sessionEndUtc, dvrDelayHours: 10,
+      };
       const html = renderCard(pending);
       expect(html).to.include('AVAILABLE SOON');
       expect(html).to.not.include('ON DEMAND');
     });
 
-    it('shows ON DEMAND once eventStart + dvrDelayHours has passed', () => {
-      // availableAt = eventStartMs + 1h = 4h ago.
-      const elapsed = { ...ONDEMAND_SESSION, id: 'session-elapsed', dvrDelayHours: 1 };
+    it('shows ON DEMAND once sessionEnd + dvrDelayHours has passed', () => {
+      // availableAt = sessionEnd(now-5h) + 1h = 4h ago.
+      const elapsed = {
+        ...ONDEMAND_SESSION, id: 'session-elapsed', endTimeUtc: sessionEndUtc, dvrDelayHours: 1,
+      };
       const html = renderCard(elapsed);
       expect(html).to.include('ON DEMAND');
       expect(html).to.not.include('AVAILABLE SOON');

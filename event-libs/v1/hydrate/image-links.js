@@ -28,6 +28,17 @@ function extractTierFromClassList(classList, metadataKey) {
   return null;
 }
 
+function sortByOrdinal(data) {
+  return [...data].sort((a, b) => {
+    const aHas = a.ordinal != null;
+    const bHas = b.ordinal != null;
+    if (aHas && bHas) return a.ordinal - b.ordinal;
+    if (aHas) return -1;
+    if (bHas) return 1;
+    return 0;
+  });
+}
+
 function createImageElement(imageData, altText = '') {
   const imgSrc = typeof imageData === 'object' ? getImageSource(imageData) : imageData;
 
@@ -83,6 +94,8 @@ export default function hydrateImageLinks(block) {
   }
 
   if (!filteredData.length) return false;
+
+  filteredData = sortByOrdinal(filteredData);
 
   // Create image rows for each item
   let rendered = 0;

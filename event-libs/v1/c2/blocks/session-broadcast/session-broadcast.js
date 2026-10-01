@@ -12,23 +12,32 @@ const DEFAULTS = {
   alsoLiveTitle: 'Currently Live',
   upcomingTitle: 'Upcoming',
   viewAllDetailsLabel: 'View all details',
-  sessionEndedImageUrl: '',
-  sessionEndedImageUrlLarge: '',
+  sessionEndedImageUrlMobile: '',
+  sessionEndedImageUrlTablet: '',
+  sessionEndedImageUrlDesktop: '',
+  sessionEndedImageUrlDesktopXl: '',
 };
 
-const SESSION_ENDED_IMAGE_LABEL = 'session ended image';
+const SESSION_ENDED_IMAGE_LABELS = [
+  ['sessionEndedImageUrlMobile', 'session ended image mobile', false],
+  ['sessionEndedImageUrlTablet', 'session ended image tablet', false],
+  ['sessionEndedImageUrlDesktop', 'session ended image desktop', true],
+  ['sessionEndedImageUrlDesktopXl', 'session ended image desktop xl', true],
+];
 
-function getSessionEndedImageValueEl(el) {
+const LEGACY_SESSION_ENDED_IMAGE_LABEL = 'session ended image';
+
+function getRowValueEl(el, label) {
   const row = [...el.querySelectorAll(':scope > div')]
-    .find((r) => r.children[0]?.textContent.trim().toLowerCase() === SESSION_ENDED_IMAGE_LABEL);
+    .find((r) => r.children[0]?.textContent.trim().toLowerCase() === label);
   return row?.children[1];
 }
 
 // Absolute URL from a linked row or embedded picture. Prefer linking text — an embedded
 // picture can get silently swapped for an empty <video> by Milo's decorateImageLinks() if
 // alt carries a `|`-delimited convention.
-function extractSessionEndedImageUrl(el) {
-  const valueEl = getSessionEndedImageValueEl(el);
+function extractImageUrl(el, label) {
+  const valueEl = getRowValueEl(el, label);
   return valueEl?.querySelector('a[href]')?.href || valueEl?.querySelector('img[src]')?.src || '';
 }
 
@@ -48,11 +57,8 @@ function firstSrcsetUrl(srcset) {
   return (srcset || '').trim().split(',')[0]?.trim().split(/\s+/)[0] || '';
 }
 
-// Bigger variant for tablet+, from the row's authored <picture> (nested in the <a> — a "linked
-// image" cell can carry both). Reads a URL only, never re-renders — if decorateImageLinks()
-// already swapped it for an empty <video>, this degrades to the single default URL everywhere.
-function extractLargestPictureUrl(el) {
-  const picture = getSessionEndedImageValueEl(el)?.querySelector('picture');
+function extractLargestPictureUrl(el, label) {
+  const picture = getRowValueEl(el, label)?.querySelector('picture');
   const sources = [...(picture?.querySelectorAll('source[srcset]') || [])];
   if (!sources.length) return '';
   const best = sources.reduce((acc, source) => {
@@ -63,13 +69,70 @@ function extractLargestPictureUrl(el) {
   return best.url ? resolveUrl(best.url) : '';
 }
 
+function extractRowImageUrl(el, label, preferLargest) {
+  if (preferLargest) {
+    const largest = extractLargestPictureUrl(el, label);
+    if (largest) return largest;
+  }
+  return extractImageUrl(el, label);
+}
+
+function fillNearestAvailable(values) {
+  return values.map((value, i) => {
+    if (value) return value;
+    for (let d = 1; d < values.length; d += 1) {
+      if (values[i - d]) return values[i - d];
+      if (values[i + d]) return values[i + d];
+    }
+    return '';
+  });
+}
+
+function stripOptimizationParams(url) {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url, document.baseURI);
+    parsed.search = '';
+    return parsed.href;
+  } catch {
+    return url;
+  }
+}
+
+function applyOptimizationPolicy(urls, mobileKey) {
+  return Object.fromEntries(Object.entries(urls).map(
+    ([key, url]) => [key, key === mobileKey ? url : stripOptimizationParams(url)],
+  ));
+}
+
+function extractSessionEndedImageUrls(el) {
+  const raw = SESSION_ENDED_IMAGE_LABELS.map(
+    ([, label, preferLargest]) => extractRowImageUrl(el, label, preferLargest),
+  );
+  const filled = fillNearestAvailable(raw);
+  const keys = SESSION_ENDED_IMAGE_LABELS.map(([key]) => key);
+  const [mobileKey] = keys;
+
+  if (filled.every((url) => !url)) {
+    const legacySmall = extractImageUrl(el, LEGACY_SESSION_ENDED_IMAGE_LABEL);
+    const legacyLarge = extractLargestPictureUrl(el, LEGACY_SESSION_ENDED_IMAGE_LABEL);
+    return applyOptimizationPolicy({
+      [keys[0]]: legacySmall || legacyLarge,
+      [keys[1]]: legacyLarge || legacySmall,
+      [keys[2]]: legacyLarge || legacySmall,
+      [keys[3]]: legacyLarge || legacySmall,
+    }, mobileKey);
+  }
+
+  return applyOptimizationPolicy(Object.fromEntries(keys.map((key, i) => [key, filled[i]])), mobileKey);
+}
+
 // Plain block-content rows, not a Configurator-app JSON blob like sessions-guide.
 export function parseBroadcastConfig(el) {
   const raw = readBlockConfig(el);
   const config = {
     ...DEFAULTS,
-    sessionEndedImageUrl: extractSessionEndedImageUrl(el),
-    sessionEndedImageUrlLarge: extractLargestPictureUrl(el),
+    ...extractSessionEndedImageUrls(el),
   };
   Object.entries(CONFIG_KEYS).forEach(([rowKey, configKey]) => {
     if (raw[rowKey]) config[configKey] = raw[rowKey];

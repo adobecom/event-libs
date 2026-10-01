@@ -24,6 +24,6 @@ export function notifySessionUnscheduled(session) {
 
 // isScheduleKnown is feds mode's orphan-cleanup gate only — unc mode's implementation takes
 // just two params and ignores the extra argument.
-export function reconcileSwanNotifications(getSessions, getScheduled, isScheduleKnown) {
-  return impl()?.reconcileSwanNotifications(getSessions, getScheduled, isScheduleKnown);
+export function reconcileSwanNotifications(getSessions, getScheduled, isScheduleKnown, options) {
+  return impl()?.reconcileSwanNotifications(getSessions, getScheduled, isScheduleKnown, options);
 }

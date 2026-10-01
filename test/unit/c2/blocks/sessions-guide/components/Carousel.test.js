@@ -151,6 +151,13 @@ describe('Carousel', () => {
     expect(() => Carousel({ sessions: [SESSION_A], forceLive: true })).to.not.throw();
   });
 
+  it('accepts pageByGroup without throwing, defaulting to one-at-a-time paging otherwise', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    expect(() => Carousel({ sessions: [SESSION_A, SESSION_B], pageByGroup: true })).to.not.throw();
+    expect(() => Carousel({ sessions: [SESSION_A, SESSION_B] })).to.not.throw();
+  });
+
   // session-broadcast's Upcoming section passes SessionCard instead of the default LiveCard —
   // see UpNextCarousel.js. Like the onCardClick/onWatchSamePage tests above, the card itself
   // sits inside a multi-sibling template whose first literal isn't a bare `<`, so this mock

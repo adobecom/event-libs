@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <style>
+      .st0 { fill: none; }
+      .st2 { clip-path: url(#clippath-1); }
+      .st4 { fill: #fff; opacity: 0.5; }
+    </style>
+    <clipPath id="clippath-1"><rect width="64" height="64" rx="12"/></clipPath>
+  </defs>
+  <g class="st2">
+    <rect class="st0" width="64" height="64"/>
+    <path class="st4 keep-me" d="M0 0h64v64H0z"/>
+  </g>
+</svg>

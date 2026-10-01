@@ -303,10 +303,10 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.include('daa-ll="Featured-Product"');
     });
 
-    it('renders an unmapped product as a non-link tile with the placeholder icon', () => {
+    it('renders an unmapped product as a non-link tile with no icon at all', () => {
       const out = render({ products: ['Some Unmapped Product'] });
       expect(out).to.include('Some Unmapped Product');
-      expect(out).to.include('sg-detail__product-icon--placeholder');
+      expect(out).to.not.include('sg-detail__product-icon');
       expect(out).to.not.include('sg-detail__product-linkout');
     });
 

@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import {
   fetchAuthToken, fetchMyData, fetchScheduled, fetchFavorited,
   addSession, removeSession, dropAndSwapSession, toggleSessionInterest, fetchAttendeeAccess,
-  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID, RF_PROFILE_IDS, RF_WIDGET_ID,
+  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID, RF_PROFILE_IDS, RF_WIDGET_ID, RfAccessError,
 } from '../../../../event-libs/v1/services/sessions/rainfocus.js';
 
 describe('services/sessions/rainfocus', () => {
@@ -134,8 +134,7 @@ describe('services/sessions/rainfocus', () => {
     });
 
     it('addSession always sends virtual=true — MAX is a hybrid event, matches northstar', async () => {
-      // Without this, RF defaults the request to in-person-only attendance and rejects
-      // with responseCode 27 even for attendees who should be allowed to schedule.
+      // Otherwise RF defaults to in-person-only and rejects with responseCode 27.
       stubFetch({ responseCode: '0' });
       await addSession('st-1', 'auth-token', 'profile-1', 'https://example.com/rf/');
       const url = new URL(lastRequest);
@@ -169,7 +168,19 @@ describe('services/sessions/rainfocus', () => {
       expect(error).to.be.an('error');
     });
 
-    it('rejects on insufficient-access responseCode', async () => {
+    it('rejects with RfAccessError on insufficient-access responseCode', async () => {
+      stubFetch({ responseCode: '27', responseMessage: 'You must be registered...' });
+      let error;
+      try {
+        await addSession('st-1', null, 'profile-1', 'https://example.com/rf/');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an.instanceOf(RfAccessError);
+      expect(error.message).to.equal('You must be registered...');
+    });
+
+    it('RfAccessError falls back to a default message when RF sends none', async () => {
       stubFetch({ responseCode: '27' });
       let error;
       try {
@@ -177,7 +188,7 @@ describe('services/sessions/rainfocus', () => {
       } catch (err) {
         error = err;
       }
-      expect(error).to.be.an('error');
+      expect(error.message).to.equal('Insufficient access to schedule this session');
     });
 
     it('rejects when the HTTP request itself fails', async () => {

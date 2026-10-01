@@ -56,9 +56,10 @@ const mockTagsData = {
           tags: {
             type: {
               title: 'Session Type',
+              'title.fr': 'Type de session',
               tags: {
-                workshop: { title: 'Workshop' },
-                lab: { title: 'Lab' },
+                workshop: { title: 'Workshop', 'title.fr': 'Atelier' },
+                lab: { title: 'Lab', 'title.fr': 'Labo' },
                 demo: { title: 'Demo' },
                 'two-word-tag': { title: 'Two Word Tag' },
                 'deep-dive': { title: 'Deep Dive' },
@@ -85,7 +86,7 @@ before(async () => {
   // Inline the pure functions under test to avoid circular-import issues with
   // the block's top-level side-effect-free closures.
 
-  resolveTagWithGroup = (tagId, tagsData) => {
+  resolveTagWithGroup = (tagId, tagsData, localeKey = 'en') => {
     const colonIdx = tagId.indexOf(':');
     if (colonIdx === -1 || !tagsData) return { label: '', group: '' };
     const ns = tagId.slice(0, colonIdx);
@@ -96,14 +97,15 @@ before(async () => {
       parentNode = node;
       node = node?.tags?.[seg];
     }
-    return { label: node?.title || '', group: parentNode?.title || '' };
+    const title = (n) => n?.[`title.${localeKey}`] || n?.title || '';
+    return { label: title(node), group: title(parentNode) };
   };
 
-  resolveTagObjects = (tagIdList, tagsData) => {
+  resolveTagObjects = (tagIdList, tagsData, localeKey = 'en') => {
     if (!tagIdList) return [];
     return tagIdList
       .split(',')
-      .map((id) => resolveTagWithGroup(id.trim(), tagsData))
+      .map((id) => resolveTagWithGroup(id.trim(), tagsData, localeKey))
       .filter((t) => t.label);
   };
 
@@ -197,6 +199,21 @@ describe('resolveTagWithGroup', () => {
     expect(resolveTagWithGroup('no-colon-tag', mockTagsData))
       .to.deep.equal({ label: '', group: '' });
   });
+
+  it('returns the localized title.fr value for label and group when localeKey is fr', () => {
+    expect(resolveTagWithGroup('caas:events/type/workshop', mockTagsData, 'fr'))
+      .to.deep.equal({ label: 'Atelier', group: 'Type de session' });
+  });
+
+  it('falls back to the English title when title.fr is missing on that node', () => {
+    expect(resolveTagWithGroup('caas:events/type/demo', mockTagsData, 'fr'))
+      .to.deep.equal({ label: 'Demo', group: 'Type de session' });
+  });
+
+  it('defaults to the English title when no localeKey is passed', () => {
+    expect(resolveTagWithGroup('caas:events/type/workshop', mockTagsData))
+      .to.deep.equal({ label: 'Workshop', group: 'Session Type' });
+  });
 });
 
 // ─── resolveTagObjects ───────────────────────────────────────────────────────
@@ -246,6 +263,22 @@ describe('resolveTagObjects', () => {
 
   it('returns empty array when tagsData is null', () => {
     expect(resolveTagObjects('caas:events/type/workshop', null)).to.deep.equal([]);
+  });
+
+  it('resolves French labels and groups when localeKey is fr', () => {
+    const result = resolveTagObjects('caas:events/type/workshop,caas:events/type/lab', mockTagsData, 'fr');
+    expect(result).to.deep.equal([
+      { label: 'Atelier', group: 'Type de session' },
+      { label: 'Labo', group: 'Type de session' },
+    ]);
+  });
+
+  it('falls back to English per-tag when a French translation is incomplete', () => {
+    const result = resolveTagObjects('caas:events/type/workshop,caas:events/type/demo', mockTagsData, 'fr');
+    expect(result).to.deep.equal([
+      { label: 'Atelier', group: 'Type de session' },
+      { label: 'Demo', group: 'Type de session' },
+    ]);
   });
 });
 

@@ -4,33 +4,6 @@ import BlockMediator from '../../../deps/block-mediator.min.js';
 
 const AUDIENCE = { ALL: 'all', SIGNED_IN: 'signed-in', IN_PERSON: 'in-person' };
 
-const DISMISSED_STORAGE_KEY = 'in-person-banner:dismissed';
-const CLOSE_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8.84849 8.0001L13.0137 3.83526C13.248 3.60088 13.248 3.22119 13.0137 2.98682C12.7793 2.75244 12.3996 2.75244 12.1652 2.98682L8 7.15166L3.83477 2.98682C3.60039 2.75244 3.2207 2.75244 2.98633 2.98682C2.75195 3.22119 2.75195 3.60088 2.98633 3.83526L7.15151 8.0001L2.98633 12.1649C2.75195 12.3993 2.75195 12.779 2.98633 13.0134C3.10351 13.1306 3.25703 13.1892 3.41054 13.1892C3.56406 13.1892 3.71758 13.1306 3.83476 13.0134L7.99999 8.84854L12.1652 13.0134C12.2824 13.1306 12.4359 13.1892 12.5894 13.1892C12.743 13.1892 12.8965 13.1306 13.0137 13.0134C13.248 12.779 13.248 12.3993 13.0137 12.1649L8.84849 8.0001Z" fill="currentColor"/></svg>';
-
-function readDismissed() {
-  try {
-    return JSON.parse(window.localStorage.getItem(DISMISSED_STORAGE_KEY)) || {};
-  } catch {
-    return {};
-  }
-}
-
-function isDismissed(bannerId) {
-  if (!bannerId) return false;
-  return Boolean(readDismissed()[bannerId]);
-}
-
-function setDismissed(bannerId) {
-  if (!bannerId) return;
-  try {
-    const all = readDismissed();
-    all[bannerId] = true;
-    window.localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify(all));
-  } catch {
-    return;
-  }
-}
-
 function resolveProfile() {
   const profile = BlockMediator.get('imsProfile');
   if (profile !== undefined) return Promise.resolve(profile);
@@ -67,28 +40,14 @@ async function isAudienceMatch(audience) {
   return isRegisteredInPerson();
 }
 
-function buildBanner(contentEl, bannerId, onDismiss) {
+function buildBanner(contentEl) {
   const banner = createTag('div', { class: 'in-person-banner-inner', role: 'status', 'aria-live': 'polite' });
   const copy = createTag('div', { class: 'in-person-banner-copy' }, contentEl.innerHTML, { parent: banner });
   copy.querySelectorAll('a').forEach((a) => a.classList.add('in-person-banner-link'));
 
-  const closeBtn = createTag('button', {
-    type: 'button',
-    class: 'in-person-banner-close',
-    'aria-label': 'Dismiss banner',
-  }, CLOSE_ICON_SVG, { parent: banner });
-  closeBtn.addEventListener('click', () => {
-    setDismissed(bannerId);
-    onDismiss?.();
-    banner.closest('.in-person-banner')?.remove();
-  });
-
   return banner;
 }
 
-// Returns a teardown fn — callers must invoke it once the banner is dismissed/removed, or
-// this listener keeps firing on every scroll indefinitely, reading offsetHeight on a
-// detached element and writing stale CSS custom properties forever.
 function observeScrollReveal(el) {
   let ticking = false;
   const update = () => {
@@ -105,7 +64,6 @@ function observeScrollReveal(el) {
   };
   window.addEventListener('scroll', onScroll, { passive: true });
   update();
-  return () => window.removeEventListener('scroll', onScroll);
 }
 
 function syncBannerHeightVar(el) {
@@ -132,18 +90,17 @@ function isTruthyConfigValue(value) {
   return (value ?? '').trim().toLowerCase() === 'true';
 }
 
-function renderBanner(el, contentCell, bannerId, navOverlay) {
+function renderBanner(el, contentCell, navOverlay) {
   el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
   el.classList.toggle('in-person-banner-nav-overlay', navOverlay);
 
-  let stopScrollReveal;
-  const banner = buildBanner(contentCell, bannerId, () => stopScrollReveal?.());
+  const banner = buildBanner(contentCell);
   el.replaceChildren(banner);
 
   if (navOverlay) {
     document.body.prepend(el);
     syncBannerHeightVar(el);
-    stopScrollReveal = observeScrollReveal(el);
+    observeScrollReveal(el);
   }
 }
 
@@ -163,33 +120,25 @@ export default function init(el) {
   });
   if (!contentCell) return;
 
-  const bannerId = config['banner-id'] || getMetadata('banner-id') || '';
   const audience = resolveAudience(config);
   const navOverlay = isTruthyConfigValue(config['nav-overlay'] ?? getMetadata('nav-overlay'));
-
-  if (isDismissed(bannerId)) {
-    el.remove();
-    return;
-  }
 
   // `all` is known synchronously, so render immediately with no wait. Gated modes need an
   // async sign-in / registration check — never await it in init (that would block the block
   // from decorating and hold up the page). Keep the banner hidden until the check passes so
   // it doesn't flash for users who shouldn't see it, then reveal or remove once resolved.
   if (audience === AUDIENCE.ALL) {
-    renderBanner(el, contentCell, bannerId, navOverlay);
+    renderBanner(el, contentCell, navOverlay);
     return;
   }
 
   el.hidden = true;
   isAudienceMatch(audience).then((matches) => {
-    // Re-check: a duplicate instance of this same banner elsewhere on the page could have
-    // been dismissed while this instance's async audience check was still pending.
-    if (!matches || isDismissed(bannerId)) {
+    if (!matches) {
       el.remove();
       return;
     }
     el.hidden = false;
-    renderBanner(el, contentCell, bannerId, navOverlay);
+    renderBanner(el, contentCell, navOverlay);
   });
 }

@@ -1,5 +1,5 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
-import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
+import { getEventServiceEnv, getEventConfig, normalizeMultilineText } from '../../utils/utils.js';
 import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
 
@@ -41,7 +41,8 @@ export function normalizeSessions(rawSessions) {
     // Session-level id; favoriting keys on this, scheduling on rfCode.
     rfSessionId: s.rfSessionId || '',
     title: s.title || '',
-    description: s.description || '',
+    // Kept as plain text with "\n" breaks; renderers use `white-space: pre-line`.
+    description: normalizeMultilineText(s.description),
     startTimeUtc: s.startTimeUtc || '',
     endTimeUtc: s.endTimeUtc || '',
     duration: s.duration || 0,
@@ -114,9 +115,16 @@ export function parseDvrDelayHours(rawValue) {
   return Number.isFinite(hours) && hours >= 0 ? hours : null;
 }
 
+// RainFocus attribute names arrive with inconsistent casing across sessions (e.g. both
+// "Primary Event Site Track" and "Primary event site track"), so match by name case-insensitively.
+function findCustomAttribute(session, names) {
+  const candidates = (Array.isArray(names) ? names : [names]).map((n) => (n || '').toLowerCase());
+  return (session?.customAttributes || []).find((a) => candidates.includes((a?.name || '').toLowerCase()));
+}
+
 // Shared by both configurators so neither imports the other's UI code.
 export function getSessionPrimaryTrack(session) {
-  const attr = (session?.customAttributes || []).find((a) => PRIMARY_TRACK_ATTRIBUTE_NAMES.includes(a?.name));
+  const attr = findCustomAttribute(session, PRIMARY_TRACK_ATTRIBUTE_NAMES);
   return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
 }
 
@@ -137,11 +145,17 @@ export function getSessionIsOnline(session) {
   return hasFormatValue(extractCustomAttributeValues(session, 'Format'), FORMAT_ONLINE);
 }
 
+// Raw session-catalog shape stores the authored copy under the en-US localization, not a
+// top-level field.
+export function getSessionDescription(session) {
+  return session?.localizations?.['en-US']?.description || '';
+}
+
 const ADDITIONAL_TRACK_ATTRIBUTE_NAME = 'Additional Event Site Tracks';
 
 // All values, not just the first — the runtime treats these as real tracks.
 export function getSessionAdditionalTracks(session) {
-  const attr = (session?.customAttributes || []).find((a) => a?.name === ADDITIONAL_TRACK_ATTRIBUTE_NAME);
+  const attr = findCustomAttribute(session, ADDITIONAL_TRACK_ATTRIBUTE_NAME);
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
@@ -160,7 +174,7 @@ const OVERRIDE_ATTRIBUTE_NAME = 'Override Primary Event Site Track';
 
 // Free text, so every distinct value an author typed becomes its own swimlane.
 export function getSessionOverrideText(session) {
-  const attr = (session?.customAttributes || []).find((a) => a?.name === OVERRIDE_ATTRIBUTE_NAME);
+  const attr = findCustomAttribute(session, OVERRIDE_ATTRIBUTE_NAME);
   return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
 }
 
@@ -177,13 +191,13 @@ const PRODUCT_ATTRIBUTE_NAME = 'Product';
 
 // Multi-select, unlike track/override — returns every value.
 export function getSessionProducts(session) {
-  const attr = (session?.customAttributes || []).find((a) => a?.name === PRODUCT_ATTRIBUTE_NAME);
+  const attr = findCustomAttribute(session, PRODUCT_ATTRIBUTE_NAME);
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
 // Identifies the product filter category; `Illustrator` is an Audience value too.
 export function getProductAttributeId(session) {
-  const attr = (session?.customAttributes || []).find((a) => a?.name === PRODUCT_ATTRIBUTE_NAME);
+  const attr = findCustomAttribute(session, PRODUCT_ATTRIBUTE_NAME);
   return attr?.attributeId || '';
 }
 
@@ -226,8 +240,7 @@ export function deriveFacetableAttributes(sessions) {
 
 // `name` may be an array of candidates, tried in order, for attributes ESP renamed across events.
 function extractCustomAttributeValues(session, name) {
-  const candidates = Array.isArray(name) ? name : [name];
-  const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
+  const attr = findCustomAttribute(session, name);
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
@@ -238,8 +251,7 @@ export function extractCustomAttributeValue(session, name) {
 
 // Returns the machine-readable slug (`v.value`) instead of the human-readable label.
 export function extractCustomAttributeSlugs(session, name) {
-  const candidates = Array.isArray(name) ? name : [name];
-  const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
+  const attr = findCustomAttribute(session, name);
   return (attr?.values || []).map((v) => v?.value).filter(Boolean);
 }
 

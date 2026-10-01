@@ -1,15 +1,14 @@
-import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN, RSVP_TOKEN_PATTERN } from './constances.js';
+import {
+  SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN, RSVP_TOKEN_PATTERN, NON_PROD_EXACT_HOSTS,
+} from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { logError } from './lana-log.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
-// Shared gate for query-param debug/test overrides (branch switching, notification
-// mount-point fallbacks, etc.) — real prod domains (www.adobe.com and friends) never match
-// `.hlx.`/`.aem.`/`local`, so anything gated on this can't be triggered there.
-// `hostname` param defaults to the real one but is overridable for tests.
 export function isNonProdHost(hostname = window.location.hostname) {
-  return hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local');
+  return hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local')
+    || NON_PROD_EXACT_HOSTS.includes(hostname);
 }
 
 export const LIBS = (() => {
@@ -165,6 +164,19 @@ export function getMetadata(name, doc = document) {
   const attr = name && name.includes('og:') ? 'property' : 'name';
   const meta = doc.head.querySelector(`meta[${attr}="${name}"]`);
   return meta && meta.content;
+}
+
+// Session copy reaches us with mixed line-break forms (CRLF, real or literal "\n"/"\t"). Unify
+// them to "\n" so `white-space: pre-line` renders the breaks; tabs become spaces.
+export function normalizeMultilineText(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/\r\n?/g, '\n')
+    .replace(/\\r\\n|\\n|\\r/g, '\n')
+    .replace(/\\t|\t/g, ' ')
+    .replace(/[ ]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export function setMetadata(name, value, doc = document) {
@@ -455,7 +467,7 @@ export function getRsvpToken(searchParams) {
  * @returns {boolean} True if sign-in must be forced.
  */
 export function shouldForceGuestSignIn(profile, allowGuestReg) {
-  return Boolean(profile?.noProfile || profile?.account_type === 'guest')
+  return Boolean(profile === null || profile?.noProfile || profile?.account_type === 'guest')
     && !allowGuestReg
     && !profile?.rsvpToken;
 }

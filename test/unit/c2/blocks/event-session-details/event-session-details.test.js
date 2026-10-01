@@ -46,6 +46,27 @@ describe('Session Details', () => {
     expect(eyebrow.firstElementChild.classList.contains('session-status-slot')).to.be.true;
   });
 
+  it('hides Share on a pure IPOD session whose recording is not available yet', async () => {
+    setMetadata('session-times', '[]');
+    setMetadata('custom-attributes', JSON.stringify([{
+      name: 'Format', values: [{ value: 'in-person' }, { value: 'on-demand-post-event' }],
+    }]));
+    const el = block();
+    document.body.append(el);
+    await init(el);
+    expect(el.querySelector('.session-share').hidden).to.be.true;
+    el.remove();
+  });
+
+  it('shows Share on a non-IPOD session', async () => {
+    setMetadata('custom-attributes', JSON.stringify([{
+      name: 'Format', values: [{ value: 'online' }],
+    }]));
+    const el = block();
+    await init(el);
+    expect(el.querySelector('.session-share').hidden).to.be.false;
+  });
+
   it('applies an authored Background row as the block background and removes the row', async () => {
     setMetadata('title', 'My Session');
     const el = block();

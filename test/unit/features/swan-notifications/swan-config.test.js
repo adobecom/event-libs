@@ -63,11 +63,17 @@ describe('swan-config', () => {
       expect(config.upcomingOffsetMinutes).to.equal(5);
       expect(config.defaultNotificationIconUrl).to.equal('');
       expect(config.localNotificationPersistTillDays).to.equal(3);
+      expect(config.eventId).to.equal(null);
     });
 
     it('derives eventName from tier-1-event-config metadata when present', () => {
       setMeta('tier-1-event-config', JSON.stringify({ backendEventTitle: 'MAX 2026' }));
       expect(getSwanConfig().eventName).to.equal('MAX 2026');
+    });
+
+    it('derives optional event ownership without requiring it for notifications', () => {
+      setMeta('tier-1-event-config', JSON.stringify({ eventId: 'event-a' }));
+      expect(getSwanConfig().eventId).to.equal('event-a');
     });
 
     it('falls back to defaults when tier-1-event-config metadata is malformed JSON', () => {

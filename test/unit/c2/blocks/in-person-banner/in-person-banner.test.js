@@ -3,8 +3,6 @@ import sinon from 'sinon';
 import init from '../../../../../event-libs/v1/c2/blocks/in-person-banner/in-person-banner.js';
 import BlockMediator from '../../../../../event-libs/v1/deps/block-mediator.min.js';
 
-const DISMISSED_STORAGE_KEY = 'in-person-banner:dismissed';
-
 function setMeta(name, content) {
   const meta = document.createElement('meta');
   meta.setAttribute('name', name);
@@ -89,35 +87,6 @@ describe('in-person-banner', () => {
     });
   });
 
-  describe('dismissal', () => {
-    it('removes the banner without rendering when already dismissed', () => {
-      window.localStorage.setItem(
-        DISMISSED_STORAGE_KEY,
-        JSON.stringify({ 'promo-1': true }),
-      );
-      const el = buildBlock({ config: { 'banner-id': 'promo-1' } });
-      init(el);
-      expect(el.isConnected).to.be.false;
-    });
-
-    it('persists dismissal and removes the banner when the close button is clicked', () => {
-      const el = buildBlock({ config: { 'banner-id': 'promo-1' } });
-      init(el);
-      el.querySelector('.in-person-banner-close').click();
-      expect(el.isConnected).to.be.false;
-      const stored = JSON.parse(window.localStorage.getItem(DISMISSED_STORAGE_KEY));
-      expect(stored['promo-1']).to.be.true;
-    });
-
-    it('does not persist dismissal when no banner-id is authored', () => {
-      const el = buildBlock();
-      init(el);
-      el.querySelector('.in-person-banner-close').click();
-      expect(el.isConnected).to.be.false;
-      expect(window.localStorage.getItem(DISMISSED_STORAGE_KEY)).to.be.null;
-    });
-  });
-
   describe('audience: signed-in', () => {
     it('does not block init: returns synchronously with the banner hidden', () => {
       BlockMediator.set('imsProfile', signedInProfile);
@@ -165,23 +134,6 @@ describe('in-person-banner', () => {
       await flush();
       expect(el.hidden).to.be.false;
       expect(el.querySelector('.in-person-banner-inner')).to.exist;
-    });
-
-    it('re-checks dismissal after the async audience check, so a dismissal during the wait still wins', async () => {
-      // Simulates a duplicate instance of the same banner-id being dismissed elsewhere on
-      // the page while this instance's own audience check is still pending.
-      const el = buildBlock({ config: { audience: 'signed-in', 'banner-id': 'promo-race' } });
-      init(el);
-      expect(el.hidden).to.be.true;
-
-      window.localStorage.setItem(
-        DISMISSED_STORAGE_KEY,
-        JSON.stringify({ 'promo-race': true }),
-      );
-      BlockMediator.set('imsProfile', signedInProfile);
-      await flush();
-
-      expect(el.isConnected).to.be.false;
     });
   });
 
@@ -304,26 +256,14 @@ describe('in-person-banner', () => {
       expect(el.classList.contains('in-person-banner-nav-overlay')).to.be.false;
     });
 
-    it('removes the scroll listener once the banner is dismissed, so it stops updating after removal', () => {
-      const el = buildBlock({ config: { 'nav-overlay': 'true', 'banner-id': 'promo-nav' } });
+    it('updates the scroll-progress CSS var as the page scrolls', () => {
+      const el = buildBlock({ config: { 'nav-overlay': 'true' } });
       init(el);
 
-      // Confirm the listener is live before dismissal.
       window.scrollY = 5;
       window.dispatchEvent(new Event('scroll'));
-      const before = document.documentElement.style.getPropertyValue('--in-person-banner-scroll-progress');
-      expect(before).to.not.equal('');
-
-      el.querySelector('.in-person-banner-close').click();
-      expect(el.isConnected).to.be.false;
-
-      // A leaked listener would still update the CSS var (and throw on el.offsetHeight
-      // only if truly detached from a document — here we assert it simply stops changing).
-      document.documentElement.style.removeProperty('--in-person-banner-scroll-progress');
-      window.scrollY = 50;
-      window.dispatchEvent(new Event('scroll'));
-      const after = document.documentElement.style.getPropertyValue('--in-person-banner-scroll-progress');
-      expect(after).to.equal('');
+      const progress = document.documentElement.style.getPropertyValue('--in-person-banner-scroll-progress');
+      expect(progress).to.not.equal('');
     });
   });
 

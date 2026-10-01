@@ -28,6 +28,13 @@ export const MAX_EVENT_PAGES = {
   sessionGuide: '/max/2026/sessions.html',
 };
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
+
+export const NON_PROD_EXACT_HOSTS = [
+  'milo-core-prod.adobe.io', // Forge render origin (confirmed by Brad/Forge, PR #352)
+  'forge-replay-dev.adobe.io', // Forge render origin
+  'forge-replay-preprod.adobe.io', // Forge render origin
+];
+
 export const ENV_MAP = {
   dev: {
     name: 'dev',
@@ -72,10 +79,11 @@ export const ENV_MAP = {
     },
   },
 };
-// CDN fronting session-catalog only, GET-only (MWPW-206486). Prod only — the non-prod CDN
-// hosts aren't reliably resolvable on every network (e.g. off VPN), so every other
-// environment (dev/local/stage, same as dev02/stage02) defaults straight to its ESP origin.
+// CDN fronting session-catalog only, GET-only (MWPW-206486). dev/stage/prod only — local,
+// dev02, and stage02 have no CDN and default straight to their ESP origin.
 const SESSION_CATALOG_CDN_MAP = {
+  dev: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
+  stage: 'https://events-platform-stage-cdn.aws125.adobeitc.com',
   prod: 'https://events-platform-prod-cdn.aws122.adobeitc.com',
 };
 
@@ -181,7 +189,11 @@ export const FALLBACK_LOCALES = {
 };
 export const LATEST_VERSION = 'v1';
 export const PHONE_FIELD_RE = /phone/i;
-export const PHONE_PATTERN = '^[+\\d\\s\\-()\\.]+$';
+// Single source of truth for phone validation; mirrors the backend PhoneNumberInput pattern.
+// Keep it a string, not a regex literal: the DOM compiles an input's `pattern` with the
+// RegExp `v` flag, where `(` and `)` inside a character class must be escaped, and ESLint's
+// no-useless-escape would strip exactly those escapes from a literal.
+export const PHONE_PATTERN = '^[+\\d\\s\\-\\(\\).]+$';
 export const STANDARD_FIELD_MAX_LENGTHS = {
   firstName: 30,
   lastName: 30,

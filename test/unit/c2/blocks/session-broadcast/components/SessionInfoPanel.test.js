@@ -59,6 +59,18 @@ describe('SessionInfoPanel', () => {
     expect(out).to.include('is-favorited');
   });
 
+  it('shows the badge row wrapper when collapsed and not favorited', () => {
+    const out = SessionInfoPanel({ session: SESSION });
+    expect(out).to.include('sb-info__meta');
+  });
+
+  it('still renders the badge row wrapper when collapsed and favorited — marks is-favorited for CSS', () => {
+    favorited.value = new Set(['s-1']);
+    const out = SessionInfoPanel({ session: SESSION });
+    expect(out).to.include('sb-info__meta');
+    expect(out).to.include('is-favorited');
+  });
+
   it('shows a Share action alongside Favorite', () => {
     const out = SessionInfoPanel({ session: SESSION });
     expect(out).to.include('daa-ll="Share"');

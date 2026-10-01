@@ -263,8 +263,8 @@ function requestAnimationFramePromise() {
   });
 }
 
-function anchorWithModalHashExists(hash) {
-  return Array.from(document.querySelectorAll('a[data-modal-hash]')).some(
+function findAnchorWithModalHash(hash) {
+  return Array.from(document.querySelectorAll('a[data-modal-hash]')).find(
     (a) => a.getAttribute('data-modal-hash') === hash,
   );
 }
@@ -308,8 +308,9 @@ export function revalidatePageTheme() {
  * Re-run Milo modal opening for the current URL hash after scheduled fragment content is in the DOM.
  * Milo listens on `window` for `modal:open` (see utils initModalEventListener). Optional rAF deferral
  * and bounded polling give RSVP / async blocks time to expose `a[data-modal-hash]`.
+ * Only a fallback: skipped when Milo already decorated the link as `a.modal`.
  */
-async function openModalFromPageHashAfterFragment() {
+export async function openModalFromPageHashAfterFragment() {
   const hash = window.location.hash;
   if (!hash) return;
 
@@ -318,8 +319,11 @@ async function openModalFromPageHashAfterFragment() {
 
   const maxAttempts = 12;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    if (anchorWithModalHashExists(hash)) {
-      dispatchModalOpenOnceForHash(hash);
+    const anchor = findAnchorWithModalHash(hash);
+    if (anchor) {
+      // Milo's modal block init already opens hash-matching `a.modal` links during the
+      // fragment's loadArea; dispatching too would race it and stack a second dialog.
+      if (!anchor.classList.contains('modal')) dispatchModalOpenOnceForHash(hash);
       return;
     }
     await requestAnimationFramePromise();
@@ -420,7 +424,8 @@ export default async function init(el) {
       const fragmentPath = typeof rawPath === 'string' ? rawPath.trim() : '';
 
       const { prefix } = getLocale(getConfig().locales);
-      el.style.height = `${el.clientHeight}px`;
+      // min-height (not height) so new content can grow before Milo scrolls to the hash in loadArea.
+      el.style.minHeight = `${el.clientHeight}px`;
 
       cleanupChronoBoxOutboundNodes(el);
 

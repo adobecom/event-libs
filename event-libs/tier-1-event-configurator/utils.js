@@ -1,7 +1,7 @@
 import {
   getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
   getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
-  getSessionProducts, extractDistinctProducts,
+  getSessionProducts, extractDistinctProducts, getSessionDescription,
   getSessionIsLivestreamed, getSessionIsOnline,
 } from '../v1/services/sessions/sessions-api.js';
 import { logError } from '../v1/utils/lana-log.js';
@@ -10,7 +10,7 @@ import { DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 export {
   getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
   getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
-  getSessionProducts, extractDistinctProducts,
+  getSessionProducts, extractDistinctProducts, getSessionDescription,
 };
 
 export async function copyTextToClipboard(text) {
@@ -148,6 +148,10 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
     track: getSessionPrimaryTrack(session) || '',
     url: session.url,
   };
+  const additionalTracks = getSessionAdditionalTracks(session);
+  if (additionalTracks.length) entry.additionalTracks = additionalTracks;
+  const description = getSessionDescription(session);
+  if (description) entry.description = description;
   if (getSessionIsLivestreamed(session)) entry.isLivestreamed = true;
   if (getSessionIsOnline(session)) entry.isOnline = true;
   if (meta?.mrStreamId) entry.mrStreamId = meta.mrStreamId;

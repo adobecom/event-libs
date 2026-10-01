@@ -52,7 +52,7 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
               class=${'sg-time-row__card-wrap' + (dismissingIds.has(s.id) ? ' sg-time-row__card-wrap--collapsing' : '')}
               key=${s.id}
               inert=${i < offset || i > lastVisible ? true : undefined}
-            ><${SessionCard} session=${s} forceOnDemand=${forceOnDemand} /></div>`)}
+            ><${SessionCard} session=${s} forceOnDemand=${forceOnDemand} showDescription=${true} /></div>`)}
           </div>
         </div>
         <button

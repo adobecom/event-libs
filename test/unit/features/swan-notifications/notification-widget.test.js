@@ -1,12 +1,26 @@
 import { expect } from '@esm-bundle/chai';
-import { mountNotificationWidget } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
+import { mountNotificationWidget, normalizeTimeCasing } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
 import {
-  getEntries, removeEntry, upsertEntry,
+  getEntries, removeEntry, upsertEntry, setNotificationsReady, flushNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from './mocks/notification-store.js';
 import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
 
-function clearStore() {
-  getEntries().forEach((entry) => removeEntry(entry.rfCode));
+// Same-origin, genuinely loadable asset — unlike an https://example.com/... URL (blocked by
+// the test harness's no-external-network rule), this actually loads, so tests using it exercise
+// a real successful <img>, not a load that was always going to fail anyway.
+const REAL_THUMBNAIL_URL = '/test/unit/features/icons/mocks/federal/federal/assets/svgs/creative-cloud-64.svg';
+
+// Polls instead of a fixed sleep for an async fetch (e.g. fetchFederalTrackIcon) to resolve
+// and update the DOM — a fixed wait is either too short under a loaded CI machine (flaky) or
+// wastefully long otherwise.
+async function waitFor(predicate, { timeout = 1000, interval = 10 } = {}) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => { setTimeout(resolve, interval); });
+  }
+  throw new Error('waitFor: condition never became true');
 }
 
 describe('notification-widget', () => {
@@ -15,6 +29,7 @@ describe('notification-widget', () => {
   function bell() { return mountPoint.querySelector('.swan-notif__bell'); }
   function panel() { return mountPoint.querySelector('.swan-notif__panel'); }
   function badge() { return mountPoint.querySelector('.swan-notif__badge'); }
+  function tooltip() { return mountPoint.querySelector('.swan-notif__tooltip'); }
   function sectionTitle() { return mountPoint.querySelector('.swan-notif__section-title'); }
   function rows() { return [...mountPoint.querySelectorAll('.swan-notif__row')]; }
   function announcer() { return mountPoint.querySelector('.swan-notif__sr-only'); }
@@ -51,8 +66,8 @@ describe('notification-widget', () => {
     document.head.querySelector('meta[name="gnav-notifications"]')?.remove();
   });
 
-  beforeEach(() => {
-    clearStore();
+  beforeEach(async () => {
+    await resetNotifications();
     panel().hidden = true;
   });
 
@@ -84,6 +99,33 @@ describe('notification-widget', () => {
     expect(sectionTitle().hidden).to.equal(true);
   });
 
+  it('never flashes cached counts before the schedule is successfully reconciled', () => {
+    setNotificationsReady(false);
+    addEntry('RF-1', { stage: 'live', title: 'Cached' });
+    addEntry('RF-2', { stage: 'live', title: 'Dismissed' });
+    expect(rows()).to.have.lengthOf(0);
+    expect(badge().hidden).to.equal(true);
+    expect(announcer().textContent).to.equal('');
+    removeEntry('RF-2');
+    setNotificationsReady(true);
+    expect(rows().map((row) => row.dataset.rfcode)).to.deep.equal(['RF-1']);
+    expect(badge().textContent).to.equal('1');
+    expect(announcer().textContent).to.equal('');
+  });
+
+  it('does not mark hidden cached entries read before readiness, but reads them when the open panel receives them', () => {
+    setNotificationsReady(false);
+    addEntry('RF-1', { stage: 'live', title: 'Cached' });
+    bell().click();
+    expect(rows()).to.have.lengthOf(0);
+    expect(getEntries()[0].read).to.equal(false);
+    setNotificationsReady(true);
+    expect(rows()).to.have.lengthOf(1);
+    expect(getEntries()[0].read).to.equal(true);
+    expect(badge().hidden).to.equal(true);
+    bell().click();
+  });
+
   it('shows the "Important" section header once there is at least one notification', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     expect(sectionTitle().hidden).to.equal(false);
@@ -97,9 +139,9 @@ describe('notification-widget', () => {
     expect(row.querySelector('.swan-notif__title').textContent).to.equal('First');
   });
 
-  it('labels the on-demand stage pill "On-Demand"', () => {
+  it('labels the on-demand stage pill "On Demand"', () => {
     addEntry('RF-1', { stage: 'on-demand', title: 'First' });
-    expect(rows()[0].querySelector('.swan-notif__pill').textContent).to.equal('On-Demand');
+    expect(rows()[0].querySelector('.swan-notif__pill').textContent).to.equal('On Demand');
   });
 
   it('renders one row per stored entry, most recently updated first', () => {
@@ -107,6 +149,13 @@ describe('notification-widget', () => {
     addEntry('RF-2', { stage: 'live', title: 'Second' });
     const titles = rows().map((row) => row.querySelector('.swan-notif__title').textContent);
     expect(titles).to.deep.equal(['Second', 'First']);
+  });
+
+  it('renders and counts notifications from different events in the same inbox', () => {
+    addEntry('RF-event-a', { eventId: 'event-a', stage: 'live', title: 'Event A' });
+    addEntry('RF-event-b', { eventId: 'event-b', stage: 'live', title: 'Event B' });
+    expect(rows()).to.have.lengthOf(2);
+    expect(badge().textContent).to.equal('2');
   });
 
   it('labels each row with its stage pill', () => {
@@ -142,6 +191,31 @@ describe('notification-widget', () => {
     expect(getEntries().find((e) => e.rfCode === 'RF-1').read).to.equal(true);
   });
 
+  it('persists the read marker before navigating away from an activated notification', async () => {
+    const originalUrl = location.href;
+    addEntry('RF-1', { stage: 'live', title: 'First', actionUrl: `${location.pathname}${location.search}#notification-read` });
+    await flushNotifications();
+    let release;
+    let acquired = false;
+    const blocker = navigator.locks.request('swan-notification-state-v3', async () => {
+      acquired = true;
+      await new Promise((resolve) => { release = resolve; });
+    });
+    await waitFor(() => acquired);
+    try {
+      rows()[0].click();
+      expect(location.href).to.equal(originalUrl);
+      release();
+      await blocker;
+      await waitFor(() => location.hash === '#notification-read');
+      const stored = JSON.parse(localStorage.getItem('swan-notification-state-v3'));
+      expect(stored['RF-1'].read).to.equal(true);
+    } finally {
+      release();
+      history.replaceState(null, '', originalUrl);
+    }
+  });
+
   it('marks the entry read on Enter/Space, not just a mouse click', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     rows()[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
@@ -158,22 +232,14 @@ describe('notification-widget', () => {
     expect(bell().getAttribute('aria-expanded')).to.equal('false');
   });
 
-  it('keeps entries unread while the panel is open the first time, so the dot is actually visible', () => {
-    addEntry('RF-1', { stage: 'reminder', title: 'First' });
-    bell().click();
-    expect(rows()[0].classList.contains('swan-notif__row--unread')).to.equal(true);
-    expect(badge().hidden).to.equal(false);
-  });
-
-  it('clears the badge on close, even for rows never individually clicked', () => {
+  it('clears the badge and marks all entries read when the panel opens', () => {
     addEntry('RF-1', { stage: 'reminder', title: 'First' });
     addEntry('RF-2', { stage: 'reminder', title: 'Second' });
     expect(badge().hidden).to.equal(false);
     bell().click();
-    expect(badge().hidden).to.equal(false); // still unread while open — see the test above
-    bell().click(); // closes
     expect(badge().hidden).to.equal(true);
     expect(getEntries().every((entry) => entry.read)).to.equal(true);
+    expect(rows().every((row) => !row.classList.contains('swan-notif__row--unread'))).to.equal(true);
   });
 
   it('closes the panel on an outside click', () => {
@@ -193,6 +259,98 @@ describe('notification-widget', () => {
   it('does not mount a second widget on a repeated call', () => {
     mountNotificationWidget();
     expect(mountPoint.querySelectorAll('.swan-notif__bell')).to.have.lengthOf(1);
+  });
+
+  describe('hover tooltip', () => {
+    // Real mouse/CDP-driven hover simulation (sendMouse) is too flaky under full-suite
+    // concurrent test execution (CDP command contention across many parallel browser
+    // sessions) to assert real-time delay behavior reliably, so this reads the actual
+    // CSSOM rule instead of simulating :hover. loadStyle()'s <link> is fetched
+    // asynchronously, so document.styleSheets may not have parsed it yet the moment this
+    // describe block runs — poll until it has, rather than racing it.
+    async function loadedStylesheet() {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const sheet = [...document.styleSheets].find((s) => s.href?.includes('notification-widget.css'));
+        if (sheet) {
+          try {
+            if (sheet.cssRules.length) return sheet;
+          } catch { /* not yet parsed */ }
+        }
+        await new Promise((resolve) => { setTimeout(resolve, 20); });
+      }
+      throw new Error('notification-widget.css never became queryable via document.styleSheets');
+    }
+
+    async function findHoverRule() {
+      const sheet = await loadedStylesheet();
+      const mediaRule = [...sheet.cssRules].find((rule) => rule instanceof CSSMediaRule);
+      return [...mediaRule.cssRules].find((rule) => rule.selectorText.includes(':hover'));
+    }
+
+    it('renders a hidden-from-AT tooltip labeled "Notifications" right after the bell', () => {
+      expect(tooltip().getAttribute('aria-hidden')).to.equal('true');
+      expect(tooltip().querySelector('.swan-notif__tooltip-label').textContent).to.equal('Notifications');
+      expect(bell().nextElementSibling).to.equal(tooltip());
+    });
+
+    it('is hidden natively at creation time, not only via the external stylesheet', () => {
+      expect(tooltip().hidden).to.equal(true);
+    });
+
+    it('is hidden by default via a visibility transition, not display, so a delay can apply', async () => {
+      await loadedStylesheet();
+      expect(getComputedStyle(tooltip()).visibility).to.equal('hidden');
+    });
+
+    it('shows the tooltip only after a 2s hover/focus-visible delay', async () => {
+      const rule = await findHoverRule();
+      expect(rule.style.visibility).to.equal('visible');
+      expect(rule.style.transitionDelay).to.equal('2s');
+    });
+
+    it('has no delay on the base (hidden) state, so leaving hover hides it immediately', async () => {
+      const sheet = await loadedStylesheet();
+      const baseRule = [...sheet.cssRules].find((rule) => rule.selectorText === '.swan-notif__tooltip');
+      expect(baseRule.style.transitionDelay).to.equal('0s');
+    });
+  });
+
+  describe('closing other gnav popups', () => {
+    let gnav;
+    let profileTrigger;
+
+    beforeEach(() => {
+      gnav = document.createElement('header');
+      gnav.className = 'global-navigation';
+      profileTrigger = document.createElement('button');
+      profileTrigger.setAttribute('aria-expanded', 'true');
+      gnav.append(profileTrigger);
+      document.body.append(gnav);
+    });
+
+    afterEach(() => {
+      if (!panel().hidden) bell().click();
+      gnav.remove();
+    });
+
+    it('closes an already-open gnav popup when the bell opens', () => {
+      bell().click();
+      expect(profileTrigger.getAttribute('aria-expanded')).to.equal('false');
+    });
+
+    it('still expands the bell itself', () => {
+      bell().click();
+      expect(bell().getAttribute('aria-expanded')).to.equal('true');
+    });
+
+    it('leaves aria-expanded elements outside header.global-navigation alone', () => {
+      const outside = document.createElement('button');
+      outside.setAttribute('aria-expanded', 'true');
+      document.body.append(outside);
+      bell().click();
+      expect(outside.getAttribute('aria-expanded')).to.equal('true');
+      outside.remove();
+    });
   });
 
   describe('analytics attributes', () => {
@@ -293,10 +451,58 @@ describe('notification-widget', () => {
       expect(timeLines[0].textContent).to.include('Oct');
     });
 
+    it('formats the start-time line without a day-of-week and with a comma separator', () => {
+      const startTimeMs = Date.parse('2026-10-28T16:00:00.000Z');
+      const endTimeMs = Date.parse('2026-10-28T17:00:00.000Z');
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', startTimeMs, endTimeMs,
+      });
+      const text = rows()[0].querySelectorAll('.swan-notif__time')[0].textContent;
+      // No day-of-week token and no "·" separator (was '{ddd}, {LLL} {dd} · ...').
+      expect(text).to.not.match(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),/);
+      expect(text).to.not.include('·');
+      // Date and time range are joined by ", " (from the template's literal comma).
+      expect(text).to.match(/^Oct \d{2}, /);
+      // Hours have no leading zero and lowercase am/pm with no leading space (tz-independent).
+      expect(text).to.not.match(/\b0\d:/);
+      expect(text).to.not.match(/\s(AM|PM)\b/);
+      expect(text).to.match(/(am|pm)\b/);
+    });
+
     it('does not show a start-time line for a live or on-demand row', () => {
       addEntry('RF-1', { stage: 'live', title: 'First' });
       const timeLines = rows()[0].querySelectorAll('.swan-notif__time');
       expect(timeLines).to.have.lengthOf(1); // relative "updated" time only
+    });
+  });
+
+  // Exercised on full '{LLL} {dd}, {timeRange} {timeZone}' strings (not just the time portion)
+  // so the leading-zero rule is proven not to touch the day-of-month number. Uses literal
+  // inputs because the rendered widget resolves the viewer's local timezone, which isn't
+  // deterministic across CI environments.
+  describe('normalizeTimeCasing', () => {
+    it('drops a leading zero on a single-digit hour and lowercases the meridiem on both times', () => {
+      expect(normalizeTimeCasing('Nov 10, 06:00 AM - 08:00 AM PST'))
+        .to.equal('Nov 10, 6:00am - 8:00am PST');
+    });
+
+    it('leaves an already-two-digit hour intact while still lowercasing the meridiem', () => {
+      expect(normalizeTimeCasing('Nov 10, 11:00 AM - 12:30 PM PST'))
+        .to.equal('Nov 10, 11:00am - 12:30pm PST');
+    });
+
+    it('does not strip a leading zero from the day-of-month number (e.g. "06")', () => {
+      // "06" here is the {dd} day-of-month, which must survive untouched — the hour rule
+      // only fires on a zero immediately followed by "H:MM".
+      const out = normalizeTimeCasing('Nov 06, 06:00 AM - 08:00 AM PST');
+      expect(out).to.equal('Nov 06, 6:00am - 8:00am PST');
+      expect(out).to.include('Nov 06,');
+    });
+
+    it('does not alter a year number that could appear in a custom template', () => {
+      // A leading-zero-free 4-digit year like "2026" must not be mangled.
+      expect(normalizeTimeCasing('Nov 06 2026, 06:00 AM PST'))
+        .to.equal('Nov 06 2026, 6:00am PST');
     });
   });
 
@@ -315,21 +521,30 @@ describe('notification-widget', () => {
 
     it('swaps in the resolved track icon once fetchFederalTrackIcon resolves', async () => {
       addEntry('RF-1', { stage: 'reminder', title: 'First', trackIconName: 'branding' });
-      await new Promise((resolve) => { setTimeout(resolve, 100); });
-      const svg = icon().querySelector('svg');
-      expect(svg.classList.contains('icon-federal-branding')).to.equal(true);
+      await waitFor(() => icon().querySelector('svg.icon-federal'));
+      expect(icon().querySelector('svg').classList.contains('icon-federal-branding')).to.equal(true);
     });
 
     it('leaves SESSION_ICON_FALLBACK in place when the named track icon does not resolve', async () => {
       addEntry('RF-1', { stage: 'reminder', title: 'First', trackIconName: 'does-not-exist-anywhere' });
-      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      await new Promise((resolve) => { setTimeout(resolve, 250); });
       expect(icon().querySelector('svg.icon-federal')).to.equal(null);
     });
 
-    it('never renders a placeholder at all when the row has a real iconUrl', () => {
+    it('renders the thumbnail immediately, then swaps to the track icon once it resolves, since track icon wins', async () => {
       addEntry('RF-1', {
-        stage: 'reminder', title: 'First', iconUrl: 'https://example.com/thumb.png', trackIconName: 'branding',
+        stage: 'reminder', title: 'First', iconUrl: REAL_THUMBNAIL_URL, trackIconName: 'branding',
       });
+      expect(icon().tagName).to.equal('IMG');
+      await waitFor(() => icon().querySelector('svg.icon-federal'));
+      expect(icon().querySelector('svg').classList.contains('icon-federal-branding')).to.equal(true);
+    });
+
+    it('keeps the thumbnail when the named track icon does not resolve', async () => {
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', iconUrl: REAL_THUMBNAIL_URL, trackIconName: 'does-not-exist-anywhere',
+      });
+      await new Promise((resolve) => { setTimeout(resolve, 250); });
       expect(icon().tagName).to.equal('IMG');
     });
   });
@@ -357,6 +572,27 @@ describe('notification-widget', () => {
       addEntry('RF-2', { stage: 'live', title: 'Second' }); // rebuilds the whole list
       expect(() => staleImg.dispatchEvent(new Event('error'))).to.not.throw();
       expect(staleImg.isConnected).to.equal(false);
+    });
+
+    it('still upgrades to the track icon after falling back to the MAX badge, once the fetch resolves', async () => {
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', iconUrl: 'https://example.com/broken.png', trackIconName: 'branding',
+      });
+      icon().dispatchEvent(new Event('error'));
+      expect(icon().classList.contains('swan-notif__icon--placeholder')).to.equal(true);
+      await waitFor(() => icon().querySelector('svg.icon-federal'));
+      expect(icon().querySelector('svg').classList.contains('icon-federal-branding')).to.equal(true);
+    });
+
+    it('does not let a late thumbnail error undo an already-resolved track icon', async () => {
+      addEntry('RF-1', {
+        stage: 'reminder', title: 'First', iconUrl: REAL_THUMBNAIL_URL, trackIconName: 'branding',
+      });
+      const img = icon();
+      await waitFor(() => icon().querySelector('svg.icon-federal-branding'));
+      expect(icon().querySelector('svg.icon-federal-branding')).to.not.equal(null);
+      expect(() => img.dispatchEvent(new Event('error'))).to.not.throw();
+      expect(icon().querySelector('svg.icon-federal-branding')).to.not.equal(null);
     });
   });
 });
