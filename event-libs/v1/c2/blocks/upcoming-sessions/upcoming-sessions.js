@@ -16,6 +16,7 @@ import { logError } from '../../../utils/lana-log.js';
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
 const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function getEventConfig() {
   return { title: '', showConflictModal: false, registerUrl: getEventApiConfig()?.registerUrl };
@@ -323,18 +324,27 @@ function isPastSession(session) {
 }
 
 function scheduleStateTimers(sessions, dropSession) {
-  const timers = [];
+  const timers = new Set();
 
   sessions.forEach((session) => {
     const { sessionTime } = session;
     if (!sessionTime) return;
 
-    const untilStart = sessionTime.startTimeMillis - getNowMs();
-    if (untilStart > 0) {
-      timers.push(setTimeout(() => dropSession(session.sessionId), untilStart));
-    } else {
-      dropSession(session.sessionId);
-    }
+    const checkStart = () => {
+      const untilStart = sessionTime.startTimeMillis - getNowMs();
+      if (untilStart > 0) {
+        // Long waits must be split to avoid signed 32-bit browser timer overflow.
+        const timer = setTimeout(() => {
+          timers.delete(timer);
+          checkStart();
+        }, Math.min(untilStart, MAX_TIMEOUT_MS));
+        timers.add(timer);
+      } else {
+        dropSession(session.sessionId);
+      }
+    };
+
+    checkStart();
   });
 
   return timers;
