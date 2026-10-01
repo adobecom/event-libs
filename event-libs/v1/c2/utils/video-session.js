@@ -221,14 +221,6 @@ function livePhase(session, nowMs, eventStartMs, liveStreamActiveIds) {
   // Poll is authoritative: inactive means not live, so fall to DVR/on-demand by the timings below.
   if (session.dvrDelayHours != null) {
     const availableAt = dvrAvailableAtMs(session, eventStartMs);
-    // TEMP DEBUG - DVR buffer diagnosis
-    // eslint-disable-next-line no-console
-    console.log('[phase] livePhase DVR', {
-      nowMs, end, availableAt, dvrDelayHours: session.dvrDelayHours, eventStartMs,
-      isLiveNow, mrStreamId: session.mrStreamId,
-      msUntilUnlock: availableAt != null ? availableAt - nowMs : null,
-      decision: (availableAt != null && nowMs < availableAt) ? 'DVR_BUFFER' : 'ON_DEMAND',
-    });
     if (availableAt != null && nowMs < availableAt) return PLAYBACK_PHASE.DVR_BUFFER;
     return PLAYBACK_PHASE.ON_DEMAND;
   }

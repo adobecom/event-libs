@@ -537,16 +537,6 @@ export default async function init(el) {
     const video = PLAYABLE_PHASES.includes(phase)
       ? resolveVideoForPhase(phase, sessionTimes, session)
       : null;
-    // TEMP DEBUG - DVR buffer diagnosis
-    // eslint-disable-next-line no-console
-    console.log('[svp] onPhase', {
-      insidePlaylist: isInsidePlaylistContainer(el),
-      phase,
-      video,
-      embeddedPhase,
-      hasPlaylist: BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist,
-      mrDvrVideoId: session.mrDvrVideoId,
-    });
 
     if (video && phase === embeddedPhase) {
       return;
@@ -570,16 +560,6 @@ export default async function init(el) {
         // act on both directions so the swap is clean — otherwise the now-losing DVR player stays
         // visible and the now-winning MPC loads into a still-hidden container.
         const nowWinning = isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist);
-        // TEMP DEBUG - DVR->ON_DEMAND swap diagnosis
-        // eslint-disable-next-line no-console
-        console.log('[svp] phase-change transition', {
-          insidePlaylist: isInsidePlaylistContainer(el),
-          previousPhase,
-          phase,
-          nowWinning,
-          isHidden: el.classList.contains('session-video-hidden'),
-          hasExistingPlayer: !!el.querySelector('.mobile-rider, .milo-video'),
-        });
         if (nowWinning) {
           el.classList.remove('session-video-hidden');
           preconnectVideoProvider(video.provider);
