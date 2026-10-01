@@ -1,4 +1,4 @@
-import { BACKEND_PHONE_RE } from './constances.js';
+import { PHONE_PATTERN } from './constances.js';
 import { logWarning } from './lana-log.js';
 
 /**
@@ -113,6 +113,8 @@ export function getBaseAttendeePayload(attendeeData) {
   }, {});
 }
 
+const PHONE_RE = new RegExp(PHONE_PATTERN);
+
 const LEGACY_PHONE_FIELDS = new Set(
   Object.keys(BASE_ATTENDEE_DATA_FILTER).filter((key) => /phone$/i.test(key)),
 );
@@ -124,7 +126,7 @@ export function sanitizeLegacyPhoneFields(existingData, newData) {
     const isStaleInvalidPhone = LEGACY_PHONE_FIELDS.has(key)
       && !Object.prototype.hasOwnProperty.call(submitted, key)
       && typeof value === 'string'
-      && !BACKEND_PHONE_RE.test(value);
+      && !PHONE_RE.test(value);
     if (!isStaleInvalidPhone) acc[key] = value;
     return acc;
   }, {});

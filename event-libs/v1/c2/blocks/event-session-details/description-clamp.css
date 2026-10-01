@@ -22,6 +22,10 @@
   -webkit-box-orient: vertical;
 }
 
+.session-description-text.is-plain-text {
+  white-space: pre-line;
+}
+
 .session-description.is-expanded .session-description-text {
   display: block;
   overflow: visible;

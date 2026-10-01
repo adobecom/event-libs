@@ -275,7 +275,10 @@
   line-clamp: unset;
 }
 
-.sb-info__desc { margin: 0; }
+.sb-info__desc {
+  margin: 0;
+  white-space: pre-line;
+}
 
 .sb-info__view-all {
   grid-area: viewall;

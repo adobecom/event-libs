@@ -457,6 +457,7 @@
   letter-spacing: 0.16px;
   color: var(--s2a-color-content-default);
   margin: 0;
+  white-space: pre-line;
 }
 
 .sg-detail__more-icon {
@@ -790,6 +791,13 @@
 @media (max-width: 767px) {
   .sg-filter-panel {
     --sg-filter-panel-pad: var(--s2a-spacing-lg);
+  }
+}
+
+/* Milo's section z-index: 3 traps the panel below the nav; lift it while open. */
+@media (max-width: 1279px) {
+  .section.rounded-corners-top:has(.sg-filter-panel) {
+    z-index: 11;
   }
 }
 
