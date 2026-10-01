@@ -101,7 +101,7 @@ describe('OnDemandView', () => {
     const store = makeStore([PAST_DESIGN], { searchQuery: 'nonexistent term' });
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('No results found');
+    expect(html).to.include('No results match your current selection.');
     expect(html).to.not.include('Sessions will be available on demand after the event.');
   });
 
@@ -109,7 +109,7 @@ describe('OnDemandView', () => {
     const store = makeStore([PAST_DESIGN], { activeFilters: { primaryTrack: new Set(['Video']) } });
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('No results found');
+    expect(html).to.include('No results match your current selection.');
     expect(html).to.not.include('Sessions will be available on demand after the event.');
   });
 });

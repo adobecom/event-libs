@@ -72,6 +72,8 @@ export function reducer(state, action) {
       return { ...state, activeFilters: action.filters };
     case 'SET_SEARCH':
       return { ...state, searchQuery: action.query };
+    case 'RESET_SEARCH_AND_FILTERS':
+      return { ...state, activeFilters: {}, searchQuery: '' };
     case 'SET_MY_TAB':
       return { ...state, mySessionsTab: action.tab };
     case 'SET_MY_FAVORITES_TAB':

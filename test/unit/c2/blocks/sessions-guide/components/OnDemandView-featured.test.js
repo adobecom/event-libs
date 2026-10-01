@@ -35,13 +35,13 @@ const BASE_CONFIG = {
   title: '', filterCategories: [], theme: 'dark', recommendedSessions: ['v-1', 'd-1'],
 };
 
-function makeStore(sessionList, activeFilters = {}) {
+function makeStore(sessionList, activeFilters = {}, searchQuery = '') {
   sessions.value = sessionList;
   liveStreamActiveIds.value = new Set();
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
     state: {
-      activeView: 'on-demand', activeFilters, searchQuery: '',
+      activeView: 'on-demand', activeFilters, searchQuery,
       guideConfig: { ...BASE_CONFIG },
     },
     dispatch: () => {},
@@ -69,5 +69,13 @@ describe('OnDemandView (recommendedSessions authored)', () => {
     const View = buildOnDemandView(preact, store);
     const html = View({});
     expect(html).to.include('sg-carousel-section--recommended');
+  });
+
+  it('hides the recommended carousel when search/filters match nothing', () => {
+    const store = makeStore([PAST_DESIGN, PAST_VIDEO], {}, 'nonexistent term');
+    const View = buildOnDemandView(preact, store);
+    const html = View({});
+    expect(html).to.not.include('sg-carousel-section--recommended');
+    expect(html).to.include('No results match your current selection.');
   });
 });

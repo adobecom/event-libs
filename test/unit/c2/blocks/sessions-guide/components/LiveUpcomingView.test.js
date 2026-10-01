@@ -125,7 +125,7 @@ describe('LiveUpcomingView', () => {
     const store = makeStore([AIRED_SESSION], AIRED_DAY, { searchQuery: 'nonexistent term' });
     const View = buildLiveUpcomingView(preact, store);
     const html = View({});
-    expect(html).to.include('No results found');
+    expect(html).to.include('No results match your current selection.');
     expect(html).to.not.include('No sessions scheduled for this day.');
   });
 
@@ -135,20 +135,18 @@ describe('LiveUpcomingView', () => {
     });
     const View = buildLiveUpcomingView(preact, store);
     const html = View({});
-    expect(html).to.include('No results found');
+    expect(html).to.include('No results match your current selection.');
     expect(html).to.not.include('No sessions scheduled for this day.');
   });
 
-  // Regression: Live sessions are exempt from search/filters (shown above regardless),
-  // which previously masked "No results found" below whenever a live session was
-  // present — the empty-state check incorrectly required the Live section to also be
-  // empty before it would render.
-  it('shows "No results found" below the Live sessions carousel when search matches nothing else', () => {
+  // Live sessions ignore search/filters, but a zero-result search hides them so only the
+  // no-results message shows (MWPW-209296).
+  it('hides the Live sessions carousel when search matches nothing else', () => {
     const store = makeStore([LIVE_SESSION], TODAY, { searchQuery: 'nonexistent term' });
     const View = buildLiveUpcomingView(preact, store);
     const html = View({});
-    expect(html).to.include('Live sessions');
-    expect(html).to.include('No results found');
+    expect(html).to.not.include('sg-carousel-section--live');
+    expect(html).to.include('No results match your current selection.');
   });
 
   it('keeps the default empty state when no search or filters are active', () => {
@@ -156,6 +154,6 @@ describe('LiveUpcomingView', () => {
     const View = buildLiveUpcomingView(preact, store);
     const html = View({});
     expect(html).to.include('No sessions scheduled for this day.');
-    expect(html).to.not.include('No results found');
+    expect(html).to.not.include('No results match your current selection.');
   });
 });

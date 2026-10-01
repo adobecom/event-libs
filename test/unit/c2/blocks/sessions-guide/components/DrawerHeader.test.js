@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
-import { resolveDrawerTitle, interpolateHeading, filterButtonLabel, DrawerHeader } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
+import {
+  resolveDrawerTitle, interpolateHeading, filterButtonLabel, searchPlaceholder, DrawerHeader,
+} from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
 import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import {
   auth, sessions, liveStreamActiveIds, sessionStateVersion,
@@ -81,6 +83,19 @@ describe('DrawerHeader filterButtonLabel', () => {
   });
 });
 
+describe('DrawerHeader searchPlaceholder', () => {
+  it('names the list being searched for each view', () => {
+    expect(searchPlaceholder('live-upcoming')).to.equal('Search upcoming');
+    expect(searchPlaceholder('on-demand')).to.equal('Search on-demand');
+    expect(searchPlaceholder('my-sessions')).to.equal('Search my sessions');
+    expect(searchPlaceholder('my-favorites')).to.equal('Search my favorites');
+  });
+
+  it('falls back to a generic placeholder for an unknown view', () => {
+    expect(searchPlaceholder(undefined)).to.equal('Search sessions');
+  });
+});
+
 describe('DrawerHeader interpolateHeading', () => {
   it('replaces every occurrence of the canonical single-brace token', () => {
     expect(interpolateHeading('{firstName}, hi {firstName}', 'Dana')).to.equal('Dana, hi Dana');
@@ -142,6 +157,12 @@ describe('DrawerHeader controlsInert', () => {
   it('leaves the controls collapse wrapper interactive otherwise', () => {
     const out = DrawerHeader({ controlsInert: false });
     expect(out).to.not.include('inert');
+  });
+
+  it('renders the active view\'s placeholder on both search inputs', () => {
+    SessionGuideContext._current.state.activeView = 'my-favorites';
+    const out = DrawerHeader({});
+    expect(out.match(/placeholder="Search my favorites"/g)).to.have.lengthOf(2);
   });
 
   it('defaults to interactive when controlsInert is not passed at all', () => {

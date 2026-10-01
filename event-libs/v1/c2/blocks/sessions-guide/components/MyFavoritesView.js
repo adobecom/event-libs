@@ -80,6 +80,7 @@ export function MyFavoritesView() {
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;
   const bothEmpty = !hasUpcoming && !hasOnDemand;
+  const noResults = bothEmpty && hasActiveSearchOrFilters(activeFilters, searchQuery);
 
   let effectiveTab = myFavoritesTab;
   if (effectiveTab === 'upcoming' && !hasUpcoming) effectiveTab = 'on-demand';
@@ -91,7 +92,7 @@ export function MyFavoritesView() {
 
   return html`
     <div class="sg-view sg-view--my-favorites">
-      ${live.length > 0 && html`
+      ${live.length > 0 && !noResults && html`
         <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
@@ -103,7 +104,7 @@ export function MyFavoritesView() {
         </div>
       `}
       ${bothEmpty ? (
-        hasActiveSearchOrFilters(activeFilters, searchQuery)
+        noResults
           ? html`<${NoResultsFound} />`
           : html`
             <div class="sg-my-favorites__empty" role="status" aria-live="polite">
