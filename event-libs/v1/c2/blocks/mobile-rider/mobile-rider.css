@@ -15,6 +15,7 @@
 .mobile-rider .mobile-rider-container {
   position: relative;
   width: 100%;
+  overflow: hidden;
 }
 
 .mobile-rider .mobile-rider-container .mr-poster {
@@ -287,12 +288,12 @@
   line-height: 1;
 }
 
-.mobile-rider .mobile-rider-container {
-  border-radius: var(--s2a-border-radius-16, 16px);
-  overflow: hidden;
-}
-
 @media (min-width: 1024px) {
+  /* Rounded corners are a desktop-only treatment; the player is edge-to-edge on tablet/mobile. */
+  .mobile-rider .mobile-rider-container {
+    border-radius: var(--s2a-border-radius-16, 16px);
+  }
+
   /* Figma: the description is constrained to roughly the left half of the bar, not full width. */
   .mobile-rider .mobile-rider-info-bar-description {
     max-width: 60%;
