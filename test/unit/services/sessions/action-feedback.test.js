@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 
 import {
-  runSessionAction, toggleScheduleWithFeedback, checkViewAccess, isAuthResolved,
+  runSessionAction, toggleScheduleWithFeedback, checkViewAccess, isAuthResolved, showAuthToast,
 } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { SessionActionError } from '../../../../event-libs/v1/services/sessions/session-actions.js';
 import { toasts } from '../../../../event-libs/v1/features/toast/toast.js';
@@ -12,6 +12,7 @@ import {
 
 describe('services/sessions/action-feedback', () => {
   const eventConfig = { title: 'Adobe MAX 2026', registerUrl: '/register' };
+  const PAST_SESSION = { id: 's-1', startTimeUtc: '2020-01-01T00:00:00Z', endTimeUtc: '2020-01-01T01:00:00Z' };
   let loggedMessages;
   let originalLog;
 
@@ -219,6 +220,46 @@ describe('services/sessions/action-feedback', () => {
       ];
       liveStreamActiveIds.value = new Set();
       expect(checkViewAccess('my-sessions', { eventConfig })).to.equal('live-upcoming');
+    });
+
+    ['my-sessions', 'my-favorites'].forEach((view) => {
+      it(`shows post-event sign-in copy for ${view} once the event has ended`, () => {
+        auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+        sessionsStatus.value = 'ready';
+        sessions.value = [PAST_SESSION];
+        checkViewAccess(view, { eventConfig });
+        expect(toasts.value[0].message).to.equal(`Sign in to view ${view.replace('-', ' ')}.`);
+        expect(toasts.value[0].ctaLabel).to.equal('Sign in');
+        expect(toasts.value[0].ctaHref).to.equal('/register');
+      });
+    });
+  });
+
+  describe('showAuthToast post-event copy', () => {
+    afterEach(() => {
+      sessions.value = [];
+      liveStreamActiveIds.value = new Set();
+    });
+
+    it('uses "Sign in to favorite." with a Sign in CTA after the event', async () => {
+      sessions.value = [PAST_SESSION];
+      const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+      await runSessionAction(authFn, { eventConfig, actionLabel: 'favorite' });
+      expect(toasts.value[0].message).to.equal('Sign in to favorite.');
+      expect(toasts.value[0].ctaLabel).to.equal('Sign in');
+      expect(toasts.value[0].ctaHref).to.equal('/register');
+    });
+
+    it('uses postEventActionLabel after the event and actionLabel during it', () => {
+      sessions.value = [PAST_SESSION];
+      showAuthToast({ eventConfig, actionLabel: 'download Slides.pdf', postEventActionLabel: 'download resources' });
+      expect(toasts.value[0].message).to.equal('Sign in to download resources.');
+
+      toasts.value = [];
+      sessions.value = [{ id: 's-2', startTimeUtc: '2099-01-01T00:00:00Z', endTimeUtc: '2099-01-01T01:00:00Z' }];
+      showAuthToast({ eventConfig, actionLabel: 'download Slides.pdf', postEventActionLabel: 'download resources' });
+      expect(toasts.value[0].message).to.equal('Register or sign in to download Slides.pdf.');
+      expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
     });
   });
 
