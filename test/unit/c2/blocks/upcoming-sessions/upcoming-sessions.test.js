@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds, sessionGuideRequest,
@@ -69,6 +70,225 @@ describe('upcoming-sessions', () => {
     pendingActions.value = new Set();
     liveStreamActiveIds.value = new Set();
     sessionGuideRequest.value = null;
+  });
+
+  afterEach(() => {
+    document.querySelectorAll('.upcoming-sessions').forEach((el) => {
+      el._upcomingSessionsCleanup?.();
+    });
+  });
+
+  describe('state timers', () => {
+    const maxDelay = 2_147_483_647;
+    let clock;
+    let timeoutSpy;
+
+    beforeEach(() => {
+      clock = sinon.useFakeTimers({
+        now: Date.now(),
+        toFake: ['Date', 'setTimeout', 'clearTimeout'],
+      });
+      timeoutSpy = sinon.spy(window, 'setTimeout');
+    });
+
+    afterEach(() => {
+      document.querySelectorAll('.upcoming-sessions').forEach((el) => {
+        el._upcomingSessionsCleanup?.();
+      });
+      sinon.restore();
+      clock.restore();
+    });
+
+    function buildTimedBlock(delay) {
+      const startTimeMillis = Date.now() + delay;
+      return buildBlock([session({
+        sessionTime: {
+          startTimeMillis,
+          endTimeMillis: startTimeMillis + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      })]);
+    }
+
+    [maxDelay - 1, maxDelay, maxDelay + 1].forEach((delay) => {
+      it(`removes a session only at its start with a ${delay} ms wait at the timer boundary`, async () => {
+        const el = buildTimedBlock(delay);
+        await init(el);
+
+        expect(timeoutSpy.lastCall.args[1]).to.equal(Math.min(delay, maxDelay));
+        expect(clock.countTimers()).to.equal(1);
+        clock.tick(delay - 1);
+
+        const card = el.querySelector('.upcoming-sessions-card');
+        expect(card).to.exist;
+        expect(card.classList.contains('upcoming-sessions-card--rotating-out')).to.equal(false);
+        expect(clock.countTimers()).to.equal(1);
+        if (delay > maxDelay) expect(timeoutSpy.lastCall.args[1]).to.equal(1);
+
+        clock.tick(1);
+        expect(card.classList.contains('upcoming-sessions-card--rotating-out')).to.equal(true);
+        clock.tick(350);
+        expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+        expect(clock.countTimers()).to.equal(0);
+      });
+    });
+
+    [40, 62].forEach((days) => {
+      it(`keeps a session ${days} days away visible through capped waits until its start`, async () => {
+        const delay = days * 86_400_000;
+        const startTimeMillis = Date.now() + delay;
+        const el = buildBlock([session({
+          sessionTime: {
+            startTimeMillis,
+            endTimeMillis: startTimeMillis + 3_600_000,
+            timezone: 'America/Los_Angeles',
+          },
+        })]);
+        await init(el);
+
+        expect(timeoutSpy.lastCall.args[1]).to.equal(maxDelay);
+        clock.tick(maxDelay);
+        expect(el.querySelector('.upcoming-sessions-card')).to.exist;
+        expect(timeoutSpy.lastCall.args[1]).to.equal(Math.min(delay - maxDelay, maxDelay));
+
+        clock.tick(delay - maxDelay - 1);
+        expect(el.querySelector('.upcoming-sessions-card')).to.exist;
+        clock.tick(351);
+        expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+        expect(clock.countTimers()).to.equal(0);
+      });
+    });
+
+    it('uses the actual remaining wait for a session starting within the timer limit', async () => {
+      const el = buildBlock([session()]);
+      await init(el);
+
+      expect(timeoutSpy.lastCall.args[1]).to.equal(60_000);
+      clock.tick(59_999);
+      expect(el.querySelector('.upcoming-sessions-card')).to.exist;
+      clock.tick(351);
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+    });
+
+    it('recalculates the remaining wait from the current clock when a capped callback runs late', async () => {
+      const delay = 40 * 86_400_000;
+      const lateness = 2 * 86_400_000;
+      const el = buildTimedBlock(delay);
+      await init(el);
+
+      clock.setSystemTime(Date.now() + lateness);
+      clock.tick(maxDelay);
+
+      expect(timeoutSpy.lastCall.args[1]).to.equal(delay - maxDelay - lateness);
+      expect(clock.countTimers()).to.equal(1);
+      const card = el.querySelector('.upcoming-sessions-card');
+      expect(card.classList.contains('upcoming-sessions-card--rotating-out')).to.equal(false);
+
+      clock.tick(delay - maxDelay - lateness);
+      expect(card.classList.contains('upcoming-sessions-card--rotating-out')).to.equal(true);
+      clock.tick(350);
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('drops a session rather than rescheduling when a capped callback runs after its start', async () => {
+      const delay = 40 * 86_400_000;
+      const el = buildTimedBlock(delay);
+      await init(el);
+
+      clock.setSystemTime(Date.now() + delay);
+      clock.tick(maxDelay);
+
+      expect(el.querySelector('.upcoming-sessions-card')
+        .classList.contains('upcoming-sessions-card--rotating-out')).to.equal(true);
+      clock.tick(350);
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('removes only the session that starts while keeping a far-future session scheduled', async () => {
+      const startTimeMillis = Date.now() + 40 * 86_400_000;
+      const el = buildBlock([
+        session({ sessionId: 'near-session' }),
+        session({
+          sessionId: 'far-session',
+          sessionTime: {
+            startTimeMillis,
+            endTimeMillis: startTimeMillis + 3_600_000,
+            timezone: 'America/Los_Angeles',
+          },
+        }),
+      ]);
+      await init(el);
+      expect(clock.countTimers()).to.equal(2);
+
+      clock.tick(60_700);
+
+      expect(el.querySelector('[data-session-id="near-session"]')).to.not.exist;
+      expect(el.querySelector('[data-session-id="far-session"]')).to.exist;
+      expect(clock.countTimers()).to.equal(1);
+      favorited.value = new Set(['far-session']);
+      expect(el.querySelector('[data-session-id="near-session"]')).to.not.exist;
+      expect(el.querySelector('[data-session-id="far-session"]')).to.exist;
+    });
+
+    it('cancels the replacement timer during re-decoration without creating duplicate timers', async () => {
+      const delay = 40 * 86_400_000;
+      const el = buildTimedBlock(delay);
+      await init(el);
+      clock.tick(maxDelay);
+      const replacementTimer = timeoutSpy.lastCall.returnValue;
+      const clearSpy = sinon.spy(window, 'clearTimeout');
+
+      await init(el);
+
+      expect(clearSpy.calledWith(replacementTimer)).to.equal(true);
+      expect(timeoutSpy.lastCall.args[1]).to.equal(delay - maxDelay);
+      expect(clock.countTimers()).to.equal(1);
+      clock.tick(delay - maxDelay + 350);
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('cancels the rescheduled timer during cleanup', async () => {
+      const startTimeMillis = Date.now() + 40 * 86_400_000;
+      const el = buildBlock([session({
+        sessionTime: {
+          startTimeMillis,
+          endTimeMillis: startTimeMillis + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      })]);
+      await init(el);
+      clock.tick(maxDelay);
+      expect(clock.countTimers()).to.equal(1);
+
+      el._upcomingSessionsCleanup();
+
+      expect(clock.countTimers()).to.equal(0);
+      clock.tick(40 * 86_400_000);
+      expect(el.querySelector('.upcoming-sessions-card')).to.exist;
+    });
+
+    it('rechecks elapsed time and clears the capped timer when the tab becomes visible', async () => {
+      const startTimeMillis = Date.now() + 40 * 86_400_000;
+      const el = buildBlock([session({
+        sessionTime: {
+          startTimeMillis,
+          endTimeMillis: startTimeMillis + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      })]);
+      await init(el);
+      sinon.stub(document, 'visibilityState').get(() => 'visible');
+
+      clock.setSystemTime(startTimeMillis);
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      expect(el.querySelector('.upcoming-sessions-card')).to.not.exist;
+      clock.tick(350);
+      expect(clock.countTimers()).to.equal(0);
+    });
   });
 
   describe('init(el)', () => {
