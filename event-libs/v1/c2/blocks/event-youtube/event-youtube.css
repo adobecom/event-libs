@@ -108,6 +108,7 @@ lite-youtube .lty-playbtn:focus {
   left: 0;
   top: 0;
   position: absolute;
+  border: none;
 }
 
 .lenis.lenis-smooth .event-youtube .youtube-chat-container iframe,
