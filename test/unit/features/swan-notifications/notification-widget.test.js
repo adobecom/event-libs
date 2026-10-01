@@ -1,4 +1,7 @@
 import { expect } from '@esm-bundle/chai';
+import {
+  setViewport, emulateMedia, sendMouse, sendKeys, executeServerCommand,
+} from '@web/test-runner-commands';
 import { mountNotificationWidget, normalizeTimeCasing } from '../../../../event-libs/v1/features/swan-notifications/notification-widget.js';
 import {
   getEntries, removeEntry, upsertEntry, setNotificationsReady, flushNotifications,
@@ -14,7 +17,7 @@ const REAL_THUMBNAIL_URL = '/test/unit/features/icons/mocks/federal/federal/asse
 // Polls instead of a fixed sleep for an async fetch (e.g. fetchFederalTrackIcon) to resolve
 // and update the DOM — a fixed wait is either too short under a loaded CI machine (flaky) or
 // wastefully long otherwise.
-async function waitFor(predicate, { timeout = 1000, interval = 10 } = {}) {
+async function waitFor(predicate, { timeout = 3000, interval = 10 } = {}) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (predicate()) return;
@@ -23,7 +26,8 @@ async function waitFor(predicate, { timeout = 1000, interval = 10 } = {}) {
   throw new Error('waitFor: condition never became true');
 }
 
-describe('notification-widget', () => {
+describe('notification-widget', function widgetTests() {
+  this.timeout(10000);
   let mountPoint;
 
   function bell() { return mountPoint.querySelector('.swan-notif__bell'); }
@@ -39,6 +43,7 @@ describe('notification-widget', () => {
   }
 
   before(async () => {
+    await setViewport({ width: 1200, height: 900 });
     const gnavNotificationsMeta = document.createElement('meta');
     gnavNotificationsMeta.name = 'gnav-notifications';
     gnavNotificationsMeta.content = 'on';
@@ -67,8 +72,18 @@ describe('notification-widget', () => {
   });
 
   beforeEach(async () => {
+    if (panel().open) {
+      panel().dispatchEvent(new Event('cancel', { cancelable: true }));
+      await waitFor(() => panel().hidden);
+    }
     await resetNotifications();
-    panel().hidden = true;
+  });
+
+  afterEach(async () => {
+    if (panel().open) {
+      panel().dispatchEvent(new Event('cancel', { cancelable: true }));
+      await waitFor(() => panel().hidden);
+    }
   });
 
   it('mounts exactly one bell button and panel into .feds-notifications-wrapper', () => {
@@ -259,6 +274,282 @@ describe('notification-widget', () => {
   it('does not mount a second widget on a repeated call', () => {
     mountNotificationWidget();
     expect(mountPoint.querySelectorAll('.swan-notif__bell')).to.have.lengthOf(1);
+  });
+
+  describe('mobile bottom sheet', () => {
+    function header() { return panel().querySelector('.swan-notif__panel-header'); }
+    function scroller() { return panel().querySelector('.swan-notif__scroll'); }
+    function pointer(target, type, y, overrides = {}) {
+      target.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, isPrimary: true, button: 0, pointerId: 1, clientY: y, ...overrides,
+      }));
+    }
+
+    beforeEach(async () => {
+      // Native input and media-query events need the foreground page when the
+      // full suite runs many Chromium tabs concurrently.
+      await executeServerCommand('focus-test-page');
+      await emulateMedia({ reducedMotion: 'reduce' });
+      await setViewport({ width: 440, height: 956 });
+    });
+
+    afterEach(async () => {
+      mountPoint.style.cssText = '';
+      if (panel().open) {
+        panel().dispatchEvent(new Event('cancel', { cancelable: true }));
+        await waitFor(() => panel().hidden);
+      }
+      await setViewport({ width: 1200, height: 900 });
+      await emulateMedia({ reducedMotion: 'no-preference' });
+    });
+
+    it('fits the actual viewport at small, tall, landscape and boundary sizes', async () => {
+      const viewports = [
+        [320, 568], [375, 667], [440, 956], [667, 375], [899, 956],
+      ];
+      for (const [width, height] of viewports) {
+        // eslint-disable-next-line no-await-in-loop
+        await setViewport({ width, height });
+        bell().click();
+        const rect = panel().getBoundingClientRect();
+        expect(panel().matches(':modal')).to.equal(true);
+        expect(rect.left).to.equal(0);
+        expect(rect.width).to.equal(width);
+        expect(rect.bottom).to.equal(height);
+        expect(rect.height).to.equal(Math.min(744, height - 100));
+        expect(rect.top).to.be.at.least(100);
+        bell().click();
+      }
+    });
+
+    it('escapes a transformed, clipping gnav ancestor', () => {
+      mountPoint.style.cssText = 'transform: translateZ(0); overflow: hidden; width: 32px; height: 32px';
+      bell().click();
+      expect(panel().matches(':modal')).to.equal(true);
+      expect(panel().getBoundingClientRect().width).to.equal(440);
+      expect(panel().getBoundingClientRect().left).to.equal(0);
+      expect(panel().getBoundingClientRect().bottom).to.equal(956);
+    });
+
+    it('releases modal state after a gnav re-render and can open the reinserted sheet again', async () => {
+      bell().click();
+      mountPoint.replaceChildren();
+      await waitFor(() => !!bell());
+      expect(panel().hidden).to.equal(true);
+      expect(document.body.style.overflow).to.equal('');
+      bell().click();
+      expect(panel().matches(':modal')).to.equal(true);
+    });
+
+    it('has no sheet close button and scrolls the list without moving the header', () => {
+      for (let i = 0; i < 20; i += 1) {
+        addEntry(`RF-${i}`, { stage: 'live', title: `Notification ${i}` });
+      }
+      bell().click();
+      expect(panel().querySelector(':scope > button')).to.equal(null);
+      expect(scroller().scrollHeight).to.be.greaterThan(scroller().clientHeight);
+      const before = header().getBoundingClientRect().top;
+      scroller().scrollTop = 200;
+      expect(scroller().scrollTop).to.equal(200);
+      expect(header().getBoundingClientRect().top).to.equal(before);
+      pointer(scroller(), 'pointerdown', 400);
+      pointer(document, 'pointerup', 600);
+      expect(panel().open).to.equal(true);
+    });
+
+    it('dismisses on a real backdrop click without clicking through to the page', async () => {
+      let clicked = false;
+      const outside = document.createElement('button');
+      outside.style.cssText = 'position: fixed; left: 0; top: 0; width: 100px; height: 100px';
+      outside.addEventListener('click', () => { clicked = true; });
+      document.body.append(outside);
+      try {
+        bell().click();
+        await sendMouse({ type: 'click', position: [20, 20] });
+        expect(panel().hidden).to.equal(true);
+        expect(clicked).to.equal(false);
+      } finally {
+        outside.remove();
+      }
+    });
+
+    it('keeps clicks in the sheet open', () => {
+      bell().click();
+      header().click();
+      expect(panel().open).to.equal(true);
+      const rect = panel().getBoundingClientRect();
+      panel().dispatchEvent(new MouseEvent('click', {
+        bubbles: true, clientX: rect.left + 10, clientY: rect.top + 10,
+      }));
+      expect(panel().open).to.equal(true);
+    });
+
+    it('dismisses by dragging the header down, without dismissing any notification', () => {
+      addEntry('RF-1', { stage: 'live', title: 'First' });
+      bell().click();
+      pointer(header(), 'pointerdown', 250);
+      pointer(document, 'pointermove', 370);
+      pointer(document, 'pointerup', 370);
+      expect(panel().hidden).to.equal(true);
+      expect(getEntries()[0].dismissed).to.equal(false);
+      expect(document.activeElement).to.equal(bell());
+    });
+
+    it('tracks a real captured pointer and dismisses after dragging the header', async () => {
+      bell().click();
+      const rect = header().getBoundingClientRect();
+      await sendMouse({ type: 'move', position: [200, rect.top + 30] });
+      await sendMouse({ type: 'down' });
+      await sendMouse({ type: 'move', position: [200, rect.top + 150] });
+      await sendMouse({ type: 'up' });
+      expect(panel().hidden).to.equal(true);
+    });
+
+    it('preserves focused rows and dismiss buttons through a background list refresh', () => {
+      addEntry('RF-1', { stage: 'live', title: 'First' });
+      bell().click();
+      rows()[0].focus();
+      addEntry('RF-2', { stage: 'live', title: 'Second' });
+      expect(document.activeElement.dataset.rfcode).to.equal('RF-1');
+      const firstRow = rows().find((row) => row.dataset.rfcode === 'RF-1');
+      firstRow.querySelector('.swan-notif__dismiss').focus();
+      addEntry('RF-3', { stage: 'live', title: 'Third' });
+      expect(document.activeElement.classList.contains('swan-notif__dismiss')).to.equal(true);
+      expect(document.activeElement.closest('.swan-notif__row').dataset.rfcode).to.equal('RF-1');
+    });
+
+    it('does not animate when reduced motion is requested', () => {
+      bell().click();
+      expect(panel().getAnimations()).to.have.lengthOf(0);
+      bell().click();
+      expect(panel().hidden).to.equal(true);
+      expect(panel().getAnimations()).to.have.lengthOf(0);
+    });
+
+    it('snaps back for a short drag or a cancelled pointer', () => {
+      bell().click();
+      pointer(header(), 'pointerdown', 250);
+      pointer(document, 'pointerup', 270);
+      expect(panel().open).to.equal(true);
+      expect(panel().getBoundingClientRect().top).to.equal(212);
+      pointer(header(), 'pointerdown', 250);
+      pointer(document, 'pointermove', 400);
+      pointer(document, 'pointercancel', 400);
+      expect(panel().open).to.equal(true);
+      expect(panel().getBoundingClientRect().top).to.equal(212);
+    });
+
+    it('locks page scrolling and restores the exact original styles after Escape', async () => {
+      document.documentElement.style.setProperty('overflow', 'auto', 'important');
+      document.body.style.overflow = 'scroll';
+      try {
+        bell().click();
+        expect(document.documentElement.style.overflow).to.equal('hidden');
+        expect(document.body.style.overflow).to.equal('hidden');
+        await sendKeys({ press: 'Escape' });
+        expect(panel().hidden).to.equal(true);
+        expect(document.documentElement.style.overflow).to.equal('auto');
+        expect(document.documentElement.style.getPropertyPriority('overflow')).to.equal('important');
+        expect(document.body.style.overflow).to.equal('scroll');
+        expect(document.activeElement).to.equal(bell());
+      } finally {
+        if (panel().open) {
+          panel().dispatchEvent(new Event('cancel', { cancelable: true }));
+          await waitFor(() => panel().hidden);
+        }
+        document.documentElement.style.removeProperty('overflow');
+        document.body.style.removeProperty('overflow');
+      }
+    });
+
+    it('contains keyboard focus and retains it after the last notification is dismissed', async () => {
+      addEntry('RF-1', { stage: 'live', title: 'First' });
+      bell().click();
+      await sendKeys({ press: 'Tab' });
+      expect(panel().contains(document.activeElement)).to.equal(true);
+      rows()[0].querySelector('.swan-notif__dismiss').click();
+      expect(document.activeElement).to.equal(header());
+      await sendKeys({ press: 'Tab' });
+      expect(document.activeElement === document.body || panel().contains(document.activeElement)).to.equal(true);
+      expect(panel().matches(':modal')).to.equal(true);
+    });
+
+    it('switches modal behavior at 900px while retaining the open inbox', async () => {
+      bell().click();
+      await setViewport({ width: 900, height: 956 });
+      await waitFor(() => !panel().matches(':modal'));
+      expect(panel().open).to.equal(true);
+      expect(panel().getBoundingClientRect().width).to.equal(400);
+      expect(document.body.style.overflow).to.equal('');
+      await setViewport({ width: 899, height: 956 });
+      await waitFor(() => panel().matches(':modal'));
+      expect(panel().getBoundingClientRect().width).to.equal(899);
+      expect(document.body.style.overflow).to.equal('hidden');
+    });
+
+    it('slides in from below and waits for slide-out before closing; rapid reopen cancels the exit', async () => {
+      await emulateMedia({ reducedMotion: 'no-preference' });
+      bell().click();
+      expect(panel().getAnimations()).to.have.lengthOf(1);
+      const opening = panel().getAnimations()[0];
+      expect(opening.effect.getKeyframes()[0].transform).to.equal('translateY(744px)');
+      opening.finish();
+      await opening.finished;
+      bell().click();
+      expect(panel().hidden).to.equal(false);
+      expect(bell().getAttribute('aria-expanded')).to.equal('false');
+      bell().click();
+      const reopened = panel().getAnimations()[0];
+      reopened.finish();
+      await reopened.finished;
+      expect(panel().open).to.equal(true);
+      expect(panel().matches(':modal')).to.equal(true);
+      bell().click();
+      await waitFor(() => panel().hidden);
+      expect(panel().open).to.equal(false);
+      expect(document.body.style.overflow).to.equal('');
+    });
+
+    it('still releases the modal when an animation finish event is not delivered', async () => {
+      await emulateMedia({ reducedMotion: 'no-preference' });
+      bell().click();
+      const opening = panel().getAnimations()[0];
+      opening.finish();
+      await opening.finished;
+      bell().click();
+      panel().getAnimations()[0].onfinish = null;
+      await waitFor(() => panel().hidden);
+      expect(panel().open).to.equal(false);
+      expect(document.body.style.overflow).to.equal('');
+    });
+
+    it('releases the modal if the breakpoint changes during slide-out', async () => {
+      await emulateMedia({ reducedMotion: 'no-preference' });
+      bell().click();
+      const opening = panel().getAnimations()[0];
+      opening.finish();
+      await opening.finished;
+      bell().click();
+      await setViewport({ width: 900, height: 956 });
+      await waitFor(() => panel().hidden);
+      expect(panel().matches(':modal')).to.equal(false);
+      expect(document.body.style.overflow).to.equal('');
+    });
+
+    it('ignores a stale animation completion after the sheet has been reopened', async () => {
+      await emulateMedia({ reducedMotion: 'no-preference' });
+      bell().click();
+      const opening = panel().getAnimations()[0];
+      opening.finish();
+      await opening.finished;
+      bell().click();
+      const staleFinish = panel().getAnimations()[0].onfinish;
+      bell().click();
+      staleFinish();
+      expect(panel().open).to.equal(true);
+      expect(panel().hidden).to.equal(false);
+      expect(document.body.style.overflow).to.equal('hidden');
+    });
   });
 
   describe('hover tooltip', () => {
