@@ -10,12 +10,18 @@ import {
 import { getNowMs, isPostEvent } from '../../utils/session-state.js';
 import { logError } from '../../utils/lana-log.js';
 
+function isEventOver() {
+  return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), getEventApiConfig()?.eventEndMs);
+}
+
 // Shared toast copy for gated actions, used by both runSessionAction's failures and checkViewAccess.
-export function showAuthToast({ eventConfig, actionLabel }) {
+// Post-event only sign-in is required (see assertAuthorized), so the copy drops "Register".
+export function showAuthToast({ eventConfig, actionLabel, postEventActionLabel = actionLabel }) {
+  const post = isEventOver();
   showToast({
-    message: `Register or sign in to ${actionLabel}.`,
+    message: post ? `Sign in to ${postEventActionLabel}.` : `Register or sign in to ${actionLabel}.`,
     variant: 'informative',
-    ctaLabel: 'Register/Sign in',
+    ctaLabel: post ? 'Sign in' : 'Register/Sign in',
     ctaHref: eventConfig.registerUrl || '/register',
     // Caps at one toast per gated action; actionLabel is already the natural per-action key.
     key: actionLabel,
@@ -93,10 +99,7 @@ const GATED_VIEW_LABELS = { 'my-sessions': 'my sessions', 'my-favorites': 'my fa
 // Where an unauthorized visitor lands: Live & upcoming during the event, On demand once isPostEvent().
 function fallbackViewForUnauthorized() {
   if (sessionsStatus.value !== 'ready' || !sessions.value.length) return 'live-upcoming';
-  const eventEndMs = getEventApiConfig()?.eventEndMs;
-  return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs)
-    ? 'on-demand'
-    : 'live-upcoming';
+  return isEventOver() ? 'on-demand' : 'live-upcoming';
 }
 
 // isRegistered stays `undefined` until session-store.js settles it (possibly to `null` on failure) —

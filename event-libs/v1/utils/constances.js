@@ -21,11 +21,29 @@ export const ADOBE_PROD_HOST = 'www.adobe.com';
 // (getWatchDestination). Any other event authors homepagePath/broadcastPath instead of
 // adding its paths here. Individual session pages are deliberately absent: the session
 // catalog gives each session's own URL, so nothing needs to build those paths.
+// adobe.com's CDN serves pages at `.html` (301s extensionless paths there), while aem.page/
+// aem.live only serve extensionless paths and 404 on `.html`. Mirrors Milo's `useDotHtml` /
+// appendHtmlToLink: same-origin page paths get `.html` only when the current page is served
+// with it. Cross-origin URLs, folder paths and other file extensions are returned untouched.
+const HTML_EXT = /\.html$/;
+const OTHER_EXT = /\.[^/]*$/;
+export function toPagePath(path) {
+  if (!path) return path;
+  let url;
+  try { url = new URL(path, window.location.origin); } catch { return path; }
+  if (url.origin !== window.location.origin || url.pathname.endsWith('/')) return path;
+  const base = url.pathname.replace(HTML_EXT, '');
+  if (OTHER_EXT.test(base.split('/').pop())) return path;
+  const pathname = HTML_EXT.test(window.location.pathname) ? `${base}.html` : base;
+  const rest = `${pathname}${url.search}${url.hash}`;
+  return path.startsWith('/') ? rest : `${url.origin}${rest}`;
+}
+
 export const MAX_EVENT_PAGES = {
-  // The published path; the doc itself is authored at /max-new.html.
-  homepage: '/max.html',
-  broadcast: '/max/2026/broadcast.html',
-  sessionGuide: '/max/2026/sessions.html',
+  // The published path; the doc itself is authored at /max-new.
+  get homepage() { return toPagePath('/max'); },
+  get broadcast() { return toPagePath('/max/2026/broadcast'); },
+  get sessionGuide() { return toPagePath('/max/2026/sessions'); },
 };
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
 
