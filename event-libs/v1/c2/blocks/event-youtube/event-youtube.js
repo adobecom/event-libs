@@ -1,5 +1,5 @@
 import { createTag, readBlockConfig } from '../../../utils/utils.js';
-import { logError } from '../../../utils/lana-log.js';
+import { logError, logWarning } from '../../../utils/lana-log.js';
 
 const CONFIG = {
   PRELOAD_DOMAINS: [
@@ -17,7 +17,6 @@ const CONFIG = {
     mute: 'mute',
     'show-controls': 'controls',
     'show-player-title-actions': 'modestbranding',
-    'show-suggestions-after-video-ends': 'rel',
   },
   IFRAME_ATTRIBUTES: {
     allowfullscreen: true,
@@ -26,6 +25,17 @@ const CONFIG = {
   DEFAULT_TITLE: 'YouTube video player',
   CHAT_LOAD_DELAY: 100,
 };
+
+let playerCount = 0;
+
+function createPlayerId() {
+  let id;
+  do {
+    playerCount += 1;
+    id = `player-${playerCount}`;
+  } while (document.getElementById(id));
+  return id;
+}
 
 function isTruthyConfigValue(value) {
   return (value ?? '').trim().toLowerCase() === 'true';
@@ -39,6 +49,7 @@ export class YouTubeChat {
     this.videoLoaded = false;
     this.pendingChatSection = null;
     this.chatContainer = null;
+    this.registeredIframes = new WeakSet();
   }
 
   async init(block) {
@@ -51,11 +62,43 @@ export class YouTubeChat {
 
       YouTubeChat.preconnect();
       block.textContent = '';
-      block.append(this.buildStream());
+      this.mountStream(block);
     } catch (err) {
       logError('event-youtube', 'failed to initialize', err);
       block.remove();
     }
+  }
+
+  mountStream(parent) {
+    const stream = this.buildStream();
+    parent.append(stream);
+    this.trackVideo(stream.querySelector('iframe.youtube-video'));
+    return stream;
+  }
+
+  trackVideo(iframe) {
+    if (!iframe?.isConnected || this.registeredIframes.has(iframe)) return;
+    this.registeredIframes.add(iframe);
+
+    const trackWhenReady = () => {
+      if (document.readyState !== 'complete') return;
+      document.removeEventListener('readystatechange', trackWhenReady);
+      if (!iframe.isConnected) return;
+
+      try {
+        const satellite = window._satellite;
+        if (typeof satellite?.track !== 'function') {
+          logWarning('event-youtube', 'YouTube tracking unavailable: Launch is not ready');
+          return;
+        }
+        satellite.track('trackYoutube');
+      } catch (err) {
+        logError('event-youtube', 'failed to register YouTube tracking', err);
+      }
+    };
+
+    if (document.readyState === 'complete') trackWhenReady();
+    else document.addEventListener('readystatechange', trackWhenReady);
   }
 
   static preconnect() {
@@ -136,6 +179,7 @@ export class YouTubeChat {
     liteYT.insertAdjacentElement('afterend', iframe);
     liteYT.remove();
 
+    this.trackVideo(iframe);
     if (this.chatEnabled) this.loadChat();
   }
 
@@ -165,6 +209,7 @@ export class YouTubeChat {
   createVideoIframe(src) {
     return createTag('iframe', {
       class: 'youtube-video',
+      id: createPlayerId(),
       src,
       title: this.getVideoTitle(),
       loading: 'lazy',
@@ -173,7 +218,14 @@ export class YouTubeChat {
   }
 
   getVideoTitle() {
-    return this.config.videotitle || CONFIG.DEFAULT_TITLE;
+    return this.config.title?.trim() || this.config.videotitle?.trim() || CONFIG.DEFAULT_TITLE;
+  }
+
+  getVideoType() {
+    const videoType = this.config.videotype?.trim().toLowerCase() || 'vod';
+    if (videoType === 'vod' || videoType === 'live') return videoType;
+    logWarning('event-youtube', 'Invalid videotype; defaulting to vod', videoType);
+    return 'vod';
   }
 
   isAutoplayEnabled() {
@@ -182,24 +234,22 @@ export class YouTubeChat {
 
   buildEmbedUrl(autoplay = false) {
     const base = `${CONFIG.YOUTUBE_EMBED_BASE}/${this.videoId}`;
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(this.buildUrlParams());
 
     if (autoplay) {
-      params.append('autoplay', '1');
-      params.append('mute', '1');
+      params.set('autoplay', '1');
+      params.set('mute', '1');
     }
-
-    Object.entries(CONFIG.PLAYER_OPTIONS).forEach(([key, param]) => {
-      if (isTruthyConfigValue(this.config[key])) {
-        params.append(param, '1');
-      }
-    });
 
     return `${base}?${params}`;
   }
 
   buildUrlParams() {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({
+      enablejsapi: '1',
+      rel: '0',
+      videotype: this.getVideoType(),
+    });
     Object.entries(CONFIG.PLAYER_OPTIONS).forEach(([key, param]) => {
       if (isTruthyConfigValue(this.config[key])) {
         params.append(param, '1');

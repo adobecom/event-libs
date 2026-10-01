@@ -1,20 +1,46 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { readFile } from '@web/test-runner-commands';
+import { YouTubeChat } from '../../../../event-libs/v1/c2/blocks/event-youtube/event-youtube.js';
 
 const defaultHtml = await readFile({ path: './mocks/default.html' });
 const modulePath = '../../../../event-libs/v1/c2/blocks/event-youtube/event-youtube.js';
 
+function createBlock() {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = defaultHtml;
+  return wrapper.firstElementChild;
+}
+
 describe('Event YouTube Module', () => {
   let sandbox;
+  let readyState;
+  let satelliteDescriptor;
+  let clock;
 
   beforeEach(() => {
     sandbox = sinon.createSandbox();
+    clock = sandbox.useFakeTimers();
+    readyState = sandbox.stub(document, 'readyState').get(() => 'complete');
+    satelliteDescriptor = Object.getOwnPropertyDescriptor(window, '_satellite');
+    Object.defineProperty(window, '_satellite', {
+      configurable: true,
+      writable: true,
+      value: { track: sandbox.spy() },
+    });
     document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    YouTubeChat.preconnected = false;
   });
 
   afterEach(() => {
+    document.body.innerHTML = '';
+    readyState.get(() => 'complete');
+    document.dispatchEvent(new Event('readystatechange'));
+    document.head.innerHTML = '';
     sandbox.restore();
+    if (satelliteDescriptor) Object.defineProperty(window, '_satellite', satelliteDescriptor);
+    else delete window._satellite;
   });
 
   describe('YouTubeChat Class', () => {
@@ -53,7 +79,7 @@ describe('Event YouTube Module', () => {
         const params = youtubeChat.buildUrlParams();
         expect(params).to.include('controls=1');
         expect(params).to.include('modestbranding=1');
-        expect(params).to.include('rel=1');
+        expect(new URLSearchParams(params).getAll('rel')).to.deep.equal(['0']);
 
         youtubeChat.config = {
           'show-controls': 'false',
@@ -61,8 +87,10 @@ describe('Event YouTube Module', () => {
           'show-suggestions-after-video-ends': 'false',
         };
 
-        const emptyParams = youtubeChat.buildUrlParams();
-        expect(emptyParams).to.equal('');
+        const requiredParams = new URLSearchParams(youtubeChat.buildUrlParams());
+        expect(Object.fromEntries(requiredParams)).to.deep.equal({
+          enablejsapi: '1', rel: '0', videotype: 'vod',
+        });
       });
     });
 
@@ -83,6 +111,7 @@ describe('Event YouTube Module', () => {
         expect(autoplayUrl).to.include('mute=1');
         expect(autoplayUrl).to.include('controls=1');
         expect(autoplayUrl).to.include('modestbranding=1');
+        expect(new URL(autoplayUrl).searchParams.getAll('autoplay')).to.deep.equal(['1']);
 
         const noAutoplayUrl = youtubeChat.buildEmbedUrl(false);
         expect(noAutoplayUrl).to.include('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
@@ -202,8 +231,14 @@ describe('Event YouTube Module', () => {
 
     describe('getVideoTitle', () => {
       it('should return correct video title', () => {
+        youtubeChat.config = { title: 'Authored Title', videotitle: 'Legacy Title' };
+        expect(youtubeChat.getVideoTitle()).to.equal('Authored Title');
+
         youtubeChat.config = { videotitle: 'Custom Video Title' };
         expect(youtubeChat.getVideoTitle()).to.equal('Custom Video Title');
+
+        youtubeChat.config = { title: ' ', videotitle: ' Legacy Title ' };
+        expect(youtubeChat.getVideoTitle()).to.equal('Legacy Title');
 
         youtubeChat.config = {};
         expect(youtubeChat.getVideoTitle()).to.equal('YouTube video player');
@@ -217,6 +252,7 @@ describe('Event YouTube Module', () => {
         const iframe = youtubeChat.createVideoIframe(src);
 
         expect(iframe.classList.contains('youtube-video')).to.be.true;
+        expect(iframe.id).to.match(/^player-/);
         expect(iframe.src).to.equal(src);
         expect(iframe.title).to.equal('Test Video');
         expect(iframe.loading).to.equal('lazy');
@@ -281,12 +317,240 @@ describe('Event YouTube Module', () => {
     });
   });
 
+  describe('Heartbeat player contract', () => {
+    let player;
+    let parent;
+
+    beforeEach(() => {
+      player = new YouTubeChat();
+      player.videoId = 'dQw4w9WgXcQ';
+      player.config = { autoplay: 'true' };
+      parent = document.createElement('div');
+      document.body.append(parent);
+    });
+
+    ['true', 'false'].forEach((autoplay) => {
+      ['vod', 'live', undefined].forEach((videotype) => {
+        it(`renders the required iframe contract with autoplay=${autoplay} and videotype=${videotype}`, () => {
+          player.config = {
+            autoplay,
+            videotype,
+            title: 'Authored video title',
+            'show-suggestions-after-video-ends': 'true',
+            'show-controls': 'true',
+          };
+          player.mountStream(parent);
+          if (autoplay === 'false') {
+            expect(parent.querySelector('iframe')).to.be.null;
+            expect(window._satellite.track.called).to.be.false;
+            const facade = parent.querySelector('lite-youtube');
+            expect(facade.getAttribute('playlabel')).to.equal('Authored video title');
+            expect(facade.querySelector('button').textContent).to.equal('Authored video title');
+            facade.querySelector('button').click();
+          }
+
+          const iframe = parent.querySelector('iframe.youtube-video');
+          const url = new URL(iframe.src);
+          expect(iframe.id).to.match(/^player-/);
+          expect(iframe.title).to.equal('Authored video title');
+          expect(url.origin).to.equal('https://www.youtube-nocookie.com');
+          expect(url.pathname).to.equal('/embed/dQw4w9WgXcQ');
+          expect(url.searchParams.getAll('enablejsapi')).to.deep.equal(['1']);
+          expect(url.searchParams.getAll('rel')).to.deep.equal(['0']);
+          expect(url.searchParams.getAll('videotype')).to.deep.equal([videotype || 'vod']);
+          expect(url.searchParams.getAll('autoplay')).to.deep.equal(['1']);
+          expect(url.searchParams.getAll('mute')).to.deep.equal(['1']);
+          expect(url.searchParams.get('controls')).to.equal('1');
+          expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+        });
+      });
+    });
+
+    it('normalizes videotype without using chat to infer it', () => {
+      player.config.videotype = ' LIVE ';
+      player.mountStream(parent);
+      expect(new URL(parent.querySelector('iframe').src).searchParams.get('videotype')).to.equal('live');
+      expect(parent.querySelector('.youtube-chat-container')).to.be.null;
+
+      player.config = { autoplay: 'true' };
+      player.chatEnabled = true;
+      const stream = player.mountStream(parent);
+      expect(new URL(stream.querySelector('iframe').src).searchParams.get('videotype')).to.equal('vod');
+    });
+
+    it('logs invalid videotype and defaults to vod without breaking playback', () => {
+      const log = sandbox.spy(window.lana, 'log');
+      player.config.videotype = 'invalid';
+      player.mountStream(parent);
+      expect(new URL(parent.querySelector('iframe').src).searchParams.get('videotype')).to.equal('vod');
+      expect(log.calledOnce).to.be.true;
+      expect(log.firstCall.args[0]).to.include('Invalid videotype; defaulting to vod');
+      expect(log.firstCall.args[1].severity).to.equal('warning');
+      expect(window._satellite.track.calledOnce).to.be.true;
+    });
+
+    it('gives duplicate videos unique IDs across autoplay, click, and shared mounts', async () => {
+      const { default: init } = await import(modulePath);
+      const block = createBlock();
+      document.body.append(block);
+      await init(block);
+
+      player.config.autoplay = 'false';
+      player.mountStream(parent);
+      parent.querySelector('button').click();
+
+      const broadcastPlayer = new YouTubeChat();
+      broadcastPlayer.videoId = player.videoId;
+      broadcastPlayer.config = { autoplay: 'true', videotype: 'live' };
+      broadcastPlayer.mountStream(parent);
+
+      const frames = [...document.querySelectorAll('iframe.youtube-video')];
+      expect(frames).to.have.length(3);
+      expect(new Set(frames.map((iframe) => iframe.id)).size).to.equal(3);
+      frames.forEach((iframe) => expect(iframe.id).to.match(/^player-/));
+      expect(window._satellite.track.callCount).to.equal(3);
+      clock.tick(100);
+      expect(window._satellite.track.callCount).to.equal(3);
+      expect(block.querySelector('iframe.youtube-chat').id).to.equal('');
+    });
+
+    it('avoids IDs already used by another player on the page', () => {
+      const first = player.createVideoIframe(player.buildEmbedUrl());
+      const nextCount = Number(first.id.slice('player-'.length)) + 1;
+      const otherPlayer = document.createElement('div');
+      otherPlayer.id = `player-${nextCount}`;
+      document.body.append(otherPlayer);
+      const second = player.createVideoIframe(player.buildEmbedUrl());
+      expect(second.id).not.to.equal(otherPlayer.id);
+      expect(second.id).not.to.equal(first.id);
+    });
+
+    it('does not track detached construction or iframe creation', () => {
+      const stream = player.buildStream();
+      const iframe = stream.querySelector('iframe');
+      player.trackVideo(iframe);
+      player.createVideoIframe(player.buildEmbedUrl());
+      expect(window._satellite.track.called).to.be.false;
+      parent.append(stream);
+      player.trackVideo(iframe);
+      expect(window._satellite.track.calledOnce).to.be.true;
+    });
+
+    it('tracks only after mounting the iframe into the document', () => {
+      const track = sandbox.stub().callsFake((eventName) => {
+        expect(eventName).to.equal('trackYoutube');
+        const iframe = parent.querySelector('iframe.youtube-video');
+        expect(iframe).not.to.be.null;
+        expect(iframe.isConnected).to.be.true;
+      });
+      window._satellite.track = track;
+      const stream = player.mountStream(parent);
+      expect(track.calledOnce).to.be.true;
+      player.trackVideo(stream.querySelector('iframe'));
+      document.dispatchEvent(new Event('readystatechange'));
+      expect(track.calledOnce).to.be.true;
+    });
+
+    it('waits for document completion and removes the once-only readiness listener', () => {
+      readyState.get(() => 'loading');
+      const addListener = sandbox.spy(document, 'addEventListener');
+      const removeListener = sandbox.spy(document, 'removeEventListener');
+      const stream = player.mountStream(parent);
+      const iframe = stream.querySelector('iframe');
+      player.trackVideo(iframe);
+      expect(window._satellite.track.called).to.be.false;
+
+      readyState.get(() => 'interactive');
+      document.dispatchEvent(new Event('readystatechange'));
+      expect(window._satellite.track.called).to.be.false;
+
+      const listener = addListener.getCalls().find((call) => call.args[0] === 'readystatechange').args[1];
+      readyState.get(() => 'complete');
+      document.dispatchEvent(new Event('readystatechange'));
+      document.dispatchEvent(new Event('readystatechange'));
+      player.trackVideo(iframe);
+      expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+      expect(removeListener.calledWithExactly('readystatechange', listener)).to.be.true;
+    });
+
+    it('does not track a player removed before document completion', () => {
+      readyState.get(() => 'loading');
+      const stream = player.mountStream(parent);
+      stream.remove();
+      readyState.get(() => 'complete');
+      document.dispatchEvent(new Event('readystatechange'));
+      parent.append(stream);
+      document.dispatchEvent(new Event('readystatechange'));
+      expect(window._satellite.track.called).to.be.false;
+    });
+
+    it('registers a click-to-play iframe only once even after repeated clicks', () => {
+      player.config.autoplay = 'false';
+      player.chatEnabled = true;
+      player.mountStream(parent);
+      const facade = parent.querySelector('lite-youtube');
+      expect(window._satellite.track.called).to.be.false;
+      facade.click();
+      facade.click();
+      expect(parent.querySelectorAll('iframe.youtube-video')).to.have.length(1);
+      expect(parent.querySelector('iframe.youtube-chat')).not.to.be.null;
+      expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+    });
+
+    it('waits for document completion on the click-to-play path', () => {
+      readyState.get(() => 'loading');
+      player.config.autoplay = 'false';
+      player.mountStream(parent);
+      parent.querySelector('button').click();
+      expect(window._satellite.track.called).to.be.false;
+      readyState.get(() => 'complete');
+      document.dispatchEvent(new Event('readystatechange'));
+      expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+    });
+
+    [undefined, {}].forEach((satellite) => {
+      it(`logs unavailable Launch (${satellite ? 'no track method' : 'absent'}) without removing the player`, async () => {
+        window._satellite = satellite;
+        const log = sandbox.spy(window.lana, 'log');
+        const block = createBlock();
+        document.body.append(block);
+        const { default: init } = await import(modulePath);
+        await init(block);
+        clock.tick(100);
+        expect(block.isConnected).to.be.true;
+        expect(block.querySelector('iframe.youtube-video')).not.to.be.null;
+        expect(block.querySelector('iframe.youtube-chat')).not.to.be.null;
+        expect(log.calledOnce).to.be.true;
+        expect(log.firstCall.args[0]).to.include('YouTube tracking unavailable');
+        expect(log.firstCall.args[1].severity).to.equal('warning');
+      });
+    });
+
+    ['true', 'false'].forEach((autoplay) => {
+      it(`logs thrown tracking errors without breaking playback or chat with autoplay=${autoplay}`, () => {
+        window._satellite.track = sandbox.stub().throws(new Error('Launch failure'));
+        const log = sandbox.spy(window.lana, 'log');
+        player.config.autoplay = autoplay;
+        player.chatEnabled = true;
+        expect(() => player.mountStream(parent)).not.to.throw();
+        if (autoplay === 'false') parent.querySelector('button').click();
+        clock.tick(100);
+        expect(parent.querySelector('iframe.youtube-video')).not.to.be.null;
+        expect(parent.querySelector('iframe.youtube-chat')).not.to.be.null;
+        expect(window._satellite.track.calledOnce).to.be.true;
+        expect(log.calledOnce).to.be.true;
+        expect(log.firstCall.args[0]).to.include('failed to register YouTube tracking');
+        expect(log.firstCall.args[0]).to.include('Launch failure');
+        expect(log.firstCall.args[1].severity).to.equal('error');
+      });
+    });
+  });
+
   describe('Default Export Function', () => {
     let block;
 
     beforeEach(() => {
-      block = document.createElement('div');
-      block.innerHTML = defaultHtml;
+      block = createBlock();
       document.body.appendChild(block);
     });
 
@@ -308,12 +572,17 @@ describe('Event YouTube Module', () => {
       const result = init(block);
       expect(result).to.be.instanceOf(Promise);
 
-      try {
-        await result;
-      } catch (error) {
-        // Expected to fail due to missing video ID in test HTML
-        expect(error).to.be.instanceOf(Error);
-      }
+      await result;
+      expect(block.querySelector('iframe.youtube-video')).not.to.be.null;
+    });
+
+    it('applies the authored title and registers the connected autoplay iframe', async () => {
+      const { default: init } = await import(modulePath);
+      await init(block);
+      const iframe = block.querySelector('iframe.youtube-video');
+      expect(iframe.title).to.equal('My Custom Video Title');
+      expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+      expect(iframe.isConnected).to.be.true;
     });
 
     it('should default live chat to off when no chatenabled row is authored', async () => {
