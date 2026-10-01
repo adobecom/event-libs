@@ -9,7 +9,7 @@ export const buildCarousel = () => Carousel;
 export function Carousel({
   sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
   CardComponent = LiveCard, timeDisplay, showDurationBadge, showDescription, forceLive,
-  pageByGroup = false,
+  pageByGroup = false, resetKey,
 }) {
   // Hooks run before the empty-list bail-out, to keep hook order stable across renders.
   const [offset, setOffset] = useState(0);
@@ -22,6 +22,7 @@ export function Carousel({
   // Kept current every render so the mount-time resize handler below reads the latest value.
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+  const resetKeyRef = useRef(resetKey);
 
   const clampOffset = () => {
     const maxOffset = Math.max(0, (sessionsRef.current?.length || 0) - visibleCountRef.current);
@@ -71,6 +72,15 @@ export function Carousel({
     refreshEdges();
     clampOffset();
   }, [sessionCount]);
+
+  // resetKey (e.g. activeDay) changing means the carousel now shows an unrelated session set —
+  // snap back to the start instead of retaining the previous day's scroll position (MWPW-209092).
+  useEffect(() => {
+    if (resetKey === undefined || resetKey === resetKeyRef.current) return;
+    resetKeyRef.current = resetKey;
+    setOffset(0);
+    if (stripRef.current) stripRef.current.scrollLeft = 0;
+  }, [resetKey]);
 
   if (!sessions || !sessionCount) return null;
 

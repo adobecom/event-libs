@@ -194,6 +194,81 @@ describe('federal-icons — id collisions across inlined SVGs', () => {
   });
 });
 
+// MWPW-209382: Adobe Aqua rendered without its clipped petal art. Its clip-path is declared
+// in an inline <style> (.st2 { clip-path: url(#clippath-1) }), which the id rewrite missed,
+// and its generic .stN classes leak page-wide once inlined.
+describe('federal-icons — <style>-declared references and classes', () => {
+  before(() => {
+    setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+  });
+
+  it('rewrites url(#id) references inside <style> to the new id', async () => {
+    const svg = await fetchFederalProductIcon('projectaqua-appicon-64');
+    const clipId = svg.querySelector('clipPath').id;
+    expect(clipId).to.match(/^clippath-1-fedicon\d+$/);
+    expect(svg.querySelector('style').textContent).to.include(`url(#${clipId})`);
+    expect(svg.querySelector('style').textContent).to.not.include('url(#clippath-1)');
+  });
+
+  it('namespaces <style> classes and the elements using them, keeping unrelated classes', async () => {
+    const svg = await fetchFederalProductIcon('projectaqua-appicon-64');
+    const styleText = svg.querySelector('style').textContent;
+    const path = svg.querySelector('path');
+    const [st4, other] = path.getAttribute('class').split(' ');
+    expect(st4).to.match(/^st4-fedicon\d+$/);
+    expect(other).to.equal('keep-me');
+    expect(styleText).to.include(`.${st4}`);
+    expect(styleText).to.include('opacity: 0.5');
+    expect(styleText).to.not.match(/\.st\d\s*\{/);
+  });
+
+  it('gives two clones of a <style> icon independent class names', async () => {
+    const first = await fetchFederalProductIcon('projectaqua-appicon-64');
+    const second = await fetchFederalProductIcon('projectaqua-appicon-64');
+    expect(first.querySelector('g').getAttribute('class'))
+      .to.not.equal(second.querySelector('g').getAttribute('class'));
+  });
+});
+
+describe('federal-icons — concurrent callers share one in-flight fetch', () => {
+  let fetchSpy;
+  let fresh;
+
+  beforeEach(async () => {
+    // Fresh module instance so the per-namespace cache starts empty.
+    fresh = await import(`../../../../event-libs/v1/features/icons/federal-icons.js?t=${Math.random()}`);
+    fresh.setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+    fetchSpy = sinon.spy(window, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.restore();
+  });
+
+  it('fetches a track icon once when many cards request it in the same tick', async () => {
+    const svgs = await Promise.all([1, 2, 3].map(() => fresh.fetchFederalTrackIcon('branding')));
+    const brandingCalls = fetchSpy.getCalls().filter(({ args }) => String(args[0]).endsWith('/branding.svg'));
+    expect(brandingCalls).to.have.lengthOf(1);
+    expect(svgs.every((svg) => svg?.classList.contains('icon-federal-branding'))).to.equal(true);
+    expect(new Set(svgs).size).to.equal(3);
+  });
+
+  it('still gives each concurrent caller its own namespaced ids', async () => {
+    const [first, second] = await Promise.all([
+      fresh.fetchFederalProductIcon('frame-io-64'),
+      fresh.fetchFederalProductIcon('frame-io-64'),
+    ]);
+    expect(fetchSpy.callCount).to.equal(1);
+    expect(first.querySelector('clipPath').id).to.not.equal(second.querySelector('clipPath').id);
+  });
+
+  it('shares a concurrent miss too, without re-fetching', async () => {
+    const results = await Promise.all([1, 2].map(() => fresh.fetchFederalTrackIcon('not-a-track-icon')));
+    expect(results).to.deep.equal([null, null]);
+    expect(fetchSpy.callCount).to.equal(1);
+  });
+});
+
 describe('federal-icons — non-ok HTTP responses are reported to lana', () => {
   let fetchStub;
   let lanaLogStub;

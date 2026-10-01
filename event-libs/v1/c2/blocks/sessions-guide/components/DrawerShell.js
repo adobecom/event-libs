@@ -274,6 +274,7 @@ export function DrawerShell() {
         role=${isOpen ? 'dialog' : undefined}
         aria-modal=${isOpen ? 'true' : undefined}
         aria-label=${isOpen ? 'Sessions guide' : undefined}
+        inert=${!isOpen ? true : undefined}
       >
         <${DrawerHeader}
           onClose=${closeDrawer}

@@ -35,6 +35,22 @@ jobs:
               return DOC_EXTENSIONS.has(ext);
             }
 
+            // Repo-only paths that are never served (mirrors .hlxignore plus dev tooling).
+            const IGNORED_TOP_LEVEL_DIRS = new Set(['test', 'docs']);
+            const IGNORED_BASENAMES = new Set([
+              'package.json', 'package-lock.json', 'eslint.config.js',
+              'web-test-runner.config.js',
+            ]);
+
+            function isNonServedFile(path) {
+              const segments = path.split('/');
+              const base = segments[segments.length - 1];
+              return segments.some((segment) => segment.startsWith('.'))
+                || IGNORED_TOP_LEVEL_DIRS.has(segments[0])
+                || IGNORED_BASENAMES.has(base)
+                || /\.test\.js$/.test(base);
+            }
+
             const files = await github.paginate(github.rest.pulls.listFiles, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -42,7 +58,7 @@ jobs:
             });
 
             const codeFiles = files
-              .filter((file) => !isDocFile(file.filename))
+              .filter((file) => !isDocFile(file.filename) && !isNonServedFile(file.filename))
               .map((file) => file.filename)
               .sort();
 

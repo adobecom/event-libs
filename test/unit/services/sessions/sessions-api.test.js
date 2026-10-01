@@ -1054,6 +1054,16 @@ describe('services/sessions/sessions-api', () => {
   });
 
   describe('normalizeSessions', () => {
+    it('normalizes description line breaks (CRLF, literal \\n, tabs) to "\\n"', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1', description: 'Intro\r\n\r\nKey takeaways:\\n-\tOne' }]);
+      expect(normalized.description).to.equal('Intro\n\nKey takeaways:\n- One');
+    });
+
+    it('defaults description to an empty string', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1' }]);
+      expect(normalized.description).to.equal('');
+    });
+
     it('defaults resources/mrStreamId to [] / null when the raw session provides neither', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: ['Designer'] }]);
       expect(normalized.resources).to.deep.equal([]);

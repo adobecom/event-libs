@@ -395,7 +395,7 @@ async function decorate(el) {
 
   const header = createTag('div', { class: 'upcoming-sessions-header' }, '', { parent: el });
   // heading is attacker-influenced too - same .textContent handling as session.enTitle above.
-  if (heading) createTag('h3', { class: 'upcoming-sessions-heading' }, '', { parent: header }).textContent = heading;
+  if (heading) createTag('h2', { class: 'upcoming-sessions-heading' }, '', { parent: header }).textContent = heading;
   header.append(buildCarouselControls(track));
 
   el.append(track);

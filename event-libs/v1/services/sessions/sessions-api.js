@@ -1,5 +1,5 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
-import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
+import { getEventServiceEnv, getEventConfig, normalizeMultilineText } from '../../utils/utils.js';
 import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
 
@@ -41,7 +41,8 @@ export function normalizeSessions(rawSessions) {
     // Session-level id; favoriting keys on this, scheduling on rfCode.
     rfSessionId: s.rfSessionId || '',
     title: s.title || '',
-    description: s.description || '',
+    // Kept as plain text with "\n" breaks; renderers use `white-space: pre-line`.
+    description: normalizeMultilineText(s.description),
     startTimeUtc: s.startTimeUtc || '',
     endTimeUtc: s.endTimeUtc || '',
     duration: s.duration || 0,

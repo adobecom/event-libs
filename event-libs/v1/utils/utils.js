@@ -166,6 +166,19 @@ export function getMetadata(name, doc = document) {
   return meta && meta.content;
 }
 
+// Session copy reaches us with mixed line-break forms (CRLF, real or literal "\n"/"\t"). Unify
+// them to "\n" so `white-space: pre-line` renders the breaks; tabs become spaces.
+export function normalizeMultilineText(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/\r\n?/g, '\n')
+    .replace(/\\r\\n|\\n|\\r/g, '\n')
+    .replace(/\\t|\t/g, ' ')
+    .replace(/[ ]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export function setMetadata(name, value, doc = document) {
   const attr = name && name.includes('og:') ? 'property' : 'name';
   const meta = doc.head.querySelector(`meta[${attr}="${name}"]`);

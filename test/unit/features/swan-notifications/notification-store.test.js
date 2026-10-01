@@ -1,320 +1,275 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import {
-  notifications, getEntry, getEntries, upsertEntry, removeEntry, markRead, markAllRead, pruneStale, dismissEntry,
+  notifications, getEntry, getEntries, upsertEntry, removeEntry, markRead, markAllRead,
+  pruneStale, dismissEntry, batchNotifications, flushNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
+import { resetNotifications } from './mocks/notification-store.js';
 
 const LOCAL_STATE_KEY = 'swan-notification-state-v3';
+const DAY = 24 * 60 * 60 * 1000;
 
-// This module is a real singleton (its `state`/`notifications` signal live for the whole
-// browser session), so tests reset it through its own public API rather than relying on
-// re-importing the module or clearing localStorage alone — a fresh import wouldn't get a
-// fresh instance anyway, since other test files in the same session may have already
-// loaded it.
-function clearStore() {
-  getEntries().forEach((entry) => removeEntry(entry.rfCode));
+async function otherTabWrite(next) {
+  await flushNotifications();
+  localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(next));
+  window.dispatchEvent(new StorageEvent('storage', { key: LOCAL_STATE_KEY, newValue: JSON.stringify(next) }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('notification-store', () => {
-  beforeEach(() => {
-    clearStore();
+  beforeEach(resetNotifications);
+  afterEach(async () => {
+    sinon.restore();
+    await flushNotifications();
   });
 
-  afterEach(() => {
-    clearStore();
-    window.localStorage.removeItem(LOCAL_STATE_KEY);
-  });
-
-  describe('upsertEntry / getEntry', () => {
-    it('stores an entry retrievable by rfCode', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
-      expect(getEntry('RF-1').title).to.equal('Session One');
-      expect(getEntry('RF-1').stage).to.equal('reminder');
-    });
-
-    it('marks a new entry unread by default', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
-      expect(getEntry('RF-1').read).to.equal(false);
-    });
-
-    it('sets updatedAt on every write', () => {
+  describe('upsertEntry', () => {
+    it('stores entries by rfCode, sets updatedAt, and defaults to unread', () => {
       const before = Date.now();
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
+      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
+      expect(getEntry('RF-1').title).to.equal('First');
+      expect(getEntry('RF-1').read).to.equal(false);
       expect(getEntry('RF-1').updatedAt).to.be.at.least(before);
     });
 
-    it('re-flags as unread when the stage actually changes', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
+    it('preserves read/dismiss and fields at the same stage, but resets flags on advancement', () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'First', actionUrl: '/a' });
       markRead('RF-1');
+      dismissEntry('RF-1');
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Refreshed' });
       expect(getEntry('RF-1').read).to.equal(true);
-
-      upsertEntry('RF-1', { stage: 'live', title: 'Session One' });
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      upsertEntry('RF-1', { stage: 'live', title: 'Live' });
       expect(getEntry('RF-1').read).to.equal(false);
-    });
-
-    it('leaves an already-read entry read on a no-op re-write of the same stage', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
-      markRead('RF-1');
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
-      expect(getEntry('RF-1').read).to.equal(true);
-    });
-
-    it('merges new fields onto the existing entry rather than replacing it wholesale', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One', actionUrl: '/a' });
-      upsertEntry('RF-1', { stage: 'live', title: 'Session One' });
+      expect(getEntry('RF-1').dismissed).to.equal(false);
       expect(getEntry('RF-1').actionUrl).to.equal('/a');
     });
 
-    it('un-dismisses an entry when its stage actually changes', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
-      dismissEntry('RF-1');
-      expect(getEntry('RF-1').dismissed).to.equal(true);
-
-      upsertEntry('RF-1', { stage: 'live', title: 'Session One' });
-      expect(getEntry('RF-1').dismissed).to.equal(false);
-    });
-
-    it('leaves an already-dismissed entry dismissed on a no-op re-write of the same stage', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
-      dismissEntry('RF-1');
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Session One' });
-      expect(getEntry('RF-1').dismissed).to.equal(true);
+    it('does not downgrade a stage advanced in another tab before the storage event arrives', async () => {
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
+      await flushNotifications();
+      localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify({
+        'RF-1': { stage: 'live', title: 'Other tab', seq: 100, updatedAt: Date.now() },
+      }));
+      upsertEntry('RF-1', { stage: 'reminder', title: 'Stale' });
+      expect(getEntry('RF-1').stage).to.equal('live');
     });
   });
 
-  describe('dismissEntry', () => {
-    it('flags the entry dismissed without removing it from the store', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
+  describe('read, dismiss and remove', () => {
+    it('keeps dismissals in the existing map and writes no extra state for repeated actions', () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
       dismissEntry('RF-1');
-      expect(getEntry('RF-1')).to.not.equal(undefined);
       expect(getEntry('RF-1').dismissed).to.equal(true);
-    });
-
-    it('no-ops for an unknown rfCode', () => {
-      expect(() => dismissEntry('RF-never')).to.not.throw();
-    });
-
-    it('is a no-op (no extra signal notification) when the entry is already dismissed', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      dismissEntry('RF-1');
       const seen = [];
       const unsubscribe = notifications.subscribe((entries) => seen.push(entries));
       dismissEntry('RF-1');
+      dismissEntry('missing');
+      markRead('missing');
       unsubscribe();
-      // subscribe() itself fires once immediately — a genuine second write would mean two.
       expect(seen).to.have.lengthOf(1);
+    });
+
+    it('marks only the requested entry read, then marks the whole inbox read', () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      upsertEntry('RF-2', { stage: 'live', title: 'Second', eventId: 'another-event' });
+      markRead('RF-1');
+      expect(getEntry('RF-2').read).to.equal(false);
+      markAllRead();
+      expect(getEntries().every((entry) => entry.read)).to.equal(true);
+    });
+
+    it('removes entries rather than retaining hidden records', async () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      removeEntry('RF-1');
+      removeEntry('missing');
+      await flushNotifications();
+      expect(getEntry('RF-1')).to.equal(undefined);
+      expect(JSON.parse(localStorage.getItem(LOCAL_STATE_KEY))).to.deep.equal({});
     });
   });
 
-  describe('getEntries / the notifications signal', () => {
-    it('reflects every stored entry, most recently updated first', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      upsertEntry('RF-2', { stage: 'reminder', title: 'Second' });
-      const entries = getEntries();
-      expect(entries.map((e) => e.rfCode)).to.deep.equal(['RF-2', 'RF-1']);
-    });
-
-    it('sorts a live entry above an on-demand entry even when the on-demand one is more recent', () => {
-      upsertEntry('RF-old-live', { stage: 'live', title: 'Live' });
-      upsertEntry('RF-newer-on-demand', { stage: 'on-demand', title: 'On-Demand' });
-      expect(getEntries().map((e) => e.rfCode)).to.deep.equal(['RF-old-live', 'RF-newer-on-demand']);
-    });
-
-    it('sorts live above reminder above on-demand, then falls back to recency within a stage', () => {
-      upsertEntry('RF-on-demand', { stage: 'on-demand', title: 'On-Demand' });
-      upsertEntry('RF-reminder-older', { stage: 'reminder', title: 'Reminder older' });
-      upsertEntry('RF-reminder-newer', { stage: 'reminder', title: 'Reminder newer' });
+  describe('ordering and publication', () => {
+    it('sorts live above reminder above on-demand, with recency within a stage', () => {
+      upsertEntry('RF-on-demand', { stage: 'on-demand', title: 'Ended' });
+      upsertEntry('RF-reminder-a', { stage: 'reminder', title: 'Older' });
+      upsertEntry('RF-reminder-b', { stage: 'reminder', title: 'Newer' });
       upsertEntry('RF-live', { stage: 'live', title: 'Live' });
-      expect(getEntries().map((e) => e.rfCode)).to.deep.equal([
-        'RF-live', 'RF-reminder-newer', 'RF-reminder-older', 'RF-on-demand',
+      expect(getEntries().map((entry) => entry.rfCode)).to.deep.equal([
+        'RF-live', 'RF-reminder-b', 'RF-reminder-a', 'RF-on-demand',
       ]);
     });
 
-    it('includes rfCode on each returned entry', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      expect(getEntries()[0].rfCode).to.equal('RF-1');
-    });
-
-    it('notifies signal subscribers on every mutation', () => {
+    it('publishes only the final list for batched mutations', () => {
       const seen = [];
       const unsubscribe = notifications.subscribe((entries) => seen.push(entries.length));
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      removeEntry('RF-1');
+      batchNotifications(() => {
+        upsertEntry('RF-1', { stage: 'live', title: 'First' });
+        upsertEntry('RF-2', { stage: 'live', title: 'Second' });
+        removeEntry('RF-1');
+      });
       unsubscribe();
-      expect(seen).to.deep.equal([0, 1, 0]);
+      expect(seen).to.deep.equal([0, 1]);
     });
   });
 
-  describe('removeEntry', () => {
-    it('drops the entry', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      removeEntry('RF-1');
-      expect(getEntry('RF-1')).to.equal(undefined);
-    });
-
-    it('no-ops for an rfCode that was never stored', () => {
-      expect(() => removeEntry('RF-never')).to.not.throw();
-    });
-  });
-
-  describe('markRead / markAllRead', () => {
-    it('markRead flips only the targeted entry', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      upsertEntry('RF-2', { stage: 'reminder', title: 'Second' });
-      markRead('RF-1');
-      expect(getEntry('RF-1').read).to.equal(true);
-      expect(getEntry('RF-2').read).to.equal(false);
-    });
-
-    it('markRead no-ops for an unknown rfCode', () => {
-      expect(() => markRead('RF-never')).to.not.throw();
-    });
-
-    it('markAllRead flips every unread entry', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      upsertEntry('RF-2', { stage: 'reminder', title: 'Second' });
-      markAllRead();
-      expect(getEntry('RF-1').read).to.equal(true);
-      expect(getEntry('RF-2').read).to.equal(true);
-    });
-
-    it('markAllRead is a no-op (no extra signal notification) when nothing is unread', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      markAllRead();
-      const seen = [];
-      const unsubscribe = notifications.subscribe((entries) => seen.push(entries));
-      markAllRead();
-      unsubscribe();
-      // subscribe() itself fires once immediately with the current value — a genuine
-      // second notification would mean two entries in `seen`.
-      expect(seen).to.have.lengthOf(1);
-    });
-  });
-
-  describe('pruneStale', () => {
-    it('drops an on-demand entry older than persistTillDays', () => {
-      upsertEntry('RF-1', { stage: 'on-demand', title: 'Old' });
-      const fourDaysMs = 4 * 24 * 60 * 60 * 1000;
-      pruneStale(Date.now() + fourDaysMs, 3);
-      expect(getEntry('RF-1')).to.equal(undefined);
-    });
-
-    it('keeps an on-demand entry younger than persistTillDays', () => {
-      upsertEntry('RF-1', { stage: 'on-demand', title: 'Recent' });
+  describe('expiry', () => {
+    it('expires from the session end rather than a recent local write', () => {
+      upsertEntry('RF-ended', { stage: 'on-demand', title: 'Old', endTimeMs: Date.now() - 4 * DAY });
+      upsertEntry('RF-live', { stage: 'live', title: 'Old cached stage', endTimeMs: Date.now() - 4 * DAY });
       pruneStale(Date.now(), 3);
-      expect(getEntry('RF-1')).to.not.equal(undefined);
-    });
-
-    it('keeps a reminder or live entry under the (default 14-day) event-wide expiration safety net', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Still upcoming' });
-      upsertEntry('RF-2', { stage: 'live', title: 'Still live' });
-      const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
-      pruneStale(Date.now() + tenDaysMs, 3);
-      expect(getEntry('RF-1')).to.not.equal(undefined);
-      expect(getEntry('RF-2')).to.not.equal(undefined);
-    });
-
-    it('drops a reminder or live entry once it exceeds the event-wide expirationDays safety net', () => {
-      // Reproduces the scenario the safety net exists for: an entry that never gets
-      // reconciled further (e.g. its session silently drops out of the catalog) would
-      // otherwise persist forever, since only on-demand entries have their own TTL.
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Stuck reminder' });
-      upsertEntry('RF-2', { stage: 'live', title: 'Stuck live' });
-      const twentyDaysMs = 20 * 24 * 60 * 60 * 1000;
-      pruneStale(Date.now() + twentyDaysMs, 3, 14);
-      expect(getEntry('RF-1')).to.equal(undefined);
-      expect(getEntry('RF-2')).to.equal(undefined);
-    });
-
-    it('falls back to a 14-day expiration window for a non-numeric expirationDays', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Still upcoming' });
-      const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
-      pruneStale(Date.now() + tenDaysMs, 3, 'not-a-number');
-      expect(getEntry('RF-1')).to.not.equal(undefined);
-    });
-
-    it('falls back to a 3-day window for a non-numeric persistTillDays', () => {
-      upsertEntry('RF-1', { stage: 'on-demand', title: 'Old' });
-      const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
-      pruneStale(Date.now() + twoDaysMs, 'not-a-number');
-      expect(getEntry('RF-1')).to.not.equal(undefined);
-    });
-
-    it('respects an explicit 0 as "prune immediately", rather than treating it as missing', () => {
-      upsertEntry('RF-1', { stage: 'on-demand', title: 'Old' });
-      pruneStale(Date.now() + 1, 0);
-      expect(getEntry('RF-1')).to.equal(undefined);
-    });
-  });
-
-  describe('persistence', () => {
-    it('persists writes to localStorage under the v3 key', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'First' });
-      const stored = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY));
-      expect(stored['RF-1'].title).to.equal('First');
-    });
-  });
-
-  describe('cross-tab sync (storage event)', () => {
-    // The real browser never fires `storage` in the same tab that made the write — this
-    // dispatches it manually to simulate another tab's write landing in this one.
-    function simulateOtherTabWrite(newState) {
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: LOCAL_STATE_KEY,
-        newValue: JSON.stringify(newState),
-      }));
-    }
-
-    it('adopts state written by another tab', () => {
-      simulateOtherTabWrite({ 'RF-1': {
-        stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 1,
-      } });
-      expect(getEntry('RF-1').title).to.equal('From another tab');
-    });
-
-    it('notifies subscribers when another tab writes', () => {
-      const seen = [];
-      const unsubscribe = notifications.subscribe((entries) => seen.push(entries.length));
-      simulateOtherTabWrite({ 'RF-1': {
-        stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 1,
-      } });
-      unsubscribe();
-      expect(seen[seen.length - 1]).to.equal(1);
-    });
-
-    it('ignores a storage event for an unrelated key', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
-      window.dispatchEvent(new StorageEvent('storage', { key: 'some-other-key', newValue: '{}' }));
-      expect(getEntry('RF-1').title).to.equal('Mine');
-    });
-
-    it('resets to empty state rather than throwing on a corrupt cross-tab write', () => {
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
-      expect(() => window.dispatchEvent(new StorageEvent('storage', {
-        key: LOCAL_STATE_KEY, newValue: '{not-json',
-      }))).to.not.throw();
       expect(getEntries()).to.have.lengthOf(0);
     });
 
-    it('resets to empty state rather than crashing when the written value is valid JSON but not an object', () => {
-      // JSON.parse('null')/('42')/('"x"') all succeed without throwing — only the try/catch
-      // shape check catches these; without it, `state` would become `null`/a number/a string,
-      // and the very next line (Object.values(state)) would throw instead.
-      upsertEntry('RF-1', { stage: 'reminder', title: 'Mine' });
-      ['null', '42', '"just a string"', '[]'].forEach((newValue) => {
-        expect(() => window.dispatchEvent(new StorageEvent('storage', {
-          key: LOCAL_STATE_KEY, newValue,
-        }))).to.not.throw();
-      });
-      expect(() => getEntry('anything')).to.not.throw();
-      expect(() => markRead('anything')).to.not.throw();
+    it('preserves the original updatedAt fallback for existing entries without session times', () => {
+      upsertEntry('RF-1', { stage: 'on-demand', title: 'Recent' });
+      pruneStale(Date.now() + 2 * DAY, 3);
+      expect(getEntry('RF-1')).to.not.equal(undefined);
+      pruneStale(Date.now() + 4 * DAY, 3);
+      expect(getEntry('RF-1')).to.equal(undefined);
     });
 
-    it('lets a subsequent local upsert generate a seq higher than anything adopted cross-tab', () => {
-      simulateOtherTabWrite({ 'RF-1': {
-        stage: 'reminder', title: 'From another tab', read: false, updatedAt: Date.now(), seq: 100,
-      } });
-      upsertEntry('RF-2', { stage: 'live', title: 'Mine, written after' });
-      expect(getEntry('RF-2').seq).to.be.above(100);
+    it('retains the 14-day safety net, invalid-value fallbacks and explicit zero', () => {
+      upsertEntry('RF-live', { stage: 'live', title: 'Live' });
+      pruneStale(Date.now() + 10 * DAY, 'invalid', 'invalid');
+      expect(getEntry('RF-live')).to.not.equal(undefined);
+      pruneStale(Date.now() + 20 * DAY, 3, 14);
+      expect(getEntry('RF-live')).to.equal(undefined);
+      upsertEntry('RF-ended', { stage: 'on-demand', title: 'Ended' });
+      pruneStale(Date.now() + 1, 0);
+      expect(getEntry('RF-ended')).to.equal(undefined);
+    });
+  });
+
+  describe('single-key persistence', () => {
+    it('writes all notifications and flags to the existing v3 map', async () => {
+      const writes = sinon.spy(Storage.prototype, 'setItem');
+      upsertEntry('RF-1', { stage: 'live', title: 'First', eventId: 'event-a' });
+      upsertEntry('RF-2', { stage: 'live', title: 'Second', eventId: 'event-b' });
+      dismissEntry('RF-1');
+      markRead('RF-2');
+      await flushNotifications();
+      const stored = JSON.parse(localStorage.getItem(LOCAL_STATE_KEY));
+      expect(stored['RF-1'].dismissed).to.equal(true);
+      expect(stored['RF-2'].read).to.equal(true);
+      expect(Object.keys(stored)).to.deep.equal(['RF-1', 'RF-2']);
+      expect(getEntries()).to.have.lengthOf(2);
+      expect(writes.getCalls().every((call) => call.args[0] === LOCAL_STATE_KEY)).to.equal(true);
+    });
+
+    it('hydrates QA testers\' existing v3 entries without losing flags or requiring scope metadata', async () => {
+      await otherTabWrite({
+        'RF-existing': { stage: 'live', title: 'QA entry', dismissed: true, read: true, seq: 1, updatedAt: Date.now() },
+      });
+      const reloaded = await import(`../../../../event-libs/v1/features/swan-notifications/notification-store.js?reload=${Math.random()}`);
+      expect(reloaded.getEntry('RF-existing').dismissed).to.equal(true);
+      expect(reloaded.getEntry('RF-existing').read).to.equal(true);
+      expect(reloaded.getEntries()).to.have.lengthOf(1);
+    });
+
+    it('retries failed persistence without overwriting another tab\'s newer entries', async () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      await flushNotifications();
+      const writes = sinon.stub(Storage.prototype, 'setItem').throws(new Error('quota exceeded'));
+      dismissEntry('RF-1');
+      expect(await flushNotifications()).to.equal(false);
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      writes.restore();
+      const latest = JSON.parse(localStorage.getItem(LOCAL_STATE_KEY));
+      latest['RF-2'] = { stage: 'live', title: 'Other tab', seq: 100, updatedAt: Date.now() };
+      localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(latest));
+      expect(await flushNotifications()).to.equal(true);
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      expect(getEntry('RF-2').title).to.equal('Other tab');
+    });
+
+    it('serializes concurrent tab writes while preserving read, dismiss and new entries', async () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      await flushNotifications();
+      const otherTab = await import(`../../../../event-libs/v1/features/swan-notifications/notification-store.js?tab=${Math.random()}`);
+      dismissEntry('RF-1');
+      otherTab.markRead('RF-1');
+      otherTab.upsertEntry('RF-2', { stage: 'live', title: 'Other tab' });
+      await Promise.all([flushNotifications(), otherTab.flushNotifications()]);
+      const stored = JSON.parse(localStorage.getItem(LOCAL_STATE_KEY));
+      expect(stored['RF-1'].dismissed).to.equal(true);
+      expect(stored['RF-1'].read).to.equal(true);
+      expect(stored['RF-2'].title).to.equal('Other tab');
+    });
+
+    it('persists mutations created by a subscriber during an ongoing flush', async () => {
+      const unsubscribe = notifications.subscribe((entries) => {
+        const entry = entries.find((value) => value.rfCode === 'RF-concurrent');
+        if (entry && !entry.read) markRead(entry.rfCode);
+      });
+      upsertEntry('RF-local', { stage: 'live', title: 'Local' });
+      // An external entry appears before the queued lock callback runs. Publishing
+      // the merged map invokes the subscriber while the first flush is still active.
+      localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify({
+        'RF-concurrent': { stage: 'live', title: 'Other tab', read: false, updatedAt: Date.now(), seq: 1 },
+      }));
+      await flushNotifications();
+      unsubscribe();
+      expect(JSON.parse(localStorage.getItem(LOCAL_STATE_KEY))['RF-concurrent'].read).to.equal(true);
+    });
+
+    it('waits for the origin-wide lock before updating the shared map', async () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      await flushNotifications();
+      let release;
+      let acquired = false;
+      const blocker = navigator.locks.request(LOCAL_STATE_KEY, async () => {
+        acquired = true;
+        await new Promise((resolve) => { release = resolve; });
+      });
+      while (!acquired) await new Promise((resolve) => setTimeout(resolve, 0));
+      dismissEntry('RF-1');
+      const pending = flushNotifications();
+      expect(JSON.parse(localStorage.getItem(LOCAL_STATE_KEY))['RF-1'].dismissed).to.equal(false);
+      release();
+      await blocker;
+      await pending;
+      expect(JSON.parse(localStorage.getItem(LOCAL_STATE_KEY))['RF-1'].dismissed).to.equal(true);
+    });
+  });
+
+  describe('storage events', () => {
+    it('uses current storage instead of a queued stale newValue', async () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      await flushNotifications();
+      const stale = localStorage.getItem(LOCAL_STATE_KEY);
+      dismissEntry('RF-1');
+      await flushNotifications();
+      window.dispatchEvent(new StorageEvent('storage', { key: LOCAL_STATE_KEY, newValue: stale }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(getEntry('RF-1').dismissed).to.equal(true);
+      expect(notifications.value[0].dismissed).to.equal(true);
+    });
+
+    it('ignores unrelated keys and coalesces a burst without republishing unchanged state', async () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      await flushNotifications();
+      const seen = [];
+      const unsubscribe = notifications.subscribe((entries) => seen.push(entries));
+      for (let index = 0; index < 100; index += 1) {
+        window.dispatchEvent(new StorageEvent('storage', { key: LOCAL_STATE_KEY, newValue: '{}' }));
+      }
+      window.dispatchEvent(new StorageEvent('storage', { key: 'unrelated', newValue: '{}' }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      unsubscribe();
+      expect(seen).to.have.lengthOf(1);
+      expect(getEntry('RF-1').title).to.equal('First');
+    });
+
+    it('logs malformed storage without throwing or replacing the live state', async () => {
+      upsertEntry('RF-1', { stage: 'live', title: 'First' });
+      await flushNotifications();
+      ['{bad-json', 'null', '42', '"text"', '[]'].forEach((value) => {
+        localStorage.setItem(LOCAL_STATE_KEY, value);
+        expect(() => getEntry('RF-1')).to.not.throw();
+        expect(getEntry('RF-1').title).to.equal('First');
+      });
+      localStorage.setItem(LOCAL_STATE_KEY, '{}');
     });
   });
 });
