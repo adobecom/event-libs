@@ -16,29 +16,32 @@ export const SERIES_404_MAP_PATH = '/events/default/series-404-map.json';
 // origin instead (see sessionPageUrlForEnv).
 export const ADOBE_PROD_HOST = 'www.adobe.com';
 
+// adobe.com's CDN serves pages at `.html` (301s extensionless paths there), while aem.page/
+// aem.live only serve extensionless paths and 404 on `.html`. Mirrors Milo's `useDotHtml` /
+// appendHtmlToLink: root-relative and same-origin page paths get `.html` only when the current
+// page is served with it. Relative and cross-origin URLs, folders and other extensions are
+// returned untouched.
+const HTML_EXT = /\.html$/;
+const OTHER_EXT = /\.[^/]*$/;
+export function toPagePath(path) {
+  if (!path) return path;
+  const { origin } = window.location;
+  if (!path.startsWith('/') && !path.startsWith(origin)) return path;
+  let url;
+  try { url = new URL(path, origin); } catch { return path; }
+  if (url.origin !== origin || url.pathname.endsWith('/')) return path;
+  const base = url.pathname.replace(HTML_EXT, '');
+  if (OTHER_EXT.test(base.split('/').pop())) return path;
+  const pathname = HTML_EXT.test(window.location.pathname) ? `${base}.html` : base;
+  const rest = `${pathname}${url.search}${url.hash}`;
+  return path.startsWith('/') ? rest : `${origin}${rest}`;
+}
+
 // MAX 2026's own pages. Paths only — they resolve against whatever domain is serving the
 // page. Used as the fallback for a Tier 1 Event Config that doesn't author its own
 // (getWatchDestination). Any other event authors homepagePath/broadcastPath instead of
 // adding its paths here. Individual session pages are deliberately absent: the session
 // catalog gives each session's own URL, so nothing needs to build those paths.
-// adobe.com's CDN serves pages at `.html` (301s extensionless paths there), while aem.page/
-// aem.live only serve extensionless paths and 404 on `.html`. Mirrors Milo's `useDotHtml` /
-// appendHtmlToLink: same-origin page paths get `.html` only when the current page is served
-// with it. Cross-origin URLs, folder paths and other file extensions are returned untouched.
-const HTML_EXT = /\.html$/;
-const OTHER_EXT = /\.[^/]*$/;
-export function toPagePath(path) {
-  if (!path) return path;
-  let url;
-  try { url = new URL(path, window.location.origin); } catch { return path; }
-  if (url.origin !== window.location.origin || url.pathname.endsWith('/')) return path;
-  const base = url.pathname.replace(HTML_EXT, '');
-  if (OTHER_EXT.test(base.split('/').pop())) return path;
-  const pathname = HTML_EXT.test(window.location.pathname) ? `${base}.html` : base;
-  const rest = `${pathname}${url.search}${url.hash}`;
-  return path.startsWith('/') ? rest : `${url.origin}${rest}`;
-}
-
 export const MAX_EVENT_PAGES = {
   // The published path; the doc itself is authored at /max-new.
   get homepage() { return toPagePath('/max'); },

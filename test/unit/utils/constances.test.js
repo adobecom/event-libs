@@ -55,6 +55,7 @@ describe('utils/constances toPagePath', () => {
       expect(toPagePath('https://www.adobe.com/max')).to.equal('https://www.adobe.com/max');
       expect(toPagePath('/max/2026/')).to.equal('/max/2026/');
       expect(toPagePath('/files/guide.pdf')).to.equal('/files/guide.pdf');
+      expect(toPagePath('summit')).to.equal('summit');
       expect(toPagePath('')).to.equal('');
       expect(toPagePath(undefined)).to.equal(undefined);
     });

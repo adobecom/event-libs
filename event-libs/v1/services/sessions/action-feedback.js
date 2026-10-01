@@ -1,18 +1,11 @@
 import {
-  resolveScheduleConflict, toggleScheduleAction, toggleFavoriteAction, assertAuthorized,
+  resolveScheduleConflict, toggleScheduleAction, toggleFavoriteAction, assertAuthorized, isEventOver,
 } from './session-actions.js';
 import { showToast } from '../../features/toast/toast.js';
 import { showConflictModal } from '../../features/conflict-modal/conflict-modal.js';
 import { getAllowDoubleBooking } from '../../utils/tier-1-event-config.js';
-import {
-  sessions, sessionsStatus, liveStreamActiveIds, getEventApiConfig,
-} from '../../utils/session-store.js';
-import { getNowMs, isPostEvent } from '../../utils/session-state.js';
+import { sessions, sessionsStatus } from '../../utils/session-store.js';
 import { logError } from '../../utils/lana-log.js';
-
-function isEventOver() {
-  return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), getEventApiConfig()?.eventEndMs);
-}
 
 // Shared toast copy for gated actions, used by both runSessionAction's failures and checkViewAccess.
 // Post-event only sign-in is required (see assertAuthorized), so the copy drops "Register".
