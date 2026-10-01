@@ -114,11 +114,12 @@ export async function flushNotifications() {
 function mutateState(mutate) {
   if (!mutationDepth) refreshState();
   const next = mutate(state);
-  if (next === state) return;
+  if (next === state) return false;
   pendingMutations.push(mutate);
   adopt(next);
   sync();
   if (!mutationDepth) flushNotifications();
+  return true;
 }
 
 export function batchNotifications(callback) {
@@ -193,6 +194,26 @@ export function upsertEntry(rfCode, entry) {
       },
     };
   });
+}
+
+// Timing corrections are not new notifications. Compare the observed payload again
+// under the storage lock, but merge the latest read/dismiss flags from other tabs.
+export function correctEntry(rfCode, entry, expected) {
+  const changed = mutateState((current) => {
+    const prev = current[rfCode];
+    if (!prev || !expected) return current;
+    const keys = new Set([...Object.keys(prev), ...Object.keys(expected)]);
+    keys.delete('read');
+    keys.delete('dismissed');
+    if ([...keys].some((key) => JSON.stringify(prev[key]) !== JSON.stringify(expected[key]))) return current;
+    const next = { ...current };
+    if (entry) next[rfCode] = { ...prev, ...entry };
+    else delete next[rfCode];
+    return next;
+  });
+  // A premature entry must become eligible again when its reminder window arrives.
+  if (changed && !entry) allowNotification(rfCode);
+  return changed;
 }
 
 export function removeEntry(rfCode) {

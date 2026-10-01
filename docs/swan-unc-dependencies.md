@@ -226,6 +226,19 @@ Reminder, live, and on-demand are distinct stages: dismissal survives repeated t
 and reloads at the same stage; a genuine stage advance intentionally surfaces an
 unread notification again.
 
+The current catalog timestamps and the shared `getNowMs()` clock are authoritative.
+If a `serverTime` reset or catalog correction leaves a cached notification ahead of
+its actual stage, FEDS repairs the stage, timing and action payload without resetting
+read/dismiss flags or notification recency. Payload corrections are checked against
+the observed entry again under the storage lock, so they cannot overwrite a newer
+payload or recreate a concurrently removed entry. Normal stage advances retain
+their existing unread/undismiss behavior.
+
+Upcoming notifications still begin five minutes before the session starts, not
+immediately when it is scheduled. A premature cached entry is removed until that
+window arrives; it can then be created normally. Invalid or inverted start/end
+timestamps are logged and skipped rather than classified as on-demand.
+
 Only a fresh successful schedule response performs orphan cleanup. New entries include
 an optional `eventId` identifying their owner, not a display filter: notifications
 from all events remain in the same inbox. Cleanup removes only current-event entries,
@@ -241,6 +254,42 @@ three days after its latest local write, preventing expiry/recreation loops.
 
 The v3 storage key and entry format remain compatible. UNC's v2 tracking, authentication
 paths, and SessionCard/action behavior are unchanged.
+
+### FEDS mobile inbox
+
+Below 900px viewport width, the inbox uses a native modal dialog in the browser's
+top layer, avoiding gnav ancestor clipping and stacking contexts. It is full-width
+and slides up from below the screen. At 900px and wider, it remains the existing
+400px, bell-anchored floating panel.
+
+The fully opened mobile sheet has height `min(744px, viewport height - 100px)`,
+using dynamic viewport units with a `vh` fallback. The 100px top clearance is an
+intentional engineering-owned viewport offset; it is not authored block spacing.
+At 440x956 the sheet is 744px tall with 212px clearance; at 375x667 it is 567px tall
+with 100px clearance. The header's 16px handle allowance applies only below 900px,
+keeps the drag affordance separate from the title, and is included in the cap.
+Bottom safe-area padding is also included within the cap. The header stays in
+place while the notification list scrolls independently.
+
+There is no sheet close button. Drag down from the header/handle to dismiss: the
+threshold is the smaller of 100px or one quarter of the sheet height. Short or
+cancelled drags snap back; list swipes only scroll the list. Tapping outside the
+sheet or pressing Escape also dismisses it, without dismissing individual
+notifications. Native modal behavior keeps background controls inert and contains
+keyboard focus. Dismissal restores bell focus and the page's previous scroll
+styles. Opening, closing and snap-back motion respect reduced-motion preferences.
+Crossing the breakpoint while open switches modal behavior without clearing the inbox.
+A gnav re-render closes the removed dialog and releases its scroll lock; the
+reinserted bell can open it again normally.
+
+### FEDS regression checks
+
+Run `npx wtr "test/unit/features/swan-notifications/*.test.js" --node-resolve --port=2000`
+for the focused feature suite, or `npm test` for the full suite with coverage.
+Mobile native-input tests use the runner's `focus-test-page` command so browser
+events reach the correct tab during concurrent execution. Animation tests explicitly
+finish browser animations rather than waiting for background-tab rendering frames;
+they also cover stale completion callbacks after reopening and the close-timeout fallback.
 
 ## Verifying the chain end-to-end
 

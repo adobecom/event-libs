@@ -11,6 +11,7 @@ import { upsertNotification } from './notification-display.js';
 import {
   getEntry, getEntries, pruneStale, daysToMs, removeEntry, setNotificationsReady,
   batchNotifications, allowNotification, wasNotificationRemoved,
+  correctEntry,
 } from './notification-store.js';
 import { getNowMs } from '../../utils/session-state.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
@@ -30,19 +31,23 @@ function desiredStage(timingProperties, now) {
   return null;
 }
 
-// No-ops if already at (or, defensively, past) the desired stage: forward-only is the only
-// guard against re-flagging an already-seen stage as unread again. One entry per rfCode,
-// updated in place as its stage advances, rather than tracked as separate per-stage records.
+// The current clock/catalog is authoritative; cached stages can be ahead after a
+// serverTime reset or a catalog correction. Only forward advances reset read/dismiss.
 function applyStage(session, swanConfig, now) {
   const timingProperties = calculateSessionTimes(session, swanConfig.upcomingOffsetMinutes);
   if (!Number.isFinite(timingProperties.triggerNotificationTime)
     || !Number.isFinite(timingProperties.triggerLiveBadgeTime)
-    || !Number.isFinite(timingProperties.triggerOnDemandBadgeTime)) {
+    || !Number.isFinite(timingProperties.triggerOnDemandBadgeTime)
+    || timingProperties.triggerOnDemandBadgeTime < timingProperties.triggerLiveBadgeTime) {
     logWarning('swan-notifications-feds', `session ${session.rfCode} has invalid start/end timestamps — skipping`);
     return;
   }
   const stage = desiredStage(timingProperties, now);
-  if (!stage) return;
+  const existing = getEntry(session.rfCode);
+  if (!stage) {
+    if (existing) correctEntry(session.rfCode, null, existing);
+    return;
+  }
   // Expiry is anchored to session time, not the last write: deleting an expired
   // entry must not make the next tick eligible to create it again.
   if (stage === 'on-demand'
@@ -50,12 +55,16 @@ function applyStage(session, swanConfig, now) {
     removeEntry(session.rfCode);
     return;
   }
-  const existing = getEntry(session.rfCode);
   if (wasNotificationRemoved(session.rfCode)) return;
-  if (existing && STAGE_RANK[existing.stage] >= STAGE_RANK[stage]) return;
 
   const entry = buildNotificationEntry(session, stage, swanConfig);
   if (swanConfig.eventId) entry.eventId = swanConfig.eventId;
+  if (existing && STAGE_RANK[existing.stage] >= STAGE_RANK[stage]) {
+    if (Object.entries(entry).some(([key, value]) => existing[key] !== value)) {
+      correctEntry(session.rfCode, entry, existing);
+    }
+    return;
+  }
   upsertNotification(session.rfCode, entry);
 }
 
