@@ -113,7 +113,7 @@ export function MySessionsView() {
                 class="sg-my-sessions__see-live-btn"
                 type="button"
                 onclick=${() => dispatch({ type: 'SET_VIEW', view: isPost ? 'on-demand' : 'live-upcoming' })}
-              >${isPost ? 'See On demand' : 'See Live & upcoming'}</button>
+              >${isPost ? 'See On demand' : 'See live & upcoming'}</button>
             </div>
           `
       ) : html`
