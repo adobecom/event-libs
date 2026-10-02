@@ -19,6 +19,13 @@ inner spacing, and body bottom padding remain unchanged. Both full-page block na
 The layout regression fixture checks the actual styles at mobile, tablet, desktop,
 and breakpoint boundaries.
 
+## On-demand section order
+
+The shared on-demand view renders Recommended first, followed by the On-demand
+heading and track rows (MWPW-208777). The heading stays above the empty or no-results
+state when Recommended is absent or hidden. This is DOM order, not a CSS reorder,
+so visual and reading order agree on both page and drawer surfaces.
+
 ## sessions-api.js
 
 ### sessionPageUrlForEnv

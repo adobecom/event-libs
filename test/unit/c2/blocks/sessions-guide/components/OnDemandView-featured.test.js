@@ -58,6 +58,20 @@ describe('OnDemandView (recommendedSessions authored)', () => {
     expect(html).to.include('Recommended');
   });
 
+  it('places Recommended before the On-demand heading and track rows', () => {
+    const store = makeStore([PAST_DESIGN, PAST_VIDEO]);
+    const View = buildOnDemandView(preact, store);
+    const html = View({});
+    const recommendedIndex = html.indexOf('sg-carousel-section--recommended');
+    const headingIndex = html.indexOf('<h3 class="sg-upcoming-title">On-demand</h3>');
+    const trackIndex = html.indexOf('sg-time-row');
+
+    expect(recommendedIndex).to.be.at.least(0);
+    expect(headingIndex).to.be.greaterThan(recommendedIndex);
+    expect(trackIndex).to.be.greaterThan(headingIndex);
+    expect(html.match(/<h3 class="sg-upcoming-title">On-demand<\/h3>/g)).to.have.lengthOf(1);
+  });
+
   // The absence of a time label/gutter on a recommended carousel is covered where it can
   // actually be observed — Carousel.test.js's "omits the time gutter when no formatTime is
   // supplied" — since the shim above never invokes a nested component's body.
@@ -77,5 +91,6 @@ describe('OnDemandView (recommendedSessions authored)', () => {
     const html = View({});
     expect(html).to.not.include('sg-carousel-section--recommended');
     expect(html).to.include('No results match your current selection.');
+    expect(html.indexOf('sg-upcoming-title')).to.be.lessThan(html.indexOf('sg-empty--no-results'));
   });
 });
