@@ -607,7 +607,9 @@ No longer a Preact component — `mountToast()` builds the toast element once vi
 `utils/ics.js` → `generateICS(sessions)` / `downloadICS(sessions, filename)`:
 - RFC 5545 compliant: `BEGIN:VCALENDAR`, `VEVENT` per session
 - `DTSTART`/`DTEND` in UTC (`Z` suffix)
-- `SUMMARY`, `DESCRIPTION` (includes speaker names), `URL`
+- `SUMMARY`, `DESCRIPTION` (includes speaker names and the individual session page link), `URL`
+- The shared widget/full-page download includes the session page link in `DESCRIPTION` for
+  Outlook, which does not display the `URL` property. `URL` is retained for Apple Calendar.
 - Line folding at 75 octets per RFC 5545 §3.1
 - Triggered by `DownloadButton` in My Sessions view header (only shown when `activeView === 'my-sessions'`)
 

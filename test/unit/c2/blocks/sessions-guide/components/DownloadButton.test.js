@@ -19,13 +19,21 @@ function session(overrides = {}) {
 describe('DownloadButton', () => {
   let clicks;
   let originalClick;
+  let downloads;
+  let originalCreateObjectURL;
 
   beforeEach(() => {
     sessions.value = [];
     scheduled.value = new Set();
     toasts.value = [];
     clicks = [];
+    downloads = [];
     originalClick = HTMLAnchorElement.prototype.click;
+    originalCreateObjectURL = URL.createObjectURL;
+    URL.createObjectURL = (blob) => {
+      downloads.push(blob);
+      return originalCreateObjectURL.call(URL, blob);
+    };
     HTMLAnchorElement.prototype.click = function stubClick() {
       clicks.push({ href: this.href, download: this.download });
     };
@@ -33,6 +41,7 @@ describe('DownloadButton', () => {
 
   afterEach(() => {
     HTMLAnchorElement.prototype.click = originalClick;
+    URL.createObjectURL = originalCreateObjectURL;
   });
 
   describe('rendering', () => {
@@ -61,6 +70,29 @@ describe('DownloadButton', () => {
       downloadSchedule(list, new Set(['a', 'c']));
       expect(clicks).to.have.lengthOf(1);
       expect(clicks[0].download).to.equal('my-sessions.ics');
+    });
+
+    it('exports each scheduled session with its own Outlook-visible link and Apple Calendar URL', async () => {
+      const list = ['a', 'b', 'c'].map((id) => session({
+        id,
+        sessionPageUrl: `https://www.adobe.com/max/2026/sessions/${id}`,
+      }));
+      downloadSchedule(list, new Set(['a', 'c']));
+
+      expect(downloads).to.have.lengthOf(1);
+      expect(downloads[0].type).to.equal('text/calendar;charset=utf-8');
+      const content = (await downloads[0].text()).replace(/\r\n /g, '');
+      const events = content.split('BEGIN:VEVENT\r\n').slice(1);
+      expect(events).to.have.lengthOf(2);
+      ['a', 'c'].forEach((id, index) => {
+        const url = list.find((s) => s.id === id).sessionPageUrl;
+        expect(events[index]).to.include(`UID:${id}@sessions.adobe.com\r\n`);
+        expect(events[index]).to.include(`DESCRIPTION:Session page: ${url}\r\n`);
+        expect(events[index]).to.include(`URL:${url}\r\n`);
+        expect(events[index]).to.include('DTSTART:20261028T170000Z\r\n');
+        expect(events[index]).to.include('DTEND:20261028T180000Z\r\n');
+      });
+      expect(content).to.not.include(list[1].sessionPageUrl);
     });
 
     it('shows an error toast and creates no download when nothing is scheduled', () => {
