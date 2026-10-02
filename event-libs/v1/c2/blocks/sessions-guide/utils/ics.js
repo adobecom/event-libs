@@ -77,6 +77,8 @@ export function generateICS(sessions) {
 
     const speakerNames = s.speakers?.map((sp) => sp.name).filter(Boolean).join(', ') || '';
     const descParts = [s.description, speakerNames ? `Speakers: ${speakerNames}` : ''].filter(Boolean);
+    // Outlook does not display VEVENT's URL, so include it in the body as well.
+    if (s.sessionPageUrl) descParts.push(`Session page: ${s.sessionPageUrl}`);
 
     lines.push('BEGIN:VEVENT');
     lines.push(foldLine(`UID:${s.id || crypto.randomUUID()}@sessions.adobe.com`));
