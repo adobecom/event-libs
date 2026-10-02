@@ -75,3 +75,44 @@ describe('DrawerShell scroll ownership', () => {
     expect(occurrences).to.equal(2);
   });
 });
+
+describe('DrawerShell FAB placement', () => {
+  let frame;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    frame = document.createElement('iframe');
+    frame.style.border = '0';
+    frame.style.height = '844px';
+  });
+
+  afterEach(() => {
+    frame.remove();
+  });
+
+  [375, 390, 768, 1440].forEach((width) => {
+    ['', 'sg-cta-btn--safari-mobile'].forEach((modifier) => {
+      it(`places the ${modifier ? 'Mobile Safari' : 'default'} FAB 24px above the viewport bottom at ${width}px`, async () => {
+        frame.style.width = `${width}px`;
+        await new Promise((resolve, reject) => {
+          frame.onload = resolve;
+          frame.onerror = reject;
+          frame.src = '/test/unit/c2/blocks/sessions-guide/mocks/fab-placement.html';
+          document.body.appendChild(frame);
+        });
+
+        const button = frame.contentDocument.querySelector('.sg-cta-btn');
+        if (modifier) button.classList.add(modifier);
+        const style = frame.contentWindow.getComputedStyle(button);
+        const bounds = button.getBoundingClientRect();
+
+        expect(frame.contentWindow.innerWidth).to.equal(width);
+        expect(style.position).to.equal('fixed');
+        expect(style.bottom).to.equal('24px');
+        expect(frame.contentWindow.innerHeight - bounds.bottom).to.equal(24);
+        expect(bounds.left + bounds.width / 2).to.equal(width / 2);
+      });
+    });
+  });
+});

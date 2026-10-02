@@ -8,6 +8,15 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ---
 
+## Mobile Safari FAB placement
+
+The Session Guide FAB uses a 24px bottom offset on Mobile Safari (MWPW-208776),
+matching the confirmed gap above Safari's controls. The previous 64px override
+added 40px of unnecessary clearance. This is an engineering-owned fixed-position
+offset, not authored block spacing (MWPW-201396); other browsers keep their existing
+24px placement. The layout regression fixture checks the rendered gap with and
+without the Safari modifier at mobile, tablet, and desktop widths.
+
 ## Full-page header-to-content spacing
 
 The full-page body must start directly below the header, matching the widget's body.
