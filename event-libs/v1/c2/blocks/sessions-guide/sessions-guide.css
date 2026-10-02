@@ -662,6 +662,25 @@
     0 2px 6px rgb(0 0 0 / 4%),
     0 4px 12px rgb(0 0 0 / 8%);
   z-index: 9;
+
+  /* The delay rides out the player's brief collapse when a session switch remounts it. */
+  transition: opacity 200ms ease 100ms, visibility 0s 100ms;
+}
+
+/* Hidden (and out of the tab order) while it would cover a video player's controls;
+   fades back once the player scrolls clear (MWPW-208524). */
+.sg-cta-btn--over-player {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 200ms ease, visibility 0s 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-cta-btn,
+  .sg-cta-btn--over-player {
+    transition: none;
+  }
 }
 
 /* Real Mobile Safari only (isSafariMobile()) — clears its floating address bar; see MWPW-201396. */
