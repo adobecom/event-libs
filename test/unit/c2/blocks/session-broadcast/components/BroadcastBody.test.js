@@ -319,5 +319,19 @@ describe('BroadcastBody', () => {
       expect(scrollToStub.calledOnce).to.equal(true);
       expect(scrollToStub.firstCall.args[0]).to.include({ top: 0 });
     });
+
+    it('scrolls through Milo Lenis when present instead of the native scroll', () => {
+      const lenisScrollTo = sinon.spy();
+      window.lenis = { scrollTo: lenisScrollTo };
+      try {
+        scheduleSwitchScroll();
+        clock.tick(SWITCH_SCROLL_DELAY_MS);
+        expect(scrollToStub.called).to.equal(false);
+        expect(lenisScrollTo.calledOnceWith(0)).to.equal(true);
+        expect(lenisScrollTo.firstCall.args[1]).to.include({ force: true });
+      } finally {
+        delete window.lenis;
+      }
+    });
   });
 });
