@@ -3194,7 +3194,7 @@
 
 .sg-full-page__body {
   flex: 1;
-  padding: var(--s2a-spacing-lg) 0;
+  padding: 0 0 var(--s2a-spacing-lg);
 }
 
 /* Programmatic focus target (Reset all), same as .sg-body-scroll. */
@@ -3204,19 +3204,9 @@
 }
 
 @media (max-width: 767px) {
-  .sg-full-page__body {
-    padding-top: 0;
-  }
-
   .sg-full-page .sg-header-title-row,
   .sg-full-page .sg-header-controls {
     padding: 0 var(--s2a-spacing-lg);
-  }
-}
-
-@media (min-width: 1280px) {
-  .sg-full-page__body {
-    padding-top: 4px;
   }
 }
 

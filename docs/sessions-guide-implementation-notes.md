@@ -8,6 +8,17 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ---
 
+## Full-page header-to-content spacing
+
+The full-page body must start directly below the header, matching the widget's body.
+Its top padding is zero at every breakpoint (MWPW-208806); the former tablet spacing
+token and desktop 4px override created a white strip above the gray Recommended/Live
+carousel. Header clearance for global navigation, header/control spacing, carousel
+inner spacing, and body bottom padding remain unchanged. Both full-page block names
+(`sessions-guide` with the page surface and `sessions-guide-full-page`) share this rule.
+The layout regression fixture checks the actual styles at mobile, tablet, desktop,
+and breakpoint boundaries.
+
 ## sessions-api.js
 
 ### sessionPageUrlForEnv
