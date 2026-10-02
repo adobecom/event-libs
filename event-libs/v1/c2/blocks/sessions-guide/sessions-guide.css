@@ -683,9 +683,9 @@
   }
 }
 
-/* Real Mobile Safari only (isSafariMobile()) — clears its floating address bar; see MWPW-201396. */
+/* Real Mobile Safari only (isSafariMobile()) — 24px above its controls (MWPW-208776). */
 .sg-cta-btn--safari-mobile {
-  bottom: 64px;
+  bottom: 24px;
 }
 
 /* ── Placeholders ────────────────────────────────────────── */
