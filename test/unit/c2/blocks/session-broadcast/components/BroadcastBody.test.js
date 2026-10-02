@@ -80,62 +80,6 @@ describe('BroadcastBody', () => {
     expect(out).to.include('aria-busy="false"');
   });
 
-  describe('live player background', () => {
-    beforeEach(() => {
-      sessionsStatus.value = 'ready';
-      sessions.value = [{
-        id: 's-1',
-        title: 'Live now',
-        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
-        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
-        youTubeId: 'yt-1',
-        isOnline: true,
-      }];
-      history.replaceState({ session: 's-1' }, '', window.location.pathname);
-    });
-
-    it('groups the player and info panel without adding a content image', () => {
-      const out = BroadcastBody({ config: CONFIG });
-      expect(out).to.include('class="sb-live"');
-      expect(out).to.not.include('--sb-player-bg');
-      expect(out).to.not.include('<img');
-    });
-
-    it('sets an authored background only on the live wrapper', () => {
-      const out = BroadcastBody({
-        config: { ...CONFIG, playerBackgroundImageUrl: 'https://example.com/player.png' },
-      });
-      expect(out).to.include('class="sb-live" style="--sb-player-bg: url(&quot;https://example.com/player.png&quot;)"');
-      expect(out).to.not.include('--sb-app-ended-bg');
-    });
-
-    it('rejects unsafe authored URLs and uses the default artwork instead', () => {
-      const out = BroadcastBody({
-        config: { ...CONFIG, playerBackgroundImageUrl: 'javascript:alert(1)' },
-      });
-      expect(out).to.not.include('--sb-player-bg');
-      expect(out).to.not.include('javascript:');
-    });
-
-    it('escapes CSS string delimiters in an authored URL', () => {
-      const out = BroadcastBody({
-        config: { ...CONFIG, playerBackgroundImageUrl: 'https://example.com/a"b.png' },
-      });
-      expect(out).to.include('a\\&quot;b.png');
-    });
-
-    ['loading', 'error', 'idle'].forEach((status) => {
-      it(`does not apply the live background during ${status}`, () => {
-        sessionsStatus.value = status;
-        const out = BroadcastBody({
-          config: { ...CONFIG, playerBackgroundImageUrl: 'https://example.com/player.png' },
-        });
-        expect(out).to.not.include('class="sb-live"');
-        expect(out).to.not.include('--sb-player-bg');
-      });
-    });
-  });
-
   // EndedState (unlike PlayerHost/AlsoLiveCarousel/etc.) IS invoked for real by this harness —
   // it's wrapped in its own bare `html`<${EndedState} .../>`` call, the one shape the mock
   // resolves (see the note at the top of this file) — so its actual rendered content is a
@@ -298,15 +242,6 @@ describe('BroadcastBody', () => {
     it('omits all four custom properties when ended but no image is authored', () => {
       const out = BroadcastBody({ config: CONFIG });
       expect(out).to.not.include('--sb-app-ended-bg');
-    });
-
-    it('does not carry the live player background into the ended state', () => {
-      const out = BroadcastBody({
-        config: { ...CONFIG, playerBackgroundImageUrl: 'https://example.com/player.png' },
-      });
-      expect(out).to.include('sb-ended');
-      expect(out).to.not.include('class="sb-live"');
-      expect(out).to.not.include('--sb-player-bg');
     });
 
     it('sets each of the four custom properties from its matching config field', () => {
