@@ -2,14 +2,13 @@ import { expect } from '@esm-bundle/chai';
 import { SessionInfoPanel } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/components/SessionInfoPanel.js';
 import { favorited, pendingActions } from '../../../../../../event-libs/v1/utils/session-store.js';
 
-const HOUR = 3600e3;
-
 const SESSION = {
   id: 's-1',
   title: 'Pixel & Product',
   description: 'A session about everything.',
-  startTimeUtc: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-  endTimeUtc: new Date(Date.now() + HOUR).toISOString(),
+  primaryTrack: 'Design, Imaging & Illustration',
+  startTimeUtc: '2026-11-10T18:00:00Z',
+  endTimeUtc: '2026-11-10T18:15:00Z',
 };
 
 describe('SessionInfoPanel', () => {
@@ -64,6 +63,13 @@ describe('SessionInfoPanel', () => {
     expect(out).to.include('sb-info__meta');
   });
 
+  it('omits the session duration without removing the badge row', () => {
+    const out = SessionInfoPanel({ session: SESSION });
+    expect(out).to.include('sb-info__meta');
+    expect(out).to.not.include('sb-info__time');
+    expect(out).to.not.include('15m');
+  });
+
   it('still renders the badge row wrapper when collapsed and favorited — marks is-favorited for CSS', () => {
     favorited.value = new Set(['s-1']);
     const out = SessionInfoPanel({ session: SESSION });
@@ -78,7 +84,7 @@ describe('SessionInfoPanel', () => {
 
   // The caret/expand toggle uses local component state, which the mocked htm-preact's
   // useState setter no-ops (see test/unit/mocks/deps/htm-preact.js) — the expanded branch
-  // (channel/time row, untruncated description, "view all details" CTA) can't be reached
+  // (track badge, untruncated description, "view all details" CTA) can't be reached
   // through this string-render harness. Collapsed is the only state testable here;
   // expand/collapse itself is verified via a preview harness in a real browser instead.
   it('starts collapsed — no "view all details" CTA until expanded', () => {
