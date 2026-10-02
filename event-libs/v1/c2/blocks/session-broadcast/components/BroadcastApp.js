@@ -13,7 +13,7 @@ import { showToast } from '../../../../features/toast/toast.js';
 import { SessionGuideProvider } from '../../sessions-guide/store/index.js';
 import { detectUserTimezone } from '../../sessions-guide/utils/time.js';
 import { findSessionByParam } from '../../sessions-guide/utils/url.js';
-import { scrollBehavior } from '../../sessions-guide/utils/motion.js';
+import { scrollPageToTop } from '../../sessions-guide/utils/motion.js';
 import { LoadingState, sessionsStatusMessage } from '../../sessions-guide/components/LoadingState.js';
 import { getBroadcastSchedule, isSessionLiveNow } from '../utils/broadcast-schedule.js';
 import {
@@ -41,9 +41,7 @@ export const SCHEDULE_REFRESH_MS = 5_000;
 export const SWITCH_SCROLL_DELAY_MS = 300;
 
 export function scheduleSwitchScroll(delayMs = SWITCH_SCROLL_DELAY_MS) {
-  return setTimeout(() => {
-    window.scrollTo({ top: 0, behavior: scrollBehavior() });
-  }, delayMs);
+  return setTimeout(scrollPageToTop, delayMs);
 }
 
 // Exported separately so tests can call it without mounting the Provider tree.

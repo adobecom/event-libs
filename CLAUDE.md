@@ -190,6 +190,13 @@ npm run lint:fix   # auto-fix JS (Airbnb) and CSS (Stylelint)
 npm run lint       # verify clean — required before PR
 ```
 
+### Jira wrap-up
+
+Once a ticket's PR(s) are done, post a **short, clear** Jira comment with manual testing steps:
+numbered steps, each with a test URL (include `serverTime=` / `eventlibs=<branch>` as needed),
+signed-in/out state, the action to take, and the expected result. Use Jira Wiki syntax
+(`[text|url]`, `# ` for numbered lists).
+
 
 <!-- pim-pod-agent-begin -->
 

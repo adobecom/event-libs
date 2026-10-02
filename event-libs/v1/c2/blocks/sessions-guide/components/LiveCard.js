@@ -11,7 +11,7 @@ import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../..
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
-import { scrollBehavior } from '../utils/motion.js';
+import { scrollPageToTop } from '../utils/motion.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
@@ -122,7 +122,7 @@ export function LiveCard({
       requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
-      window.scrollTo({ top: 0, behavior: scrollBehavior() });
+      scrollPageToTop();
       return;
     }
     window.location.href = watchHref;
