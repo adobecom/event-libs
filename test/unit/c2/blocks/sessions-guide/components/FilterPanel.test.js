@@ -179,4 +179,68 @@ describe('FilterPanel', () => {
       expect(out).to.include('aria-pressed="false"');
     });
   });
+
+  describe('responsive tag icons', () => {
+    let frame;
+    let originalMatchMedia;
+
+    beforeEach(() => {
+      document.body.innerHTML = '';
+      document.head.innerHTML = '';
+      originalMatchMedia = window.matchMedia;
+      // Keep the options mounted: the unit Preact stub cannot drill into mobile categories.
+      window.matchMedia = () => ({
+        matches: false,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      });
+      setState({ activeFilters: { Product: new Set(['Photoshop']) } });
+      frame = document.createElement('iframe');
+      frame.style.border = '0';
+      frame.style.height = '900px';
+    });
+
+    afterEach(() => {
+      frame.remove();
+      window.matchMedia = originalMatchMedia;
+    });
+
+    [375, 767, 768, 1024, 1279, 1280, 1440].forEach((width) => {
+      ['sg-portal', 'sessions-guide-full-page'].forEach((surface) => {
+        ['light', 'dark'].forEach((theme) => {
+          it(`preserves tag selection with desktop-only icon removal for ${surface}, ${theme}, ${width}px`, async () => {
+            frame.style.width = `${width}px`;
+            await new Promise((resolve, reject) => {
+              frame.onload = resolve;
+              frame.onerror = reject;
+              frame.srcdoc = `<!DOCTYPE html><html lang="en"><head>
+                <link rel="stylesheet" href="/event-libs/v1/c2/blocks/sessions-guide-full-page/sessions-guide-full-page.css">
+                </head><body></body></html>`;
+              document.body.appendChild(frame);
+            });
+            const doc = frame.contentDocument;
+            doc.body.innerHTML = `<div class="${surface}" data-theme="${theme}">${render()}</div>`;
+            const selected = doc.querySelector('.sg-filter-pill--selected');
+            const unselected = doc.querySelector('.sg-filter-pill:not(.sg-filter-pill--selected)');
+            const selectionIcon = selected.querySelector(':scope > svg');
+            const style = frame.contentWindow.getComputedStyle(selected);
+            const iconStyle = frame.contentWindow.getComputedStyle(selectionIcon);
+            const productIcon = selected.querySelector('.sg-filter-pill__icon');
+            const close = doc.querySelector('.sg-filter-panel__close');
+
+            expect(frame.contentWindow.innerWidth).to.equal(width);
+            expect(iconStyle.display === 'none').to.equal(width >= 1280);
+            expect(selected.getAttribute('aria-pressed')).to.equal('true');
+            expect(unselected.getAttribute('aria-pressed')).to.equal('false');
+            expect(unselected.querySelector(':scope > svg')).to.equal(null);
+            expect(selected.querySelector('.sg-filter-pill__label').textContent).to.equal('Photoshop');
+            expect(style.borderTopColor).to.not.equal('rgba(0, 0, 0, 0)');
+            expect(Number(style.fontWeight)).to.be.at.least(700);
+            expect(frame.contentWindow.getComputedStyle(productIcon).display).to.not.equal('none');
+            expect(frame.contentWindow.getComputedStyle(close).display).to.not.equal('none');
+          });
+        });
+      });
+    });
+  });
 });
