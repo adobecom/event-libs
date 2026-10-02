@@ -225,8 +225,11 @@ describe('FilterPanel', () => {
             const selectionIcon = selected.querySelector(':scope > svg');
             const style = frame.contentWindow.getComputedStyle(selected);
             const iconStyle = frame.contentWindow.getComputedStyle(selectionIcon);
-            const productIcon = selected.querySelector('.sg-filter-pill__icon');
+            const productIcon = selected.querySelector('.sg-filter-pill__content .sg-icon');
             const close = doc.querySelector('.sg-filter-panel__close');
+            expect(productIcon).to.exist;
+            // Icon effects are stubbed; populate the nested SVG to check its visibility.
+            productIcon.innerHTML = '<svg width="24" height="24" aria-hidden="true"></svg>';
 
             expect(frame.contentWindow.innerWidth).to.equal(width);
             expect(iconStyle.display === 'none').to.equal(width >= 1280);
@@ -236,7 +239,7 @@ describe('FilterPanel', () => {
             expect(selected.querySelector('.sg-filter-pill__label').textContent).to.equal('Photoshop');
             expect(style.borderTopColor).to.not.equal('rgba(0, 0, 0, 0)');
             expect(Number(style.fontWeight)).to.be.at.least(700);
-            expect(frame.contentWindow.getComputedStyle(productIcon).display).to.not.equal('none');
+            expect(frame.contentWindow.getComputedStyle(productIcon.querySelector('svg')).display).to.not.equal('none');
             expect(frame.contentWindow.getComputedStyle(close).display).to.not.equal('none');
           });
         });
