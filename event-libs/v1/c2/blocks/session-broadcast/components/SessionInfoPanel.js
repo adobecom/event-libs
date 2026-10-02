@@ -6,7 +6,6 @@ import { toggleFavoriteWithFeedback } from '../../../../services/sessions/action
 import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { logError } from '../../../../utils/lana-log.js';
-import { formatDuration } from '../../sessions-guide/utils/time.js';
 import { CategoryBadge } from '../../sessions-guide/components/CategoryBadge.js';
 import {
   IconHeartFilled, IconHeartOutline, IconShare, IconChevronRight,
@@ -24,9 +23,6 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
 
   const isFavorited = favorited.value.has(session.id);
   const isPending = pendingActions.value.has(session.id);
-  const durationLabel = session.endTimeUtc
-    ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
-    : '';
 
   async function handleFavorite(e) {
     e.stopPropagation();
@@ -103,7 +99,6 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
       ${actions}
       <div class="sb-info__meta">
         <${CategoryBadge} session=${session} hideCount=${true} />
-        ${expanded && durationLabel && html`<span class="sb-info__time">${durationLabel}</span>`}
       </div>
       ${session.description && html`
         <div class=${'sb-info__desc-wrap' + (expanded ? ' is-expanded' : '')} id="sb-info-desc">
