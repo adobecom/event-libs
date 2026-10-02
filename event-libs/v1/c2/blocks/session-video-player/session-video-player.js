@@ -1,4 +1,4 @@
-import { createTag, LIBS } from '../../../utils/utils.js';
+import { createTag, getMetadata, LIBS } from '../../../utils/utils.js';
 import { getEventStartMs, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
@@ -20,6 +20,9 @@ import {
   buildSessionFromMetadata,
 } from '../../utils/video-session.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
+import {
+  createYouTubePlayerId, buildYouTubeAnalyticsParams, registerYouTubeTracking,
+} from '../../utils/youtube-analytics.js';
 
 const LOG_SCOPE = 'session-video-player';
 const BLOCK_CSS_URL = new URL('./session-video-player.css', import.meta.url).href;
@@ -92,19 +95,22 @@ function buildMiloVideo(video) {
   const container = createTag('div', { class: 'milo-video' });
   if (video.provider === 'youtube') {
     const youtubeId = extractYouTubeId(video.url);
+    const params = buildYouTubeAnalyticsParams();
+    params.set('origin', window.location.origin);
+    params.set('autoplay', '1');
     const src = youtubeId
-      ? `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&origin=${window.location.origin}&autoplay=1`
+      ? `https://www.youtube.com/embed/${youtubeId}?${params}`
       : video.url;
     createTag('iframe', {
       src,
       class: 'youtube',
-      id: youtubeId ? `session-video-player-yt-${youtubeId}` : '',
+      id: youtubeId ? createYouTubePlayerId() : '',
       webkitallowfullscreen: '',
       mozallowfullscreen: '',
       allowfullscreen: '',
       scrolling: 'no',
       allow: 'encrypted-media; accelerometer; gyroscope; picture-in-picture',
-      title: 'YouTube video player',
+      title: getMetadata('title')?.trim() || getMetadata('en-title')?.trim() || 'YouTube video player',
     }, '', { parent: container });
     return container;
   }
@@ -428,8 +434,10 @@ function loadVideoPlayer(el, sessionId, video) {
     el.append(builtContainer);
   }
 
-  if (video.provider === 'youtube') watchYouTubePlayback(sessionId, iframe);
-  else watchMpcPlayback(sessionId, iframe);
+  if (video.provider === 'youtube') {
+    watchYouTubePlayback(sessionId, iframe);
+    if (iframe.id) registerYouTubeTracking(iframe, LOG_SCOPE);
+  } else watchMpcPlayback(sessionId, iframe);
 
   el.dataset.embedded = 'true';
 }
@@ -573,4 +581,3 @@ export default async function init(el) {
   const stopWatching = watchPlaybackPhase(session, onPhase, { eventStartMs: getEventStartMs() });
   onElementDetached(el, stopWatching);
 }
-
