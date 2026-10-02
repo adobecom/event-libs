@@ -2442,6 +2442,19 @@ into one `min-width: 768px` block.
 
 Lint clean, 150/150 tests pass (CSS-only change, no test behavior affected).
 
+## Session description width (MWPW-208757)
+
+The now-playing panel's description uses a fixed 700px width from the tablet breakpoint
+(768px) upward, including desktop and desktop XL. The constraint applies to
+`.sb-info__desc-wrap` in both collapsed and expanded states, whether favorited or not;
+the title, channel badge, and action row retain their existing grid layout. `width: min(700px, 100%)`
+prevents overflow if an embedding container leaves less than 700px available. Mobile retains
+its fluid width and existing collapsed/favorited visibility.
+
+This change is scoped to Session Broadcast, not the homepage widget or session detail overlay.
+Browser-backed layout tests cover breakpoint boundaries, all four expansion/favorite states,
+the two-line clamp, and a narrower embedding container.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

@@ -342,6 +342,7 @@
   .sb-info__actions { gap: 5px; }
 
   .sb-info__desc-wrap {
+    width: min(700px, 100%);
     font-size: 16px;
     margin-top: -12px;
   }
