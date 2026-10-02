@@ -108,6 +108,7 @@ describe('MyFavoritesView', () => {
     const store = makeStore({ sessionList: [UPCOMING_SESSION] });
     const View = buildMyFavoritesView(preact, store);
     expect(View({})).to.include('sg-my-favorites__empty');
+    expect(View({})).to.include('See live & upcoming');
   });
 
   it('shows favorited upcoming sessions', () => {

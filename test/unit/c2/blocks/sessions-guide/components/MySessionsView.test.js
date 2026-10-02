@@ -129,6 +129,7 @@ describe('MySessionsView', () => {
     const store = makeStore({ sessionList: [UPCOMING_SESSION] });
     const View = buildMySessionsView(preact, store);
     expect(View({})).to.include('sg-my-sessions__empty');
+    expect(View({})).to.include('See live & upcoming');
   });
 
   it('shows scheduled upcoming sessions', () => {
