@@ -12,7 +12,6 @@ const DEFAULTS = {
   alsoLiveTitle: 'Currently Live',
   upcomingTitle: 'Upcoming',
   viewAllDetailsLabel: 'View all details',
-  playerBackgroundImageUrl: '',
   sessionEndedImageUrlMobile: '',
   sessionEndedImageUrlTablet: '',
   sessionEndedImageUrlDesktop: '',
@@ -134,7 +133,6 @@ export function parseBroadcastConfig(el) {
   const config = {
     ...DEFAULTS,
     ...extractSessionEndedImageUrls(el),
-    playerBackgroundImageUrl: extractRowImageUrl(el, 'player background image', true),
   };
   Object.entries(CONFIG_KEYS).forEach(([rowKey, configKey]) => {
     if (raw[rowKey]) config[configKey] = raw[rowKey];

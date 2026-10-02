@@ -43,27 +43,6 @@ The Figma file (`MAX-2026-UX-SSOT`, branch `f3wtXH32KwrStRx5VbCzed`, section "Se
 
 ## Architecture decisions
 
-### Desktop live-player background (MWPW-207363)
-
-The live player and session info panel share a decorative background from the MAX 2026
-[Figma broadcast design](https://www.figma.com/design/zNe8auqfmanqiXWvQBpSyH/branch/PsafLZIADk0bgLrj9Voc6g/MAX-2026-Virtual-VizD-SSOT?node-id=8482-20021).
-The exact artwork is bundled at `assets/player-background.png`; no authoring change is
-required to show it. It uses the design's 60% opacity and cover sizing at desktop
-breakpoints only (`1280px+`, including desktop XL). Mobile and tablet do not request the
-CSS background asset. Player dimensions, controls, nav offsets, and vertical spacing
-remain unchanged.
-
-Authors can replace the artwork with an optional **Player background image** block-content
-row containing an image link or embedded picture. Pictures use the widest optimized
-source, resolved against the authored page's URL; URL query parameters are preserved.
-Leave the row empty or omit it to use the bundled artwork. Use empty alt text for an
-embedded decorative image (avoid Milo's `|`-delimited video convention).
-
-The background is non-interactive and belongs only to the live wrapper, not the
-loading/error/empty or session-ended states. The info panel has a 64% black backing
-on desktop to keep its text at WCAG AA contrast even with bright replacement artwork.
-The existing **Session ended image** rows remain separate and unchanged.
-
 | Area | Decision | Why |
 |---|---|---|
 | Block type | New Tier 1 C2 Preact block `session-broadcast`, registered in `EVENT_BLOCKS_C2` (`event-libs/v1/libs.js`) | Matches `sessions-guide-full-page`'s precedent — only existing "full custom page" pattern in this codebase |
