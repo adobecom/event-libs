@@ -170,6 +170,9 @@ export function BroadcastBody({ config }) {
     .filter(([, url]) => url)
     .map(([name, url]) => `${name}: url("${url}")`)
     .join(';');
+  const playerBgUrl = safeUrl(config.playerBackgroundImageUrl);
+  const playerStyle = playerBgUrl
+    ? `--sb-player-bg: url(${JSON.stringify(playerBgUrl)})` : '';
 
   return html`
     <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')} style=${appStyle}>
@@ -178,8 +181,10 @@ export function BroadcastBody({ config }) {
       ${sessionsStatus.value === 'error' && html`<div class="sb-error" role="alert">Failed to load sessions.</div>`}
       ${sessionsStatus.value === 'ready' && html`
         ${schedule.activeSession && html`
-          <${PlayerHost} session=${schedule.activeSession} />
-          <${SessionInfoPanel} session=${schedule.activeSession} viewAllDetailsLabel=${config.viewAllDetailsLabel} />
+          <div class="sb-live" style=${playerStyle}>
+            <${PlayerHost} session=${schedule.activeSession} />
+            <${SessionInfoPanel} session=${schedule.activeSession} viewAllDetailsLabel=${config.viewAllDetailsLabel} />
+          </div>
         `}
         ${endedActive && html`<${EndedState} session=${schedule.endedSession} />`}
         <${AlsoLiveCarousel} sessions=${schedule.alsoLive} title=${config.alsoLiveTitle} onSwitchSession=${handleSwitchSession} />
