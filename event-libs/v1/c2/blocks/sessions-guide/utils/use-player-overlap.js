@@ -18,7 +18,7 @@ export function rectsOverlap(a, b) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
-// Desktop only: on narrower viewports the player is short enough to clear the FAB.
+// Desktop only, per the design decision on MWPW-208524.
 export function isOverPlayer(el, root = document) {
   if (!el || !window.matchMedia?.(DESKTOP_QUERY).matches) return false;
   const rect = el.getBoundingClientRect();
