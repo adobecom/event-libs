@@ -10,7 +10,7 @@ function block(rows) {
     const k = document.createElement('div');
     k.textContent = key;
     const v = document.createElement('div');
-    if (key.toLowerCase().startsWith('session ended image')) {
+    if (value && (key.toLowerCase().startsWith('session ended image') || key === 'Player background image')) {
       const a = document.createElement('a');
       a.href = value;
       a.textContent = 'image';
@@ -31,6 +31,7 @@ describe('parseBroadcastConfig', () => {
       alsoLiveTitle: 'Currently Live',
       upcomingTitle: 'Upcoming',
       viewAllDetailsLabel: 'View all details',
+      playerBackgroundImageUrl: '',
       sessionEndedImageUrlMobile: '',
       sessionEndedImageUrlTablet: '',
       sessionEndedImageUrlDesktop: '',
@@ -58,6 +59,43 @@ describe('parseBroadcastConfig', () => {
     const config = parseBroadcastConfig(block([['Also live title', 'Live Now']]));
     expect(config.alsoLiveTitle).to.equal('Live Now');
     expect(config.upcomingTitle).to.equal('Upcoming');
+  });
+
+  describe('player background image', () => {
+    it('reads an authored image link independently of the ended image', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image', 'https://example.com/player.png?version=2'],
+        ['Session ended image', 'https://example.com/ended.png'],
+      ]));
+      expect(config.playerBackgroundImageUrl).to.equal('https://example.com/player.png?version=2');
+      expect(config.sessionEndedImageUrlDesktop).to.equal('https://example.com/ended.png');
+    });
+
+    it('selects the largest optimized source and resolves relative URLs', () => {
+      const el = block([]);
+      el.innerHTML = `
+        <div><div>Player background image</div><div>
+          <picture>
+            <source srcset="./player.png?width=2000&format=webply 2x">
+            <source srcset="./player.png?width=750&format=webply">
+            <img src="./player.png?width=750&format=png" alt="">
+          </picture>
+        </div></div>`;
+      expect(parseBroadcastConfig(el).playerBackgroundImageUrl)
+        .to.equal(new URL('./player.png?width=2000&format=webply', document.baseURI).href);
+    });
+
+    it('accepts an embedded image without picture sources', () => {
+      const el = block([]);
+      el.innerHTML = '<div><div>Player background image</div><div><img src="./player.png" alt=""></div></div>';
+      expect(parseBroadcastConfig(el).playerBackgroundImageUrl)
+        .to.equal(new URL('./player.png', document.baseURI).href);
+    });
+
+    it('leaves the default artwork in place for an empty authored row', () => {
+      expect(parseBroadcastConfig(block([['Player background image', '']])).playerBackgroundImageUrl)
+        .to.equal('');
+    });
   });
 
   describe('four breakpoint-specific "session ended image" rows', () => {

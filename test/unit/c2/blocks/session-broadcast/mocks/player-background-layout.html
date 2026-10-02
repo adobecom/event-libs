@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Broadcast player background layout fixture</title>
+  <link rel="stylesheet" href="/event-libs/v1/c2/blocks/session-broadcast/session-broadcast.css">
+  <style>
+    body { margin: 0; background: #000; }
+    .youtube-video-container { background: #131313; }
+  </style>
+</head>
+<body>
+  <main class="session-broadcast">
+    <div class="sb-app">
+      <div class="sb-live">
+        <div class="sb-player__mount event-youtube">
+          <div class="youtube-stream">
+            <div class="youtube-video-container">
+              <iframe title="Local player controls fixture" srcdoc="<!DOCTYPE html><html lang='en'><body style='margin:0;background:#131313;color:white;font-family:sans-serif'><p>Local player fixture</p><button type='button' style='position:absolute;bottom:16px;left:16px'>Play</button></body></html>"></iframe>
+            </div>
+          </div>
+        </div>
+        <div class="sb-info">
+          <div class="sb-info__row">
+            <h2 class="sb-info__title">Pixel &amp; Product: Scalable Visual Systems for Modern Brands</h2>
+            <button class="sb-info__expand" type="button" aria-label="Expand session details">+</button>
+          </div>
+          <div class="sb-info__meta">Design, Imaging &amp; Illustration</div>
+          <div class="sb-info__desc-wrap">
+            <p class="sb-info__desc">A session about designing scalable visual systems for modern brands.</p>
+          </div>
+          <div class="sb-info__actions">
+            <button class="sb-info__icon-btn" type="button" aria-label="Share session">S</button>
+            <button class="sb-info__icon-btn sb-info__icon-btn--favorite" type="button" aria-label="Add to favorites">F</button>
+          </div>
+        </div>
+      </div>
+      <section class="sb-carousel-section sb-carousel-section--also-live" aria-label="Currently live">
+        <h2>Currently Live</h2>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

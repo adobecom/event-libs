@@ -78,6 +78,30 @@
   background: var(--s2a-color-gray-900, #000);
 }
 
+@media (min-width: 1280px) {
+  .sb-live {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .sb-live .sb-player__mount {
+    background: transparent;
+  }
+
+  .sb-live::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--sb-player-bg, url('./assets/player-background.png'));
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    opacity: 0.6;
+  }
+}
+
 /* Unconditionally dark; grid lets title/actions swap by named area.
    position:relative is load-bearing — without it, an authored dark section background
    paints above this element regardless of DOM order. */
@@ -248,7 +272,7 @@
     gap: 6px;
   }
 
-  .sb-info + .sb-carousel-section--also-live {
+  .sb-live + .sb-carousel-section--also-live {
     margin-top: calc(-1 * var(--s2a-border-radius-md, 16px));
     padding-top: var(--s2a-spacing-xl, 32px);
   }
@@ -375,6 +399,13 @@
 @media (min-width: 768px) {
   .sb-info {
     background: transparent;
+  }
+}
+
+/* Keeps text contrast >= 4.5:1 even with a white authored image behind the 60%-opacity layer. */
+@media (min-width: 1280px) {
+  .sb-live .sb-info {
+    background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
   }
 }
 
