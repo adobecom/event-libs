@@ -77,8 +77,15 @@ function resolveTrackIcon(session) {
   return getOverrideTrackIcon(session.trackOverride) || getTrackIcon(session.primaryTrack);
 }
 
+// Avoid double "Adobe" when the authored event name already includes it
+// (e.g. backendEventTitle = "Adobe Max 2026" instead of a short name like "Max 2026").
+function withAdobePrefix(eventName) {
+  const name = eventName || 'Event';
+  return name.toLowerCase().startsWith('adobe') ? `${name} Session` : `Adobe ${name} Session`;
+}
+
 export function buildNotificationEntry(session, stage, swanConfig) {
-  const category = `Adobe ${swanConfig.eventName || 'Event'} Session`;
+  const category = withAdobePrefix(swanConfig.eventName);
   const trackIcon = resolveTrackIcon(session);
   return {
     title: session.title || category,
@@ -138,7 +145,7 @@ function toEpochSecondsString(isoString) {
 }
 
 function buildTimelineContent(session, stage, swanConfig) {
-  const sessionTitle = session.title || `Adobe ${swanConfig.eventName || 'Event'} Session`;
+  const sessionTitle = session.title || withAdobePrefix(swanConfig.eventName);
   const trackIcon = resolveTrackIcon(session);
   const serviceIcon = session.thumbnailUrl
     || buildFederalTrackIconUrl(trackIcon?.icon)
