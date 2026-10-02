@@ -21,6 +21,8 @@ Authored as key/value rows on the block:
 Each video iframe has a unique ID beginning with `player-`. Both autoplay and
 click-to-play URLs include `enablejsapi=1`, `rel=0`, and the resolved `videotype`.
 The privacy-enhanced embed host remains `www.youtube-nocookie.com`.
+ID generation, required parameters, and once-only Launch registration are shared
+with `session-video-player` through `c2/utils/youtube-analytics.js`.
 
 The block calls `window._satellite.track('trackYoutube')` once per inserted video
 iframe, after it is connected to the document and `document.readyState` is
