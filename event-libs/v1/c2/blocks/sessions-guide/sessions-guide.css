@@ -1732,6 +1732,7 @@
   .sg-right-controls {
     width: auto;
     gap: var(--s2a-spacing-md);
+    margin-left: auto;
   }
 
   .sg-view-dropdown-wrap {
