@@ -1,9 +1,11 @@
 import { html } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { useIsPostEvent } from '../utils/use-post-event.js';
 
 export function DateTabs() {
   const { state, dispatch } = useSessionGuide();
   const { activeDay, activeView, eventDays } = state;
+  if (useIsPostEvent()) return null;
   const disabled = activeView === 'on-demand';
 
   function formatDay(isoDate) {
