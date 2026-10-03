@@ -15,6 +15,7 @@ export function Carousel({
   const [offset, setOffset] = useState(0);
   // Desktop pages the strip with a transform; narrower viewports scroll natively.
   const [paged, setPaged] = useState(false);
+  const [cardOffsets, setCardOffsets] = useState([]);
   const [edges, setEdges] = useState({ atStart: true, atEnd: false });
   const stripRef = useRef(null);
   const cardWidthRef = useRef(0);
@@ -44,11 +45,15 @@ export function Carousel({
   const measure = () => {
     const strip = stripRef.current;
     if (!strip) return;
-    const firstCard = strip.querySelector('.sg-carousel__card-wrap');
+    const cards = [...strip.children];
+    const firstCard = cards[0];
     if (!firstCard) return;
     const styles = getComputedStyle(strip);
     const gap = parseFloat(styles.columnGap || '16') || 16;
-    cardWidthRef.current = firstCard.offsetWidth + gap;
+    const firstRect = firstCard.getBoundingClientRect();
+    cardWidthRef.current = firstRect.width + gap;
+    // Cards can differ in width; multiplying the first card's width accumulates clipping.
+    setCardOffsets(cards.map((card) => card.getBoundingClientRect().left - firstRect.left));
     const trackWidth = strip.parentElement.offsetWidth;
     visibleCountRef.current = Math.max(1, Math.floor(trackWidth / cardWidthRef.current));
     setPaged(styles.overflowX === 'visible');
@@ -85,7 +90,7 @@ export function Carousel({
   if (!sessions || !sessionCount) return null;
 
   const clampedOffset = Math.min(offset, maxOffset);
-  const translateX = paged ? clampedOffset * (cardWidthRef.current || 576) : 0;
+  const translateX = paged ? (cardOffsets[clampedOffset] || 0) : 0;
   const atStart = paged ? clampedOffset <= 0 : edges.atStart;
   const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 

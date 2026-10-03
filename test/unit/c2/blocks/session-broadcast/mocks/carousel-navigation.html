@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Broadcast carousel navigation fixture</title>
+  <link rel="stylesheet" href="/event-libs/v1/c2/blocks/sessions-guide/sessions-guide.css">
+  <link rel="stylesheet" href="/event-libs/v1/c2/blocks/session-broadcast/session-broadcast.css">
+  <style>
+    body { margin: 0; background: #000; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "/event-libs/v1/deps/htm-preact.js": "/test/unit/mocks/deps/htm-preact-real.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main class="session-broadcast">
+    <div class="sb-carousel-section sb-carousel-section--also-live" id="carousel"></div>
+  </main>
+  <script type="module">
+    import { h, render, useEffect } from '/event-libs/v1/deps/htm-preact.js';
+    import { Carousel } from '/event-libs/v1/c2/blocks/sessions-guide/components/Carousel.js';
+    import {
+      SessionGuideContext, buildInitialState,
+    } from '/event-libs/v1/c2/blocks/sessions-guide/store/index.js';
+
+    const sessions = Array.from({ length: 5 }, (_, i) => ({
+      id: `session-${i}`,
+      title: [
+        'Creative workflows',
+        'Building extraordinary designs with generative AI and scalable creative workflows for modern teams',
+        'Designing with the MAX community',
+        'From inspiration to a finished creative project',
+        'New creative tools',
+      ][i],
+      description: 'Explore creative workflows with the MAX community.',
+      primaryTrack: 'Design',
+      startTimeUtc: '2026-11-10T17:00:00Z',
+      endTimeUtc: '2026-11-10T18:00:00Z',
+      sessionPageUrl: `/sessions/session-${i}`,
+      thumbnailUrl: null,
+    }));
+    const state = buildInitialState({
+      userTz: 'America/Los_Angeles',
+      surface: 'page',
+      liveCardMobileMaxWidth: 1279,
+    });
+    function Fixture() {
+      useEffect(() => { document.body.dataset.ready = 'true'; }, []);
+      return h(SessionGuideContext.Provider, { value: { state, dispatch: () => {} } },
+        h(Carousel, { sessions, title: 'More live sessions', forceLive: true }));
+    }
+    render(h(Fixture), document.getElementById('carousel'));
+  </script>
+</body>
+</html>

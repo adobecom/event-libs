@@ -27,6 +27,9 @@ export default {
     async function mockVendoredPreact(ctx, next) {
       if (ctx.path === '/event-libs/v1/deps/htm-preact.js') {
         ctx.path = '/test/unit/mocks/deps/htm-preact.js';
+      } else if (ctx.path === '/test/unit/mocks/deps/htm-preact-real.js') {
+        // DOM integration fixtures opt into real hooks/rendering with an import map.
+        ctx.path = '/event-libs/v1/deps/htm-preact.js';
       }
       return next();
     },

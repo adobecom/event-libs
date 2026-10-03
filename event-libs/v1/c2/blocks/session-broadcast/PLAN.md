@@ -43,6 +43,18 @@ The Figma file (`MAX-2026-UX-SSOT`, branch `f3wtXH32KwrStRx5VbCzed`, section "Se
 
 ## Architecture decisions
 
+### Carousel navigation (MWPW-208927)
+
+Desktop arrow navigation uses each card's measured position relative to the first card,
+including fractional pixels, rather than multiplying the first card's width by the page
+index. This prevents cumulative misalignment and clipped cards when widths differ.
+Measurements are stored in Preact state so resizing refreshes the active page even when
+its index remains unchanged. Mobile and tablet retain native scrolling.
+
+The real-rendering `carousel-navigation.test.js` fixture covers next/previous navigation,
+unequal card widths, resizing on a nonzero page, disabled end controls, and native scrolling.
+Other unit tests retain the lightweight Preact mock.
+
 ### Desktop live-player background (MWPW-207363)
 
 The live player and session info panel support an author-controlled decorative background from the MAX 2026
