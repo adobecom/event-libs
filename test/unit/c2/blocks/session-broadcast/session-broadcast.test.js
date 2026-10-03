@@ -283,6 +283,16 @@ describe('session-broadcast init()', () => {
     expect(el.innerHTML).to.include('sb-app');
     expect(el.innerHTML).to.not.include('Also live title');
   });
+
+  it('loads sessions-guide.css once, before rendering, since that widget loads in a later section', async () => {
+    const el = block([['Also live title', 'Currently Live']]);
+    await init(el);
+    await init(block([['Also live title', 'Currently Live']]));
+    const links = [...document.head.querySelectorAll('link[rel="stylesheet"]')]
+      .filter((l) => l.href.endsWith('/c2/blocks/sessions-guide/sessions-guide.css'));
+    expect(links).to.have.length(1);
+    expect(el.innerHTML).to.include('sb-app');
+  });
 });
 
 // --sb-fill-height (read by .sb-app's min-height in session-broadcast.css) keeps a short state

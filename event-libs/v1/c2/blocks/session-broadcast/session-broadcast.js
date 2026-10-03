@@ -1,6 +1,15 @@
 import { h, render } from '../../../deps/htm-preact.js';
-import { readBlockConfig } from '../../../utils/utils.js';
+import { readBlockConfig, loadStyle } from '../../../utils/utils.js';
 import { BroadcastApp } from './components/BroadcastApp.js';
+
+// Broadcast renders Session Guide components but is authored in an earlier section than the
+// sessions-guide widget, and Milo loads sections sequentially — so that block's CSS would arrive
+// after our first render (unstyled flash, stale carousel measurements). Load it here first; the
+// widget's own load later dedupes on the same href.
+const SESSIONS_GUIDE_CSS_URL = new URL('../sessions-guide/sessions-guide.css', import.meta.url).href;
+const loadSessionsGuideStyles = () => new Promise((resolve) => {
+  loadStyle(SESSIONS_GUIDE_CSS_URL, resolve);
+});
 
 const CONFIG_KEYS = {
   'also-live-title': 'alsoLiveTitle',
@@ -161,6 +170,8 @@ export default async function init(el) {
   const config = parseBroadcastConfig(el);
   el.innerHTML = '';
   el.classList.add('session-broadcast');
+  // Resolves on load or error, so a failed stylesheet degrades to today's late styling, not a blank block.
+  await loadSessionsGuideStyles();
   render(h(BroadcastApp, { config }), el);
   observeFillHeight(el);
 }
