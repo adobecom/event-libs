@@ -45,7 +45,9 @@ export function Carousel({
   const measure = () => {
     const strip = stripRef.current;
     if (!strip) return;
-    const firstCard = strip.querySelector('.sg-carousel__card-wrap');
+    // Skips a hover/focus-expanded card so its temporary width can't skew the page size.
+    const cards = strip.querySelectorAll('.sg-carousel__card-wrap');
+    const firstCard = [...cards].find((c) => !c.matches(':hover, :focus-within')) || cards[0];
     if (!firstCard) return;
     const styles = getComputedStyle(strip);
     const gap = parseFloat(styles.columnGap || '16') || 16;
@@ -76,6 +78,17 @@ export function Carousel({
 
   // Catches strip/card size changes the window resize listener misses (e.g. drawer opening).
   useEffect(() => (paged ? undefined : watchScrollEdges(stripRef.current, applyEdges)), [paged, sessionCount]);
+
+  // Broadcast can mount this before sessions-guide.css applies, when an unstyled strip reads as
+  // overflow:visible (paged) and cards as full-width. Re-measure when the strip or a card resizes
+  // (cards too: Broadcast's own CSS can pin the strip's size while only the cards change).
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || typeof ResizeObserver !== 'function') return undefined;
+    const ro = new ResizeObserver(() => { measure(); refreshEdges(); clampOffset(); });
+    [strip, ...strip.children].forEach((el) => ro.observe(el));
+    return () => ro.disconnect();
+  }, [sessionCount]);
 
   // resetKey (e.g. activeDay) changing means the carousel now shows an unrelated session set —
   // snap back to the start instead of retaining the previous day's scroll position (MWPW-209092).
