@@ -111,7 +111,7 @@ export function useCarouselRow(sessions, cardStateKey) {
   };
 
   const step = (direction, button) => {
-    pressedRef.current = button;
+    pressedRef.current = { button, at: performance.now() };
     if (isDesktopCarousel) {
       const next = Math.min(Math.max(0, offset + direction), sessionCount - 1);
       setOffset(next);
@@ -125,7 +125,7 @@ export function useCarouselRow(sessions, cardStateKey) {
   const prevDisabled = isDesktopCarousel ? offset <= 0 : edges.atStart;
   const nextDisabled = isDesktopCarousel ? !showNext : edges.atEnd;
 
-  useEffect(() => { handOffArrowFocus(pressedRef.current); }, [prevDisabled, nextDisabled]);
+  useEffect(() => { handOffArrowFocus(pressedRef); }, [prevDisabled, nextDisabled]);
 
   return {
     dismissingIds,

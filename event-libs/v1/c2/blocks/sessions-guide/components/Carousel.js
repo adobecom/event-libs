@@ -86,8 +86,8 @@ export function Carousel({
     if (stripRef.current) stripRef.current.scrollLeft = 0;
   }, [resetKey]);
 
-  // Cheap no-op unless the last-pressed arrow just disabled itself while focused.
-  useEffect(() => { handOffArrowFocus(pressedRef.current); });
+  // Cheap no-op unless an arrow press just disabled that arrow while it had focus.
+  useEffect(() => { handOffArrowFocus(pressedRef); });
 
   if (!sessions || !sessionCount) return null;
 
@@ -102,7 +102,7 @@ export function Carousel({
     if (title) setAnnouncement(title);
   };
   const go = (direction, button) => {
-    pressedRef.current = button;
+    pressedRef.current = { button, at: performance.now() };
     if (paged) {
       const next = Math.min(maxOffset, Math.max(0, clampedOffset + direction * step));
       setOffset(next);

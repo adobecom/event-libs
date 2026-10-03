@@ -104,11 +104,19 @@ describe('sessions-guide/utils/carousel-nav', () => {
     });
 
     it('ignores a pending target that is expired or already reached', () => {
-      const expired = { current: { left: 440, until: performance.now() - 1 } };
+      const expired = { current: { from: 0, left: 440, until: performance.now() - 1 } };
       expect(scrollToAdjacent(strip, 1, expired).index).to.equal(1);
       strip.scrollLeft = 220;
-      const reached = { current: { left: 220, until: performance.now() + 1000 } };
+      const reached = { current: { from: 0, left: 220, until: performance.now() + 1000 } };
       expect(scrollToAdjacent(strip, 1, reached).index).to.equal(2);
+    });
+
+    it('ignores a pending target once a swipe moves outside the start-to-target range', () => {
+      strip.scrollLeft = 220;
+      const pendingRef = { current: null };
+      scrollToAdjacent(strip, 1, pendingRef); // from 220 toward 440
+      strip.scrollLeft = 0; // user swipes back past the start
+      expect(scrollToAdjacent(strip, 1, pendingRef).index).to.equal(1);
     });
   });
 
@@ -116,6 +124,7 @@ describe('sessions-guide/utils/carousel-nav', () => {
     let nav;
     let prev;
     let next;
+    const pressOf = (button, at = performance.now()) => ({ current: { button, at } });
 
     beforeEach(() => {
       nav = document.createElement('div');
@@ -127,33 +136,49 @@ describe('sessions-guide/utils/carousel-nav', () => {
 
     afterEach(() => nav.remove());
 
-    it('moves focus to the other arrow when the focused one is disabled', () => {
+    it('moves focus to the other arrow when the pressed, focused one is disabled, then forgets the press', () => {
       next.focus();
       next.disabled = true;
-      handOffArrowFocus(next);
+      const ref = pressOf(next);
+      handOffArrowFocus(ref);
       expect(document.activeElement).to.equal(prev);
+      expect(ref.current).to.equal(null);
     });
 
-    it('does nothing when the arrow is still enabled or focus moved elsewhere', () => {
+    it('keeps the press while the arrow is still enabled', () => {
       next.focus();
-      handOffArrowFocus(next);
+      const ref = pressOf(next);
+      handOffArrowFocus(ref);
       expect(document.activeElement).to.equal(next);
+      expect(ref.current).to.not.equal(null);
+    });
+
+    it('does not steal focus that moved elsewhere', () => {
       const other = document.createElement('input');
       document.body.appendChild(other);
       other.focus();
       next.disabled = true;
-      handOffArrowFocus(next);
+      handOffArrowFocus(pressOf(next));
       expect(document.activeElement).to.equal(other);
       other.remove();
     });
 
-    it('does nothing when the other arrow is disabled too, or no button is given', () => {
+    it('ignores and clears an expired press', () => {
+      next.focus();
+      next.disabled = true;
+      const ref = pressOf(next, performance.now() - 5000);
+      handOffArrowFocus(ref);
+      expect(document.activeElement).to.not.equal(prev);
+      expect(ref.current).to.equal(null);
+    });
+
+    it('does nothing when the other arrow is disabled too, or there is no press', () => {
       next.focus();
       next.disabled = true;
       prev.disabled = true;
-      handOffArrowFocus(next);
+      handOffArrowFocus(pressOf(next));
       expect(document.activeElement).to.not.equal(prev);
-      expect(() => handOffArrowFocus(null)).to.not.throw();
+      expect(() => handOffArrowFocus({ current: null })).to.not.throw();
     });
   });
 
