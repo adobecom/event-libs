@@ -1,6 +1,7 @@
 import { html, useState, useRef, useEffect } from '../../../../deps/htm-preact.js';
 import { LiveCard } from './LiveCard.js';
 import { scrollBehavior } from '../utils/motion.js';
+import { adjacentCard, scrollEdges, watchScrollEdges } from '../utils/carousel-nav.js';
 
 export const buildCarousel = () => Carousel;
 
@@ -23,22 +24,19 @@ export function Carousel({
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
   const resetKeyRef = useRef(resetKey);
+  // Polite live-region text naming the card each arrow press brings into view.
+  const [announcement, setAnnouncement] = useState('');
 
   const clampOffset = () => {
     const maxOffset = Math.max(0, (sessionsRef.current?.length || 0) - visibleCountRef.current);
     setOffset((o) => Math.min(o, maxOffset));
   };
 
+  const applyEdges = ({ atStart, atEnd }) => setEdges((prev) => (
+    prev.atStart === atStart && prev.atEnd === atEnd ? prev : { atStart, atEnd }));
+
   const refreshEdges = () => {
-    const strip = stripRef.current;
-    if (!strip) return;
-    const maxScroll = strip.scrollWidth - strip.clientWidth;
-    const atStart = strip.scrollLeft <= 1;
-    const atEnd = strip.scrollLeft >= maxScroll - 1;
-    setEdges((prev) => {
-      if (prev.atStart === atStart && prev.atEnd === atEnd) return prev;
-      return { atStart, atEnd };
-    });
+    if (stripRef.current) applyEdges(scrollEdges(stripRef.current));
   };
 
   const measure = () => {
@@ -73,6 +71,9 @@ export function Carousel({
     clampOffset();
   }, [sessionCount]);
 
+  // Catches strip/card size changes the window resize listener misses (e.g. drawer opening).
+  useEffect(() => (paged ? undefined : watchScrollEdges(stripRef.current, applyEdges)), [paged, sessionCount]);
+
   // resetKey (e.g. activeDay) changing means the carousel now shows an unrelated session set —
   // snap back to the start instead of retaining the previous day's scroll position (MWPW-209092).
   useEffect(() => {
@@ -90,14 +91,25 @@ export function Carousel({
   const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 
   const step = pageByGroup ? Math.max(1, visibleCountRef.current) : 1;
-  const goPrev = () => {
-    if (paged) { setOffset((o) => Math.max(0, o - step)); return; }
-    stripRef.current?.scrollBy({ left: -(cardWidthRef.current || 300), behavior: scrollBehavior() });
+  const announce = (index) => {
+    const title = sessions[index]?.title;
+    if (title) setAnnouncement(title);
   };
-  const goNext = () => {
-    if (paged) { setOffset((o) => Math.min(maxOffset, o + step)); return; }
-    stripRef.current?.scrollBy({ left: cardWidthRef.current || 300, behavior: scrollBehavior() });
+  const go = (direction) => {
+    if (paged) {
+      const next = Math.min(maxOffset, Math.max(0, clampedOffset + direction * step));
+      setOffset(next);
+      announce(next);
+      return;
+    }
+    const strip = stripRef.current;
+    const target = adjacentCard(strip, direction);
+    if (!target) return;
+    strip.scrollTo({ left: target.left, behavior: scrollBehavior() });
+    announce(target.index);
   };
+  const goPrev = () => go(-1);
+  const goNext = () => go(1);
 
   const focused = sessions[Math.min(clampedOffset, sessionCount - 1)];
   const timeLabel = formatTime ? formatTime(focused) : '';
@@ -154,6 +166,7 @@ export function Carousel({
           </div>
         `}
       </div>
+      <span class="sg-sr-only" aria-live="polite">${announcement}</span>
     </div>
   `;
 }

@@ -2,6 +2,8 @@ import {
   useState, useRef, useEffect, useLayoutEffect,
 } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { adjacentCard, watchScrollEdges } from './carousel-nav.js';
+import { scrollBehavior } from './motion.js';
 
 // Must match the breakpoint sessions-guide.css uses to switch into the desktop transform-carousel.
 const DESKTOP_CAROUSEL_QUERY = '(min-width: 1280px)';
@@ -91,16 +93,52 @@ export function useCarouselRow(sessions, cardStateKey) {
     });
   }, [offset, cardStateKey, isDesktopCarousel]);
 
+  // Below 1280px the strip scrolls natively, so the arrows' disabled state follows scroll position.
+  const [edges, setEdges] = useState({ atStart: true, atEnd: true });
+  const sessionCount = sessions?.length || 0;
+  useEffect(() => {
+    if (isDesktopCarousel) return undefined;
+    return watchScrollEdges(stripRef.current, (next) => setEdges((prev) => (
+      prev.atStart === next.atStart && prev.atEnd === next.atEnd ? prev : next)));
+  }, [isDesktopCarousel, sessionCount]);
+
+  // Polite live-region text naming the card each arrow press brings into view.
+  const [announcement, setAnnouncement] = useState('');
+  const announce = (index) => {
+    const title = sessions?.[index]?.title;
+    if (title) setAnnouncement(title);
+  };
+
+  const step = (direction) => {
+    if (isDesktopCarousel) {
+      const next = Math.min(Math.max(0, offset + direction), sessionCount - 1);
+      setOffset(next);
+      announce(next);
+      return;
+    }
+    const strip = stripRef.current;
+    const target = adjacentCard(strip, direction);
+    if (!target) return;
+    strip.scrollTo({ left: target.left, behavior: scrollBehavior() });
+    announce(target.index);
+  };
+
+  const prevDisabled = isDesktopCarousel ? offset <= 0 : edges.atStart;
+  const nextDisabled = isDesktopCarousel ? !showNext : edges.atEnd;
+
   return {
     dismissingIds,
     allDismissing,
     offset,
-    setOffset,
     tx,
-    showNext,
     lastVisible,
     stripRef,
     viewportRef,
     rowRef,
+    goPrev: () => step(-1),
+    goNext: () => step(1),
+    prevDisabled,
+    nextDisabled,
+    announcement,
   };
 }
