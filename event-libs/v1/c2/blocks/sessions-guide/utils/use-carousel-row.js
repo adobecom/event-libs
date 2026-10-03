@@ -2,8 +2,7 @@ import {
   useState, useRef, useEffect, useLayoutEffect,
 } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { adjacentCard, watchScrollEdges } from './carousel-nav.js';
-import { scrollBehavior } from './motion.js';
+import { handOffArrowFocus, scrollToAdjacent, watchScrollEdges } from './carousel-nav.js';
 
 // Must match the breakpoint sessions-guide.css uses to switch into the desktop transform-carousel.
 const DESKTOP_CAROUSEL_QUERY = '(min-width: 1280px)';
@@ -104,27 +103,29 @@ export function useCarouselRow(sessions, cardStateKey) {
 
   // Polite live-region text naming the card each arrow press brings into view.
   const [announcement, setAnnouncement] = useState('');
+  const pendingRef = useRef(null);
+  const pressedRef = useRef(null);
   const announce = (index) => {
     const title = sessions?.[index]?.title;
     if (title) setAnnouncement(title);
   };
 
-  const step = (direction) => {
+  const step = (direction, button) => {
+    pressedRef.current = button;
     if (isDesktopCarousel) {
       const next = Math.min(Math.max(0, offset + direction), sessionCount - 1);
       setOffset(next);
       announce(next);
       return;
     }
-    const strip = stripRef.current;
-    const target = adjacentCard(strip, direction);
-    if (!target) return;
-    strip.scrollTo({ left: target.left, behavior: scrollBehavior() });
-    announce(target.index);
+    const target = scrollToAdjacent(stripRef.current, direction, pendingRef);
+    if (target) announce(target.index);
   };
 
   const prevDisabled = isDesktopCarousel ? offset <= 0 : edges.atStart;
   const nextDisabled = isDesktopCarousel ? !showNext : edges.atEnd;
+
+  useEffect(() => { handOffArrowFocus(pressedRef.current); }, [prevDisabled, nextDisabled]);
 
   return {
     dismissingIds,
@@ -135,8 +136,8 @@ export function useCarouselRow(sessions, cardStateKey) {
     stripRef,
     viewportRef,
     rowRef,
-    goPrev: () => step(-1),
-    goNext: () => step(1),
+    goPrev: (e) => step(-1, e?.currentTarget),
+    goNext: (e) => step(1, e?.currentTarget),
     prevDisabled,
     nextDisabled,
     announcement,

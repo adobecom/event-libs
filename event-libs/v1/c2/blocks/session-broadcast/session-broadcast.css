@@ -842,6 +842,14 @@
   }
 }
 
+/* Keeps the tablet drop shadow these arrows used to inherit from sessions-guide's old unscoped rule. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sb-carousel-section--also-live .sg-carousel__arrow,
+  .sb-carousel-section--up-next .sg-carousel__arrow {
+    box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+  }
+}
+
 @media (min-width: 1280px) {
   .sb-carousel-section--also-live .sg-carousel__header,
   .sb-carousel-section--up-next .sg-carousel__header {

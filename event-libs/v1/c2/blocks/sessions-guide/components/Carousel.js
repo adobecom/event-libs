@@ -1,7 +1,8 @@
 import { html, useState, useRef, useEffect } from '../../../../deps/htm-preact.js';
 import { LiveCard } from './LiveCard.js';
-import { scrollBehavior } from '../utils/motion.js';
-import { adjacentCard, scrollEdges, watchScrollEdges } from '../utils/carousel-nav.js';
+import {
+  handOffArrowFocus, scrollEdges, scrollToAdjacent, watchScrollEdges,
+} from '../utils/carousel-nav.js';
 
 export const buildCarousel = () => Carousel;
 
@@ -26,6 +27,8 @@ export function Carousel({
   const resetKeyRef = useRef(resetKey);
   // Polite live-region text naming the card each arrow press brings into view.
   const [announcement, setAnnouncement] = useState('');
+  const pendingRef = useRef(null);
+  const pressedRef = useRef(null);
 
   const clampOffset = () => {
     const maxOffset = Math.max(0, (sessionsRef.current?.length || 0) - visibleCountRef.current);
@@ -83,6 +86,9 @@ export function Carousel({
     if (stripRef.current) stripRef.current.scrollLeft = 0;
   }, [resetKey]);
 
+  // Cheap no-op unless the last-pressed arrow just disabled itself while focused.
+  useEffect(() => { handOffArrowFocus(pressedRef.current); });
+
   if (!sessions || !sessionCount) return null;
 
   const clampedOffset = Math.min(offset, maxOffset);
@@ -95,21 +101,19 @@ export function Carousel({
     const title = sessions[index]?.title;
     if (title) setAnnouncement(title);
   };
-  const go = (direction) => {
+  const go = (direction, button) => {
+    pressedRef.current = button;
     if (paged) {
       const next = Math.min(maxOffset, Math.max(0, clampedOffset + direction * step));
       setOffset(next);
       announce(next);
       return;
     }
-    const strip = stripRef.current;
-    const target = adjacentCard(strip, direction);
-    if (!target) return;
-    strip.scrollTo({ left: target.left, behavior: scrollBehavior() });
-    announce(target.index);
+    const target = scrollToAdjacent(stripRef.current, direction, pendingRef);
+    if (target) announce(target.index);
   };
-  const goPrev = () => go(-1);
-  const goNext = () => go(1);
+  const goPrev = (e) => go(-1, e?.currentTarget);
+  const goNext = (e) => go(1, e?.currentTarget);
 
   const focused = sessions[Math.min(clampedOffset, sessionCount - 1)];
   const timeLabel = formatTime ? formatTime(focused) : '';
@@ -131,7 +135,7 @@ export function Carousel({
           </div>
         `}
         <div class="sg-carousel__track">
-          <div class="sg-carousel__cards" ref=${stripRef} onscroll=${refreshEdges} style=${'transform:translateX(-' + translateX + 'px)'}>
+          <div class="sg-carousel__cards" ref=${stripRef} style=${'transform:translateX(-' + translateX + 'px)'}>
             ${sessions.map((s, i) => html`<div
               class="sg-carousel__card-wrap"
               key=${s.id}

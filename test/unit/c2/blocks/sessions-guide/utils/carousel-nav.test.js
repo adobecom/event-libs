@@ -1,7 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 import {
   adjacentCard,
+  handOffArrowFocus,
   scrollEdges,
+  scrollToAdjacent,
   watchScrollEdges,
 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/carousel-nav.js';
 
@@ -62,6 +64,96 @@ describe('sessions-guide/utils/carousel-nav', () => {
     it('returns null for next when no card starts ahead', () => {
       strip = buildStrip(1);
       expect(adjacentCard(strip, 1)).to.equal(null);
+    });
+
+    it('steps from an explicit position instead of scrollLeft', () => {
+      strip = buildStrip();
+      expect(adjacentCard(strip, 1, 220)).to.deep.equal({ index: 2, left: 440 });
+      expect(adjacentCard(strip, -1, 440)).to.deep.equal({ index: 1, left: 220 });
+    });
+  });
+
+  describe('scrollToAdjacent', () => {
+    let calls;
+
+    beforeEach(() => {
+      strip = buildStrip();
+      calls = [];
+      strip.scrollTo = (opts) => calls.push(opts.left);
+    });
+
+    it('returns null for a missing strip or at an end', () => {
+      expect(scrollToAdjacent(null, 1, { current: null })).to.equal(null);
+      expect(scrollToAdjacent(strip, -1, { current: null })).to.equal(null);
+      expect(calls).to.have.length(0);
+    });
+
+    it('scrolls to the adjacent card and records it as pending', () => {
+      const pendingRef = { current: null };
+      expect(scrollToAdjacent(strip, 1, pendingRef)).to.deep.equal({ index: 1, left: 220 });
+      expect(calls).to.deep.equal([220]);
+      expect(pendingRef.current.left).to.equal(220);
+    });
+
+    it('steps from the pending target while a smooth scroll is still running', () => {
+      const pendingRef = { current: null };
+      scrollToAdjacent(strip, 1, pendingRef);
+      // scrollTo is stubbed, so scrollLeft stays at 0 — as if the press landed mid-animation.
+      expect(scrollToAdjacent(strip, 1, pendingRef).index).to.equal(2);
+      expect(calls).to.deep.equal([220, 440]);
+    });
+
+    it('ignores a pending target that is expired or already reached', () => {
+      const expired = { current: { left: 440, until: performance.now() - 1 } };
+      expect(scrollToAdjacent(strip, 1, expired).index).to.equal(1);
+      strip.scrollLeft = 220;
+      const reached = { current: { left: 220, until: performance.now() + 1000 } };
+      expect(scrollToAdjacent(strip, 1, reached).index).to.equal(2);
+    });
+  });
+
+  describe('handOffArrowFocus', () => {
+    let nav;
+    let prev;
+    let next;
+
+    beforeEach(() => {
+      nav = document.createElement('div');
+      prev = document.createElement('button');
+      next = document.createElement('button');
+      nav.append(prev, document.createElement('div'), next);
+      document.body.appendChild(nav);
+    });
+
+    afterEach(() => nav.remove());
+
+    it('moves focus to the other arrow when the focused one is disabled', () => {
+      next.focus();
+      next.disabled = true;
+      handOffArrowFocus(next);
+      expect(document.activeElement).to.equal(prev);
+    });
+
+    it('does nothing when the arrow is still enabled or focus moved elsewhere', () => {
+      next.focus();
+      handOffArrowFocus(next);
+      expect(document.activeElement).to.equal(next);
+      const other = document.createElement('input');
+      document.body.appendChild(other);
+      other.focus();
+      next.disabled = true;
+      handOffArrowFocus(next);
+      expect(document.activeElement).to.equal(other);
+      other.remove();
+    });
+
+    it('does nothing when the other arrow is disabled too, or no button is given', () => {
+      next.focus();
+      next.disabled = true;
+      prev.disabled = true;
+      handOffArrowFocus(next);
+      expect(document.activeElement).to.not.equal(prev);
+      expect(() => handOffArrowFocus(null)).to.not.throw();
     });
   });
 
