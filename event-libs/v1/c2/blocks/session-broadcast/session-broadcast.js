@@ -12,6 +12,8 @@ const DEFAULTS = {
   alsoLiveTitle: 'Currently Live',
   upcomingTitle: 'Upcoming',
   viewAllDetailsLabel: 'View all details',
+  playerBackgroundImageUrlDesktop: '',
+  playerBackgroundImageUrlDesktopXl: '',
   sessionEndedImageUrlMobile: '',
   sessionEndedImageUrlTablet: '',
   sessionEndedImageUrlDesktop: '',
@@ -26,6 +28,11 @@ const SESSION_ENDED_IMAGE_LABELS = [
 ];
 
 const LEGACY_SESSION_ENDED_IMAGE_LABEL = 'session ended image';
+
+const PLAYER_BACKGROUND_IMAGE_LABELS = [
+  ['playerBackgroundImageUrlDesktop', 'player background image desktop'],
+  ['playerBackgroundImageUrlDesktopXl', 'player background image desktop xl'],
+];
 
 function getRowValueEl(el, label) {
   const row = [...el.querySelectorAll(':scope > div')]
@@ -127,12 +134,24 @@ function extractSessionEndedImageUrls(el) {
   return applyOptimizationPolicy(Object.fromEntries(keys.map((key, i) => [key, filled[i]])), mobileKey);
 }
 
+function extractPlayerBackgroundImageUrls(el) {
+  const raw = PLAYER_BACKGROUND_IMAGE_LABELS.map(([, label]) => extractRowImageUrl(el, label, true));
+  if (raw.every((url) => !url)) {
+    raw[0] = extractRowImageUrl(el, 'player background image', true);
+  }
+  const filled = fillNearestAvailable(raw).map(stripOptimizationParams);
+  return Object.fromEntries(PLAYER_BACKGROUND_IMAGE_LABELS.map(
+    ([key], i) => [key, filled[i]],
+  ));
+}
+
 // Plain block-content rows, not a Configurator-app JSON blob like sessions-guide.
 export function parseBroadcastConfig(el) {
   const raw = readBlockConfig(el);
   const config = {
     ...DEFAULTS,
     ...extractSessionEndedImageUrls(el),
+    ...extractPlayerBackgroundImageUrls(el),
   };
   Object.entries(CONFIG_KEYS).forEach(([rowKey, configKey]) => {
     if (raw[rowKey]) config[configKey] = raw[rowKey];

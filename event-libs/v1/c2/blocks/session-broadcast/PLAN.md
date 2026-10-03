@@ -43,6 +43,33 @@ The Figma file (`MAX-2026-UX-SSOT`, branch `f3wtXH32KwrStRx5VbCzed`, section "Se
 
 ## Architecture decisions
 
+### Desktop live-player background (MWPW-207363)
+
+The live player and session info panel support an author-controlled decorative background from the MAX 2026
+[Figma broadcast design](https://www.figma.com/design/zNe8auqfmanqiXWvQBpSyH/branch/PsafLZIADk0bgLrj9Voc6g/MAX-2026-Virtual-VizD-SSOT?node-id=8482-20021).
+There is no bundled/default artwork: the background remains plain until an image is
+authored. Authored images use the design's 60% opacity and cover sizing at desktop
+breakpoints only. Mobile and tablet do not request a background image. Player dimensions,
+controls, nav offsets, and vertical spacing remain unchanged.
+
+| Block-content row | Viewports |
+|---|---|
+| **Player background image desktop** | 1280-1440px |
+| **Player background image desktop xl** | 1441px+ |
+
+Both rows accept an image link or embedded picture. Like the session-ended image rows,
+pictures use the widest source, relative URLs resolve against the authored page, and
+desktop URLs have their optimization query parameters removed. If only one tier is
+authored, it supplies both desktop tiers. Leave both empty or omit them for a plain
+background. The earlier single **Player background image** row remains a fallback when
+neither breakpoint row is populated. Use empty alt text for an embedded decorative image
+(avoid Milo's `|`-delimited video convention).
+
+The background is non-interactive and belongs only to the live wrapper, not the
+loading/error/empty or session-ended states. The info panel has a 64% black backing
+on desktop when an image is authored to keep its text at WCAG AA contrast even with bright artwork.
+The existing **Session ended image** rows remain separate and unchanged.
+
 | Area | Decision | Why |
 |---|---|---|
 | Block type | New Tier 1 C2 Preact block `session-broadcast`, registered in `EVENT_BLOCKS_C2` (`event-libs/v1/libs.js`) | Matches `sessions-guide-full-page`'s precedent — only existing "full custom page" pattern in this codebase |

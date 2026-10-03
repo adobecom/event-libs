@@ -10,7 +10,7 @@ function block(rows) {
     const k = document.createElement('div');
     k.textContent = key;
     const v = document.createElement('div');
-    if (key.toLowerCase().startsWith('session ended image')) {
+    if (value && /^(session ended image|player background image)/i.test(key)) {
       const a = document.createElement('a');
       a.href = value;
       a.textContent = 'image';
@@ -31,6 +31,8 @@ describe('parseBroadcastConfig', () => {
       alsoLiveTitle: 'Currently Live',
       upcomingTitle: 'Upcoming',
       viewAllDetailsLabel: 'View all details',
+      playerBackgroundImageUrlDesktop: '',
+      playerBackgroundImageUrlDesktopXl: '',
       sessionEndedImageUrlMobile: '',
       sessionEndedImageUrlTablet: '',
       sessionEndedImageUrlDesktop: '',
@@ -58,6 +60,84 @@ describe('parseBroadcastConfig', () => {
     const config = parseBroadcastConfig(block([['Also live title', 'Live Now']]));
     expect(config.alsoLiveTitle).to.equal('Live Now');
     expect(config.upcomingTitle).to.equal('Upcoming');
+  });
+
+  describe('desktop player background images', () => {
+    it('reads an authored image link independently of the ended image', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image desktop', 'https://example.com/player.png'],
+        ['Session ended image', 'https://example.com/ended.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/player.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/player.png');
+      expect(config.sessionEndedImageUrlDesktop).to.equal('https://example.com/ended.png');
+    });
+
+    it('reads independent desktop and desktop XL rows', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image desktop', 'https://example.com/desktop.png'],
+        ['Player background image desktop xl', 'https://example.com/xl.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/desktop.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/xl.png');
+    });
+
+    it('backfills desktop from desktop XL when only the XL row is authored', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image desktop xl', 'https://example.com/xl.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/xl.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/xl.png');
+    });
+
+    it('retains the single image row as a fallback for both desktop tiers', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image', 'https://example.com/legacy.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/legacy.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/legacy.png');
+    });
+
+    it('prefers breakpoint rows to the single image row', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image', 'https://example.com/legacy.png'],
+        ['Player background image desktop xl', 'https://example.com/xl.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/xl.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/xl.png');
+    });
+
+    it('resolves the largest picture source and strips optimization parameters like ended images', () => {
+      const el = block([]);
+      el.innerHTML = `
+        <div><div>Player background image desktop</div><div>
+          <picture>
+            <source srcset="./player-large.png?width=2000&format=webply 2x">
+            <source srcset="./player-small.png?width=750&format=webply">
+            <img src="./player-small.png?width=750&format=png" alt="">
+          </picture>
+        </div></div>`;
+      const config = parseBroadcastConfig(el);
+      expect(config.playerBackgroundImageUrlDesktop)
+        .to.equal(new URL('./player-large.png', document.baseURI).href);
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal(config.playerBackgroundImageUrlDesktop);
+    });
+
+    it('accepts an embedded image without picture sources', () => {
+      const el = block([]);
+      el.innerHTML = '<div><div>Player background image desktop</div><div><img src="./player.png" alt=""></div></div>';
+      expect(parseBroadcastConfig(el).playerBackgroundImageUrlDesktop)
+        .to.equal(new URL('./player.png', document.baseURI).href);
+    });
+
+    it('leaves both tiers empty when no image is authored', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image desktop', ''],
+        ['Player background image desktop xl', ''],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('');
+    });
   });
 
   describe('four breakpoint-specific "session ended image" rows', () => {
