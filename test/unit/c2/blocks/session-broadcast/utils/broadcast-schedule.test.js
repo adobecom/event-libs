@@ -11,17 +11,19 @@ import {
 } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-schedule.js';
 
 const MIN = 60_000;
+// One fixed clock for every fixture and `nowMs`: reading Date.now() per call let the millisecond
+// tick between two "same start time" sessions, making tie/grouping tests flaky.
+const NOW = Date.now();
 
 // isOnline: true, youTubeId set by default — a plain broadcast-eligible, video-having session,
 // per isBroadcastEligible()/hasPlayableVideoSource() (session-state.js / this module). Tests
 // below that specifically exercise the mainstage/keynote or missing-video exclusions override
 // isLivestreamed/isOnline/youTubeId explicitly.
 function session(id, startOffsetMin, endOffsetMin, overrides = {}) {
-  const now = Date.now();
   return {
     id,
-    startTimeUtc: new Date(now + startOffsetMin * MIN).toISOString(),
-    endTimeUtc: new Date(now + endOffsetMin * MIN).toISOString(),
+    startTimeUtc: new Date(NOW + startOffsetMin * MIN).toISOString(),
+    endTimeUtc: new Date(NOW + endOffsetMin * MIN).toISOString(),
     hasOnDemandFormat: false,
     mrStreamId: null,
     isOnline: true,
@@ -56,7 +58,7 @@ function ytSession(id, startOffsetMin, endOffsetMin, overrides = {}) {
 }
 
 describe('broadcast-schedule', () => {
-  const nowMs = Date.now();
+  const nowMs = NOW;
   const liveStreamActiveIds = new Set();
 
   describe('getSessionBucket', () => {
