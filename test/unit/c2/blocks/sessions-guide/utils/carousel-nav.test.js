@@ -9,6 +9,7 @@ import {
   scrollEdges,
   scrollToAdjacent,
   watchScrollEdges,
+  widthTransitionRunning,
 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/carousel-nav.js';
 
 // 300px strip, 16px left padding, five 200px cards with 20px gaps: offsets 0, 220, 440, 660, 880.
@@ -304,6 +305,25 @@ describe('sessions-guide/utils/carousel-nav', () => {
       expect(previousPageStart(layout, 3, 1246)).to.equal(0); // cards 0..2 end at 1217
       expect(previousPageStart(layout, 4, 900)).to.equal(2); // cards 2..3 span 838..1660 = 822
       expect(previousPageStart(layout, 0, 1246)).to.equal(0);
+    });
+  });
+
+  describe('widthTransitionRunning', () => {
+    it('is true only while a width transition runs inside the element', () => {
+      const wrap = document.createElement('div');
+      const card = document.createElement('div');
+      card.style.cssText = 'width:100px;height:10px;transition:width 300ms linear;';
+      wrap.appendChild(card);
+      document.body.appendChild(wrap);
+      expect(widthTransitionRunning(wrap)).to.equal(false);
+      // eslint-disable-next-line no-unused-expressions
+      card.offsetWidth; // commit the start width so the change below transitions
+      card.style.width = '200px';
+      expect(widthTransitionRunning(wrap)).to.equal(true);
+      card.style.transition = 'none';
+      expect(widthTransitionRunning(wrap)).to.equal(false);
+      wrap.remove();
+      expect(widthTransitionRunning(null)).to.equal(false);
     });
   });
 });

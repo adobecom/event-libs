@@ -2,7 +2,7 @@ import { html, useState, useRef, useEffect } from '../../../../deps/htm-preact.j
 import { LiveCard } from './LiveCard.js';
 import {
   handOffArrowFocus, lastFullyVisible, maxPageOffset, measureCards, previousPageStart,
-  scrollEdges, scrollToAdjacent, watchScrollEdges,
+  scrollEdges, scrollToAdjacent, watchScrollEdges, widthTransitionRunning,
 } from '../utils/carousel-nav.js';
 
 export const buildCarousel = () => Carousel;
@@ -51,10 +51,11 @@ export function Carousel({
     // Cards widen on hover/focus (and some rest wider when scheduled/favorited), so re-measuring
     // mid-hover could shrink the page size and inert a visible card; keep the last size until it
     // settles — unless the track itself resized, which hover never causes (a real layout change).
+    // A running width transition is skipped too; `transitionend` (below) re-measures once it ends.
     const trackWidth = strip.parentElement.offsetWidth;
     const prev = layoutRef.current;
     if (prev.starts.length === cards.length && trackWidth === prev.trackWidth
-      && cards.some((c) => c.matches(':hover, :focus-within'))) return;
+      && (cards.some((c) => c.matches(':hover, :focus-within')) || widthTransitionRunning(strip))) return;
     layoutRef.current = { ...measureCards(cards), trackWidth };
     // The ref drives translate/inert, so re-render when it changes (a same-value set is a no-op).
     const { starts, ends } = layoutRef.current;
@@ -72,8 +73,11 @@ export function Carousel({
 
   const sessionCount = sessions?.length || 0;
   const layout = layoutRef.current;
-  const measured = layout.starts.length === sessionCount;
-  const maxOffset = measured ? maxPageOffset(layout, layout.trackWidth) : 0;
+  // After the session count changes, page off the previous layout until the re-measure lands
+  // rather than snapping to 0 for a frame (which would start the transform transition backwards).
+  const measuredCount = layout.starts.length;
+  const maxOffset = measuredCount
+    ? Math.min(maxPageOffset(layout, layout.trackWidth), sessionCount - 1) : 0;
 
   // Re-measures for async-loaded sessions; the mount effect above can fire before the strip exists.
   useEffect(() => {
@@ -91,9 +95,15 @@ export function Carousel({
   useEffect(() => {
     const strip = stripRef.current;
     if (!strip || typeof ResizeObserver !== 'function') return undefined;
-    const ro = new ResizeObserver(() => { measure(); refreshEdges(); clampOffset(); });
+    const remeasure = () => { measure(); refreshEdges(); clampOffset(); };
+    const onTransitionEnd = (e) => { if (e.propertyName === 'width') remeasure(); };
+    const ro = new ResizeObserver(remeasure);
     [strip, ...strip.children].forEach((el) => ro.observe(el));
-    return () => ro.disconnect();
+    strip.addEventListener('transitionend', onTransitionEnd);
+    return () => {
+      ro.disconnect();
+      strip.removeEventListener('transitionend', onTransitionEnd);
+    };
   }, [sessionCount]);
 
   // resetKey (e.g. activeDay) changing means the carousel now shows an unrelated session set —
@@ -111,9 +121,10 @@ export function Carousel({
   if (!sessions || !sessionCount) return null;
 
   const clampedOffset = Math.min(offset, maxOffset);
-  const translateX = paged && measured ? layout.starts[clampedOffset] : 0;
-  const lastVisible = paged && measured
-    ? lastFullyVisible(layout, clampedOffset, layout.trackWidth) : sessionCount - 1;
+  const layoutIndex = Math.min(clampedOffset, measuredCount - 1);
+  const translateX = paged && measuredCount ? layout.starts[layoutIndex] : 0;
+  const lastVisible = paged && measuredCount
+    ? lastFullyVisible(layout, layoutIndex, layout.trackWidth) : sessionCount - 1;
   const atStart = paged ? clampedOffset <= 0 : edges.atStart;
   const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 

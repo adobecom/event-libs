@@ -88,6 +88,13 @@ export function watchScrollEdges(strip, onChange) {
 // Cards can differ in width (e.g. Broadcast Up Next: scheduled/favorited cards rest wider), so
 // paging works from each card's measured start/end instead of assuming one uniform width.
 
+// True while a CSS `width` transition runs inside `el` (cards easing after hover/focus or a
+// breakpoint change). Measuring then reads in-between widths, so callers wait for `transitionend`.
+export function widthTransitionRunning(el) {
+  return !!el?.getAnimations?.({ subtree: true })
+    .some((a) => a.transitionProperty === 'width' && a.playState === 'running');
+}
+
 // Resting card geometry relative to the first card; offsetLeft ignores the strip's transform.
 export function measureCards(cards) {
   const base = cards[0]?.offsetLeft || 0;

@@ -2,7 +2,7 @@ import {
   useState, useRef, useEffect, useLayoutEffect,
 } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { handOffArrowFocus, scrollToAdjacent, watchScrollEdges } from './carousel-nav.js';
+import { handOffArrowFocus, scrollToAdjacent, watchScrollEdges, widthTransitionRunning } from './carousel-nav.js';
 
 // Must match the breakpoint sessions-guide.css uses to switch into the desktop transform-carousel.
 const DESKTOP_CAROUSEL_QUERY = '(min-width: 1280px)';
@@ -104,19 +104,28 @@ export function useCarouselRow(sessions, cardStateKey) {
 
   // Re-measures when the viewport or a card resizes. Crossing into desktop, cards animate from
   // their tablet width, so the switch-time measure is stale (next stayed hidden until reload).
-  // Skips while a card is hover/focus-expanded at an unchanged viewport width, so the expansion
-  // can't toggle `inert` on visible cards.
+  // At an unchanged viewport width it skips while a card is hover/focus-expanded (so expansion
+  // can't toggle `inert`) and while a width transition runs (one re-measure on `transitionend`
+  // instead of one per animation frame).
   useEffect(() => {
     const strip = stripRef.current;
     const viewport = viewportRef.current;
     if (!isDesktopCarousel || !strip || !viewport || typeof ResizeObserver !== 'function') return undefined;
+    const settling = () => viewport.offsetWidth === measuredViewportRef.current
+      && ([...strip.children].some((c) => c.matches(':hover, :focus-within'))
+        || widthTransitionRunning(strip));
     const ro = new ResizeObserver(() => {
-      const expanded = [...strip.children].some((c) => c.matches(':hover, :focus-within'));
-      if (expanded && viewport.offsetWidth === measuredViewportRef.current) return;
-      setResizeTick((n) => n + 1);
+      if (!settling()) setResizeTick((n) => n + 1);
     });
+    const onTransitionEnd = (e) => {
+      if (e.propertyName === 'width' && !settling()) setResizeTick((n) => n + 1);
+    };
     [viewport, ...strip.children].forEach((el) => ro.observe(el));
-    return () => ro.disconnect();
+    strip.addEventListener('transitionend', onTransitionEnd);
+    return () => {
+      ro.disconnect();
+      strip.removeEventListener('transitionend', onTransitionEnd);
+    };
   }, [isDesktopCarousel, sessionCount]);
   useEffect(() => {
     if (isDesktopCarousel) return undefined;
