@@ -21,6 +21,7 @@ export function Carousel({
   const stripRef = useRef(null);
   const cardWidthRef = useRef(0);
   const visibleCountRef = useRef(1);
+  const trackWidthRef = useRef(0);
   const [, setPageSize] = useState('');
   // Kept current every render so the mount-time resize handler below reads the latest value.
   const sessionsRef = useRef(sessions);
@@ -51,11 +52,14 @@ export function Carousel({
     const styles = getComputedStyle(strip);
     setPaged(styles.overflowX === 'visible');
     // Cards widen on hover/focus (and some rest wider when scheduled/favorited), so re-measuring
-    // mid-hover could shrink the page size and inert a visible card; keep the last size until it settles.
-    if (cardWidthRef.current && cards.some((c) => c.matches(':hover, :focus-within'))) return;
+    // mid-hover could shrink the page size and inert a visible card; keep the last size until it
+    // settles — unless the track itself resized, which hover never causes (a real layout change).
+    const trackWidth = strip.parentElement.offsetWidth;
+    if (cardWidthRef.current && trackWidth === trackWidthRef.current
+      && cards.some((c) => c.matches(':hover, :focus-within'))) return;
+    trackWidthRef.current = trackWidth;
     const gap = parseFloat(styles.columnGap || '16') || 16;
     cardWidthRef.current = cards[0].offsetWidth + gap;
-    const trackWidth = strip.parentElement.offsetWidth;
     visibleCountRef.current = Math.max(1, Math.floor(trackWidth / cardWidthRef.current));
     // The refs drive translate/inert, so re-render when they change (a same-value set is a no-op).
     setPageSize(`${cardWidthRef.current}:${visibleCountRef.current}`);
