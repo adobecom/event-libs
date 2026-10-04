@@ -2,6 +2,10 @@ import { expect } from '@esm-bundle/chai';
 import {
   adjacentCard,
   handOffArrowFocus,
+  lastFullyVisible,
+  maxPageOffset,
+  measureCards,
+  previousPageStart,
   scrollEdges,
   scrollToAdjacent,
   watchScrollEdges,
@@ -253,6 +257,53 @@ describe('sessions-guide/utils/carousel-nav', () => {
       expect(observers[0].disconnected).to.equal(true);
       strip.dispatchEvent(new Event('scroll'));
       expect(calls).to.have.length(3);
+    });
+  });
+
+  // Mixed widths, like Broadcast Up Next where scheduled/favorited cards rest wider:
+  // widths 427, 379, 379, 427, 379 with 16px gaps -> starts 0, 443, 838, 1233, 1676.
+  describe('paged geometry', () => {
+    let wrap;
+    let layout;
+    const WIDTHS = [427, 379, 379, 427, 379];
+
+    beforeEach(() => {
+      wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;gap:16px;width:4000px;transform:translateX(-500px);';
+      WIDTHS.forEach((w) => {
+        const card = document.createElement('div');
+        card.style.cssText = `flex:0 0 ${w}px;height:10px;`;
+        wrap.appendChild(card);
+      });
+      document.body.appendChild(wrap);
+      layout = measureCards([...wrap.children]);
+    });
+
+    afterEach(() => wrap.remove());
+
+    it('measures resting starts/ends relative to the first card, ignoring the transform', () => {
+      expect(layout.starts).to.deep.equal([0, 443, 838, 1233, 1676]);
+      expect(layout.ends).to.deep.equal([427, 822, 1217, 1660, 2055]);
+    });
+
+    it('finds the last fully visible card from any start', () => {
+      expect(lastFullyVisible(layout, 0, 1246)).to.equal(2); // 0..1217 fits in 1246
+      expect(lastFullyVisible(layout, 0, 1200)).to.equal(1); // card 2 would end at 1217
+      expect(lastFullyVisible(layout, 2, 1246)).to.equal(4); // 838..2055 = 1217
+      expect(lastFullyVisible(layout, 4, 100)).to.equal(4); // a too-wide card still counts as itself
+    });
+
+    it('finds the smallest start from which all remaining cards fit', () => {
+      expect(maxPageOffset(layout, 1246)).to.equal(2);
+      expect(maxPageOffset(layout, 5000)).to.equal(0);
+      expect(maxPageOffset(layout, 100)).to.equal(4);
+      expect(maxPageOffset({ starts: [], ends: [] }, 100)).to.equal(0);
+    });
+
+    it('finds the previous page start that ends right before the current one', () => {
+      expect(previousPageStart(layout, 3, 1246)).to.equal(0); // cards 0..2 end at 1217
+      expect(previousPageStart(layout, 4, 900)).to.equal(2); // cards 2..3 span 838..1660 = 822
+      expect(previousPageStart(layout, 0, 1246)).to.equal(0);
     });
   });
 });

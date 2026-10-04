@@ -83,3 +83,42 @@ export function watchScrollEdges(strip, onChange) {
     ro?.disconnect();
   };
 }
+
+// ── Paged (desktop transform) carousels ─────────────────────────────────────
+// Cards can differ in width (e.g. Broadcast Up Next: scheduled/favorited cards rest wider), so
+// paging works from each card's measured start/end instead of assuming one uniform width.
+
+// Resting card geometry relative to the first card; offsetLeft ignores the strip's transform.
+export function measureCards(cards) {
+  const base = cards[0]?.offsetLeft || 0;
+  const starts = cards.map((c) => c.offsetLeft - base);
+  return { starts, ends: cards.map((c, i) => starts[i] + c.offsetWidth) };
+}
+
+// Index of the last card fully inside a `trackWidth` window that starts at card `from`.
+export function lastFullyVisible({ starts, ends }, from, trackWidth) {
+  let last = from;
+  for (let i = from + 1; i < starts.length; i += 1) {
+    if (ends[i] - starts[from] > trackWidth + 1) break;
+    last = i;
+  }
+  return last;
+}
+
+// Smallest start index from which every remaining card fits; the last card if none does.
+export function maxPageOffset({ starts, ends }, trackWidth) {
+  if (!starts.length) return 0;
+  const total = ends[ends.length - 1];
+  const index = starts.findIndex((s) => total - s <= trackWidth + 1);
+  return index < 0 ? starts.length - 1 : index;
+}
+
+// Start index of the page before `from`: the earliest card that still fits with card `from - 1`
+// as the last fully visible one.
+export function previousPageStart({ starts, ends }, from, trackWidth) {
+  if (from <= 0) return 0;
+  const lastIndex = from - 1;
+  let start = lastIndex;
+  while (start > 0 && ends[lastIndex] - starts[start - 1] <= trackWidth + 1) start -= 1;
+  return start;
+}

@@ -1,7 +1,8 @@
 import { html, useState, useRef, useEffect } from '../../../../deps/htm-preact.js';
 import { LiveCard } from './LiveCard.js';
 import {
-  handOffArrowFocus, scrollEdges, scrollToAdjacent, watchScrollEdges,
+  handOffArrowFocus, lastFullyVisible, maxPageOffset, measureCards, previousPageStart,
+  scrollEdges, scrollToAdjacent, watchScrollEdges,
 } from '../utils/carousel-nav.js';
 
 export const buildCarousel = () => Carousel;
@@ -19,13 +20,9 @@ export function Carousel({
   const [paged, setPaged] = useState(false);
   const [edges, setEdges] = useState({ atStart: true, atEnd: false });
   const stripRef = useRef(null);
-  const cardWidthRef = useRef(0);
-  const visibleCountRef = useRef(1);
-  const trackWidthRef = useRef(0);
+  // Resting card geometry + track width from the last full measure(); drives desktop paging.
+  const layoutRef = useRef({ starts: [], ends: [], trackWidth: 0 });
   const [, setPageSize] = useState('');
-  // Kept current every render so the mount-time resize handler below reads the latest value.
-  const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
   const resetKeyRef = useRef(resetKey);
   // Polite live-region text naming the card each arrow press brings into view.
   const [announcement, setAnnouncement] = useState('');
@@ -33,8 +30,8 @@ export function Carousel({
   const pressedRef = useRef(null);
 
   const clampOffset = () => {
-    const maxOffset = Math.max(0, (sessionsRef.current?.length || 0) - visibleCountRef.current);
-    setOffset((o) => Math.min(o, maxOffset));
+    const max = maxPageOffset(layoutRef.current, layoutRef.current.trackWidth);
+    setOffset((o) => Math.min(o, max));
   };
 
   const applyEdges = ({ atStart, atEnd }) => setEdges((prev) => (
@@ -55,14 +52,13 @@ export function Carousel({
     // mid-hover could shrink the page size and inert a visible card; keep the last size until it
     // settles — unless the track itself resized, which hover never causes (a real layout change).
     const trackWidth = strip.parentElement.offsetWidth;
-    if (cardWidthRef.current && trackWidth === trackWidthRef.current
+    const prev = layoutRef.current;
+    if (prev.starts.length === cards.length && trackWidth === prev.trackWidth
       && cards.some((c) => c.matches(':hover, :focus-within'))) return;
-    trackWidthRef.current = trackWidth;
-    const gap = parseFloat(styles.columnGap || '16') || 16;
-    cardWidthRef.current = cards[0].offsetWidth + gap;
-    visibleCountRef.current = Math.max(1, Math.floor(trackWidth / cardWidthRef.current));
-    // The refs drive translate/inert, so re-render when they change (a same-value set is a no-op).
-    setPageSize(`${cardWidthRef.current}:${visibleCountRef.current}`);
+    layoutRef.current = { ...measureCards(cards), trackWidth };
+    // The ref drives translate/inert, so re-render when it changes (a same-value set is a no-op).
+    const { starts, ends } = layoutRef.current;
+    setPageSize(`${trackWidth}|${starts.join(',')}|${ends.join(',')}`);
   };
 
   useEffect(() => {
@@ -75,7 +71,9 @@ export function Carousel({
   }, []);
 
   const sessionCount = sessions?.length || 0;
-  const maxOffset = Math.max(0, sessionCount - visibleCountRef.current);
+  const layout = layoutRef.current;
+  const measured = layout.starts.length === sessionCount;
+  const maxOffset = measured ? maxPageOffset(layout, layout.trackWidth) : 0;
 
   // Re-measures for async-loaded sessions; the mount effect above can fire before the strip exists.
   useEffect(() => {
@@ -113,11 +111,12 @@ export function Carousel({
   if (!sessions || !sessionCount) return null;
 
   const clampedOffset = Math.min(offset, maxOffset);
-  const translateX = paged ? clampedOffset * (cardWidthRef.current || 576) : 0;
+  const translateX = paged && measured ? layout.starts[clampedOffset] : 0;
+  const lastVisible = paged && measured
+    ? lastFullyVisible(layout, clampedOffset, layout.trackWidth) : sessionCount - 1;
   const atStart = paged ? clampedOffset <= 0 : edges.atStart;
   const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 
-  const step = pageByGroup ? Math.max(1, visibleCountRef.current) : 1;
   const announce = (index) => {
     const title = sessions[index]?.title;
     if (title) setAnnouncement(title);
@@ -125,7 +124,12 @@ export function Carousel({
   const go = (direction, button) => {
     pressedRef.current = { button, at: performance.now() };
     if (paged) {
-      const next = Math.min(maxOffset, Math.max(0, clampedOffset + direction * step));
+      let next = clampedOffset + direction;
+      if (pageByGroup) {
+        next = direction > 0 ? lastVisible + 1
+          : previousPageStart(layout, clampedOffset, layout.trackWidth);
+      }
+      next = Math.min(maxOffset, Math.max(0, next));
       setOffset(next);
       announce(next);
       return;
@@ -160,7 +164,7 @@ export function Carousel({
             ${sessions.map((s, i) => html`<div
               class="sg-carousel__card-wrap"
               key=${s.id}
-              inert=${paged && (i < clampedOffset || i >= clampedOffset + visibleCountRef.current) ? true : undefined}
+              inert=${paged && (i < clampedOffset || i > lastVisible) ? true : undefined}
             ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} showDurationBadge=${showDurationBadge} showDescription=${showDescription} forceLive=${forceLive} /></div>`)}
           </div>
         </div>
