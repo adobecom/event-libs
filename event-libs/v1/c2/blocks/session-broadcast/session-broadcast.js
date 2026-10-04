@@ -2,17 +2,13 @@ import { h, render } from '../../../deps/htm-preact.js';
 import { readBlockConfig, loadStyle } from '../../../utils/utils.js';
 import { BroadcastApp } from './components/BroadcastApp.js';
 
-// Broadcast renders Session Guide components but is authored in an earlier section than the
-// sessions-guide widget, and Milo loads sections sequentially — so that block's CSS would arrive
-// after our first render (unstyled flash, stale carousel measurements). Load it here first; the
-// widget's own load later dedupes on the same href.
+// Broadcast renders Session Guide components, but the widget that loads their CSS sits in a later
+// section (Milo loads sections in order), so load it here before the first render.
 const SESSIONS_GUIDE_CSS_URL = new URL('../sessions-guide/sessions-guide.css', import.meta.url).href;
-// Never block rendering longer than this on the stylesheet (e.g. an existing link that already failed).
 const STYLE_WAIT_MS = 3000;
 
-// Resolves once `link`'s stylesheet has loaded, failed, or `timeoutMs` passed. loadStyle returns an
-// existing link as-is (widget in the same section, or a second Broadcast block) that may still be
-// loading, so this waits on the link itself rather than loadStyle's immediate 'noop' callback.
+// Resolves when the stylesheet loads, fails, or times out. Waits on the link itself because
+// loadStyle reuses an existing (possibly still loading) link and calls back immediately.
 export function whenStylesheetReady(link, timeoutMs = STYLE_WAIT_MS) {
   return new Promise((resolve) => {
     if (link.sheet) {
@@ -186,7 +182,6 @@ export default async function init(el) {
   const config = parseBroadcastConfig(el);
   el.innerHTML = '';
   el.classList.add('session-broadcast');
-  // Resolves on load, error or timeout, so a failed stylesheet degrades to late styling, not a blank block.
   await loadSessionsGuideStyles();
   render(h(BroadcastApp, { config }), el);
   observeFillHeight(el);

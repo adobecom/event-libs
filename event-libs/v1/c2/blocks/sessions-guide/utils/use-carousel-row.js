@@ -35,7 +35,6 @@ export function useCarouselRow(sessions, cardStateKey) {
   const rowRef = useRef(null);
   const rowHeightRef = useRef(0);
   const collapsingRef = useRef(false);
-  // Bumped by the desktop ResizeObserver below to re-run the measure effect.
   const [resizeTick, setResizeTick] = useState(0);
   const measuredViewportRef = useRef(0);
 
@@ -98,15 +97,12 @@ export function useCarouselRow(sessions, cardStateKey) {
       && prev.lastVisible === next.lastVisible ? prev : next));
   }, [offset, cardStateKey, isDesktopCarousel, resizeTick]);
 
-  // Below 1280px the strip scrolls natively, so the arrows' disabled state follows scroll position.
+  // Below 1280px the arrows' disabled state follows the native scroll position.
   const [edges, setEdges] = useState({ atStart: true, atEnd: true });
   const sessionCount = sessions?.length || 0;
 
-  // Re-measures when the viewport or a card resizes. Crossing into desktop, cards animate from
-  // their tablet width, so the switch-time measure is stale (next stayed hidden until reload).
-  // At an unchanged viewport width it skips while a card is hover/focus-expanded (so expansion
-  // can't toggle `inert`) and while a width transition runs (one re-measure on `transitionend`
-  // instead of one per animation frame).
+  // Re-measure on viewport/card resize (e.g. cards animating in after crossing into desktop),
+  // skipping hover expansion and running width transitions unless the viewport itself changed.
   useEffect(() => {
     const strip = stripRef.current;
     const viewport = viewportRef.current;
@@ -133,7 +129,6 @@ export function useCarouselRow(sessions, cardStateKey) {
       prev.atStart === next.atStart && prev.atEnd === next.atEnd ? prev : next)));
   }, [isDesktopCarousel, sessionCount]);
 
-  // Polite live-region text naming the card each arrow press brings into view.
   const [announcement, setAnnouncement] = useState('');
   const pendingRef = useRef(null);
   const pressedRef = useRef(null);

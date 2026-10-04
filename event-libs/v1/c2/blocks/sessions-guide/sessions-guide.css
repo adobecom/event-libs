@@ -917,8 +917,7 @@
   transition: background 0.15s, opacity 0.15s;
 }
 
-/* Live/Recommended arrows: 32px at every breakpoint per Figma (larger than the 24px time-row arrows).
-   Scoped so Broadcast's .sb-carousel-section carousels keep their own 40px arrows. */
+/* Live/Recommended arrows are 32px (Figma); Broadcast keeps its own 40px arrows. */
 .sg-carousel-section .sg-carousel__nav { gap: 16px; }
 
 .sg-carousel-section .sg-carousel__arrow {
@@ -1840,12 +1839,9 @@
   .sg-carousel__track { margin-right: 0; }
 }
 
-/* ── Mobile + tablet carousel arrows (MWPW-208434) ───────────────────────── */
+/* ── Mobile + tablet carousel arrows ─────────────────────────────────────── */
 
-/* Figma 12115:65093 (mobile) / 12115:65145 (tablet): cards scroll natively; prev/next arrows sit
-   at the right of the section header. Grid + `display: contents` moves the nav (rendered after
-   the track) into the header row without changing the DOM the ≥1024px layouts rely on. Scoped to
-   .sg-carousel-section: Broadcast's .sb-carousel-section carousels keep their own header arrows. */
+/* Grid + `display: contents` moves the nav into the header row without changing the DOM. */
 @media (max-width: 1023px) {
   .sg-carousel-section .sg-carousel {
     display: grid;
@@ -1875,7 +1871,7 @@
 
   .sg-carousel-section .sg-carousel__arrow { position: relative; }
 
-  /* Extends the 32px arrow's touch target to 40px; the 16px gap keeps neighbours from overlapping. */
+  /* 40px touch target. */
   .sg-carousel-section .sg-carousel__arrow::after {
     content: '';
     position: absolute;
@@ -2177,8 +2173,7 @@
 
   .sg-time-row:is(:hover, :focus-within) .sg-card:not(:hover, :focus-within) { background: var(--s2a-color-gray-50); }
 
-  /* MWPW-208434 (Figma 12115:65093 / 12115:65145): label on top with prev/next arrows at its
-     right, cards below. `display: contents` on the track lets its arrows join the header row. */
+  /* Label and arrows on top, cards below; `display: contents` lifts the arrows into the header. */
   .sg-time-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
@@ -2200,7 +2195,7 @@
 
   .sg-time-row__viewport { grid-area: 2 / 1 / 3 / -1; }
 
-  /* Trailing gutter (same as .sg-carousel__cards) so the last card doesn't touch the edge. */
+  /* Trailing gutter after the last card. */
   .sg-time-row__cards { padding-right: var(--s2a-spacing-md); }
 
   .sg-time-row__arrow,
@@ -2227,14 +2222,14 @@
     height: 10px;
   }
 
-  /* Extends the 24px arrow's touch target to 40px; the 20px gap keeps neighbours from overlapping. */
+  /* 40px touch target. */
   .sg-time-row__arrow::after {
     content: '';
     position: absolute;
     inset: -8px;
   }
 
-  /* Disabled arrows stay visible (dimmed) below desktop so users can see they're at an end. */
+  /* Below desktop, disabled arrows stay visible (dimmed). */
   .sg-time-row .sg-time-row__arrow:disabled,
   .sg-time-row:is(:hover, :focus-within) .sg-time-row__arrow:disabled {
     opacity: 0.4;
@@ -2518,8 +2513,7 @@
     right: 0;
   }
 
-  /* Full page: the section keeps a 20px right padding for the card bleed, so inset the nav by the
-     rest of the 156px gutter to line up with the header's search button. */
+  /* Align with the header's search button (gutter minus the section's 20px right padding). */
   .sg-full-page .sg-carousel__nav {
     right: calc(156px - 20px);
   }

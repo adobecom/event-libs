@@ -11,8 +11,7 @@ import {
 } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-schedule.js';
 
 const MIN = 60_000;
-// One fixed clock for every fixture and `nowMs`: reading Date.now() per call let the millisecond
-// tick between two "same start time" sessions, making tie/grouping tests flaky.
+// One fixed clock so "same start time" fixtures really are equal.
 const NOW = Date.now();
 
 // isOnline: true, youTubeId set by default — a plain broadcast-eligible, video-having session,

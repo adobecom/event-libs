@@ -20,11 +20,10 @@ export function Carousel({
   const [paged, setPaged] = useState(false);
   const [edges, setEdges] = useState({ atStart: true, atEnd: false });
   const stripRef = useRef(null);
-  // Resting card geometry + track width from the last full measure(); drives desktop paging.
+  // Resting card geometry from the last measure(); drives desktop paging.
   const layoutRef = useRef({ starts: [], ends: [], trackWidth: 0 });
   const [, setPageSize] = useState('');
   const resetKeyRef = useRef(resetKey);
-  // Polite live-region text naming the card each arrow press brings into view.
   const [announcement, setAnnouncement] = useState('');
   const pendingRef = useRef(null);
   const pressedRef = useRef(null);
@@ -48,16 +47,13 @@ export function Carousel({
     if (!cards.length) return;
     const styles = getComputedStyle(strip);
     setPaged(styles.overflowX === 'visible');
-    // Cards widen on hover/focus (and some rest wider when scheduled/favorited), so re-measuring
-    // mid-hover could shrink the page size and inert a visible card; keep the last size until it
-    // settles — unless the track itself resized, which hover never causes (a real layout change).
-    // A running width transition is skipped too; `transitionend` (below) re-measures once it ends.
+    // Keep the last layout while a card is hover-expanded or animating, unless the track resized;
+    // `transitionend` re-measures once it settles.
     const trackWidth = strip.parentElement.offsetWidth;
     const prev = layoutRef.current;
     if (prev.starts.length === cards.length && trackWidth === prev.trackWidth
       && (cards.some((c) => c.matches(':hover, :focus-within')) || widthTransitionRunning(strip))) return;
     layoutRef.current = { ...measureCards(cards), trackWidth };
-    // The ref drives translate/inert, so re-render when it changes (a same-value set is a no-op).
     const { starts, ends } = layoutRef.current;
     setPageSize(`${trackWidth}|${starts.join(',')}|${ends.join(',')}`);
   };
@@ -73,8 +69,7 @@ export function Carousel({
 
   const sessionCount = sessions?.length || 0;
   const layout = layoutRef.current;
-  // After the session count changes, page off the previous layout until the re-measure lands
-  // rather than snapping to 0 for a frame (which would start the transform transition backwards).
+  // Until a count change is re-measured, page off the previous layout instead of snapping to 0.
   const measuredCount = layout.starts.length;
   const maxOffset = measuredCount
     ? Math.min(maxPageOffset(layout, layout.trackWidth), sessionCount - 1) : 0;
@@ -89,9 +84,7 @@ export function Carousel({
   // Catches strip/card size changes the window resize listener misses (e.g. drawer opening).
   useEffect(() => (paged ? undefined : watchScrollEdges(stripRef.current, applyEdges)), [paged, sessionCount]);
 
-  // Broadcast can mount this before sessions-guide.css applies, when an unstyled strip reads as
-  // overflow:visible (paged) and cards as full-width. Re-measure when the strip or a card resizes
-  // (cards too: Broadcast's own CSS can pin the strip's size while only the cards change).
+  // Re-measure when the strip or a card resizes (late CSS, breakpoint changes, card width changes).
   useEffect(() => {
     const strip = stripRef.current;
     if (!strip || typeof ResizeObserver !== 'function') return undefined;
@@ -115,7 +108,6 @@ export function Carousel({
     if (stripRef.current) stripRef.current.scrollLeft = 0;
   }, [resetKey]);
 
-  // Cheap no-op unless an arrow press just disabled that arrow while it had focus.
   useEffect(() => { handOffArrowFocus(pressedRef); });
 
   if (!sessions || !sessionCount) return null;

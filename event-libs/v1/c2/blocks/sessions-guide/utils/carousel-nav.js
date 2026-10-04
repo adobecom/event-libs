@@ -1,7 +1,7 @@
-// Prev/next stepping for natively scrolling (mobile/tablet) carousel strips (MWPW-208434).
+// Prev/next navigation helpers for Session Guide carousels.
 import { scrollBehavior } from './motion.js';
 
-// Card start offsets in the strip's scroll coordinates, so offset === the scrollLeft that aligns it.
+// Card start offsets in scrollLeft coordinates.
 function cardOffsets(strip) {
   const { left } = strip.getBoundingClientRect();
   const origin = left + strip.clientLeft
@@ -9,7 +9,7 @@ function cardOffsets(strip) {
   return [...strip.children].map((card) => card.getBoundingClientRect().left - origin);
 }
 
-// Index + scrollLeft of the card one step away from `from` (default: current position), or null at that end.
+// The card one step away from `from` (default: scrollLeft), or null at that end.
 export function adjacentCard(strip, direction, from) {
   if (!strip?.children.length) return null;
   const offsets = cardOffsets(strip);
@@ -22,12 +22,10 @@ export function adjacentCard(strip, direction, from) {
   return { index, left: Math.min(Math.max(0, offsets[index]), maxScroll) };
 }
 
-// Upper bound on a smooth scroll's duration; past it a pending target or arrow press is stale.
+// Upper bound on a smooth scroll; older pending targets/presses are stale.
 const PENDING_MS = 1000;
 
-// Scrolls one card in `direction` and returns the target (or null). A smooth scroll reports
-// in-between scrollLeft values, so a press mid-animation steps from the pending target instead.
-// Only positions between the previous start and target count, so an intervening swipe resets it.
+// Scrolls one card; a press mid-animation steps from the pending target, not the in-between scrollLeft.
 export function scrollToAdjacent(strip, direction, pendingRef) {
   if (!strip) return null;
   const pending = pendingRef.current;
@@ -43,9 +41,7 @@ export function scrollToAdjacent(strip, direction, pendingRef) {
   return target;
 }
 
-// A focused arrow that becomes disabled at an end drops focus to <body>; hand it to the other
-// arrow. `pressRef.current` is `{ button, at }` from the click; it's consumed once and expires so a
-// later re-render can't pull focus (or scroll the page) back to the carousel.
+// When a just-pressed arrow disables itself, move focus to the other arrow instead of <body>.
 export function handOffArrowFocus(pressRef) {
   const press = pressRef.current;
   if (!press) return;
@@ -69,8 +65,7 @@ export function scrollEdges(strip) {
   return { atStart: strip.scrollLeft <= 1, atEnd: strip.scrollLeft >= maxScroll - 1 };
 }
 
-// Keeps prev/next disabled state in sync with the strip's scroll position and size. Cards are
-// observed too since a card widening (scheduled/favorited) changes scrollWidth, not the strip box.
+// Reports scroll edges on scroll and on strip/card resize; returns a cleanup.
 export function watchScrollEdges(strip, onChange) {
   if (!strip) return () => {};
   const update = () => onChange(scrollEdges(strip));
@@ -84,18 +79,15 @@ export function watchScrollEdges(strip, onChange) {
   };
 }
 
-// ── Paged (desktop transform) carousels ─────────────────────────────────────
-// Cards can differ in width (e.g. Broadcast Up Next: scheduled/favorited cards rest wider), so
-// paging works from each card's measured start/end instead of assuming one uniform width.
+// ── Paged (desktop) carousels: page by measured card positions (widths can vary) ──
 
-// True while a CSS `width` transition runs inside `el` (cards easing after hover/focus or a
-// breakpoint change). Measuring then reads in-between widths, so callers wait for `transitionend`.
+// True while a CSS `width` transition runs inside `el`.
 export function widthTransitionRunning(el) {
   return !!el?.getAnimations?.({ subtree: true })
     .some((a) => a.transitionProperty === 'width' && a.playState === 'running');
 }
 
-// Resting card geometry relative to the first card; offsetLeft ignores the strip's transform.
+// Card starts/ends relative to the first card (offsetLeft ignores transforms).
 export function measureCards(cards) {
   const base = cards[0]?.offsetLeft || 0;
   const starts = cards.map((c) => c.offsetLeft - base);
@@ -112,7 +104,7 @@ export function lastFullyVisible({ starts, ends }, from, trackWidth) {
   return last;
 }
 
-// Smallest start index from which every remaining card fits; the last card if none does.
+// Smallest start index from which every remaining card fits.
 export function maxPageOffset({ starts, ends }, trackWidth) {
   if (!starts.length) return 0;
   const total = ends[ends.length - 1];
@@ -120,8 +112,7 @@ export function maxPageOffset({ starts, ends }, trackWidth) {
   return index < 0 ? starts.length - 1 : index;
 }
 
-// Start index of the page before `from`: the earliest card that still fits with card `from - 1`
-// as the last fully visible one.
+// Start of the page that ends with card `from - 1`.
 export function previousPageStart({ starts, ends }, from, trackWidth) {
   if (from <= 0) return 0;
   const lastIndex = from - 1;

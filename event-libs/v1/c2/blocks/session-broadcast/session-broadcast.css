@@ -745,7 +745,7 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
 
-    /* Trailing gutter matching the left inset so the last card doesn't touch the frame edge. */
+    /* Trailing gutter after the last card. */
     padding-right: var(--s2a-spacing-lg, 24px);
   }
 
@@ -842,7 +842,7 @@
   }
 }
 
-/* Keeps the tablet drop shadow these arrows used to inherit from sessions-guide's old unscoped rule. */
+/* Tablet arrow shadow (previously inherited from sessions-guide). */
 @media (min-width: 768px) and (max-width: 1023px) {
   .sb-carousel-section--also-live .sg-carousel__arrow,
   .sb-carousel-section--up-next .sg-carousel__arrow {

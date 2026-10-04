@@ -103,7 +103,7 @@ describe('sessions-guide/utils/carousel-nav', () => {
     it('steps from the pending target while a smooth scroll is still running', () => {
       const pendingRef = { current: null };
       scrollToAdjacent(strip, 1, pendingRef);
-      // scrollTo is stubbed, so scrollLeft stays at 0 — as if the press landed mid-animation.
+      // scrollTo is stubbed, so scrollLeft stays at 0, as if mid-animation.
       expect(scrollToAdjacent(strip, 1, pendingRef).index).to.equal(2);
       expect(calls).to.deep.equal([220, 440]);
     });
@@ -261,8 +261,7 @@ describe('sessions-guide/utils/carousel-nav', () => {
     });
   });
 
-  // Mixed widths, like Broadcast Up Next where scheduled/favorited cards rest wider:
-  // widths 427, 379, 379, 427, 379 with 16px gaps -> starts 0, 443, 838, 1233, 1676.
+  // Mixed widths 427, 379, 379, 427, 379 with 16px gaps -> starts 0, 443, 838, 1233, 1676.
   describe('paged geometry', () => {
     let wrap;
     let layout;
