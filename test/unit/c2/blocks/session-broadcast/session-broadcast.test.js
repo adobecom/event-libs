@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import init, { parseBroadcastConfig, observeFillHeight } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
+import init, { parseBroadcastConfig, observeFillHeight, whenStylesheetReady } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
 import { sessionsStatus } from '../../../../../event-libs/v1/utils/session-store.js';
 
 function block(rows) {
@@ -362,6 +362,45 @@ describe('session-broadcast init()', () => {
     expect(el.classList.contains('session-broadcast')).to.be.true;
     expect(el.innerHTML).to.include('sb-app');
     expect(el.innerHTML).to.not.include('Also live title');
+  });
+
+  it('loads sessions-guide.css once, before rendering, since that widget loads in a later section', async () => {
+    const el = block([['Also live title', 'Currently Live']]);
+    await init(el);
+    await init(block([['Also live title', 'Currently Live']]));
+    const links = [...document.head.querySelectorAll('link[rel="stylesheet"]')]
+      .filter((l) => l.href.endsWith('/c2/blocks/sessions-guide/sessions-guide.css'));
+    expect(links).to.have.length(1);
+    expect(el.innerHTML).to.include('sb-app');
+  });
+
+  it('waits for a still-loading stylesheet link to load', async () => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/event-libs/v1/c2/blocks/session-broadcast/session-broadcast.css?wait=${Date.now()}`;
+    document.head.appendChild(link);
+    expect(!!link.sheet).to.be.false;
+    await whenStylesheetReady(link);
+    expect(!!link.sheet).to.be.true;
+    link.remove();
+  });
+
+  it('resolves when the stylesheet fails to load, without waiting for the timeout', async () => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/does-not-exist-${Date.now()}.css`;
+    document.head.appendChild(link);
+    const start = performance.now();
+    await whenStylesheetReady(link, 10_000);
+    expect(performance.now() - start).to.be.below(1000);
+    link.remove();
+  });
+
+  it('resolves after the timeout when the link never settles', async () => {
+    const detached = document.createElement('link'); // never appended, so never loads
+    const start = performance.now();
+    await whenStylesheetReady(detached, 50);
+    expect(performance.now() - start).to.be.at.least(45);
   });
 });
 

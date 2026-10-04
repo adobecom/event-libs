@@ -782,6 +782,9 @@
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+
+    /* Trailing gutter after the last card. */
+    padding-right: var(--s2a-spacing-lg, 24px);
   }
 
   .sb-carousel-section--also-live .sg-carousel__card-wrap,
@@ -874,6 +877,14 @@
   .sb-carousel-section--also-live .sg-carousel__arrow[disabled],
   .sb-carousel-section--up-next .sg-carousel__arrow[disabled] {
     display: flex;
+  }
+}
+
+/* Tablet arrow shadow (previously inherited from sessions-guide). */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sb-carousel-section--also-live .sg-carousel__arrow,
+  .sb-carousel-section--up-next .sg-carousel__arrow {
+    box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
   }
 }
 
