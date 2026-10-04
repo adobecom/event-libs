@@ -21,6 +21,7 @@ export function Carousel({
   const stripRef = useRef(null);
   const cardWidthRef = useRef(0);
   const visibleCountRef = useRef(1);
+  const [, setPageSize] = useState('');
   // Kept current every render so the mount-time resize handler below reads the latest value.
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -45,16 +46,19 @@ export function Carousel({
   const measure = () => {
     const strip = stripRef.current;
     if (!strip) return;
-    // Skips a hover/focus-expanded card so its temporary width can't skew the page size.
-    const cards = strip.querySelectorAll('.sg-carousel__card-wrap');
-    const firstCard = [...cards].find((c) => !c.matches(':hover, :focus-within')) || cards[0];
-    if (!firstCard) return;
+    const cards = [...strip.querySelectorAll('.sg-carousel__card-wrap')];
+    if (!cards.length) return;
     const styles = getComputedStyle(strip);
+    setPaged(styles.overflowX === 'visible');
+    // Cards widen on hover/focus (and some rest wider when scheduled/favorited), so re-measuring
+    // mid-hover could shrink the page size and inert a visible card; keep the last size until it settles.
+    if (cardWidthRef.current && cards.some((c) => c.matches(':hover, :focus-within'))) return;
     const gap = parseFloat(styles.columnGap || '16') || 16;
-    cardWidthRef.current = firstCard.offsetWidth + gap;
+    cardWidthRef.current = cards[0].offsetWidth + gap;
     const trackWidth = strip.parentElement.offsetWidth;
     visibleCountRef.current = Math.max(1, Math.floor(trackWidth / cardWidthRef.current));
-    setPaged(styles.overflowX === 'visible');
+    // The refs drive translate/inert, so re-render when they change (a same-value set is a no-op).
+    setPageSize(`${cardWidthRef.current}:${visibleCountRef.current}`);
   };
 
   useEffect(() => {
