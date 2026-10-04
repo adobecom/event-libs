@@ -35,6 +35,9 @@ export function useCarouselRow(sessions, cardStateKey) {
   const rowRef = useRef(null);
   const rowHeightRef = useRef(0);
   const collapsingRef = useRef(false);
+  // Bumped by the desktop ResizeObserver below to re-run the measure effect.
+  const [resizeTick, setResizeTick] = useState(0);
+  const measuredViewportRef = useRef(0);
 
   // Pins max-height to the real captured height before animating to 0, so the collapse doesn't start from the 600px CSS baseline.
   useLayoutEffect(() => {
@@ -65,6 +68,7 @@ export function useCarouselRow(sessions, cardStateKey) {
     }
     const cards = [...strip.children];
     if (!cards.length) return;
+    measuredViewportRef.current = viewport.offsetWidth;
     const gap = parseFloat(getComputedStyle(strip).columnGap) || 0;
     let newTx = 0;
     let totalWidth = 0;
@@ -85,16 +89,35 @@ export function useCarouselRow(sessions, cardStateKey) {
       last = i;
     }
 
-    setMeasure({
+    const next = {
       tx: newTx,
       showNext: effectiveTotal - newTx > viewport.offsetWidth + 1,
       lastVisible: last,
-    });
-  }, [offset, cardStateKey, isDesktopCarousel]);
+    };
+    setMeasure((prev) => (prev.tx === next.tx && prev.showNext === next.showNext
+      && prev.lastVisible === next.lastVisible ? prev : next));
+  }, [offset, cardStateKey, isDesktopCarousel, resizeTick]);
 
   // Below 1280px the strip scrolls natively, so the arrows' disabled state follows scroll position.
   const [edges, setEdges] = useState({ atStart: true, atEnd: true });
   const sessionCount = sessions?.length || 0;
+
+  // Re-measures when the viewport or a card resizes. Crossing into desktop, cards animate from
+  // their tablet width, so the switch-time measure is stale (next stayed hidden until reload).
+  // Skips while a card is hover/focus-expanded at an unchanged viewport width, so the expansion
+  // can't toggle `inert` on visible cards.
+  useEffect(() => {
+    const strip = stripRef.current;
+    const viewport = viewportRef.current;
+    if (!isDesktopCarousel || !strip || !viewport || typeof ResizeObserver !== 'function') return undefined;
+    const ro = new ResizeObserver(() => {
+      const expanded = [...strip.children].some((c) => c.matches(':hover, :focus-within'));
+      if (expanded && viewport.offsetWidth === measuredViewportRef.current) return;
+      setResizeTick((n) => n + 1);
+    });
+    [viewport, ...strip.children].forEach((el) => ro.observe(el));
+    return () => ro.disconnect();
+  }, [isDesktopCarousel, sessionCount]);
   useEffect(() => {
     if (isDesktopCarousel) return undefined;
     return watchScrollEdges(stripRef.current, (next) => setEdges((prev) => (
