@@ -2518,6 +2518,12 @@
     right: 0;
   }
 
+  /* Full page: the section keeps a 20px right padding for the card bleed, so inset the nav by the
+     rest of the 156px gutter to line up with the header's search button. */
+  .sg-full-page .sg-carousel__nav {
+    right: calc(156px - 20px);
+  }
+
   /* Time inline with the title hides; it moves to the left gutter. */
   .sg-section-time {
     display: none;
@@ -3328,6 +3334,10 @@
   /* Right stays at the base 20px — see the 1280px tier's identical comment. */
   .sg-full-page .sg-carousel-section {
     padding-left: 160px;
+  }
+
+  .sg-full-page .sg-carousel__nav {
+    right: calc(160px - 20px);
   }
 
   .sg-full-page .sg-upcoming-title {
