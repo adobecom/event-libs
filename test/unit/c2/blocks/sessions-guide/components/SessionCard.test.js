@@ -90,6 +90,16 @@ describe('SessionCard', () => {
     expect(html).to.include('Design');
   });
 
+  it('renders the title before the badge-row so Tablet/Mobile shows title, then track, then actions', () => {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = renderCard(UPCOMING_SESSION);
+    const children = [...wrap.querySelector('.sg-card__body').children];
+    const titleIndex = children.findIndex((n) => n.classList.contains('sg-card__title'));
+    const badgeRowIndex = children.findIndex((n) => n.classList.contains('sg-card__badge-row'));
+    expect(titleIndex).to.equal(0);
+    expect(badgeRowIndex).to.equal(titleIndex + 1);
+  });
+
   it('applies is-scheduled class when session is scheduled', () => {
     scheduled.value = new Set(['session-1']);
     const html = renderCard(UPCOMING_SESSION);
