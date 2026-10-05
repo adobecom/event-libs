@@ -435,6 +435,25 @@ describe('session-video-player', () => {
       expect(playlistPlayer.dataset.embedded).to.equal(undefined);
     });
 
+    it('hides the losing playlist-container instance', async () => {
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+      const { fullWidthPlayer, playlistPlayer } = await initBoth();
+
+      expect(playlistPlayer.classList.contains('session-video-hidden')).to.be.true;
+      expect(fullWidthPlayer.classList.contains('session-video-hidden')).to.be.false;
+    });
+
+    it('embeds only the winner when both instances init under the same decision', async () => {
+      // The winning instance un-hides and embeds; the loser stays hidden with no iframe. Mirrors the
+      // DVR_BUFFER → ON_DEMAND swap's end state where exactly one instance shows the player.
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: true });
+      const { fullWidthPlayer, playlistPlayer } = await initBoth();
+
+      expect(playlistPlayer.classList.contains('session-video-hidden')).to.be.false;
+      expect(playlistPlayer.querySelector('iframe.adobetv')).to.exist;
+      expect(fullWidthPlayer.querySelector('iframe')).to.not.exist;
+    });
+
     /**
      * Regression: two players embedded at once on a real page. Milo's decorateSection()
      * resets `section.className = 'section'` and the Style-row classes are re-applied
@@ -539,6 +558,50 @@ describe('session-video-player', () => {
       const rider = document.createElement('div');
       rider.className = 'mobile-rider';
       fullWidthPlayer.append(rider);
+
+      await init(fullWidthPlayer);
+      await flush();
+
+      expect(fullWidthPlayer.querySelector('.mobile-rider')).to.not.exist;
+      expect(fullWidthPlayer.querySelector('.milo-video')).to.exist;
+    });
+
+    it('disposes the MobileRider VideoJS player before removing a prior .mobile-rider', async () => {
+      // A DVR_BUFFER → ON_DEMAND swap tears down the MobileRider player and mounts an MPC iframe.
+      // The player's VideoJS instance lives on window.__mr_player; it must be disposed before its
+      // DOM is removed, or orphaned event handlers (userActive → createPlayerWidget) throw
+      // "Cannot read properties of null (reading 'appendChild')" against detached nodes.
+      setMeta('session-times', sessionTimes());
+      setCustomAttributes();
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      const rider = document.createElement('div');
+      rider.className = 'mobile-rider';
+      fullWidthPlayer.append(rider);
+      let disposedBeforeRemoval = null;
+      const dispose = sinon.stub().callsFake(() => { disposedBeforeRemoval = rider.isConnected; });
+      window.__mr_player = { dispose };
+
+      await init(fullWidthPlayer);
+      await flush();
+
+      expect(dispose.calledOnce).to.be.true;
+      // Disposed while the rider was still in the DOM, then removed — never the other way round.
+      expect(disposedBeforeRemoval).to.be.true;
+      expect(fullWidthPlayer.querySelector('.mobile-rider')).to.not.exist;
+      expect(window.__mr_player).to.equal(null);
+      expect(fullWidthPlayer.querySelector('.milo-video')).to.exist;
+
+      delete window.__mr_player;
+    });
+
+    it('does not throw when disposing a .mobile-rider with no VideoJS instance', async () => {
+      setMeta('session-times', sessionTimes());
+      setCustomAttributes();
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      const rider = document.createElement('div');
+      rider.className = 'mobile-rider';
+      fullWidthPlayer.append(rider);
+      window.__mr_player = null;
 
       await init(fullWidthPlayer);
       await flush();
