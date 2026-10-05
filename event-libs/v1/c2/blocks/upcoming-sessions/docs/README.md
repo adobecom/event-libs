@@ -96,10 +96,11 @@ the marquee's capped foreground without capping the carousel itself.
 - Container sections with a direct `.upcoming-sessions` child remove their right
   padding so the carousel can reach the section edge. Left and authored vertical
   padding remain unchanged; other container sections are unaffected.
-- Standalone container sections inset the arrow controls with a right margin of
-  24px below 1440px (mobile/tablet), 128px at 1440px, and 240px at 1441px and above.
-  The cards still bleed right. Non-container sections and attached marquee
-  carousels retain the controls' default `--s2a-spacing-lg` margin (24px fallback).
+- Standalone container sections and attached event-marquee carousels inset the
+  arrow controls with a right margin of 24px below 1440px (mobile/tablet), 128px
+  at 1440px, and 240px at 1441px and above. The cards still bleed right.
+  Standalone non-container sections retain the controls' default
+  `--s2a-spacing-lg` margin (24px fallback).
 - Design tokens come from `milo/libs/c2/styles/styles.css` (the C2 foundation
   stylesheet, guaranteed loaded whenever this block's `foundation: c2` metadata is
   present) rather than `c2/styles/tokens.css`, which isn't guaranteed present on a

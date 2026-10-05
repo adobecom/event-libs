@@ -176,9 +176,9 @@ describe('upcoming-sessions', () => {
       });
     });
 
-    [375, 1440, 1441, 3200].forEach((width) => {
+    [[375, 24], [1440, 128], [1441, 240], [3200, 240]].forEach(([width, margin]) => {
       ['non-container', 'attached'].forEach((layout) => {
-        it(`preserves the default controls margin for ${layout} layouts at ${width}px`, async () => {
+        it(`uses the expected controls margin for ${layout} layouts at ${width}px`, async () => {
           await setViewport({ width, height: 900 });
           const fixture = document.createElement('div');
           fixture.className = layout === 'attached' ? 'section container' : 'section';
@@ -190,13 +190,17 @@ describe('upcoming-sessions', () => {
             </div>`;
           document.body.append(fixture);
 
-          expect(getComputedStyle(fixture.querySelector('.upcoming-sessions-controls')).marginRight).to.equal('24px');
+          expect(getComputedStyle(fixture.querySelector('.upcoming-sessions-controls')).marginRight)
+            .to.equal(`${layout === 'attached' ? margin : 24}px`);
         });
       });
     });
 
-    [375, 1024, 1440, 1920, 2300, 2560, 3200].forEach((width) => {
-      it(`bleeds only to the right viewport edge at ${width}px`, async () => {
+    [
+      [375, 24], [768, 24], [1024, 24], [1439, 24], [1440, 128],
+      [1441, 240], [1920, 240], [2300, 240], [2560, 240], [3200, 240],
+    ].forEach(([width, margin]) => {
+      it(`insets attached controls by ${margin}px while cards bleed right at ${width}px`, async () => {
         await setViewport({ width, height: 900 });
         const wrapper = document.createElement('div');
         wrapper.className = 'event-marquee-upcoming-wrapper';
@@ -206,6 +210,13 @@ describe('upcoming-sessions', () => {
             <div class="event-marquee-foreground"><div class="event-marquee-text">Heading</div></div>
           </div>
           <div class="upcoming-sessions upcoming-sessions--attached">
+            <div class="upcoming-sessions-header">
+              <div class="upcoming-sessions-heading">Upcoming</div>
+              <div class="upcoming-sessions-controls">
+                <button class="upcoming-sessions-arrow">Previous</button>
+                <button class="upcoming-sessions-arrow">Next</button>
+              </div>
+            </div>
             <div class="upcoming-sessions-track">
               ${'<div class="upcoming-sessions-card" style="width:375px;height:108px">Session</div>'.repeat(12)}
             </div>
@@ -217,10 +228,13 @@ describe('upcoming-sessions', () => {
 
         try {
           const track = wrapper.querySelector('.upcoming-sessions-track');
+          const controls = wrapper.querySelector('.upcoming-sessions-controls');
           const marqueeText = wrapper.querySelector('.event-marquee-text');
           const bounds = track.getBoundingClientRect();
           expect(bounds.left).to.be.closeTo(marqueeText.getBoundingClientRect().left, 1);
           expect(bounds.right).to.be.closeTo(document.documentElement.clientWidth, 1);
+          expect(getComputedStyle(controls).marginRight).to.equal(`${margin}px`);
+          expect(controls.getBoundingClientRect().right).to.be.closeTo(width - margin, 1);
           expect(track.scrollWidth).to.be.greaterThan(track.clientWidth);
           expect(document.documentElement.scrollWidth).to.equal(document.documentElement.clientWidth);
         } finally {
