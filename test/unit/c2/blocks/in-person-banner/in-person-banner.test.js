@@ -243,10 +243,10 @@ describe('in-person-banner', () => {
   });
 
   describe('nav-overlay', () => {
-    it('prepends the banner to the body and adds the overlay class when true', () => {
+    it('prepends the banner to the body without adding the overlay class when true', () => {
       const el = buildBlock({ config: { 'nav-overlay': 'true' } });
       init(el);
-      expect(el.classList.contains('in-person-banner-nav-overlay')).to.be.true;
+      expect(el.classList.contains('in-person-banner-nav-overlay')).to.be.false;
       expect(document.body.firstElementChild).to.equal(el);
     });
 
