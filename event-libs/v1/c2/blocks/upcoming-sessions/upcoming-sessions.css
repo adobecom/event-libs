@@ -107,6 +107,22 @@
   display: none;
 }
 
+.section.container > .upcoming-sessions:not(.upcoming-sessions--attached) .upcoming-sessions-controls {
+  margin-right: 24px;
+}
+
+@media (min-width: 1440px) {
+  .section.container > .upcoming-sessions:not(.upcoming-sessions--attached) .upcoming-sessions-controls {
+    margin-right: 128px;
+  }
+}
+
+@media (min-width: 1441px) {
+  .section.container > .upcoming-sessions:not(.upcoming-sessions--attached) .upcoming-sessions-controls {
+    margin-right: 240px;
+  }
+}
+
 .upcoming-sessions-arrow {
   box-sizing: border-box;
   display: flex;
