@@ -1436,6 +1436,18 @@
   overflow: hidden;
 }
 
+/* The body's overflow: hidden clipped three sides of the title's focus ring (1px + 2px offset).
+   Pad the clip box by the ring's 3px reach and cancel it with a negative margin: layout is unchanged.
+   Scoped to SessionCard's hosts so other .sg-card users (upcoming-sessions) are untouched. */
+@media (max-width: 1279px) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal, .sb-carousel-section--up-next) .sg-card__body {
+    box-sizing: border-box;
+    width: calc(100% + 6px);
+    margin: -3px;
+    padding: 3px;
+  }
+}
+
 /* Titles are real buttons, so reset UA chrome before .sg-card__title's own rule. */
 .sg-card__title-btn {
   display: block;
