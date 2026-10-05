@@ -1735,6 +1735,27 @@
     margin-left: auto;
   }
 
+  /* Post-event (no date tabs): title shares the controls' row, 6/12 columns on tablet. */
+  .sg-header.sg-header--no-dates {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(max-content, 6fr);
+    column-gap: 72px;
+    align-items: center;
+  }
+
+  .sg-header.sg-header--no-dates .sg-header-title-row {
+    padding-right: 0;
+  }
+
+  .sg-header.sg-header--no-dates .sg-header-controls {
+    padding-left: 0;
+  }
+
+  /* Drawer only: controls now share the close button's row; clear its 16px inset + 19px width. */
+  .sg-drawer .sg-header--no-dates .sg-header-controls {
+    padding-right: calc(35px + var(--s2a-spacing-md));
+  }
+
   .sg-view-dropdown-wrap {
     flex: none;
     min-width: auto;
@@ -1858,6 +1879,27 @@
   .sg-carousel__arrow--next { right: var(--s2a-spacing-sm); }
 
   .sg-carousel__arrow[disabled] { display: none; }
+}
+
+/* Tablet, no date tabs, search open: flatten the controls wrapper so the search row gets its own
+   full-width grid row below the title and controls, whatever the title's height. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sg-header--no-dates:has(.sg-mobile-search-row--open) :is(.sg-header-controls-collapse, .sg-header-controls-collapse-inner) {
+    display: contents;
+  }
+
+  .sg-header.sg-header--no-dates:has(.sg-mobile-search-row--open) {
+    row-gap: var(--s2a-spacing-lg);
+  }
+
+  .sg-header--no-dates .sg-mobile-search-row {
+    grid-column: 1 / -1;
+  }
+
+  /* The flattened wrapper can't collapse, so hide its contents while a session detail is open. */
+  .sg-drawer--detail-open .sg-header--no-dates:has(.sg-mobile-search-row--open) :is(.sg-header-controls, .sg-mobile-search-row) {
+    display: none;
+  }
 }
 
 /* ── Intermediate Tablet (1024px–1279px) — desktop-style live section ─────── */
@@ -2186,6 +2228,10 @@
     flex-direction: row;
     align-items: center;
     gap: var(--s2a-spacing-md);
+  }
+
+  .sg-header.sg-header--no-dates {
+    grid-template-columns: minmax(0, 8fr) minmax(max-content, 4fr);
   }
 
   /* Full page (Figma 8463:87660): wider side gutter than the widget's drawer, and a shorter
