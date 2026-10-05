@@ -310,11 +310,12 @@ Product icons are scoped to the product filter category alone, keyed on `product
 `Illustrator` is both a product and an `Audience` value, so matching against the products map
 isn't enough on its own.
 
-At desktop (1280px and above), filter tags have no trailing selection icon (MWPW-208026).
-The current implementation uses a checkmark rather than an X; only that trailing SVG is hidden.
-Selected tags retain their border, bold label, and `aria-pressed` state, and clicking the tag
-still toggles selection. Mobile/tablet checkmarks, product icons, and the panel's close button
-are unchanged. The shared stylesheet covers both the widget portal and full-page guide.
+At desktop (1280px and above), the filter panel's close (X) button is hidden (MWPW-208026),
+not the selected tags' checkmarks. `display: none` removes the button from the layout,
+keyboard focus order, and accessibility tree; Escape, click-away, and Apply still dismiss
+the desktop popover. Mobile/tablet keep their close button. Selection checkmarks, product
+icons, selected styling, and `aria-pressed` are unchanged at every width. The shared
+stylesheet covers both the widget portal and full-page guide.
 
 ---
 

@@ -180,7 +180,7 @@ describe('FilterPanel', () => {
     });
   });
 
-  describe('responsive tag icons', () => {
+  describe('responsive panel close button', () => {
     let frame;
     let originalMatchMedia;
 
@@ -208,7 +208,7 @@ describe('FilterPanel', () => {
     [375, 767, 768, 1024, 1279, 1280, 1440].forEach((width) => {
       ['sg-portal', 'sessions-guide-full-page'].forEach((surface) => {
         ['light', 'dark'].forEach((theme) => {
-          it(`preserves tag selection with desktop-only icon removal for ${surface}, ${theme}, ${width}px`, async () => {
+          it(`hides only the desktop panel close button for ${surface}, ${theme}, ${width}px`, async () => {
             frame.style.width = `${width}px`;
             await new Promise((resolve, reject) => {
               frame.onload = resolve;
@@ -232,7 +232,7 @@ describe('FilterPanel', () => {
             productIcon.innerHTML = '<svg width="24" height="24" aria-hidden="true"></svg>';
 
             expect(frame.contentWindow.innerWidth).to.equal(width);
-            expect(iconStyle.display === 'none').to.equal(width >= 1280);
+            expect(iconStyle.display).to.not.equal('none');
             expect(selected.getAttribute('aria-pressed')).to.equal('true');
             expect(unselected.getAttribute('aria-pressed')).to.equal('false');
             expect(unselected.querySelector(':scope > svg')).to.equal(null);
@@ -240,7 +240,9 @@ describe('FilterPanel', () => {
             expect(style.borderTopColor).to.not.equal('rgba(0, 0, 0, 0)');
             expect(Number(style.fontWeight)).to.be.at.least(700);
             expect(frame.contentWindow.getComputedStyle(productIcon.querySelector('svg')).display).to.not.equal('none');
-            expect(frame.contentWindow.getComputedStyle(close).display).to.not.equal('none');
+            expect(frame.contentWindow.getComputedStyle(close).display === 'none').to.equal(width >= 1280);
+            close.focus();
+            expect(doc.activeElement === close).to.equal(width < 1280);
           });
         });
       });
