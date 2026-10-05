@@ -150,16 +150,16 @@ describe('utils/time', () => {
 
   describe('formatDuration', () => {
     it('formats minutes only', () => {
-      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T17:30:00Z')).to.equal('30 min');
+      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T17:30:00Z')).to.equal('30m');
     });
     it('formats whole hours', () => {
-      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T18:00:00Z')).to.equal('1 hr');
+      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T18:00:00Z')).to.equal('1h');
     });
     it('formats hours and minutes', () => {
-      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T18:45:00Z')).to.equal('1 hr 45 min');
+      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T18:15:00Z')).to.equal('1h 15m');
     });
     it('formats multiple whole hours', () => {
-      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T19:00:00Z')).to.equal('2 hr');
+      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T19:00:00Z')).to.equal('2h');
     });
   });
 });

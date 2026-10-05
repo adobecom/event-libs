@@ -767,7 +767,8 @@
   line-height: 1.1;
   letter-spacing: normal;
   margin: var(--s2a-spacing-lg) 0 0;
-  padding: 0 var(--s2a-spacing-lg);
+  padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-sm);
+  border-bottom: 1px solid #e8e8e8;
 }
 
 .sg-empty {
@@ -1233,8 +1234,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--s2a-spacing-sm);
-  padding: 18px 0 18px var(--s2a-spacing-lg);
-  border-bottom: none;
+  padding: var(--s2a-spacing-lg) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
+  border-bottom: 1px solid #e8e8e8;
   position: relative;
   overflow: visible;
   max-height: none;
@@ -1279,10 +1280,11 @@
   }
 }
 
-/* Matches .sg-time-row__time-value's font; font-family explicit since this is a real <h3>. */
+/* Matches .sg-time-row__time-value's font (Figma title-xs below 1280px; desktop restates lg);
+   font-family explicit since this is a real <h3>. */
 .sg-time-row__label--category {
   font-family: var(--body-font-family);
-  font-size: var(--s2a-font-size-lg);
+  font-size: var(--s2a-font-size-md);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   color: var(--s2a-color-gray-800);
   line-height: var(--s2a-font-line-height-sm);
@@ -1290,7 +1292,7 @@
 
 .sg-time-row__time-value {
   color: var(--s2a-color-gray-800);
-  font-size: var(--s2a-font-size-lg);
+  font-size: var(--s2a-font-size-md);
   font-style: normal;
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   line-height: var(--s2a-font-line-height-sm);
@@ -1436,6 +1438,18 @@
   overflow: hidden;
 }
 
+/* The body's overflow: hidden clipped three sides of the title's focus ring (1px + 2px offset).
+   Pad the clip box by the ring's 3px reach and cancel it with a negative margin: layout is unchanged.
+   Scoped to SessionCard's hosts so other .sg-card users (upcoming-sessions) are untouched. */
+@media (max-width: 1279px) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal, .sb-carousel-section--up-next) .sg-card__body {
+    box-sizing: border-box;
+    width: calc(100% + 6px);
+    margin: -3px;
+    padding: 3px;
+  }
+}
+
 /* Titles are real buttons, so reset UA chrome before .sg-card__title's own rule. */
 .sg-card__title-btn {
   display: block;
@@ -1462,17 +1476,23 @@
   color: var(--s2a-color-gray-900);
   line-height: 1.25;
   overflow: hidden;
-  display: box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   margin: 0;
-  margin-top: 0;
-  margin-bottom: 2px;
   min-width: 0;
   width: 100%;
   min-height: 40px;
   transition: none;
+}
+
+/* Figma's small card title is a fixed two lines (40px), so every card in a row is the same height.
+   Below 1280px only: desktop sizes its title separately. */
+@media (max-width: 1279px) {
+  .sg-card__title {
+    /* stylelint-disable-next-line value-no-vendor-prefix */
+    display: -webkit-box;
+  }
 }
 
 .sg-card:is(:hover, :focus-within) .sg-card__title { color: var(--s2a-color-gray-900); }
@@ -1499,14 +1519,16 @@
   transition: none;
 }
 
-/* Category badge row — shown at top on mobile, hidden on desktop */
+/* Track row below the title on mobile/tablet, hidden on desktop. Figma's row is 16px tall; the
+   20px badge (16px icon + 2px padding) overflows it evenly, as in the design. */
 .sg-card__badge-row {
   display: flex;
   align-items: center;
   flex-shrink: 0;
   width: 100%;
+  height: 16px;
   overflow: visible;
-  margin-bottom: var(--s2a-spacing-md);
+  margin-top: var(--s2a-spacing-md);
 }
 
 /* Desktop footer track and badge hidden on mobile */
@@ -1592,6 +1614,27 @@
 
 /* stylelint-disable-next-line no-descending-specificity */
 .sg-card__btn:hover { background: rgb(255 255 255 / 100%); }
+
+/* Mobile/tablet: a scheduled/favorited (solid variant) button keeps the unselected button's transparent
+   look with Figma's gray-900 outline, instead of IconButton's frosted fill and near-invisible gray-100
+   border. Hover/press tints match the outlined variant. Broadcast styles its own card. */
+@media (max-width: 1279px) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite) {
+    background: transparent;
+    border-color: var(--s2a-color-gray-900, #131313);
+    color: var(--s2a-color-gray-900, #131313);
+  }
+
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite):hover:not(:disabled) {
+    background: var(--s2a-color-transparent-black-08, rgb(0 0 0 / 8%));
+    border-color: var(--s2a-color-gray-900, #131313);
+  }
+
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite):active:not(:disabled) {
+    background: var(--s2a-color-transparent-black-12, rgb(0 0 0 / 12%));
+    border-color: var(--s2a-color-gray-900, #131313);
+  }
+}
 
 /* ── My Sessions / My Favorites tabs ────────────────────── */
 
@@ -1779,7 +1822,6 @@
     font-size: var(--s2a-font-size-2xl);
     margin: 0;
     padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-sm);
-    border-bottom: 1px solid #e8e8e8;
   }
 
   /* ── Time slot rows ────────────────────────────────────── */
@@ -1789,7 +1831,6 @@
     align-items: center;
     gap: 36px;
     padding: var(--s2a-spacing-md) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
-    border-bottom: 1px solid #e8e8e8;
     background: #fff;
   }
 
@@ -1806,7 +1847,7 @@
     overflow-wrap: break-word;
 
     /* Restates .sg-time-row__time-value's values so the category label keeps matching it. */
-    font-size: var(--s2a-font-size-lg);
+    font-size: var(--s2a-font-size-md);
     color: var(--s2a-color-gray-800);
   }
 
@@ -2821,6 +2862,11 @@
     white-space: nowrap;
     width: 60px;
     padding: 0;
+  }
+
+  /* Desktop row headings stay lg; mobile/tablet use Figma's title-xs (md). */
+  .sg-time-row__time-value {
+    font-size: var(--s2a-font-size-lg);
   }
 
   .sg-time-row__label--category {

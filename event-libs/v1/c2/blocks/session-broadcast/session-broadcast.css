@@ -742,7 +742,7 @@
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  width: 268px;
+  width: 255px;
   min-height: 0;
   background: var(--s2a-color-gray-50, #f8f8f8);
   border: none;
@@ -750,8 +750,6 @@
   padding: var(--s2a-spacing-md, 16px);
   box-shadow: none;
 }
-
-.sb-carousel-section--up-next .sg-card__badge-row { margin-bottom: var(--s2a-spacing-sm); }
 
 /* Replicates the frosted-glass/light treatment since SessionCard.js hardcodes IconButton's dark-card context. */
 .sb-carousel-section--up-next .sg-card__btn--schedule,
@@ -768,10 +766,11 @@
   backdrop-filter: blur(16px);
 }
 
-/* Matches this card's own uniform 12px gap; sessions-guide's 2px margin is meant for wrapped title lines. */
-@media (min-width: 768px) and (max-width: 1279px) {
-  .sb-carousel-section--up-next .sg-card__title {
-    margin-bottom: var(--s2a-spacing-sm, 12px);
+/* Figma's 16px body-to-actions gap; sessions-guide's own .sg-card gap is gated behind an ancestor this DOM lacks.
+   Below 1280px only: the desktop card switches to a row layout. */
+@media (max-width: 1279px) {
+  .sb-carousel-section--up-next .sg-card {
+    gap: var(--s2a-spacing-md, 16px);
   }
 }
 

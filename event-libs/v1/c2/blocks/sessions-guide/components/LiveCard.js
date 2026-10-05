@@ -72,7 +72,7 @@ export function LiveCard({
   const duration = Date.parse(session.endTimeUtc) - Date.parse(session.startTimeUtc);
   const progressPct = computeProgressPct(session, nowMs);
   const durationLabel = duration >= 0
-    ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
+    ? formatDuration(session.startTimeUtc, session.endTimeUtc)
     : '';
 
   const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
