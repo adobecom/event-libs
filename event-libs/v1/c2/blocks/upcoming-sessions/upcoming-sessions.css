@@ -1,3 +1,7 @@
+.section.container:has(> .upcoming-sessions) {
+  padding-right: 0;
+}
+
 .upcoming-sessions {
   position: relative;
   box-sizing: border-box;
