@@ -8,6 +8,32 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ---
 
+## Collapsed widget visibility
+
+The widget stays mounted while closed, preserving its view and scroll state.
+`inert` prevents interaction but does not visually hide content, and moving the
+drawer to `top: 100vh` is not a sufficient visibility guarantee on real iOS
+browsers with changing viewport geometry (MWPW-208862). The closed drawer now
+has zero opacity, masking the entire subtree, including its sticky heading and
+any descendants with their own visibility rules. This prevents the unregistered
+"Find more inspiration" heading from leaking over the host page or a full-page
+Session Guide.
+
+The opacity change is delayed until the existing 450ms closing slide ends;
+the layout effect sets the transition before paint so closing does not snap
+invisible before the delay is applied. Opening clears that delay before sliding
+in. Reduced-motion users hide the drawer immediately. Peek and expanded states,
+header layout, dropdown overflow,
+and the separate "View all sessions" FAB are unchanged. Regression coverage
+forces the closed drawer into visible viewport coordinates to verify hiding
+does not depend on viewport height, at mobile, tablet, and desktop widths.
+An isolated iframe loads the actual Preact bundle via an import map for
+open/close/reopen and reduced-motion coverage, rather than relying on the
+unit suite's no-op effect mocks. The `real-preact=true` test-runner query opt-out
+serves the real bundle without changing the default mock used by the other tests.
+Real iPhone 16 Pro Chrome verification remains necessary for the device-only
+symptom, including scrolling with browser controls expanded and collapsed.
+
 ## Mobile Safari FAB placement
 
 The Session Guide FAB uses a 24px bottom offset on Mobile Safari (MWPW-208776),

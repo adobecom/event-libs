@@ -207,6 +207,11 @@
   z-index: 50;
 }
 
+/* Off-screen positioning alone can expose the sticky header on iOS (MWPW-208862). */
+.sg-drawer[inert] {
+  opacity: 0;
+}
+
 /* Clip rounded corners without clipping dropdown panels */
 .sg-drawer::before {
   content: '';
