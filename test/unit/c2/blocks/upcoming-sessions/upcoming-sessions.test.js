@@ -133,14 +133,15 @@ describe('upcoming-sessions', () => {
       await setViewport(originalViewport);
     });
 
-    [
-      [375, 24], [768, 24], [1024, 24], [1439, 24], [1440, 128],
-      [1441, 240], [1920, 240], [2300, 240], [2560, 240], [3200, 240],
-    ].forEach(([width, margin]) => {
-      it(`sets standalone container controls to ${margin}px right margin at ${width}px`, async () => {
+    [375, 768, 1024, 1439, 1440, 1441, 1920, 2300, 2560, 3200].forEach((width) => {
+      it(`aligns standalone controls with the player container gutter at ${width}px`, async () => {
         await setViewport({ width, height: 900 });
         const block = buildBlock([]);
         block.parentElement.classList.add('container');
+        const playerSection = document.createElement('div');
+        playerSection.className = 'section container';
+        playerSection.innerHTML = '<div class="reference-player">Player</div>';
+        document.body.insertBefore(playerSection, block.parentElement);
         block.innerHTML = `
           <div class="upcoming-sessions-header">
             <div class="upcoming-sessions-heading">Upcoming</div>
@@ -153,23 +154,27 @@ describe('upcoming-sessions', () => {
         const style = document.createElement('style');
         style.textContent = `
           html, body { margin: 0; padding: 0; }
-          .container { --grid-padding: 72px; padding: 24px var(--grid-padding) 40px; }`;
+          .container { --grid-padding: clamp(24px, 5vw, 160px); padding: 24px var(--grid-padding) 40px; }`;
         document.head.prepend(style);
 
         try {
           const controls = block.querySelector('.upcoming-sessions-controls');
+          const player = playerSection.querySelector('.reference-player');
           const sectionStyle = getComputedStyle(block.parentElement);
+          const playerStyle = getComputedStyle(playerSection);
           expect(sectionStyle.paddingRight).to.equal('0px');
-          expect(sectionStyle.paddingLeft).to.equal('72px');
+          expect(sectionStyle.paddingLeft).to.equal(playerStyle.paddingRight);
           expect(sectionStyle.paddingTop).to.equal('24px');
           expect(sectionStyle.paddingBottom).to.equal('40px');
-          expect(getComputedStyle(controls).marginRight).to.equal(`${margin}px`);
-          expect(controls.getBoundingClientRect().right).to.be.closeTo(width - margin, 1);
+          expect(getComputedStyle(controls).marginRight).to.equal(playerStyle.paddingRight);
+          expect(controls.getBoundingClientRect().right).to.be.closeTo(player.getBoundingClientRect().right, 1);
           expect(block.querySelector('.upcoming-sessions-track').getBoundingClientRect().right)
             .to.be.closeTo(document.documentElement.clientWidth, 1);
 
           block.parentElement.style.setProperty('--grid-padding', '48px');
-          expect(getComputedStyle(controls).marginRight).to.equal(`${margin}px`);
+          playerSection.style.setProperty('--grid-padding', '48px');
+          expect(getComputedStyle(controls).marginRight).to.equal('48px');
+          expect(controls.getBoundingClientRect().right).to.be.closeTo(player.getBoundingClientRect().right, 1);
         } finally {
           style.remove();
         }
