@@ -106,7 +106,7 @@ describe('upcoming-sessions', () => {
     }
   });
 
-  describe('attached carousel layout', () => {
+  describe('carousel layout', () => {
     let styles;
     let originalViewport;
 
@@ -131,6 +131,79 @@ describe('upcoming-sessions', () => {
 
     afterEach(async () => {
       await setViewport(originalViewport);
+    });
+
+    [375, 1024, 1440, 1920, 2300, 2560, 3200].forEach((width) => {
+      it(`aligns standalone controls with the container gutter while cards bleed at ${width}px`, async () => {
+        await setViewport({ width, height: 900 });
+        const fixture = document.createElement('div');
+        fixture.className = 'upcoming-layout-fixture';
+        fixture.innerHTML = `
+          <div class="section container"><div class="reference-video">Video</div></div>
+          <div class="section container">
+            <div class="upcoming-sessions">
+              <div class="upcoming-sessions-header">
+                <div class="upcoming-sessions-heading">Upcoming</div>
+                <div class="upcoming-sessions-controls">
+                  <button class="upcoming-sessions-arrow">Previous</button>
+                  <button class="upcoming-sessions-arrow">Next</button>
+                </div>
+              </div>
+              <div class="upcoming-sessions-track"></div>
+            </div>
+          </div>`;
+        const style = document.createElement('style');
+        style.textContent = `
+          html, body { margin: 0; padding: 0; }
+          .upcoming-layout-fixture .container {
+            --grid-padding: clamp(24px, 5vw, 160px);
+            padding-inline: var(--grid-padding);
+            padding-top: 24px;
+            padding-bottom: 40px;
+          }`;
+        document.head.prepend(style);
+        document.body.append(fixture);
+
+        try {
+          const block = fixture.querySelector('.upcoming-sessions');
+          const controls = block.querySelector('.upcoming-sessions-controls');
+          const video = fixture.querySelector('.reference-video');
+          const videoSection = video.parentElement;
+          const sectionStyle = getComputedStyle(block.parentElement);
+          expect(sectionStyle.paddingRight).to.equal('0px');
+          expect(sectionStyle.paddingLeft).to.equal(getComputedStyle(videoSection).paddingRight);
+          expect(sectionStyle.paddingTop).to.equal('24px');
+          expect(sectionStyle.paddingBottom).to.equal('40px');
+          expect(getComputedStyle(controls).marginRight).to.equal(getComputedStyle(videoSection).paddingRight);
+          expect(controls.getBoundingClientRect().right).to.be.closeTo(video.getBoundingClientRect().right, 1);
+          expect(block.querySelector('.upcoming-sessions-track').getBoundingClientRect().right)
+            .to.be.closeTo(document.documentElement.clientWidth, 1);
+
+          fixture.querySelectorAll('.container').forEach((section) => {
+            section.style.setProperty('--grid-padding', '48px');
+          });
+          expect(getComputedStyle(controls).marginRight).to.equal('48px');
+          expect(controls.getBoundingClientRect().right).to.be.closeTo(video.getBoundingClientRect().right, 1);
+        } finally {
+          style.remove();
+        }
+      });
+    });
+
+    ['non-container', 'attached'].forEach((layout) => {
+      it(`preserves the default controls margin for ${layout} layouts`, () => {
+        const fixture = document.createElement('div');
+        fixture.className = layout === 'attached' ? 'section container' : 'section';
+        fixture.style.setProperty('--grid-padding', '120px');
+        fixture.style.setProperty('--s2a-spacing-lg', '24px');
+        fixture.innerHTML = `
+          <div class="upcoming-sessions${layout === 'attached' ? ' upcoming-sessions--attached' : ''}">
+            <div class="upcoming-sessions-controls"></div>
+          </div>`;
+        document.body.append(fixture);
+
+        expect(getComputedStyle(fixture.querySelector('.upcoming-sessions-controls')).marginRight).to.equal('24px');
+      });
     });
 
     [375, 1024, 1440, 1920, 2300, 2560, 3200].forEach((width) => {

@@ -96,6 +96,11 @@ the marquee's capped foreground without capping the carousel itself.
 - Container sections with a direct `.upcoming-sessions` child remove their right
   padding so the carousel can reach the section edge. Left and authored vertical
   padding remain unchanged; other container sections are unaffected.
+- In standalone container sections, the arrow controls use the inherited
+  `--grid-padding` as their right margin to align with other container content,
+  including the video player, at every breakpoint. The cards still bleed right.
+  Non-container sections and attached marquee carousels retain the controls'
+  default `--s2a-spacing-lg` right margin (24px fallback).
 - Design tokens come from `milo/libs/c2/styles/styles.css` (the C2 foundation
   stylesheet, guaranteed loaded whenever this block's `foundation: c2` metadata is
   present) rather than `c2/styles/tokens.css`, which isn't guaranteed present on a

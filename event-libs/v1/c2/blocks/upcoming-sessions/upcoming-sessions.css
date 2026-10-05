@@ -107,6 +107,10 @@
   display: none;
 }
 
+.section.container > .upcoming-sessions:not(.upcoming-sessions--attached) .upcoming-sessions-controls {
+  margin-right: var(--grid-padding);
+}
+
 .upcoming-sessions-arrow {
   box-sizing: border-box;
   display: flex;
