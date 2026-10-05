@@ -250,6 +250,42 @@ describe('in-person-banner', () => {
       expect(document.body.firstElementChild).to.equal(el);
     });
 
+    describe('navigation menu visibility', () => {
+      [375, 1023, 1024, 1440].forEach((width) => {
+        it(`only hides the banner for an open mobile menu at ${width}px`, async () => {
+          const frame = document.createElement('iframe');
+          frame.style.width = `${width}px`;
+          frame.style.border = '0';
+          await new Promise((resolve, reject) => {
+            frame.onload = resolve;
+            frame.onerror = reject;
+            frame.srcdoc = `
+              <link rel="stylesheet" href="/event-libs/v1/c2/blocks/in-person-banner/in-person-banner.css">
+              <div class="in-person-banner">In-person event information</div>
+              <header class="global-navigation"><nav><ul>
+                <li id="feds-menu-wrapper"></li>
+              </ul></nav></header>
+            `;
+            document.body.append(frame);
+          });
+          const view = frame.contentWindow;
+          expect(view.innerWidth).to.equal(width);
+          const banner = frame.contentDocument.querySelector('.in-person-banner');
+          const menu = frame.contentDocument.getElementById('feds-menu-wrapper');
+          expect(view.getComputedStyle(banner).display).to.equal('block');
+
+          menu.classList.add('is-open');
+          expect(view.getComputedStyle(banner).display).to.equal(width < 1024 ? 'none' : 'block');
+
+          menu.classList.remove('is-open');
+          expect(view.getComputedStyle(banner).display).to.equal('block');
+
+          menu.remove();
+          expect(view.getComputedStyle(banner).display).to.equal('block');
+        });
+      });
+    });
+
     it('leaves the banner inline without the overlay class when false', () => {
       const el = buildBlock({ config: { 'nav-overlay': 'false' } });
       init(el);

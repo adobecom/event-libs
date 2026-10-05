@@ -5,6 +5,12 @@
   width: 100%;
 }
 
+@media (max-width: 1023px) {
+  body:has(#feds-menu-wrapper.is-open) .in-person-banner {
+    display: none;
+  }
+}
+
 body:has(.in-person-banner) main > .section:first-child:not(.rounded-corners-top):not(.rounded-corners) {
   border-radius: var(--s2a-border-radius-lg) var(--s2a-border-radius-lg) 0 0;
   overflow: clip;
