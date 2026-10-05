@@ -917,6 +917,14 @@
   transition: background 0.15s, opacity 0.15s;
 }
 
+/* Live/Recommended arrows are 32px (Figma); Broadcast keeps its own 40px arrows. */
+.sg-carousel-section .sg-carousel__nav { gap: 16px; }
+
+.sg-carousel-section .sg-carousel__arrow {
+  width: 32px;
+  height: 32px;
+}
+
 .sg-carousel__arrow:hover:not([disabled]) { background: var(--s2a-color-gray-75); }
 
 .sg-carousel__arrow[disabled] {
@@ -1831,32 +1839,48 @@
   .sg-carousel__track { margin-right: 0; }
 }
 
-/* ── Tablet only: floating carousel arrows ───────────────────────────────── */
+/* ── Mobile + tablet carousel arrows ─────────────────────────────────────── */
 
-@media (min-width: 768px) and (max-width: 1023px) {
-  /* Cards scroll natively; arrows float over the strip as glass buttons, only actionable ones shown. */
-  .sg-carousel__body { position: relative; }
-
-  .sg-carousel__nav { display: contents; }
-
-  .sg-carousel__arrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 2;
-    width: 32px;
-    height: 32px;
-    background: rgb(255 255 255 / 72%);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--s2a-color-border-subtle);
-    box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+/* Grid + `display: contents` moves the nav into the header row without changing the DOM. */
+@media (max-width: 1023px) {
+  .sg-carousel-section .sg-carousel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    row-gap: var(--s2a-spacing-md);
   }
 
-  .sg-carousel__arrow--prev { left: var(--spacing-xxl-static, 40px); }
+  .sg-carousel-section .sg-carousel__header {
+    grid-area: 1 / 1;
+    margin: 0;
+  }
 
-  .sg-carousel__arrow--next { right: var(--s2a-spacing-sm); }
+  .sg-carousel-section .sg-carousel__body { display: contents; }
 
-  .sg-carousel__arrow[disabled] { display: none; }
+  .sg-carousel-section .sg-carousel__time { display: none; }
+
+  .sg-carousel-section .sg-section-time { display: inline; }
+
+  .sg-carousel-section .sg-carousel__track { grid-area: 2 / 1 / 3 / -1; }
+
+  .sg-carousel-section .sg-carousel__nav {
+    display: flex;
+    grid-area: 1 / 2;
+    margin-right: var(--s2a-spacing-lg);
+  }
+
+  .sg-carousel-section .sg-carousel__arrow { position: relative; }
+
+  /* 40px touch target. */
+  .sg-carousel-section .sg-carousel__arrow::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sg-carousel-section .sg-carousel { row-gap: 20px; }
 }
 
 /* ── Intermediate Tablet (1024px–1279px) — desktop-style live section ─────── */
@@ -1880,7 +1904,7 @@
   }
 
   /* Cancels .sg-carousel-section's 20px right padding so the peeking card bleeds to the edge. */
-  .sg-carousel__track {
+  .sg-carousel-section .sg-carousel__track {
     margin-right: -20px;
   }
 
@@ -2149,8 +2173,67 @@
 
   .sg-time-row:is(:hover, :focus-within) .sg-card:not(:hover, :focus-within) { background: var(--s2a-color-gray-50); }
 
+  /* Label and arrows on top, cards below; `display: contents` lifts the arrows into the header. */
+  .sg-time-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 20px;
+    row-gap: var(--s2a-spacing-sm);
+  }
+
+  .sg-time-row__label,
+  .sg-time-row__label--category {
+    grid-area: 1 / 1;
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--s2a-spacing-4);
+    width: auto;
+  }
+
+  .sg-time-row__track { display: contents; }
+
+  .sg-time-row__viewport { grid-area: 2 / 1 / 3 / -1; }
+
+  /* Trailing gutter after the last card. */
+  .sg-time-row__cards { padding-right: var(--s2a-spacing-md); }
+
+  .sg-time-row__arrow,
   .sg-time-row:is(:hover, :focus-within) .sg-time-row__arrow {
-    opacity: 0;
+    display: flex;
+    position: relative;
+    inset: auto;
+    transform: none;
+    width: 24px;
+    height: 24px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sg-time-row__arrow--prev { grid-area: 1 / 2; }
+
+  .sg-time-row__arrow--next {
+    grid-area: 1 / 3;
+    margin-right: var(--s2a-spacing-lg);
+  }
+
+  .sg-time-row__arrow svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* 40px touch target. */
+  .sg-time-row__arrow::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+
+  /* Below desktop, disabled arrows stay visible (dimmed). */
+  .sg-time-row .sg-time-row__arrow:disabled,
+  .sg-time-row:is(:hover, :focus-within) .sg-time-row__arrow:disabled {
+    opacity: 0.4;
+    cursor: default;
     pointer-events: none;
   }
 }
@@ -2428,6 +2511,11 @@
     position: absolute;
     top: 0;
     right: 0;
+  }
+
+  /* Align with the header's search button (gutter minus the section's 20px right padding). */
+  .sg-full-page .sg-carousel__nav {
+    right: calc(156px - 20px);
   }
 
   /* Time inline with the title hides; it moves to the left gutter. */
@@ -3240,6 +3328,10 @@
   /* Right stays at the base 20px — see the 1280px tier's identical comment. */
   .sg-full-page .sg-carousel-section {
     padding-left: 160px;
+  }
+
+  .sg-full-page .sg-carousel__nav {
+    right: calc(160px - 20px);
   }
 
   .sg-full-page .sg-upcoming-title {

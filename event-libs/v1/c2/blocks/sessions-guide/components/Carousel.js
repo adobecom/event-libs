@@ -1,6 +1,9 @@
 import { html, useState, useRef, useEffect } from '../../../../deps/htm-preact.js';
 import { LiveCard } from './LiveCard.js';
-import { scrollBehavior } from '../utils/motion.js';
+import {
+  handOffArrowFocus, lastFullyVisible, maxPageOffset, measureCards, previousPageStart,
+  scrollEdges, scrollToAdjacent, watchScrollEdges, widthTransitionRunning,
+} from '../utils/carousel-nav.js';
 
 export const buildCarousel = () => Carousel;
 
@@ -15,48 +18,44 @@ export function Carousel({
   const [offset, setOffset] = useState(0);
   // Desktop pages the strip with a transform; narrower viewports scroll natively.
   const [paged, setPaged] = useState(false);
-  const [cardOffsets, setCardOffsets] = useState([]);
   const [edges, setEdges] = useState({ atStart: true, atEnd: false });
   const stripRef = useRef(null);
-  const cardWidthRef = useRef(0);
-  const visibleCountRef = useRef(1);
-  // Kept current every render so the mount-time resize handler below reads the latest value.
-  const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
+  // Resting card geometry from the last measure(); drives desktop paging.
+  const layoutRef = useRef({ starts: [], ends: [], trackWidth: 0 });
+  const [, setPageSize] = useState('');
   const resetKeyRef = useRef(resetKey);
+  const [announcement, setAnnouncement] = useState('');
+  const pendingRef = useRef(null);
+  const pressedRef = useRef(null);
 
   const clampOffset = () => {
-    const maxOffset = Math.max(0, (sessionsRef.current?.length || 0) - visibleCountRef.current);
-    setOffset((o) => Math.min(o, maxOffset));
+    const max = maxPageOffset(layoutRef.current, layoutRef.current.trackWidth);
+    setOffset((o) => Math.min(o, max));
   };
 
+  const applyEdges = ({ atStart, atEnd }) => setEdges((prev) => (
+    prev.atStart === atStart && prev.atEnd === atEnd ? prev : { atStart, atEnd }));
+
   const refreshEdges = () => {
-    const strip = stripRef.current;
-    if (!strip) return;
-    const maxScroll = strip.scrollWidth - strip.clientWidth;
-    const atStart = strip.scrollLeft <= 1;
-    const atEnd = strip.scrollLeft >= maxScroll - 1;
-    setEdges((prev) => {
-      if (prev.atStart === atStart && prev.atEnd === atEnd) return prev;
-      return { atStart, atEnd };
-    });
+    if (stripRef.current) applyEdges(scrollEdges(stripRef.current));
   };
 
   const measure = () => {
     const strip = stripRef.current;
     if (!strip) return;
-    const cards = [...strip.children];
-    const firstCard = cards[0];
-    if (!firstCard) return;
+    const cards = [...strip.querySelectorAll('.sg-carousel__card-wrap')];
+    if (!cards.length) return;
     const styles = getComputedStyle(strip);
-    const gap = parseFloat(styles.columnGap || '16') || 16;
-    const firstRect = firstCard.getBoundingClientRect();
-    cardWidthRef.current = firstRect.width + gap;
-    // Cards can differ in width; multiplying the first card's width accumulates clipping.
-    setCardOffsets(cards.map((card) => card.getBoundingClientRect().left - firstRect.left));
-    const trackWidth = strip.parentElement.offsetWidth;
-    visibleCountRef.current = Math.max(1, Math.floor(trackWidth / cardWidthRef.current));
     setPaged(styles.overflowX === 'visible');
+    // Keep the last layout while a card is hover-expanded or animating, unless the track resized;
+    // `transitionend` re-measures once it settles.
+    const trackWidth = strip.parentElement.offsetWidth;
+    const prev = layoutRef.current;
+    if (prev.starts.length === cards.length && trackWidth === prev.trackWidth
+      && (cards.some((c) => c.matches(':hover, :focus-within')) || widthTransitionRunning(strip))) return;
+    layoutRef.current = { ...measureCards(cards), trackWidth };
+    const { starts, ends } = layoutRef.current;
+    setPageSize(`${trackWidth}|${starts.join(',')}|${ends.join(',')}`);
   };
 
   useEffect(() => {
@@ -69,13 +68,35 @@ export function Carousel({
   }, []);
 
   const sessionCount = sessions?.length || 0;
-  const maxOffset = Math.max(0, sessionCount - visibleCountRef.current);
+  const layout = layoutRef.current;
+  // Until a count change is re-measured, page off the previous layout instead of snapping to 0.
+  const measuredCount = layout.starts.length;
+  const maxOffset = measuredCount
+    ? Math.min(maxPageOffset(layout, layout.trackWidth), sessionCount - 1) : 0;
 
   // Re-measures for async-loaded sessions; the mount effect above can fire before the strip exists.
   useEffect(() => {
     measure();
     refreshEdges();
     clampOffset();
+  }, [sessionCount]);
+
+  // Catches strip/card size changes the window resize listener misses (e.g. drawer opening).
+  useEffect(() => (paged ? undefined : watchScrollEdges(stripRef.current, applyEdges)), [paged, sessionCount]);
+
+  // Re-measure when the strip or a card resizes (late CSS, breakpoint changes, card width changes).
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || typeof ResizeObserver !== 'function') return undefined;
+    const remeasure = () => { measure(); refreshEdges(); clampOffset(); };
+    const onTransitionEnd = (e) => { if (e.propertyName === 'width') remeasure(); };
+    const ro = new ResizeObserver(remeasure);
+    [strip, ...strip.children].forEach((el) => ro.observe(el));
+    strip.addEventListener('transitionend', onTransitionEnd);
+    return () => {
+      ro.disconnect();
+      strip.removeEventListener('transitionend', onTransitionEnd);
+    };
   }, [sessionCount]);
 
   // resetKey (e.g. activeDay) changing means the carousel now shows an unrelated session set —
@@ -87,22 +108,40 @@ export function Carousel({
     if (stripRef.current) stripRef.current.scrollLeft = 0;
   }, [resetKey]);
 
+  useEffect(() => { handOffArrowFocus(pressedRef); });
+
   if (!sessions || !sessionCount) return null;
 
   const clampedOffset = Math.min(offset, maxOffset);
-  const translateX = paged ? (cardOffsets[clampedOffset] || 0) : 0;
+  const layoutIndex = Math.min(clampedOffset, measuredCount - 1);
+  const translateX = paged && measuredCount ? layout.starts[layoutIndex] : 0;
+  const lastVisible = paged && measuredCount
+    ? lastFullyVisible(layout, layoutIndex, layout.trackWidth) : sessionCount - 1;
   const atStart = paged ? clampedOffset <= 0 : edges.atStart;
   const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 
-  const step = pageByGroup ? Math.max(1, visibleCountRef.current) : 1;
-  const goPrev = () => {
-    if (paged) { setOffset((o) => Math.max(0, o - step)); return; }
-    stripRef.current?.scrollBy({ left: -(cardWidthRef.current || 300), behavior: scrollBehavior() });
+  const announce = (index) => {
+    const title = sessions[index]?.title;
+    if (title) setAnnouncement(title);
   };
-  const goNext = () => {
-    if (paged) { setOffset((o) => Math.min(maxOffset, o + step)); return; }
-    stripRef.current?.scrollBy({ left: cardWidthRef.current || 300, behavior: scrollBehavior() });
+  const go = (direction, button) => {
+    pressedRef.current = { button, at: performance.now() };
+    if (paged) {
+      let next = clampedOffset + direction;
+      if (pageByGroup) {
+        next = direction > 0 ? lastVisible + 1
+          : previousPageStart(layout, clampedOffset, layout.trackWidth);
+      }
+      next = Math.min(maxOffset, Math.max(0, next));
+      setOffset(next);
+      announce(next);
+      return;
+    }
+    const target = scrollToAdjacent(stripRef.current, direction, pendingRef);
+    if (target) announce(target.index);
   };
+  const goPrev = (e) => go(-1, e?.currentTarget);
+  const goNext = (e) => go(1, e?.currentTarget);
 
   const focused = sessions[Math.min(clampedOffset, sessionCount - 1)];
   const timeLabel = formatTime ? formatTime(focused) : '';
@@ -124,11 +163,11 @@ export function Carousel({
           </div>
         `}
         <div class="sg-carousel__track">
-          <div class="sg-carousel__cards" ref=${stripRef} onscroll=${refreshEdges} style=${'transform:translateX(-' + translateX + 'px)'}>
+          <div class="sg-carousel__cards" ref=${stripRef} style=${'transform:translateX(-' + translateX + 'px)'}>
             ${sessions.map((s, i) => html`<div
               class="sg-carousel__card-wrap"
               key=${s.id}
-              inert=${paged && (i < clampedOffset || i >= clampedOffset + visibleCountRef.current) ? true : undefined}
+              inert=${paged && (i < clampedOffset || i > lastVisible) ? true : undefined}
             ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} showDurationBadge=${showDurationBadge} showDescription=${showDescription} forceLive=${forceLive} /></div>`)}
           </div>
         </div>
@@ -159,6 +198,7 @@ export function Carousel({
           </div>
         `}
       </div>
+      <span class="sg-sr-only" aria-live="polite">${announcement}</span>
     </div>
   `;
 }

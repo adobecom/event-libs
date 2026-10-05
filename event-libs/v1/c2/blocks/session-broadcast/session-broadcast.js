@@ -1,6 +1,27 @@
 import { h, render } from '../../../deps/htm-preact.js';
-import { readBlockConfig } from '../../../utils/utils.js';
+import { readBlockConfig, loadStyle } from '../../../utils/utils.js';
 import { BroadcastApp } from './components/BroadcastApp.js';
+
+// Broadcast renders Session Guide components, but the widget that loads their CSS sits in a later
+// section (Milo loads sections in order), so load it here before the first render.
+const SESSIONS_GUIDE_CSS_URL = new URL('../sessions-guide/sessions-guide.css', import.meta.url).href;
+const STYLE_WAIT_MS = 3000;
+
+// Resolves when the stylesheet loads, fails, or times out. Waits on the link itself because
+// loadStyle reuses an existing (possibly still loading) link and calls back immediately.
+export function whenStylesheetReady(link, timeoutMs = STYLE_WAIT_MS) {
+  return new Promise((resolve) => {
+    if (link.sheet) {
+      resolve();
+      return;
+    }
+    link.addEventListener('load', resolve, { once: true });
+    link.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, timeoutMs);
+  });
+}
+
+const loadSessionsGuideStyles = () => whenStylesheetReady(loadStyle(SESSIONS_GUIDE_CSS_URL));
 
 const CONFIG_KEYS = {
   'also-live-title': 'alsoLiveTitle',
@@ -180,6 +201,7 @@ export default async function init(el) {
   const config = parseBroadcastConfig(el);
   el.innerHTML = '';
   el.classList.add('session-broadcast');
+  await loadSessionsGuideStyles();
   render(h(BroadcastApp, { config }), el);
   observeFillHeight(el);
 }
