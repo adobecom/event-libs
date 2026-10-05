@@ -59,7 +59,9 @@ describe('session-store: session-catalog fetch failure reports to lana, not cons
     expect(message).to.include('sessions fetch failed');
     expect(message).to.include('event-99');
     expect(message).to.include('network error');
-    expect(options).to.include({ tags: 'session-store,sessions', severity: 'error' });
+    expect(message).to.include('[session-store,sessions]');
+    expect(options).to.include({ severity: 'error' });
+    expect(options).to.not.have.property('tags');
   });
 
   it('settles sessionsStatus to error', () => {

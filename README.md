@@ -24,3 +24,25 @@ or:
 npm run test:watch
 ```
 This will give you several options to debug tests. Note: coverage may not be accurate.
+
+## LANA logging
+
+Use the helpers in `event-libs/v1/utils/lana-log.js`. They pass LANA's native
+`severity` option, which populates Splunk's `l_severity` field for the existing
+Rundeck jobs. Do not pass `l_severity` as a custom option or encode severity in
+scope tags. The `[scope]` message prefix identifies the module and operation
+for triage; alert routing does not require a list of module tags.
+
+`critical` is reserved for service failures (5xx, HTTP 408 timeouts, and HTTP 429
+throttling), network failures, or unexpected runtime failures that block
+event/session registration, cancellation, attendee creation/update, or
+RSVP-token validation. These logs use 100% sampling. Other registration HTTP 4xx
+rejections, including validation errors, full-session conflicts, and stale tokens
+at submit time, are `warning`, not outage signals. Known unusable RSVP tokens
+(401/404/409/410) during the load-time validation check remain `info`.
+An unreadable failure body preserves the original HTTP status and logs a warning,
+without emitting a second critical failure.
+
+Other errors remain `error` with 10% sampling. `debug`, `info`, and `warning` use
+LANA's default sampling. `cso` is not a supported LANA severity; do not use it
+without a coordinated client and monitoring change.

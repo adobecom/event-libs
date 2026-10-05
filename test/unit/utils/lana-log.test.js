@@ -20,10 +20,10 @@ describe('lana-log', () => {
 
   const CONTEXT_PATTERN = /\| ua=.*,viewport=\d+x\d+,lang=.*,env=(dev|stage|prod)$/;
 
-  it('formats the message with a [scope] prefix and sets tags/severity from scope', () => {
+  it('keeps scope in the message and uses severity instead of scope tags for alerting', () => {
     logError('my-scope', 'thing failed');
     expect(calls[0].msg).to.include('[my-scope] thing failed');
-    expect(calls[0].options).to.deep.equal({ tags: 'my-scope', severity: 'error', sampleRate: 10 });
+    expect(calls[0].options).to.deep.equal({ severity: 'error', sampleRate: 10 });
   });
 
   it('omits the trailing data suffix when no data is passed', () => {
@@ -40,6 +40,10 @@ describe('lana-log', () => {
     expect(calls.map((c) => c.options.severity)).to.deep.equal([
       'debug', 'info', 'warning', 'error', 'critical',
     ]);
+    calls.forEach((call) => {
+      expect(call.options).to.not.have.property('tags');
+      expect(call.options).to.not.have.property('l_severity');
+    });
   });
 
   it('serializes an Error without producing "{}"', () => {

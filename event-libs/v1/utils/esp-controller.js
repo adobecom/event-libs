@@ -101,6 +101,22 @@ async function parseFailureBody(response) {
   }
 }
 
+function logRegistrationFailure(scope, message, response) {
+  const { status } = response;
+  const isClientRejection = status >= 400 && status < 500 && status !== 408 && status !== 429;
+  const log = isClientRejection ? logWarning : logCritical;
+  log(scope, message, response);
+}
+
+async function readFailureBody(response, scope, readBody = parseFailureBody) {
+  try {
+    return await readBody(response);
+  } catch (error) {
+    logWarning(scope, 'Failed to read error response', error);
+    return response.status;
+  }
+}
+
 export async function getEvent(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -345,8 +361,8 @@ export async function createAttendee(eventId, attendeeData, rsvpToken = null) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
 
     if (!response.ok) {
-      logCritical('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
-      const error = await parseFailureBody(response);
+      logRegistrationFailure('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
+      const error = await readFailureBody(response, 'esp-controller,create-attendee');
       return { ok: response.ok, status: response.status, error };
     }
 
@@ -371,8 +387,8 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
 
     if (!response.ok) {
-      logCritical('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
-      const error = await parseFailureBody(response);
+      logRegistrationFailure('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
+      const error = await readFailureBody(response, 'esp-controller,add-attendee-to-event');
       return { ok: response.ok, status: response.status, error };
     }
 
@@ -395,8 +411,8 @@ export async function updateAttendee(eventId, attendeeData) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
-      logCritical('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
-      const error = await parseFailureBody(response);
+      logRegistrationFailure('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
+      const error = await readFailureBody(response, 'esp-controller,update-attendee');
       return { ok: response.ok, status: response.status, error };
     }
 
@@ -423,13 +439,8 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     }
 
     if (!response.ok) {
-      logCritical('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, response);
-      let textResp;
-      try {
-        textResp = await response.text();
-      } catch (e) {
-        logCritical('esp-controller,delete-attendee', `Failed to parse response text for attendee ${attendeeId ?? 'me'} on event ${eventId}`, e);
-      }
+      logRegistrationFailure('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, response);
+      const textResp = await readFailureBody(response, 'esp-controller,delete-attendee', (resp) => resp.text());
 
       return {
         ok: response.ok,
@@ -484,18 +495,18 @@ export async function validateRsvpToken(eventId, token) {
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
-    const data = await response.json();
 
     if (!response.ok) {
       if (RSVP_TOKEN_INVALID_STATUSES.includes(response.status)) {
         logInfo('esp-controller,validate-rsvp-token', `RSVP token not usable for event ${eventId}`, response);
       } else {
-        logCritical('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, response);
+        logRegistrationFailure('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, response);
       }
-      return { ok: false, status: response.status, error: data };
+      const error = await readFailureBody(response, 'esp-controller,validate-rsvp-token');
+      return { ok: false, status: response.status, error };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
     logCritical('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
@@ -673,14 +684,14 @@ export async function registerForSessionTime(sessionTimeId, attendeeId, registra
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/session-times/${sessionTimeId}/attendees/${attendeeId}`, options);
-    const data = await response.json();
 
     if (!response.ok) {
-      logCritical('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, response);
-      return { ok: false, status: response.status, error: data };
+      logRegistrationFailure('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, response);
+      const error = await readFailureBody(response, 'esp-controller,register-session-time');
+      return { ok: false, status: response.status, error };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
     logCritical('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
@@ -701,7 +712,7 @@ export async function unregisterFromSessionTime(sessionTimeId) {
     );
 
     if (!response.ok) {
-      logCritical('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, response);
+      logRegistrationFailure('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, response);
       return { ok: false, status: response.status };
     }
 
