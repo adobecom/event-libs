@@ -37,11 +37,14 @@ export function trapFocus(containerEl, onEscape) {
     if (!items.length) return;
     const firstItem = items[0];
     const lastItem = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === firstItem) {
+    const activeElement = document.activeElement;
+    // Dismissing the final toast focuses its region, which is not a sequential Tab stop.
+    const outsideTabOrder = !items.includes(activeElement);
+    if (e.shiftKey && (activeElement === firstItem || outsideTabOrder)) {
       e.preventDefault();
       e.stopPropagation();
       lastItem.focus();
-    } else if (!e.shiftKey && document.activeElement === lastItem) {
+    } else if (!e.shiftKey && (activeElement === lastItem || outsideTabOrder)) {
       e.preventDefault();
       e.stopPropagation();
       firstItem.focus();

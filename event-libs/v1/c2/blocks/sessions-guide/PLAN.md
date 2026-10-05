@@ -603,6 +603,18 @@ No longer a Preact component — `mountToast()` builds the toast element once vi
 - `showToast({ message, variant, ctaLabel, ctaAction, ctaHref, duration })` / `hideToast()` are the only two entry points — any block can call them directly
 - CSS is co-located at `event-libs/v1/features/toast/toast.css`, loaded the same way as the conflict modal's
 
+While the widget drawer is open, `DrawerShell` uses `containToasts()` to move the shared
+notification region into its dedicated `.sg-drawer__notifications` host. The `.sg-shell`
+owns the dialog semantics and focus trap, containing both the drawer and notification host.
+The host stays outside the transformed drawer so fixed toast positions remain viewport-relative.
+This keeps auth CTAs inside both the drawer's Tab cycle and its `aria-modal` subtree
+(MWPW-209748), without moving focus away from the triggering control. Cleanup restores the
+same region to its previous page-level mount before restoring focus. Closing/reopening or
+unmounting the drawer preserves queued notifications, timers, and listeners; full-page
+guides retain the page-level mount.
+When the last notification is dismissed, the focus trap also handles the region's
+programmatic (`tabindex="-1"`) focus so the next Tab cannot escape the drawer.
+
 ### 4.5 ICS download ✅
 `utils/ics.js` → `generateICS(sessions)` / `downloadICS(sessions, filename)`:
 - RFC 5545 compliant: `BEGIN:VCALENDAR`, `VEVENT` per session
