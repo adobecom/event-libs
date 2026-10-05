@@ -64,6 +64,26 @@ describe('sessions-guide/utils/focus-trap', () => {
     expect(document.activeElement.id).to.equal('middle');
   });
 
+  it('wraps Tab from a programmatically focused region outside the sequential tab order', () => {
+    const region = document.createElement('div');
+    region.tabIndex = -1;
+    container.appendChild(region);
+    trapFocus(container);
+    region.focus();
+    fireTab();
+    expect(document.activeElement.id).to.equal('first');
+  });
+
+  it('wraps Shift+Tab from a programmatically focused region outside the sequential tab order', () => {
+    const region = document.createElement('div');
+    region.tabIndex = -1;
+    container.appendChild(region);
+    trapFocus(container);
+    region.focus();
+    fireTab({ shiftKey: true });
+    expect(document.activeElement.id).to.equal('last');
+  });
+
   it('calls onEscape when Escape is pressed', () => {
     let escaped = false;
     trapFocus(container, () => { escaped = true; });

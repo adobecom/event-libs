@@ -85,7 +85,7 @@ class Timer {
   }
 }
 
-let mounted = false;
+let toastRegion = null;
 
 function renderToastContent(el, data) {
   el.textContent = '';
@@ -124,8 +124,7 @@ function renderToastContent(el, data) {
 }
 
 export function mountToast() {
-  if (mounted) return;
-  mounted = true;
+  if (toastRegion) return toastRegion;
 
   loadStyle(new URL('./toast.css', import.meta.url).href);
 
@@ -133,6 +132,7 @@ export function mountToast() {
   const region = createTag('div', {
     class: 'sg-toast-region', role: 'region', 'aria-label': '0 notifications', tabindex: '-1',
   }, '', { parent: document.body });
+  toastRegion = region;
 
   const items = new Map(); // id -> { el, timer, leaving }
   let hovered = false;
@@ -215,4 +215,15 @@ export function mountToast() {
       items.delete(id);
     });
   });
+  return region;
+}
+
+// Keep notifications in a modal's DOM/focus scope without recreating their state or listeners.
+export function containToasts(containerEl) {
+  const region = mountToast();
+  const { parentNode, nextSibling } = region;
+  containerEl.append(region);
+  return () => {
+    parentNode.insertBefore(region, nextSibling?.parentNode === parentNode ? nextSibling : null);
+  };
 }

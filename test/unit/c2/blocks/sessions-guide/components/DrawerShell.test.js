@@ -74,6 +74,18 @@ describe('DrawerShell scroll ownership', () => {
     const occurrences = out.split('data-lenis-prevent').length - 1;
     expect(occurrences).to.equal(2);
   });
+
+  it('includes the drawer and notification host in one modal subtree', () => {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = DrawerShell();
+    const modal = wrapper.querySelector('[role="dialog"][aria-modal="true"]');
+    const drawer = modal.querySelector('.sg-drawer');
+    const host = modal.querySelector('.sg-drawer__notifications');
+    expect(modal.classList.contains('sg-shell')).to.be.true;
+    expect(modal.getAttribute('aria-label')).to.equal('Sessions guide');
+    expect(host).to.exist;
+    expect(drawer.contains(host)).to.be.false;
+  });
 });
 
 describe('DrawerShell FAB placement', () => {
