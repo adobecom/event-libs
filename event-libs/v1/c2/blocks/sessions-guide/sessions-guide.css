@@ -1614,6 +1614,27 @@
 /* stylelint-disable-next-line no-descending-specificity */
 .sg-card__btn:hover { background: rgb(255 255 255 / 100%); }
 
+/* Mobile/tablet: a scheduled/favorited (solid variant) button keeps the unselected button's transparent
+   look with Figma's gray-900 outline, instead of IconButton's frosted fill and near-invisible gray-100
+   border. Hover/press tints match the outlined variant. Broadcast styles its own card. */
+@media (max-width: 1279px) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite) {
+    background: transparent;
+    border-color: var(--s2a-color-gray-900, #131313);
+    color: var(--s2a-color-gray-900, #131313);
+  }
+
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite):hover:not(:disabled) {
+    background: var(--s2a-color-transparent-black-08, rgb(0 0 0 / 8%));
+    border-color: var(--s2a-color-gray-900, #131313);
+  }
+
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite):active:not(:disabled) {
+    background: var(--s2a-color-transparent-black-12, rgb(0 0 0 / 12%));
+    border-color: var(--s2a-color-gray-900, #131313);
+  }
+}
+
 /* ── My Sessions / My Favorites tabs ────────────────────── */
 
 .sg-my-sessions-tab-bar {
