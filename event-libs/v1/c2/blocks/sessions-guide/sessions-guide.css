@@ -1279,10 +1279,11 @@
   }
 }
 
-/* Matches .sg-time-row__time-value's font; font-family explicit since this is a real <h3>. */
+/* Matches .sg-time-row__time-value's font (Figma title-xs below 1280px; desktop restates lg);
+   font-family explicit since this is a real <h3>. */
 .sg-time-row__label--category {
   font-family: var(--body-font-family);
-  font-size: var(--s2a-font-size-lg);
+  font-size: var(--s2a-font-size-md);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   color: var(--s2a-color-gray-800);
   line-height: var(--s2a-font-line-height-sm);
@@ -1290,7 +1291,7 @@
 
 .sg-time-row__time-value {
   color: var(--s2a-color-gray-800);
-  font-size: var(--s2a-font-size-lg);
+  font-size: var(--s2a-font-size-md);
   font-style: normal;
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   line-height: var(--s2a-font-line-height-sm);
@@ -1826,7 +1827,7 @@
     overflow-wrap: break-word;
 
     /* Restates .sg-time-row__time-value's values so the category label keeps matching it. */
-    font-size: var(--s2a-font-size-lg);
+    font-size: var(--s2a-font-size-md);
     color: var(--s2a-color-gray-800);
   }
 
@@ -2841,6 +2842,11 @@
     white-space: nowrap;
     width: 60px;
     padding: 0;
+  }
+
+  /* Desktop row headings stay lg; mobile/tablet use Figma's title-xs (md). */
+  .sg-time-row__time-value {
+    font-size: var(--s2a-font-size-lg);
   }
 
   .sg-time-row__label--category {
