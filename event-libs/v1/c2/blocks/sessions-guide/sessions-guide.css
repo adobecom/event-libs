@@ -767,7 +767,8 @@
   line-height: 1.1;
   letter-spacing: normal;
   margin: var(--s2a-spacing-lg) 0 0;
-  padding: 0 var(--s2a-spacing-lg);
+  padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-sm);
+  border-bottom: 1px solid #e8e8e8;
 }
 
 .sg-empty {
@@ -1234,7 +1235,7 @@
   align-items: flex-start;
   gap: var(--s2a-spacing-sm);
   padding: 18px 0 18px var(--s2a-spacing-lg);
-  border-bottom: none;
+  border-bottom: 1px solid #e8e8e8;
   position: relative;
   overflow: visible;
   max-height: none;
@@ -1821,7 +1822,6 @@
     font-size: var(--s2a-font-size-2xl);
     margin: 0;
     padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-sm);
-    border-bottom: 1px solid #e8e8e8;
   }
 
   /* ── Time slot rows ────────────────────────────────────── */
@@ -1831,7 +1831,6 @@
     align-items: center;
     gap: 36px;
     padding: var(--s2a-spacing-md) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
-    border-bottom: 1px solid #e8e8e8;
     background: #fff;
   }
 
