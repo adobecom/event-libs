@@ -88,6 +88,9 @@ the same section, but only if that block opts in via an `attach-upcoming` class
 
 ## CSS notes (`upcoming-sessions.css`)
 
+- Container sections with a direct `.upcoming-sessions` child remove their right
+  padding so the carousel can reach the section edge. Left and authored vertical
+  padding remain unchanged; other container sections are unaffected.
 - Design tokens come from `milo/libs/c2/styles/styles.css` (the C2 foundation
   stylesheet, guaranteed loaded whenever this block's `foundation: c2` metadata is
   present) rather than `c2/styles/tokens.css`, which isn't guaranteed present on a

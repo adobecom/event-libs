@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
 import {
@@ -76,6 +77,33 @@ describe('upcoming-sessions', () => {
     document.querySelectorAll('.upcoming-sessions').forEach((el) => {
       el._upcomingSessionsCleanup?.();
     });
+  });
+
+  it('removes only right padding from the upcoming-sessions container section', async () => {
+    const css = await readFile({
+      path: '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.css',
+    });
+    const style = document.createElement('style');
+    style.textContent = `.container { padding: 24px 72px 40px; } ${css}`;
+    document.head.append(style);
+
+    try {
+      const block = buildBlock([]);
+      const section = block.parentElement;
+      section.classList.add('container');
+      const unrelatedSection = document.createElement('div');
+      unrelatedSection.className = 'section container';
+      document.body.append(unrelatedSection);
+
+      const computed = getComputedStyle(section);
+      expect(computed.paddingRight).to.equal('0px');
+      expect(computed.paddingLeft).to.equal('72px');
+      expect(computed.paddingTop).to.equal('24px');
+      expect(computed.paddingBottom).to.equal('40px');
+      expect(getComputedStyle(unrelatedSection).paddingRight).to.equal('72px');
+    } finally {
+      style.remove();
+    }
   });
 
   describe('state timers', () => {
