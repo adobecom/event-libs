@@ -127,7 +127,7 @@ export function DrawerHeader({
   }
 
   return html`
-    <header class="sg-header">
+    <header class=${`sg-header${isPost ? ' sg-header--no-dates' : ''}`}>
       ${!hideClose && html`
         <button class="sg-close-btn" onclick=${onClose} aria-label="Close sessions" daa-ll="Session-Guide-Close" type="button"></button>
       `}
