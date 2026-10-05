@@ -36,13 +36,28 @@ for triage; alert routing does not require a list of module tags.
 `critical` is reserved for service failures (5xx, HTTP 408 timeouts, and HTTP 429
 throttling), network failures, or unexpected runtime failures that block
 event/session registration, cancellation, attendee creation/update, or
-RSVP-token validation. These logs use 100% sampling. Other registration HTTP 4xx
+RSVP-token validation. This includes event/attendee prerequisite lookups made
+during an active RSVP submission, but not background lookups. These logs use
+100% sampling. Successful attendee responses missing the required attendee ID
+are unexpected registration-blocking failures; submission stops and logs one
+critical error instead of sending an invalid registration request.
+Other registration HTTP 4xx
 rejections, including validation errors, full-session conflicts, and stale tokens
 at submit time, are `warning`, not outage signals. Known unusable RSVP tokens
 (401/404/409/410) during the load-time validation check remain `info`.
 An unreadable failure body preserves the original HTTP status and logs a warning,
 without emitting a second critical failure.
 
-Other errors remain `error` with 10% sampling. `debug`, `info`, and `warning` use
-LANA's default sampling. `cso` is not a supported LANA severity; do not use it
-without a coordinated client and monitoring change.
+RainFocus add/remove/swap schedule calls use the same transport classification.
+Unreadable successful responses and unexpected business response codes are
+critical for those mutations. Expected conflicts (code 13), access rejections
+(code 27), and already-scheduled results (code 15) are not critical. Read-only
+RainFocus calls and favorites do not receive critical severity. RainFocus logs
+exclude response URLs and raw response bodies because URLs carry auth tokens
+and bodies can contain attendee information.
+
+Other shared-helper errors remain `error` with 10% sampling. `debug`, `info`,
+and `warning` use LANA's default sampling. The deferred hydration logger also
+moves scope tags into the message prefix, retaining its existing severity,
+sampling options, and startup retry behavior. `cso` is not a supported LANA
+severity; do not use it without a coordinated client and monitoring change.

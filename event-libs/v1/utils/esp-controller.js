@@ -9,7 +9,7 @@ import {
 import { ENV_MAP, sessionCatalogHost } from './constances.js';
 import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
 import {
-  logError, logWarning, logCritical, logInfo,
+  logError, logWarning, logCritical, logInfo, logRegistrationFailure,
 } from './lana-log.js';
 
 export const getCaasTags = (() => {
@@ -101,13 +101,6 @@ async function parseFailureBody(response) {
   }
 }
 
-function logRegistrationFailure(scope, message, response) {
-  const { status } = response;
-  const isClientRejection = status >= 400 && status < 500 && status !== 408 && status !== 429;
-  const log = isClientRejection ? logWarning : logCritical;
-  log(scope, message, response);
-}
-
 async function readFailureBody(response, scope, readBody = parseFailureBody) {
   try {
     return await readBody(response);
@@ -117,26 +110,27 @@ async function readFailureBody(response, scope, readBody = parseFailureBody) {
   }
 }
 
-export async function getEvent(eventId) {
+export async function getEvent(eventId, { registration = false } = {}) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}`, options);
-    const data = await response.json();
-
     if (!response.ok) {
-      if (response.status === 404) {
+      if (response.status === 404 && !registration) {
         logWarning('esp-controller,get-event', `Event ${eventId} not found on "${eventServiceEnv.name}" ESP env. Verify the event exists in this environment or switch using ?espenv=<env>.`);
       }
-      logError('esp-controller,get-event', `Failed to get details for event ${eventId}`, response);
+      const log = registration ? logRegistrationFailure : logError;
+      log('esp-controller,get-event', `Failed to get details for event ${eventId}`, response);
+      const data = await readFailureBody(response, 'esp-controller,get-event', (resp) => resp.json());
       return { ok: response.ok, status: response.status, error: data };
     }
 
-    return { ok: true, data };
+    return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,get-event', `Failed to get details for event ${eventId}`, error);
+    const log = registration ? logCritical : logError;
+    log('esp-controller,get-event', `Failed to get details for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -307,7 +301,7 @@ export async function getEventAttendee(eventId) {
   }
 }
 
-export async function getAttendee(eventId) {
+export async function getAttendee(eventId, { registration = false } = {}) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
@@ -319,14 +313,10 @@ export async function getAttendee(eventId) {
       if (response.status === 404) {
         logInfo('esp-controller,get-attendee', `No attendee record yet for event ${eventId}`);
       } else {
-        logError('esp-controller,get-attendee', `Failed to get attendee details for event ${eventId}`, response);
+        const log = registration ? logRegistrationFailure : logError;
+        log('esp-controller,get-attendee', `Failed to get attendee details for event ${eventId}`, response);
       }
-      let textResp;
-      try {
-        textResp = await response.text();
-      } catch (e) {
-        logError('esp-controller,get-attendee', `Failed to parse response text for event ${eventId}`, e);
-      }
+      const textResp = await readFailureBody(response, 'esp-controller,get-attendee', (resp) => resp.text());
 
       return {
         ok: response.ok,
@@ -337,7 +327,8 @@ export async function getAttendee(eventId) {
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logError('esp-controller,get-attendee', `Failed to get attendee for event ${eventId}`, error);
+    const log = registration ? logCritical : logError;
+    log('esp-controller,get-attendee', `Failed to get attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -728,9 +719,9 @@ export async function unregisterFromSessionTime(sessionTimeId) {
 export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToken = null) {
   try {
     const profile = BlockMediator.get('imsProfile');
-    const eventObj = await getEvent(eventId);
+    const eventObj = await getEvent(eventId, { registration: true });
 
-    if (!eventObj.ok) return { ok: false, error: 'Failed to get event' };
+    if (!eventObj.ok) return eventObj;
 
     let attendee;
     let registrationStatus = 'registered';
@@ -743,7 +734,9 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
       const filteredPayload = getBaseAttendeePayload(attendeeData);
       attendee = await createAttendee(eventId, filteredPayload, rsvpToken);
     } else {
-      const attendeeResp = await getAttendee(eventId);
+      const attendeeResp = await getAttendee(eventId, { registration: true });
+
+      if (!attendeeResp.ok && attendeeResp.status !== 404) return attendeeResp;
 
       if (!attendeeResp.ok && attendeeResp.status === 404) {
         // Use BaseAttendee filter for creating new attendee
@@ -757,6 +750,8 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
         };
         const filteredPayload = getBaseAttendeePayload(payload);
         attendee = await updateAttendee(eventId, filteredPayload);
+      } else {
+        throw new Error('Attendee lookup response is missing attendeeId');
       }
     }
 
@@ -766,6 +761,7 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
     if (!attendee?.ok) return { ok: false, status: attendee?.status, error: attendee?.error || 'Failed to create or update attendee' };
 
     const newAttendeeData = attendee.data;
+    if (!newAttendeeData?.attendeeId) throw new Error('Attendee create/update response is missing attendeeId');
 
     if (eventObj.data.isFull) registrationStatus = 'waitlisted';
 

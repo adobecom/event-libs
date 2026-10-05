@@ -837,6 +837,151 @@ describe('Adobe Event Service API', () => {
       BlockMediator.set('imsProfile', { account_type: 'type1' });
     });
 
+    ['event', 'attendee'].forEach((lookup) => {
+      [400, 401, 403, 409, 410, 422, 408, 429, 500, 503].forEach((status) => {
+        it(`preserves and classifies HTTP ${status} from the ${lookup} prerequisite during submission`, async () => {
+          const fetchStub = sandbox.stub(window, 'fetch');
+          const failure = new Response(JSON.stringify({ message: 'Lookup failed' }), { status });
+          if (lookup === 'event') {
+            fetchStub.onCall(0).resolves(failure);
+          } else {
+            fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+            fetchStub.onCall(1).resolves(failure);
+          }
+          const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+          const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+          expect(result.ok).to.be.false;
+          expect(result.status).to.equal(status);
+          expect(result.error).to.deep.equal(lookup === 'event' ? { message: 'Lookup failed' } : '{"message":"Lookup failed"}');
+          expect(fetchStub.callCount).to.equal(lookup === 'event' ? 1 : 2);
+          expect(lanaLogStub.calledOnce).to.be.true;
+          const isCritical = [408, 429, 500, 503].includes(status);
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal(isCritical
+            ? { severity: 'critical', sampleRate: 100 } : { severity: 'warning' });
+          expect(lanaLogStub.firstCall.args[0]).to.include(eventId);
+        });
+      });
+
+      it(`reports a network failure in the ${lookup} prerequisite once as critical during submission`, async () => {
+        const fetchStub = sandbox.stub(window, 'fetch');
+        if (lookup === 'event') {
+          fetchStub.onCall(0).rejects(new Error('offline'));
+        } else {
+          fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+          fetchStub.onCall(1).rejects(new Error('offline'));
+        }
+        const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+        const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+        expect(result).to.deep.equal({ ok: false, status: 'Network Error', error: 'offline' });
+        expect(lanaLogStub.calledOnce).to.be.true;
+        expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+      });
+
+      it(`does not emit a second critical log when the ${lookup} failure body cannot be read`, async () => {
+        const fetchStub = sandbox.stub(window, 'fetch');
+        const response = new Response(null, { status: 503 });
+        sandbox.stub(response, lookup === 'event' ? 'json' : 'text').rejects(new Error('body unavailable'));
+        if (lookup === 'event') {
+          fetchStub.onCall(0).resolves(response);
+        } else {
+          fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+          fetchStub.onCall(1).resolves(response);
+        }
+        const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+        const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+        expect(result).to.deep.equal({ ok: false, status: 503, error: 503 });
+        expect(lanaLogStub.getCalls().map((call) => call.args[1].severity)).to.deep.equal(['critical', 'warning']);
+      });
+
+      it(`keeps ${lookup} prerequisite failures at error outside a submission`, async () => {
+        sandbox.stub(window, 'fetch').resolves(new Response('{}', { status: 503 }));
+        const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+        await (lookup === 'event' ? api.getEvent(eventId) : api.getAttendee(eventId));
+
+        expect(lanaLogStub.calledOnce).to.be.true;
+        expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'error', sampleRate: 10 });
+      });
+
+      it(`reports a malformed successful ${lookup} response once as critical during submission`, async () => {
+        const fetchStub = sandbox.stub(window, 'fetch');
+        if (lookup === 'event') {
+          fetchStub.onCall(0).resolves(new Response('not JSON'));
+        } else {
+          fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+          fetchStub.onCall(1).resolves(new Response('not JSON'));
+        }
+        const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+        const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+        expect(result.ok).to.be.false;
+        expect(lanaLogStub.calledOnce).to.be.true;
+        expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+      });
+    });
+
+    it('keeps a missing event non-critical during submission', async () => {
+      sandbox.stub(window, 'fetch').resolves(new Response('{"message":"Not found"}', { status: 404 }));
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+      expect(result.status).to.equal(404);
+      expect(lanaLogStub.calledOnce).to.be.true;
+      expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'warning' });
+    });
+
+    it('creates a first-time attendee after a 404 lookup without a critical log', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+      fetchStub.onCall(1).resolves(new Response('Not found', { status: 404 }));
+      fetchStub.onCall(2).resolves(new Response(JSON.stringify(attendeeResp)));
+      fetchStub.onCall(3).resolves(new Response('{"registrationStatus":"registered"}'));
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+      expect(result.ok).to.be.true;
+      expect(fetchStub.callCount).to.equal(4);
+      expect(lanaLogStub.calledOnce).to.be.true;
+      expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'info' });
+    });
+
+    ['lookup', 'create', 'update'].forEach((operation) => {
+      [{}, null].forEach((body) => {
+        it(`reports an unusable successful attendee ${operation} response ${JSON.stringify(body)} once as critical`, async () => {
+          const fetchStub = sandbox.stub(window, 'fetch');
+          fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+          if (operation === 'create') {
+            BlockMediator.set('imsProfile', { account_type: 'guest' });
+            fetchStub.onCall(1).resolves(new Response(JSON.stringify(body)));
+          } else if (operation === 'lookup') {
+            fetchStub.onCall(1).resolves(new Response(JSON.stringify(body)));
+          } else {
+            fetchStub.onCall(1).resolves(new Response(JSON.stringify(attendeeResp)));
+            fetchStub.onCall(2).resolves(new Response(JSON.stringify(body)));
+          }
+          const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+          const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+          expect(result.ok).to.be.false;
+          expect(result.status).to.equal('Unexpected Error');
+          expect(fetchStub.callCount).to.equal(operation === 'update' ? 3 : 2);
+          expect(lanaLogStub.calledOnce).to.be.true;
+          expect(lanaLogStub.firstCall.args[0]).to.include('missing attendeeId');
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+        });
+      });
+    });
+
     it('should register when event is not full and no campaign', async () => {
       const fetchStub = sandbox.stub(window, 'fetch');
       fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });

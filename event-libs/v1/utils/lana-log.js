@@ -61,3 +61,10 @@ export function logError(scope, message, data) {
 export function logCritical(scope, message, data) {
   send('critical', scope, message, data);
 }
+
+export function logRegistrationFailure(scope, message, response) {
+  const { status } = response;
+  const isClientRejection = status >= 400 && status < 500 && status !== 408 && status !== 429;
+  const log = isClientRejection ? logWarning : logCritical;
+  log(scope, message, response);
+}
