@@ -136,34 +136,31 @@ describe('upcoming-sessions', () => {
     [375, 768, 1024, 1439, 1440, 1441, 1920, 2300, 2560, 3200].forEach((width) => {
       it(`aligns standalone controls with the player container gutter at ${width}px`, async () => {
         await setViewport({ width, height: 900 });
-        const block = buildBlock([]);
+        const block = buildBlock([1, 2, 3, 4].map((id) => session({ sessionId: `layout-${id}` })));
         block.parentElement.classList.add('container');
         const playerSection = document.createElement('div');
-        playerSection.className = 'section container';
+        playerSection.className = 'section livestream-layout container';
         playerSection.innerHTML = '<div class="reference-player">Player</div>';
         document.body.insertBefore(playerSection, block.parentElement);
-        block.innerHTML = `
-          <div class="upcoming-sessions-header">
-            <div class="upcoming-sessions-heading">Upcoming</div>
-            <div class="upcoming-sessions-controls">
-              <button class="upcoming-sessions-arrow">Previous</button>
-              <button class="upcoming-sessions-arrow">Next</button>
-            </div>
-          </div>
-          <div class="upcoming-sessions-track"></div>`;
         const style = document.createElement('style');
         style.textContent = `
           html, body { margin: 0; padding: 0; }
-          .container { --grid-padding: clamp(24px, 5vw, 160px); padding: 24px var(--grid-padding) 40px; }`;
+          .container {
+            --grid-padding: max(24px, calc((100% - 1920px) / 2));
+            padding: 24px var(--grid-padding) 40px;
+          }
+          .livestream-layout { padding-inline: max(8.333%, calc(50% - 960px)); }`;
         document.head.prepend(style);
 
         try {
+          const leftPadding = getComputedStyle(block.parentElement).paddingLeft;
+          await init(block);
           const controls = block.querySelector('.upcoming-sessions-controls');
           const player = playerSection.querySelector('.reference-player');
           const sectionStyle = getComputedStyle(block.parentElement);
           const playerStyle = getComputedStyle(playerSection);
           expect(sectionStyle.paddingRight).to.equal('0px');
-          expect(sectionStyle.paddingLeft).to.equal(playerStyle.paddingRight);
+          expect(sectionStyle.paddingLeft).to.equal(leftPadding);
           expect(sectionStyle.paddingTop).to.equal('24px');
           expect(sectionStyle.paddingBottom).to.equal('40px');
           expect(getComputedStyle(controls).marginRight).to.equal(playerStyle.paddingRight);
@@ -171,14 +168,57 @@ describe('upcoming-sessions', () => {
           expect(block.querySelector('.upcoming-sessions-track').getBoundingClientRect().right)
             .to.be.closeTo(document.documentElement.clientWidth, 1);
 
+          if (width === 2560) {
+            await setViewport({ width: 3200, height: 900 });
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            expect(getComputedStyle(controls).marginRight).to.equal('640px');
+            expect(controls.getBoundingClientRect().right).to.be.closeTo(player.getBoundingClientRect().right, 1);
+          }
+
           block.parentElement.style.setProperty('--grid-padding', '48px');
-          playerSection.style.setProperty('--grid-padding', '48px');
+          playerSection.style.paddingRight = '48px';
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
           expect(getComputedStyle(controls).marginRight).to.equal('48px');
           expect(controls.getBoundingClientRect().right).to.be.closeTo(player.getBoundingClientRect().right, 1);
         } finally {
           style.remove();
         }
       });
+    });
+
+    it('resolves percentage container gutters without a preceding livestream section', async () => {
+      await setViewport({ width: 2560, height: 900 });
+      const block = buildBlock([1, 2, 3, 4].map((id) => session({ sessionId: `fallback-${id}` })));
+      block.parentElement.classList.add('container');
+      block.parentElement.style.paddingLeft = '12.5%';
+      await init(block);
+
+      expect(getComputedStyle(block.querySelector('.upcoming-sessions-controls')).marginRight)
+        .to.equal(getComputedStyle(block.parentElement).paddingLeft);
+    });
+
+    it('disconnects controls observers on re-decoration and cleanup', async () => {
+      const block = buildBlock([1, 2, 3, 4].map((id) => session({ sessionId: `cleanup-${id}` })));
+      block.parentElement.classList.add('container');
+      const playerSection = document.createElement('div');
+      playerSection.className = 'section livestream-layout container';
+      document.body.insertBefore(playerSection, block.parentElement);
+      const observeSpy = sinon.spy(ResizeObserver.prototype, 'observe');
+      const disconnectSpy = sinon.spy(ResizeObserver.prototype, 'disconnect');
+
+      try {
+        await init(block);
+        expect(observeSpy.calledWith(block.parentElement)).to.equal(true);
+        expect(observeSpy.calledWith(playerSection)).to.equal(true);
+        await init(block);
+        expect(disconnectSpy.calledOnce).to.equal(true);
+        block._upcomingSessionsCleanup();
+        expect(disconnectSpy.calledTwice).to.equal(true);
+        expect(block.style.getPropertyValue('--upcoming-sessions-controls-inset')).to.equal('');
+      } finally {
+        observeSpy.restore();
+        disconnectSpy.restore();
+      }
     });
 
     [[375, 24], [1440, 128], [1441, 240], [3200, 240]].forEach(([width, margin]) => {

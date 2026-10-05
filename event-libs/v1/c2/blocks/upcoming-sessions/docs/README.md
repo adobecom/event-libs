@@ -96,9 +96,12 @@ the marquee's capped foreground without capping the carousel itself.
 - Container sections with a direct `.upcoming-sessions` child remove their right
   padding so the carousel can reach the section edge. Left and authored vertical
   padding remain unchanged; other container sections are unaffected.
-- Standalone container sections, including upcoming sessions below the livestream
-  player, use the inherited `--grid-padding` as the controls' right margin to align
-  with the player container at every breakpoint. The cards still bleed right.
+- Standalone container sections measure the preceding `.livestream-layout`
+  section's content edge to align the controls with the player. Without that
+  preceding section, they use their own resolved left gutter. A `ResizeObserver`
+  keeps the pixel inset current and is disconnected during cleanup/re-decoration.
+  This avoids resolving percentage-based container gutters against the narrower
+  carousel header. The cards still bleed right.
 - Attached event-marquee carousels use fixed controls' right margins: 24px below
   1440px (mobile/tablet), 128px at 1440px, and 240px at 1441px and above.
   Standalone non-container sections retain the default `--s2a-spacing-lg` margin

@@ -358,6 +358,31 @@ function attachToPrecedingBlock(el) {
   }
 }
 
+function observeControlsInset(el) {
+  const section = el.parentElement;
+  if (!section?.matches('.section.container') || el.classList.contains('upcoming-sessions--attached')) return null;
+
+  const previous = section.previousElementSibling;
+  const playerSection = previous?.matches('.section.livestream-layout') ? previous : null;
+  const updateInset = () => {
+    let inset = parseFloat(getComputedStyle(section).paddingLeft);
+    if (playerSection) {
+      const style = getComputedStyle(playerSection);
+      const playerRight = playerSection.getBoundingClientRect().right
+        - parseFloat(style.paddingRight) - parseFloat(style.borderRightWidth);
+      inset = Math.max(0, el.getBoundingClientRect().right - playerRight);
+    }
+    el.style.setProperty('--upcoming-sessions-controls-inset', `${inset}px`);
+  };
+
+  // Resolve percentage gutters against the section, not the narrower carousel header.
+  const observer = new ResizeObserver(updateInset);
+  observer.observe(section);
+  if (playerSection) observer.observe(playerSection);
+  updateInset();
+  return observer;
+}
+
 export default async function init(el) {
   performance.mark('upcoming-sessions:init-start');
   try {
@@ -409,6 +434,7 @@ async function decorate(el) {
   header.append(buildCarouselControls(track));
 
   el.append(track);
+  const controlsObserver = observeControlsInset(el);
 
   function dropSession(sessionId) {
     removeCard(el, sessionId);
@@ -431,6 +457,8 @@ async function decorate(el) {
   document.addEventListener('visibilitychange', onVisibilityChange);
 
   el._upcomingSessionsCleanup = () => {
+    controlsObserver?.disconnect();
+    el.style.removeProperty('--upcoming-sessions-controls-inset');
     timers.forEach(clearTimeout);
     unsubscribeFavorited();
     unsubscribeScheduled();

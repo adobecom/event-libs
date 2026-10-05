@@ -112,7 +112,7 @@
 }
 
 .section.container > .upcoming-sessions:not(.upcoming-sessions--attached) .upcoming-sessions-controls {
-  margin-right: var(--grid-padding);
+  margin-right: var(--upcoming-sessions-controls-inset, var(--grid-padding));
 }
 
 @media (min-width: 1440px) {
