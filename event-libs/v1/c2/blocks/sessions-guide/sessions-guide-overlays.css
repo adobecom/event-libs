@@ -1242,6 +1242,10 @@
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     padding: var(--s2a-spacing-lg);
   }
+
+  .sg-filter-panel__close {
+    display: none;
+  }
 }
 
 /* ── Dark theme overrides (Phases 4–9) ───────────────────────── */

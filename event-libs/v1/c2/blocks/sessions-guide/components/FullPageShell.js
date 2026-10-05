@@ -95,7 +95,7 @@ export function FullPageShell() {
           hideClose=${true}
         />
       </div>
-      <div class="sg-full-page__body" aria-busy=${String(sessionsStatus.value === 'loading')}>
+      <div class="sg-full-page__body" tabindex="-1" aria-busy=${String(sessionsStatus.value === 'loading')}>
         <div class="sg-sr-only" role="status" aria-live="polite">${sessionsStatusMessage(sessionsStatus.value)}</div>
         ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
         ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}

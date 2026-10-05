@@ -15,17 +15,14 @@ export function applyLocaleFormat(hours, minutes, locale) {
   return new Intl.DateTimeFormat(locale, DEFAULT_TIME_FORMAT_OPTIONS).format(date);
 }
 
-// Shared duration formatter — `short: true` gives compact units ("1h 30m") for tight
-// UI spaces (cards, modals); the default ("1 hr 30 min") suits looser layouts.
-export function formatDuration(startUtc, endUtc, { short = false } = {}) {
+// Shared duration formatter with compact units: "30m", "1h", "1h 15m".
+export function formatDuration(startUtc, endUtc) {
   const totalMin = Math.round((Date.parse(endUtc) - Date.parse(startUtc)) / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  const hUnit = short ? 'h' : ' hr';
-  const mUnit = short ? 'm' : ' min';
-  if (h === 0) return `${m}${mUnit}`;
-  if (m === 0) return `${h}${hUnit}`;
-  return `${h}${hUnit} ${m}${mUnit}`;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 export function formatCountdown(targetMs, nowMs) {

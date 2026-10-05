@@ -28,13 +28,17 @@ function findScheduleConflict(incoming, allSessions, scheduledIds) {
   ) || null;
 }
 
+// Shared by assertAuthorized and action-feedback.js's toast copy so the two can't disagree.
+export function isEventOver() {
+  return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), getEventApiConfig()?.eventEndMs);
+}
+
 // Exported so action-feedback.js's checkViewAccess() can reuse the same check.
 // Post-event, signed-in is enough — registration no longer gates these actions.
 export function assertAuthorized() {
   const { isLoggedIn, isRegistered } = auth.value;
   if (isLoggedIn !== true) throw new SessionActionError('auth-required');
-  const eventEndMs = getEventApiConfig()?.eventEndMs;
-  if (isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs)) return;
+  if (isEventOver()) return;
   if (isRegistered !== true) throw new SessionActionError('registration-required');
 }
 

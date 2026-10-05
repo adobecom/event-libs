@@ -90,7 +90,7 @@ export default async function init(el) {
           assertAuthorized();
         } catch {
           e.preventDefault();
-          showAuthToast({ eventConfig, actionLabel: `download ${name}` });
+          showAuthToast({ eventConfig, actionLabel: `download ${name}`, postEventActionLabel: 'download resources' });
           return;
         }
         showToast({ message: 'Session resource downloaded', variant: 'positive' });

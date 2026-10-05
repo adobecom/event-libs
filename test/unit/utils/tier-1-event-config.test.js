@@ -73,8 +73,9 @@ describe('tier-1-event-config', () => {
     expect(getAllowDoubleBooking()).to.equal(true);
   });
 
+  // Authored as /summit.html; the test page is extensionless (like aem.page), so toPagePath drops it.
   it('reads the authored homepage path off the same parsed config', () => {
-    expect(getHomepagePath()).to.equal('/summit.html');
+    expect(getHomepagePath()).to.equal('/summit');
   });
 
   it('returns empty for an event page the config does not declare — the caller decides the fallback', () => {

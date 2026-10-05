@@ -35,6 +35,17 @@ export function filterButtonLabel(activeFilterCount) {
   return activeFilterCount > 0 ? `Filter sessions, ${activeFilterCount} active` : 'Filter sessions';
 }
 
+const SEARCH_PLACEHOLDERS = {
+  'live-upcoming': 'Search upcoming',
+  'on-demand': 'Search on-demand',
+  'my-sessions': 'Search my sessions',
+  'my-favorites': 'Search my favorites',
+};
+
+export function searchPlaceholder(activeView) {
+  return SEARCH_PLACEHOLDERS[activeView] || 'Search sessions';
+}
+
 function isDesktopSearchLayout() {
   return window.matchMedia('(min-width: 1280px)').matches;
 }
@@ -182,7 +193,7 @@ export function DrawerHeader({
                     type="search"
                     aria-label="Search sessions"
                     aria-hidden=${searchOpen ? undefined : 'true'}
-                    placeholder="Search sessions..."
+                    placeholder=${searchPlaceholder(activeView)}
                     autocomplete="off"
                     spellcheck="false"
                     tabindex=${searchOpen ? undefined : '-1'}
@@ -212,7 +223,7 @@ export function DrawerHeader({
                 ref=${mobileSearchRef}
                 type="search"
                 aria-label="Search sessions"
-                placeholder="Search sessions..."
+                placeholder=${searchPlaceholder(activeView)}
                 autocomplete="off"
                 spellcheck="false"
                 value=${state.searchQuery}

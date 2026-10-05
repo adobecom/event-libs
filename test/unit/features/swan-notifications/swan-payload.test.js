@@ -83,6 +83,13 @@ describe('swan-payload', () => {
       expect(entry.category).to.equal('Adobe Event Session');
     });
 
+
+    it('does not duplicate "Adobe" when eventName already includes it', () => {
+      const entry = buildNotificationEntry(session, 'reminder', { ...swanConfig, eventName: 'Adobe MAX 2026' });
+      expect(entry.category).to.equal('Adobe MAX 2026 Session');
+      expect(entry.category).to.not.include('Adobe Adobe');
+    });
+
     it('falls back to the page origin when sessionPageUrl is absent', () => {
       const entry = buildNotificationEntry({ ...session, sessionPageUrl: '' }, 'reminder', swanConfig);
       expect(entry.actionUrl).to.equal(window.location.origin);

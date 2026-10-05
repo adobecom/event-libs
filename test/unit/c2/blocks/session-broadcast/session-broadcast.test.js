@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import init, { parseBroadcastConfig, observeFillHeight } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
+import init, { parseBroadcastConfig, observeFillHeight, whenStylesheetReady } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
 import { sessionsStatus } from '../../../../../event-libs/v1/utils/session-store.js';
 
 function block(rows) {
@@ -10,7 +10,7 @@ function block(rows) {
     const k = document.createElement('div');
     k.textContent = key;
     const v = document.createElement('div');
-    if (key.toLowerCase().startsWith('session ended image')) {
+    if (value && /^(session ended image|player background image)/i.test(key)) {
       const a = document.createElement('a');
       a.href = value;
       a.textContent = 'image';
@@ -31,6 +31,8 @@ describe('parseBroadcastConfig', () => {
       alsoLiveTitle: 'Currently Live',
       upcomingTitle: 'Upcoming',
       viewAllDetailsLabel: 'View all details',
+      playerBackgroundImageUrlDesktop: '',
+      playerBackgroundImageUrlDesktopXl: '',
       sessionEndedImageUrlMobile: '',
       sessionEndedImageUrlTablet: '',
       sessionEndedImageUrlDesktop: '',
@@ -58,6 +60,84 @@ describe('parseBroadcastConfig', () => {
     const config = parseBroadcastConfig(block([['Also live title', 'Live Now']]));
     expect(config.alsoLiveTitle).to.equal('Live Now');
     expect(config.upcomingTitle).to.equal('Upcoming');
+  });
+
+  describe('desktop player background images', () => {
+    it('reads an authored image link independently of the ended image', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image desktop', 'https://example.com/player.png'],
+        ['Session ended image', 'https://example.com/ended.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/player.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/player.png');
+      expect(config.sessionEndedImageUrlDesktop).to.equal('https://example.com/ended.png');
+    });
+
+    it('reads independent desktop and desktop XL rows', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image desktop', 'https://example.com/desktop.png'],
+        ['Player background image desktop xl', 'https://example.com/xl.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/desktop.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/xl.png');
+    });
+
+    it('backfills desktop from desktop XL when only the XL row is authored', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image desktop xl', 'https://example.com/xl.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/xl.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/xl.png');
+    });
+
+    it('retains the single image row as a fallback for both desktop tiers', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image', 'https://example.com/legacy.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/legacy.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/legacy.png');
+    });
+
+    it('prefers breakpoint rows to the single image row', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image', 'https://example.com/legacy.png'],
+        ['Player background image desktop xl', 'https://example.com/xl.png'],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('https://example.com/xl.png');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('https://example.com/xl.png');
+    });
+
+    it('resolves the largest picture source and strips optimization parameters like ended images', () => {
+      const el = block([]);
+      el.innerHTML = `
+        <div><div>Player background image desktop</div><div>
+          <picture>
+            <source srcset="./player-large.png?width=2000&format=webply 2x">
+            <source srcset="./player-small.png?width=750&format=webply">
+            <img src="./player-small.png?width=750&format=png" alt="">
+          </picture>
+        </div></div>`;
+      const config = parseBroadcastConfig(el);
+      expect(config.playerBackgroundImageUrlDesktop)
+        .to.equal(new URL('./player-large.png', document.baseURI).href);
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal(config.playerBackgroundImageUrlDesktop);
+    });
+
+    it('accepts an embedded image without picture sources', () => {
+      const el = block([]);
+      el.innerHTML = '<div><div>Player background image desktop</div><div><img src="./player.png" alt=""></div></div>';
+      expect(parseBroadcastConfig(el).playerBackgroundImageUrlDesktop)
+        .to.equal(new URL('./player.png', document.baseURI).href);
+    });
+
+    it('leaves both tiers empty when no image is authored', () => {
+      const config = parseBroadcastConfig(block([
+        ['Player background image desktop', ''],
+        ['Player background image desktop xl', ''],
+      ]));
+      expect(config.playerBackgroundImageUrlDesktop).to.equal('');
+      expect(config.playerBackgroundImageUrlDesktopXl).to.equal('');
+    });
   });
 
   describe('four breakpoint-specific "session ended image" rows', () => {
@@ -282,6 +362,45 @@ describe('session-broadcast init()', () => {
     expect(el.classList.contains('session-broadcast')).to.be.true;
     expect(el.innerHTML).to.include('sb-app');
     expect(el.innerHTML).to.not.include('Also live title');
+  });
+
+  it('loads sessions-guide.css once, before rendering, since that widget loads in a later section', async () => {
+    const el = block([['Also live title', 'Currently Live']]);
+    await init(el);
+    await init(block([['Also live title', 'Currently Live']]));
+    const links = [...document.head.querySelectorAll('link[rel="stylesheet"]')]
+      .filter((l) => l.href.endsWith('/c2/blocks/sessions-guide/sessions-guide.css'));
+    expect(links).to.have.length(1);
+    expect(el.innerHTML).to.include('sb-app');
+  });
+
+  it('waits for a still-loading stylesheet link to load', async () => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/event-libs/v1/c2/blocks/session-broadcast/session-broadcast.css?wait=${Date.now()}`;
+    document.head.appendChild(link);
+    expect(!!link.sheet).to.be.false;
+    await whenStylesheetReady(link);
+    expect(!!link.sheet).to.be.true;
+    link.remove();
+  });
+
+  it('resolves when the stylesheet fails to load, without waiting for the timeout', async () => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/does-not-exist-${Date.now()}.css`;
+    document.head.appendChild(link);
+    const start = performance.now();
+    await whenStylesheetReady(link, 10_000);
+    expect(performance.now() - start).to.be.below(1000);
+    link.remove();
+  });
+
+  it('resolves after the timeout when the link never settles', async () => {
+    const detached = document.createElement('link'); // never appended, so never loads
+    const start = performance.now();
+    await whenStylesheetReady(detached, 50);
+    expect(performance.now() - start).to.be.at.least(45);
   });
 });
 

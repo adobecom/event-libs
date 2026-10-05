@@ -78,6 +78,36 @@
   background: var(--s2a-color-gray-900, #000);
 }
 
+@media (min-width: 1280px) {
+  .sb-live.has-background {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .sb-live.has-background .sb-player__mount {
+    background: transparent;
+  }
+
+  .sb-live.has-background::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--sb-player-bg-desktop, var(--sb-player-bg-desktop-xl, none));
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    opacity: 0.6;
+  }
+}
+
+@media (min-width: 1441px) {
+  .sb-live.has-background::before {
+    background-image: var(--sb-player-bg-desktop-xl, var(--sb-player-bg-desktop, none));
+  }
+}
+
 /* Unconditionally dark; grid lets title/actions swap by named area.
    position:relative is load-bearing — without it, an authored dark section background
    paints above this element regardless of DOM order. */
@@ -248,7 +278,7 @@
     gap: 6px;
   }
 
-  .sb-info + .sb-carousel-section--also-live {
+  .sb-live + .sb-carousel-section--also-live {
     margin-top: calc(-1 * var(--s2a-border-radius-md, 16px));
     padding-top: var(--s2a-spacing-xl, 32px);
   }
@@ -342,6 +372,7 @@
   .sb-info__actions { gap: 5px; }
 
   .sb-info__desc-wrap {
+    width: min(700px, 100%);
     font-size: 16px;
     margin-top: -12px;
   }
@@ -374,6 +405,13 @@
 @media (min-width: 768px) {
   .sb-info {
     background: transparent;
+  }
+}
+
+/* Keeps text contrast >= 4.5:1 even with a white authored image behind the 60%-opacity layer. */
+@media (min-width: 1280px) {
+  .sb-live.has-background .sb-info {
+    background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
   }
 }
 
@@ -704,7 +742,7 @@
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  width: 268px;
+  width: 255px;
   min-height: 0;
   background: var(--s2a-color-gray-50, #f8f8f8);
   border: none;
@@ -712,8 +750,6 @@
   padding: var(--s2a-spacing-md, 16px);
   box-shadow: none;
 }
-
-.sb-carousel-section--up-next .sg-card__badge-row { margin-bottom: var(--s2a-spacing-sm); }
 
 /* Replicates the frosted-glass/light treatment since SessionCard.js hardcodes IconButton's dark-card context. */
 .sb-carousel-section--up-next .sg-card__btn--schedule,
@@ -730,10 +766,11 @@
   backdrop-filter: blur(16px);
 }
 
-/* Matches this card's own uniform 12px gap; sessions-guide's 2px margin is meant for wrapped title lines. */
-@media (min-width: 768px) and (max-width: 1279px) {
-  .sb-carousel-section--up-next .sg-card__title {
-    margin-bottom: var(--s2a-spacing-sm, 12px);
+/* Figma's 16px body-to-actions gap; sessions-guide's own .sg-card gap is gated behind an ancestor this DOM lacks.
+   Below 1280px only: the desktop card switches to a row layout. */
+@media (max-width: 1279px) {
+  .sb-carousel-section--up-next .sg-card {
+    gap: var(--s2a-spacing-md, 16px);
   }
 }
 
@@ -744,6 +781,9 @@
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+
+    /* Trailing gutter after the last card. */
+    padding-right: var(--s2a-spacing-lg, 24px);
   }
 
   .sb-carousel-section--also-live .sg-carousel__card-wrap,
@@ -836,6 +876,14 @@
   .sb-carousel-section--also-live .sg-carousel__arrow[disabled],
   .sb-carousel-section--up-next .sg-carousel__arrow[disabled] {
     display: flex;
+  }
+}
+
+/* Tablet arrow shadow (previously inherited from sessions-guide). */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sb-carousel-section--also-live .sg-carousel__arrow,
+  .sb-carousel-section--up-next .sg-carousel__arrow {
+    box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
   }
 }
 

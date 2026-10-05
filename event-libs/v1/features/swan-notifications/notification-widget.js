@@ -13,6 +13,7 @@ import { STAGE_COPY } from './swan-payload.js';
 import { waitForElement } from './gnav-wait.js';
 import { fetchFederalTrackIcon } from '../icons/federal-icons.js';
 import { isGnavNotificationsEnabled } from './swan-config.js';
+import { bindNotificationPanel } from './notification-panel.js';
 
 // Page-level, framework-agnostic widget — same shape as features/toast/toast.js (a signal
 // for state, createTag/loadStyle for vanilla DOM, a mounted guard) rather than a full
@@ -213,7 +214,8 @@ function buildWidget(mount) {
   const button = createTag('button', {
     class: 'swan-notif__bell',
     type: 'button',
-    'aria-haspopup': 'true',
+    'aria-haspopup': 'dialog',
+    'aria-controls': 'swan-notifications-panel',
     'aria-expanded': 'false',
     'aria-label': dictionaryManager.getValue('Notifications'),
     'daa-ll': 'Notification-Bell-Open',
@@ -232,16 +234,21 @@ function buildWidget(mount) {
   // hijacks wheel/touch events at the document level; this attribute is Lenis's own
   // documented escape hatch for a nested scrollable region, already used the same way by
   // sessions-guide's DrawerShell.js/FilterPanel.js.
-  const panel = createTag('div', {
-    class: 'swan-notif__panel', role: 'dialog', 'aria-label': dictionaryManager.getValue('Notifications'), 'data-lenis-prevent': '',
+  const panel = createTag('dialog', {
+    id: 'swan-notifications-panel',
+    class: 'swan-notif__panel', 'aria-label': dictionaryManager.getValue('Notifications'), 'data-lenis-prevent': '',
   });
   panel.hidden = true;
-  panel.append(createTag('p', { class: 'swan-notif__panel-title' }, dictionaryManager.getValue('Notifications')));
+  const header = createTag('div', { class: 'swan-notif__panel-header', tabindex: '-1' });
+  header.append(createTag('p', { class: 'swan-notif__panel-title' }, dictionaryManager.getValue('Notifications')));
+  panel.append(header);
   panel.append(createTag('div', { class: 'swan-notif__divider', 'aria-hidden': 'true' }));
+  const scroller = createTag('div', { class: 'swan-notif__scroll', 'data-lenis-prevent': '' });
   const sectionTitle = createTag('p', { class: 'swan-notif__section-title' }, dictionaryManager.getValue('Important'));
-  panel.append(sectionTitle);
+  scroller.append(sectionTitle);
   const list = createTag('ul', { class: 'swan-notif__list' });
-  panel.append(list);
+  scroller.append(list);
+  panel.append(scroller);
 
   // Visually hidden, always in the DOM (unlike the badge, which is aria-hidden and purely
   // visual) — role="status"/aria-live="polite" is DrawerShell.js's own established pattern
@@ -253,29 +260,6 @@ function buildWidget(mount) {
   wrapper.append(button, tooltip, panel, announcer);
   mount.prepend(wrapper);
 
-  // Cheap insurance for the life of the page: nothing today re-renders gnav's own template
-  // wholesale (a locale switch or sign-in state change could), but if one ever does, this
-  // silently reinserts the widget into the fresh mount point instead of leaving the bell
-  // missing until the next mountNotificationWidget() call.
-  new MutationObserver(() => {
-    if (!wrapper.isConnected) mount.prepend(wrapper);
-  }).observe(mount, { childList: true });
-
-  function closePanel() {
-    panel.hidden = true;
-    button.setAttribute('aria-expanded', 'false');
-    document.removeEventListener('click', onOutsideClick);
-    document.removeEventListener('keydown', onKeydown);
-  }
-
-  function onOutsideClick(e) {
-    if (!wrapper.contains(e.target)) closePanel();
-  }
-
-  function onKeydown(e) {
-    if (e.key === 'Escape') closePanel();
-  }
-
   function closeOtherGnavPopups() {
     document.querySelectorAll('header.global-navigation [aria-expanded="true"]').forEach((trigger) => {
       if (wrapper.contains(trigger)) return;
@@ -283,20 +267,19 @@ function buildWidget(mount) {
     });
   }
 
-  function openPanel() {
+  const resetPanel = bindNotificationPanel(panel, button, header, () => {
     closeOtherGnavPopups();
-    panel.hidden = false;
-    button.setAttribute('aria-expanded', 'true');
-    document.addEventListener('click', onOutsideClick);
-    document.addEventListener('keydown', onKeydown);
     if (notificationsReady.value) markAllRead();
-  }
-
-  button.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (panel.hidden) openPanel();
-    else closePanel();
   });
+
+  // Removing a native dialog also removes it from the top layer. Reset its
+  // modal/scroll state when reinserting the widget after a gnav re-render.
+  new MutationObserver(() => {
+    if (!wrapper.isConnected) {
+      mount.prepend(wrapper);
+      resetPanel();
+    }
+  }).observe(mount, { childList: true });
 
   // Dismissing a row destroys the very DOM node that currently has keyboard focus (renderList
   // rebuilds the whole <ul> from scratch on every store change) — without this, focus would
@@ -312,7 +295,7 @@ function buildWidget(mount) {
     dismissEntry(rfCode);
     const neighborRow = neighborRfCode
       && [...list.querySelectorAll('.swan-notif__row')].find((row) => row.dataset.rfcode === neighborRfCode);
-    (neighborRow?.querySelector('.swan-notif__dismiss') || button).focus();
+    (neighborRow?.querySelector('.swan-notif__dismiss') || (panel.matches(':modal') ? header : button)).focus();
   }
 
   // Announces only on an *increase* (a genuinely new thing to notice), not every render —
@@ -322,11 +305,20 @@ function buildWidget(mount) {
   // which must never be announced as "new" on this first call.
   let previousUnreadCount = null;
   function updateList() {
+    const focused = document.activeElement;
+    const focusedRow = focused?.closest('.swan-notif__row');
+    const restoreListFocus = focusedRow && list.contains(focused);
     // Dismissed entries stay in the store (so the stage guard in swan-notifications.js can
     // still see them) but must never render or count toward the badge/announcer.
     const visibleEntries = notificationsReady.value
       ? notifications.value.filter((entry) => !entry.dismissed) : [];
     const unreadCount = renderList(sectionTitle, list, badge, visibleEntries, locale, timezone, dismissAndRefocus);
+    if (restoreListFocus && panel.open) {
+      const replacement = [...list.children].find((row) => row.dataset.rfcode === focusedRow.dataset.rfcode);
+      const target = focused.matches('.swan-notif__dismiss')
+        ? replacement?.querySelector('.swan-notif__dismiss') : replacement;
+      (target || (panel.matches(':modal') ? header : button)).focus({ preventScroll: true });
+    }
     if (!notificationsReady.value) {
       previousUnreadCount = null;
       announcer.textContent = '';
@@ -340,7 +332,7 @@ function buildWidget(mount) {
   }
   notifications.subscribe(updateList);
   notificationsReady.subscribe((ready) => {
-    if (ready && !panel.hidden) markAllRead();
+    if (ready && button.getAttribute('aria-expanded') === 'true') markAllRead();
     updateList();
   });
 }

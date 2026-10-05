@@ -27,17 +27,18 @@ describe('getWatchDestination — authored event pages', () => {
     initTierOneEventConfig();
   });
 
+  // Authored with .html; the test page is extensionless (like aem.page), so toPagePath drops it.
   it('sends a live livestreamed session to the authored homepage path', () => {
-    expect(getWatchDestination(session({ isLivestreamed: true }), 'live')).to.equal('/summit.html');
+    expect(getWatchDestination(session({ isLivestreamed: true }), 'live')).to.equal('/summit');
   });
 
   it('sends a live online-only session to the authored broadcast path, carrying ?watch=<id>', () => {
-    expect(getWatchDestination(session({ isOnline: true }), 'live')).to.equal('/summit/broadcast.html?watch=s1');
+    expect(getWatchDestination(session({ isOnline: true }), 'live')).to.equal('/summit/broadcast?watch=s1');
   });
 
   it('prefers the homepage path when a session is both livestreamed and online', () => {
     const both = session({ isLivestreamed: true, isOnline: true });
-    expect(getWatchDestination(both, 'live')).to.equal('/summit.html');
+    expect(getWatchDestination(both, 'live')).to.equal('/summit');
   });
 
   it('sends an on-demand session to its own session page, not an event page', () => {
