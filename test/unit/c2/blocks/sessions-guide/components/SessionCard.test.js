@@ -171,7 +171,7 @@ describe('SessionCard', () => {
   it('shows duration by default for upcoming sessions', () => {
     const html = renderCard(UPCOMING_SESSION);
     // UPCOMING_SESSION is 1 hour long
-    expect(html).to.include('1 hr');
+    expect(html).to.include('data-time="1h"');
     expect(html).to.not.include('sg-card--on-demand');
   });
 
@@ -181,7 +181,7 @@ describe('SessionCard', () => {
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: UPCOMING_SESSION, timeDisplay: 'time' });
     // Should NOT show duration format
-    expect(html).to.not.include('1 hr');
+    expect(html).to.not.include('data-time="1h"');
     // Should show a time string (contains AM or PM)
     expect(html).to.match(/\d+(:\d+)?\s*(AM|PM)/i);
   });
