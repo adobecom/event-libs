@@ -8,6 +8,17 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ---
 
+## Session detail title wrapping
+
+The shared detail-overlay title uses `text-wrap: balance` at every breakpoint
+(MWPW-208944), matching the individual session page's title treatment
+(MWPW-208937). This evens out multiline titles within the existing summary column,
+including at the reported 1572px viewport, without changing font sizes, column
+widths, spacing, or session copy. Browsers without support retain normal wrapping.
+The layout regression fixture checks computed styles and overflow across mobile,
+tablet, and desktop widths, and compares actual line widths against normal
+wrapping at 1572px.
+
 ## Mobile Safari FAB placement
 
 The Session Guide FAB uses a 24px bottom offset on Mobile Safari (MWPW-208776),

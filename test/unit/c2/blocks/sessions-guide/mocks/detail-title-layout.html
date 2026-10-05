@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Session detail title wrapping fixture</title>
+  <link rel="stylesheet" href="/event-libs/v1/c2/blocks/sessions-guide/sessions-guide.css">
+  <style>
+    :root {
+      --heading-font-family: var(--s2a-font-family-heading);
+      --body-font-family: var(--s2a-font-family-body);
+    }
+
+    body { margin: 0; }
+    .sg-drawer { top: 0; }
+    .sg-detail-panel--open { animation: none; }
+  </style>
+</head>
+<body>
+  <div class="sg-portal">
+    <section class="sg-drawer sg-drawer--detail-open">
+      <div class="sg-detail-panel sg-detail-panel--open">
+        <div class="sg-detail" role="region" aria-label="Session detail">
+          <div class="sg-detail__body">
+            <div class="sg-detail__back-wrap">
+              <button class="sg-detail__back" type="button">Back</button>
+            </div>
+            <div class="sg-detail__cols sg-detail__cols--split">
+              <div class="sg-detail__col sg-detail__col--main">
+                <div class="sg-detail__group sg-detail__group--summary">
+                  <div class="sg-detail__summary">
+                    <div class="sg-detail__summary-top">
+                      <span class="sg-detail__channel-name">Branding</span>
+                      <span class="sg-detail__time">11:30am – 11:45am</span>
+                    </div>
+                    <h2 class="sg-detail__title">In-House to Studio: Timeless Brands in the AI Era</h2>
+                    <div class="sg-detail__actions">
+                      <button class="sg-detail__btn sg-detail__btn--primary" type="button">Add to schedule</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sg-detail__col sg-detail__col--side">
+                <div class="sg-detail__group sg-detail__group--speakers">Speakers</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+    if (innerWidth < 1280) {
+      const cols = document.querySelector('.sg-detail__cols');
+      cols.classList.remove('sg-detail__cols--split');
+      cols.replaceChildren(...document.querySelectorAll('.sg-detail__group'));
+    }
+  </script>
+</body>
+</html>
