@@ -92,7 +92,6 @@ function isTruthyConfigValue(value) {
 
 function renderBanner(el, contentCell, navOverlay) {
   el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
-  el.classList.toggle('in-person-banner-nav-overlay', navOverlay);
 
   const banner = buildBanner(contentCell);
   el.replaceChildren(banner);
