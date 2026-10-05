@@ -297,6 +297,20 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
       eventStartMs: resolveEventStartMs(),
       liveStreamActiveIds,
     });
+    // TEMP DEBUG - phase flip diagnosis
+    // eslint-disable-next-line no-console
+    console.log('[watch] emit', {
+      phase,
+      lastPhase,
+      nowMs: getNowMs(),
+      mrStreamId: session.mrStreamId,
+      activeIds: [...liveStreamActiveIds],
+      isLiveNow: session.mrStreamId ? liveStreamActiveIds.has(session.mrStreamId) : 'n/a',
+      dvrDelayHours: session.dvrDelayHours,
+      endTimeUtc: session.endTimeUtc,
+      isLivestreamed: session.isLivestreamed,
+      caller: new Error().stack?.split('\n')[2]?.trim(),
+    });
     if (phase !== lastPhase) {
       lastPhase = phase;
       onChange(phase);
