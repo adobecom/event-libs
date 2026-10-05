@@ -401,9 +401,6 @@ async function watchYouTubePlayback(sessionId, iframe) {
   }
 }
 
-// Dispose the MobileRider VideoJS instance (stored globally as window.__mr_player) before its DOM
-// is removed. Without this, the orphaned player keeps firing events (userActive -> createPlayerWidget)
-// against detached nodes and throws "Cannot read properties of null (reading 'appendChild')".
 function removeMobileRiderPlayer(el) {
   const rider = el.querySelector('.mobile-rider');
   if (!rider) return;
@@ -563,10 +560,6 @@ export default async function init(el) {
           BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
           window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
         }
-        // The winning instance can flip between phases: DVR_BUFFER has no playlist (outside
-        // instance wins), ON_DEMAND renders the playlist (inside instance wins). Re-evaluate and
-        // act on both directions so the swap is clean — otherwise the now-losing DVR player stays
-        // visible and the now-winning MPC loads into a still-hidden container.
         const nowWinning = isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist);
         if (nowWinning) {
           el.classList.remove('session-video-hidden');
