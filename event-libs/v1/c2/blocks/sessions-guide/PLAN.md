@@ -535,7 +535,7 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 - Live section: `liveSessions()` filtered to `activeDay` — uses `isInLiveNow()` for MR sessions, `isSessionLive()` for non-MR
 - Featured carousel: shown when `live.length === 0`; uses `getFeaturedSessions()` which maps `featuredSessionIds` to day sessions (falls back to deterministic random shuffle keyed on `activeDay`)
 - Upcoming section: `upcomingSessions()` filtered to `activeDay`, then `filterSessions()` applied
-- Previously aired section: shown when both `timeSlots.length === 0 && live.length === 0`; shows all sessions for the day with `forceOnDemand={true}`, grouped by start time
+- Previously aired section: shown when `timeSlots.length === 0` (nothing upcoming that day); shows the day's sessions with `forceOnDemand={true}`, grouped by start time, **minus any still in the Live carousel**. It used to also require `live.length === 0`, but MR streams stay on until ops turns them off, so one lingering stream hid the whole finished day (Recommended stays gated on `live.length === 0`).
 - Empty state: "No sessions scheduled for this day."
 
 ### 3.2 My Sessions view ✅ (`MySessionsView`)
