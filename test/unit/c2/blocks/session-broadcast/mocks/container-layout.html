@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Broadcast container layout fixture</title>
+  <link rel="stylesheet" href="/event-libs/v1/c2/blocks/sessions-guide/sessions-guide.css">
+  <link rel="stylesheet" href="/event-libs/v1/c2/blocks/session-broadcast/session-broadcast.css">
+  <style>
+    body { margin: 0; background: #000; }
+    .youtube-video-container { background: #131313; }
+  </style>
+</head>
+<body>
+  <main class="session-broadcast">
+    <div class="sb-app">
+      <div class="sb-live">
+        <div class="sb-player__mount event-youtube">
+          <div class="youtube-stream">
+            <div class="youtube-video-container">
+              <iframe title="Local player fixture" srcdoc="<!DOCTYPE html><html lang='en'><body></body></html>"></iframe>
+            </div>
+          </div>
+        </div>
+        <div class="sb-info">
+          <div class="sb-info__row">
+            <h2 class="sb-info__title">Pixel &amp; Product</h2>
+          </div>
+          <div class="sb-info__meta">Design</div>
+          <div class="sb-info__actions">
+            <button class="sb-info__icon-btn" type="button" aria-label="Share session">S</button>
+          </div>
+        </div>
+      </div>
+      <div class="sb-carousel-section sb-carousel-section--also-live">
+        <div class="sg-carousel">
+          <div class="sg-carousel__header"><h3 class="sg-section-title">More live sessions</h3></div>
+          <div class="sg-carousel__body">
+            <div class="sg-carousel__track">
+              <div class="sg-carousel__cards">
+                <div class="sg-carousel__card-wrap"><div class="sg-live-card">Live one</div></div>
+                <div class="sg-carousel__card-wrap"><div class="sg-live-card">Live two</div></div>
+              </div>
+            </div>
+            <div class="sg-carousel__nav">
+              <button class="sg-carousel__arrow sg-carousel__arrow--prev" type="button" aria-label="Previous">&lt;</button>
+              <button class="sg-carousel__arrow sg-carousel__arrow--next" type="button" aria-label="Next">&gt;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sb-carousel-section sb-carousel-section--up-next">
+        <div class="sg-carousel">
+          <div class="sg-carousel__header"><h3 class="sg-section-title">Upcoming sessions</h3></div>
+          <div class="sg-carousel__body">
+            <div class="sg-carousel__track">
+              <div class="sg-carousel__cards">
+                <div class="sg-carousel__card-wrap"><div class="sg-card">One</div></div>
+                <div class="sg-carousel__card-wrap"><div class="sg-card">Two</div></div>
+                <div class="sg-carousel__card-wrap"><div class="sg-card">Three</div></div>
+                <div class="sg-carousel__card-wrap"><div class="sg-card">Four</div></div>
+                <div class="sg-carousel__card-wrap"><div class="sg-card">Five</div></div>
+                <div class="sg-carousel__card-wrap"><div class="sg-card">Six</div></div>
+                <div class="sg-carousel__card-wrap"><div class="sg-card">Seven</div></div>
+              </div>
+            </div>
+            <div class="sg-carousel__nav">
+              <button class="sg-carousel__arrow sg-carousel__arrow--prev" type="button" aria-label="Previous">&lt;</button>
+              <button class="sg-carousel__arrow sg-carousel__arrow--next" type="button" aria-label="Next">&gt;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

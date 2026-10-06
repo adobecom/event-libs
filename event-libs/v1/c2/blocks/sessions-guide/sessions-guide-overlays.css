@@ -277,6 +277,7 @@
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
   font-size: var(--s2a-font-size-xl);
   line-height: 1.1;
+  text-wrap: balance;
   color: var(--s2a-color-content-default);
   margin: 0;
 }
@@ -1241,6 +1242,10 @@
   .sg-filter-panel__options {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     padding: var(--s2a-spacing-lg);
+  }
+
+  .sg-filter-panel__close {
+    display: none;
   }
 }
 

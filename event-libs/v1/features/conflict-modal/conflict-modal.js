@@ -31,7 +31,7 @@ function buildOption(name, value, session, onSelect) {
   track.textContent = session.primaryTrack || '';
   const duration = createTag('span', { class: 'sg-conflict-option__duration' });
   if (session.startTimeUtc && session.endTimeUtc) {
-    duration.textContent = formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true });
+    duration.textContent = formatDuration(session.startTimeUtc, session.endTimeUtc);
   }
   meta.append(track, duration);
 

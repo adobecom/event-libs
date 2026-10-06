@@ -8,6 +8,70 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ---
 
+## Collapsed widget visibility
+
+The widget stays mounted while closed, preserving its view and scroll state.
+`inert` prevents interaction but does not visually hide content, and moving the
+drawer to `top: 100vh` is not a sufficient visibility guarantee on real iOS
+browsers with changing viewport geometry (MWPW-208862). The closed drawer now
+has zero opacity, masking the entire subtree, including its sticky heading and
+any descendants with their own visibility rules. This prevents the unregistered
+"Find more inspiration" heading from leaking over the host page or a full-page
+Session Guide.
+
+The opacity change is delayed until the existing 450ms closing slide ends;
+the layout effect sets the transition before paint so closing does not snap
+invisible before the delay is applied. Opening clears that delay before sliding
+in. Reduced-motion users hide the drawer immediately. Peek and expanded states,
+header layout, dropdown overflow,
+and the separate "View all sessions" FAB are unchanged. Regression coverage
+forces the closed drawer into visible viewport coordinates to verify hiding
+does not depend on viewport height, at mobile, tablet, and desktop widths.
+An isolated iframe loads the actual Preact bundle via an import map for
+open/close/reopen and reduced-motion coverage, rather than relying on the
+unit suite's no-op effect mocks. The `real-preact=true` test-runner query opt-out
+serves the real bundle without changing the default mock used by the other tests.
+Real iPhone 16 Pro Chrome verification remains necessary for the device-only
+symptom, including scrolling with browser controls expanded and collapsed.
+
+## Session detail title wrapping
+
+The shared detail-overlay title uses `text-wrap: balance` at every breakpoint
+(MWPW-208944), matching the individual session page's title treatment
+(MWPW-208937). This evens out multiline titles within the existing summary column,
+including at the reported 1572px viewport, without changing font sizes, column
+widths, spacing, or session copy. Browsers without support retain normal wrapping.
+The layout regression fixture checks computed styles and overflow across mobile,
+tablet, and desktop widths, and compares actual line widths against normal
+wrapping at 1572px.
+
+## Mobile Safari FAB placement
+
+The Session Guide FAB uses a 24px bottom offset on Mobile Safari (MWPW-208776),
+matching the confirmed gap above Safari's controls. The previous 64px override
+added 40px of unnecessary clearance. This is an engineering-owned fixed-position
+offset, not authored block spacing (MWPW-201396); other browsers keep their existing
+24px placement. The layout regression fixture checks the rendered gap with and
+without the Safari modifier at mobile, tablet, and desktop widths.
+
+## Full-page header-to-content spacing
+
+The full-page body must start directly below the header, matching the widget's body.
+Its top padding is zero at every breakpoint (MWPW-208806); the former tablet spacing
+token and desktop 4px override created a white strip above the gray Recommended/Live
+carousel. Header clearance for global navigation, header/control spacing, carousel
+inner spacing, and body bottom padding remain unchanged. Both full-page block names
+(`sessions-guide` with the page surface and `sessions-guide-full-page`) share this rule.
+The layout regression fixture checks the actual styles at mobile, tablet, desktop,
+and breakpoint boundaries.
+
+## On-demand section order
+
+The shared on-demand view renders Recommended first, followed by the On-demand
+heading and track rows (MWPW-208777). The heading stays above the empty or no-results
+state when Recommended is absent or hidden. This is DOM order, not a CSS reorder,
+so visual and reading order agree on both page and drawer surfaces.
+
 ## sessions-api.js
 
 ### sessionPageUrlForEnv
@@ -298,6 +362,13 @@ rest of the drawer is unavailable.
 Product icons are scoped to the product filter category alone, keyed on `productAttributeId` —
 `Illustrator` is both a product and an `Audience` value, so matching against the products map
 isn't enough on its own.
+
+At desktop (1280px and above), the filter panel's close (X) button is hidden (MWPW-208026),
+not the selected tags' checkmarks. `display: none` removes the button from the layout,
+keyboard focus order, and accessibility tree; Escape, click-away, and Apply still dismiss
+the desktop popover. Mobile/tablet keep their close button. Selection checkmarks, product
+icons, selected styling, and `aria-pressed` are unchanged at every width. The shared
+stylesheet covers both the widget portal and full-page guide.
 
 ---
 

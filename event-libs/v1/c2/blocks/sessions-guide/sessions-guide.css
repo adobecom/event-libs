@@ -207,6 +207,11 @@
   z-index: 50;
 }
 
+/* Off-screen positioning alone can expose the sticky header on iOS (MWPW-208862). */
+.sg-drawer[inert] {
+  opacity: 0;
+}
+
 /* Clip rounded corners without clipping dropdown panels */
 .sg-drawer::before {
   content: '';
@@ -440,7 +445,7 @@
   overflow-y: auto;
 }
 
-/* tabindex="-1" is only a Back-to-top landing target, so the UA focus ring here is noise. */
+/* tabindex="-1" is only a programmatic landing target (Back-to-top, Reset all), so the UA focus ring here is noise. */
 .sg-body-scroll:focus,
 .sg-body-scroll:focus-visible {
   outline: none;
@@ -662,11 +667,30 @@
     0 2px 6px rgb(0 0 0 / 4%),
     0 4px 12px rgb(0 0 0 / 8%);
   z-index: 9;
+
+  /* The delay rides out the player's brief collapse when a session switch remounts it. */
+  transition: opacity 200ms ease 100ms, visibility 0s 100ms;
 }
 
-/* Real Mobile Safari only (isSafariMobile()) — clears its floating address bar; see MWPW-201396. */
+/* Hidden (and out of the tab order) while it would cover a video player's controls;
+   fades back once the player scrolls clear (MWPW-208524). */
+.sg-cta-btn--over-player {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 200ms ease, visibility 0s 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-cta-btn,
+  .sg-cta-btn--over-player {
+    transition: none;
+  }
+}
+
+/* Real Mobile Safari only (isSafariMobile()) — 24px above its controls (MWPW-208776). */
 .sg-cta-btn--safari-mobile {
-  bottom: 64px;
+  bottom: 24px;
 }
 
 /* ── Placeholders ────────────────────────────────────────── */
@@ -748,7 +772,8 @@
   line-height: 1.1;
   letter-spacing: normal;
   margin: var(--s2a-spacing-lg) 0 0;
-  padding: 0 var(--s2a-spacing-lg);
+  padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-sm);
+  border-bottom: 1px solid #e8e8e8;
 }
 
 .sg-empty {
@@ -762,7 +787,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--s2a-spacing-lg);
+  gap: var(--s2a-spacing-md);
   padding: var(--s2a-spacing-4xl) var(--s2a-spacing-lg);
   text-align: center;
   color: var(--s2a-color-content-default);
@@ -771,10 +796,50 @@
 
 .sg-empty--no-results p {
   margin: 0;
+  max-width: 60ch;
+}
+
+.sg-empty__message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2a-spacing-md);
 }
 
 .sg-empty__title {
+  font-family: var(--heading-font-family);
+  font-weight: var(--s2a-font-weight-adobe-clean-display-black);
+  font-size: var(--s2a-font-size-lg);
+  line-height: var(--s2a-font-line-height-18, 18px);
+  letter-spacing: var(--s2a-font-letter-spacing-neg-0-2, -0.2px);
+}
+
+.sg-empty__reset {
+  min-height: 40px;
+  padding: var(--s2a-spacing-xs) var(--s2a-spacing-lg);
+  border: var(--s2a-border-width-sm) solid var(--s2a-color-border-knockout, #000);
+  border-radius: var(--s2a-border-radius-round);
+  background: transparent;
+  color: inherit;
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-size: var(--s2a-font-size-sm);
+  line-height: var(--s2a-font-line-height-18, 18px);
+  cursor: pointer;
+}
+
+.sg-empty__reset:hover {
+  background: var(--s2a-color-background-subtle);
+}
+
+.sg-empty__reset:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 2px;
+}
+
+[data-theme="dark"] .sg-empty__reset,
+.sg-portal[data-theme="dark"] .sg-empty__reset {
+  border-color: var(--s2a-color-transparent-white-16);
 }
 
 /* ── Carousel ────────────────────────────────────────────── */
@@ -856,6 +921,14 @@
   justify-content: center;
   color: var(--s2a-color-content-default);
   transition: background 0.15s, opacity 0.15s;
+}
+
+/* Live/Recommended arrows are 32px (Figma); Broadcast keeps its own 40px arrows. */
+.sg-carousel-section .sg-carousel__nav { gap: 16px; }
+
+.sg-carousel-section .sg-carousel__arrow {
+  width: 32px;
+  height: 32px;
 }
 
 .sg-carousel__arrow:hover:not([disabled]) { background: var(--s2a-color-gray-75); }
@@ -1166,8 +1239,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--s2a-spacing-sm);
-  padding: 18px 0 18px var(--s2a-spacing-lg);
-  border-bottom: none;
+  padding: var(--s2a-spacing-lg) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
+  border-bottom: 1px solid #e8e8e8;
   position: relative;
   overflow: visible;
   max-height: none;
@@ -1212,10 +1285,11 @@
   }
 }
 
-/* Matches .sg-time-row__time-value's font; font-family explicit since this is a real <h3>. */
+/* Matches .sg-time-row__time-value's font (Figma title-xs below 1280px; desktop restates lg);
+   font-family explicit since this is a real <h3>. */
 .sg-time-row__label--category {
   font-family: var(--body-font-family);
-  font-size: var(--s2a-font-size-lg);
+  font-size: var(--s2a-font-size-md);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   color: var(--s2a-color-gray-800);
   line-height: var(--s2a-font-line-height-sm);
@@ -1223,7 +1297,7 @@
 
 .sg-time-row__time-value {
   color: var(--s2a-color-gray-800);
-  font-size: var(--s2a-font-size-lg);
+  font-size: var(--s2a-font-size-md);
   font-style: normal;
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   line-height: var(--s2a-font-line-height-sm);
@@ -1369,6 +1443,18 @@
   overflow: hidden;
 }
 
+/* The body's overflow: hidden clipped three sides of the title's focus ring (1px + 2px offset).
+   Pad the clip box by the ring's 3px reach and cancel it with a negative margin: layout is unchanged.
+   Scoped to SessionCard's hosts so other .sg-card users (upcoming-sessions) are untouched. */
+@media (max-width: 1279px) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal, .sb-carousel-section--up-next) .sg-card__body {
+    box-sizing: border-box;
+    width: calc(100% + 6px);
+    margin: -3px;
+    padding: 3px;
+  }
+}
+
 /* Titles are real buttons, so reset UA chrome before .sg-card__title's own rule. */
 .sg-card__title-btn {
   display: block;
@@ -1395,17 +1481,23 @@
   color: var(--s2a-color-gray-900);
   line-height: 1.25;
   overflow: hidden;
-  display: box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   margin: 0;
-  margin-top: 0;
-  margin-bottom: 2px;
   min-width: 0;
   width: 100%;
   min-height: 40px;
   transition: none;
+}
+
+/* Figma's small card title is a fixed two lines (40px), so every card in a row is the same height.
+   Below 1280px only: desktop sizes its title separately. */
+@media (max-width: 1279px) {
+  .sg-card__title {
+    /* stylelint-disable-next-line value-no-vendor-prefix */
+    display: -webkit-box;
+  }
 }
 
 .sg-card:is(:hover, :focus-within) .sg-card__title { color: var(--s2a-color-gray-900); }
@@ -1432,14 +1524,16 @@
   transition: none;
 }
 
-/* Category badge row — shown at top on mobile, hidden on desktop */
+/* Track row below the title on mobile/tablet, hidden on desktop. Figma's row is 16px tall; the
+   20px badge (16px icon + 2px padding) overflows it evenly, as in the design. */
 .sg-card__badge-row {
   display: flex;
   align-items: center;
   flex-shrink: 0;
   width: 100%;
+  height: 16px;
   overflow: visible;
-  margin-bottom: var(--s2a-spacing-md);
+  margin-top: var(--s2a-spacing-md);
 }
 
 /* Desktop footer track and badge hidden on mobile */
@@ -1525,6 +1619,27 @@
 
 /* stylelint-disable-next-line no-descending-specificity */
 .sg-card__btn:hover { background: rgb(255 255 255 / 100%); }
+
+/* Mobile/tablet: a scheduled/favorited (solid variant) button keeps the unselected button's transparent
+   look with Figma's gray-900 outline, instead of IconButton's frosted fill and near-invisible gray-100
+   border. Hover/press tints match the outlined variant. Broadcast styles its own card. */
+@media (max-width: 1279px) {
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite) {
+    background: transparent;
+    border-color: var(--s2a-color-gray-900, #131313);
+    color: var(--s2a-color-gray-900, #131313);
+  }
+
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite):hover:not(:disabled) {
+    background: var(--s2a-color-transparent-black-08, rgb(0 0 0 / 8%));
+    border-color: var(--s2a-color-gray-900, #131313);
+  }
+
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-card .sg-icon-btn--solid.sg-icon-btn--on-light:is(.sg-card__btn--schedule, .sg-card__btn--favorite):active:not(:disabled) {
+    background: var(--s2a-color-transparent-black-12, rgb(0 0 0 / 12%));
+    border-color: var(--s2a-color-gray-900, #131313);
+  }
+}
 
 /* ── My Sessions / My Favorites tabs ────────────────────── */
 
@@ -1673,6 +1788,28 @@
   .sg-right-controls {
     width: auto;
     gap: var(--s2a-spacing-md);
+    margin-left: auto;
+  }
+
+  /* Post-event (no date tabs): title shares the controls' row, 6/12 columns on tablet. */
+  .sg-header.sg-header--no-dates {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(max-content, 6fr);
+    column-gap: 72px;
+    align-items: center;
+  }
+
+  .sg-header.sg-header--no-dates .sg-header-title-row {
+    padding-right: 0;
+  }
+
+  .sg-header.sg-header--no-dates .sg-header-controls {
+    padding-left: 0;
+  }
+
+  /* Drawer only: controls now share the close button's row; clear its 16px inset + 19px width. */
+  .sg-drawer .sg-header--no-dates .sg-header-controls {
+    padding-right: calc(35px + var(--s2a-spacing-md));
   }
 
   .sg-view-dropdown-wrap {
@@ -1712,7 +1849,6 @@
     font-size: var(--s2a-font-size-2xl);
     margin: 0;
     padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-sm);
-    border-bottom: 1px solid #e8e8e8;
   }
 
   /* ── Time slot rows ────────────────────────────────────── */
@@ -1722,7 +1858,6 @@
     align-items: center;
     gap: 36px;
     padding: var(--s2a-spacing-md) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
-    border-bottom: 1px solid #e8e8e8;
     background: #fff;
   }
 
@@ -1739,7 +1874,7 @@
     overflow-wrap: break-word;
 
     /* Restates .sg-time-row__time-value's values so the category label keeps matching it. */
-    font-size: var(--s2a-font-size-lg);
+    font-size: var(--s2a-font-size-md);
     color: var(--s2a-color-gray-800);
   }
 
@@ -1772,32 +1907,69 @@
   .sg-carousel__track { margin-right: 0; }
 }
 
-/* ── Tablet only: floating carousel arrows ───────────────────────────────── */
+/* ── Mobile + tablet carousel arrows ─────────────────────────────────────── */
 
-@media (min-width: 768px) and (max-width: 1023px) {
-  /* Cards scroll natively; arrows float over the strip as glass buttons, only actionable ones shown. */
-  .sg-carousel__body { position: relative; }
-
-  .sg-carousel__nav { display: contents; }
-
-  .sg-carousel__arrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 2;
-    width: 32px;
-    height: 32px;
-    background: rgb(255 255 255 / 72%);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--s2a-color-border-subtle);
-    box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+/* Grid + `display: contents` moves the nav into the header row without changing the DOM. */
+@media (max-width: 1023px) {
+  .sg-carousel-section .sg-carousel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    row-gap: var(--s2a-spacing-md);
   }
 
-  .sg-carousel__arrow--prev { left: var(--spacing-xxl-static, 40px); }
+  .sg-carousel-section .sg-carousel__header {
+    grid-area: 1 / 1;
+    margin: 0;
+  }
 
-  .sg-carousel__arrow--next { right: var(--s2a-spacing-sm); }
+  .sg-carousel-section .sg-carousel__body { display: contents; }
 
-  .sg-carousel__arrow[disabled] { display: none; }
+  .sg-carousel-section .sg-carousel__time { display: none; }
+
+  .sg-carousel-section .sg-section-time { display: inline; }
+
+  .sg-carousel-section .sg-carousel__track { grid-area: 2 / 1 / 3 / -1; }
+
+  .sg-carousel-section .sg-carousel__nav {
+    display: flex;
+    grid-area: 1 / 2;
+    margin-right: var(--s2a-spacing-lg);
+  }
+
+  .sg-carousel-section .sg-carousel__arrow { position: relative; }
+
+  /* 40px touch target. */
+  .sg-carousel-section .sg-carousel__arrow::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sg-carousel-section .sg-carousel { row-gap: 20px; }
+}
+
+/* Tablet, no date tabs, search open: flatten the controls wrapper so the search row gets its own
+   full-width grid row below the title and controls, whatever the title's height. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sg-header--no-dates:has(.sg-mobile-search-row--open) :is(.sg-header-controls-collapse, .sg-header-controls-collapse-inner) {
+    display: contents;
+  }
+
+  .sg-header.sg-header--no-dates:has(.sg-mobile-search-row--open) {
+    row-gap: var(--s2a-spacing-lg);
+  }
+
+  .sg-header--no-dates .sg-mobile-search-row {
+    grid-column: 1 / -1;
+  }
+
+  /* The flattened wrapper can't collapse, so hide its contents while a session detail is open. */
+  .sg-drawer--detail-open .sg-header--no-dates:has(.sg-mobile-search-row--open) :is(.sg-header-controls, .sg-mobile-search-row) {
+    display: none;
+  }
 }
 
 /* ── Intermediate Tablet (1024px–1279px) — desktop-style live section ─────── */
@@ -1821,7 +1993,7 @@
   }
 
   /* Cancels .sg-carousel-section's 20px right padding so the peeking card bleeds to the edge. */
-  .sg-carousel__track {
+  .sg-carousel-section .sg-carousel__track {
     margin-right: -20px;
   }
 
@@ -2090,8 +2262,67 @@
 
   .sg-time-row:is(:hover, :focus-within) .sg-card:not(:hover, :focus-within) { background: var(--s2a-color-gray-50); }
 
+  /* Label and arrows on top, cards below; `display: contents` lifts the arrows into the header. */
+  .sg-time-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 20px;
+    row-gap: var(--s2a-spacing-sm);
+  }
+
+  .sg-time-row__label,
+  .sg-time-row__label--category {
+    grid-area: 1 / 1;
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--s2a-spacing-4);
+    width: auto;
+  }
+
+  .sg-time-row__track { display: contents; }
+
+  .sg-time-row__viewport { grid-area: 2 / 1 / 3 / -1; }
+
+  /* Trailing gutter after the last card. */
+  .sg-time-row__cards { padding-right: var(--s2a-spacing-md); }
+
+  .sg-time-row__arrow,
   .sg-time-row:is(:hover, :focus-within) .sg-time-row__arrow {
-    opacity: 0;
+    display: flex;
+    position: relative;
+    inset: auto;
+    transform: none;
+    width: 24px;
+    height: 24px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sg-time-row__arrow--prev { grid-area: 1 / 2; }
+
+  .sg-time-row__arrow--next {
+    grid-area: 1 / 3;
+    margin-right: var(--s2a-spacing-lg);
+  }
+
+  .sg-time-row__arrow svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* 40px touch target. */
+  .sg-time-row__arrow::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+
+  /* Below desktop, disabled arrows stay visible (dimmed). */
+  .sg-time-row .sg-time-row__arrow:disabled,
+  .sg-time-row:is(:hover, :focus-within) .sg-time-row__arrow:disabled {
+    opacity: 0.4;
+    cursor: default;
     pointer-events: none;
   }
 }
@@ -2126,6 +2357,10 @@
     flex-direction: row;
     align-items: center;
     gap: var(--s2a-spacing-md);
+  }
+
+  .sg-header.sg-header--no-dates {
+    grid-template-columns: minmax(0, 8fr) minmax(max-content, 4fr);
   }
 
   /* Full page (Figma 8463:87660): wider side gutter than the widget's drawer, and a shorter
@@ -2369,6 +2604,11 @@
     position: absolute;
     top: 0;
     right: 0;
+  }
+
+  /* Align with the header's search button (gutter minus the section's 20px right padding). */
+  .sg-full-page .sg-carousel__nav {
+    right: calc(156px - 20px);
   }
 
   /* Time inline with the title hides; it moves to the left gutter. */
@@ -2674,6 +2914,11 @@
     white-space: nowrap;
     width: 60px;
     padding: 0;
+  }
+
+  /* Desktop row headings stay lg; mobile/tablet use Figma's title-xs (md). */
+  .sg-time-row__time-value {
+    font-size: var(--s2a-font-size-lg);
   }
 
   .sg-time-row__label--category {
@@ -3154,23 +3399,19 @@
 
 .sg-full-page__body {
   flex: 1;
-  padding: var(--s2a-spacing-lg) 0;
+  padding: 0 0 var(--s2a-spacing-lg);
+}
+
+/* Programmatic focus target (Reset all), same as .sg-body-scroll. */
+.sg-full-page__body:focus,
+.sg-full-page__body:focus-visible {
+  outline: none;
 }
 
 @media (max-width: 767px) {
-  .sg-full-page__body {
-    padding-top: 0;
-  }
-
   .sg-full-page .sg-header-title-row,
   .sg-full-page .sg-header-controls {
     padding: 0 var(--s2a-spacing-lg);
-  }
-}
-
-@media (min-width: 1280px) {
-  .sg-full-page__body {
-    padding-top: 4px;
   }
 }
 
@@ -3185,6 +3426,10 @@
   /* Right stays at the base 20px — see the 1280px tier's identical comment. */
   .sg-full-page .sg-carousel-section {
     padding-left: 160px;
+  }
+
+  .sg-full-page .sg-carousel__nav {
+    right: calc(160px - 20px);
   }
 
   .sg-full-page .sg-upcoming-title {

@@ -13,7 +13,7 @@ import { showToast } from '../../../../features/toast/toast.js';
 import { SessionGuideProvider } from '../../sessions-guide/store/index.js';
 import { detectUserTimezone } from '../../sessions-guide/utils/time.js';
 import { findSessionByParam } from '../../sessions-guide/utils/url.js';
-import { scrollBehavior } from '../../sessions-guide/utils/motion.js';
+import { scrollPageToTop } from '../../sessions-guide/utils/motion.js';
 import { LoadingState, sessionsStatusMessage } from '../../sessions-guide/components/LoadingState.js';
 import { getBroadcastSchedule, isSessionLiveNow } from '../utils/broadcast-schedule.js';
 import {
@@ -41,9 +41,7 @@ export const SCHEDULE_REFRESH_MS = 5_000;
 export const SWITCH_SCROLL_DELAY_MS = 300;
 
 export function scheduleSwitchScroll(delayMs = SWITCH_SCROLL_DELAY_MS) {
-  return setTimeout(() => {
-    window.scrollTo({ top: 0, behavior: scrollBehavior() });
-  }, delayMs);
+  return setTimeout(scrollPageToTop, delayMs);
 }
 
 // Exported separately so tests can call it without mounting the Provider tree.
@@ -172,6 +170,14 @@ export function BroadcastBody({ config }) {
     .filter(([, url]) => url)
     .map(([name, url]) => `${name}: url("${url}")`)
     .join(';');
+  const playerBgVars = {
+    '--sb-player-bg-desktop': safeUrl(config.playerBackgroundImageUrlDesktop),
+    '--sb-player-bg-desktop-xl': safeUrl(config.playerBackgroundImageUrlDesktopXl),
+  };
+  const playerStyle = Object.entries(playerBgVars)
+    .filter(([, url]) => url)
+    .map(([name, url]) => `${name}: url(${JSON.stringify(url)})`)
+    .join(';');
 
   return html`
     <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')} style=${appStyle}>
@@ -180,8 +186,10 @@ export function BroadcastBody({ config }) {
       ${sessionsStatus.value === 'error' && html`<div class="sb-error" role="alert">Failed to load sessions.</div>`}
       ${sessionsStatus.value === 'ready' && html`
         ${schedule.activeSession && html`
-          <${PlayerHost} session=${schedule.activeSession} />
-          <${SessionInfoPanel} session=${schedule.activeSession} viewAllDetailsLabel=${config.viewAllDetailsLabel} />
+          <div class=${`sb-live${playerStyle ? ' has-background' : ''}`} style=${playerStyle}>
+            <${PlayerHost} session=${schedule.activeSession} />
+            <${SessionInfoPanel} session=${schedule.activeSession} viewAllDetailsLabel=${config.viewAllDetailsLabel} />
+          </div>
         `}
         ${endedActive && html`<${EndedState} session=${schedule.endedSession} />`}
         <${AlsoLiveCarousel} sessions=${schedule.alsoLive} title=${config.alsoLiveTitle} onSwitchSession=${handleSwitchSession} />

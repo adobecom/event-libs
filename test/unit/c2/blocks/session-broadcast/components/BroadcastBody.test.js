@@ -80,6 +80,88 @@ describe('BroadcastBody', () => {
     expect(out).to.include('aria-busy="false"');
   });
 
+  describe('live player background', () => {
+    beforeEach(() => {
+      sessionsStatus.value = 'ready';
+      sessions.value = [{
+        id: 's-1',
+        title: 'Live now',
+        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
+        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
+        youTubeId: 'yt-1',
+        isOnline: true,
+      }];
+      history.replaceState({ session: 's-1' }, '', window.location.pathname);
+    });
+
+    it('groups the player and info panel without adding a content image', () => {
+      const out = BroadcastBody({ config: CONFIG });
+      expect(out).to.include('class="sb-live"');
+      expect(out).to.not.include('--sb-player-bg');
+      expect(out).to.not.include('<img');
+    });
+
+    it('sets an authored background only on the live wrapper', () => {
+      const out = BroadcastBody({
+        config: { ...CONFIG, playerBackgroundImageUrlDesktop: 'https://example.com/player.png' },
+      });
+      expect(out).to.include('class="sb-live has-background" style="--sb-player-bg-desktop: url(&quot;https://example.com/player.png&quot;)"');
+      expect(out).to.not.include('--sb-app-ended-bg');
+    });
+
+    it('renders the two desktop properties independently', () => {
+      const out = BroadcastBody({
+        config: {
+          ...CONFIG,
+          playerBackgroundImageUrlDesktop: 'https://example.com/desktop.png',
+          playerBackgroundImageUrlDesktopXl: 'https://example.com/xl.png',
+        },
+      });
+      expect(out).to.include('--sb-player-bg-desktop: url(&quot;https://example.com/desktop.png&quot;)');
+      expect(out).to.include('--sb-player-bg-desktop-xl: url(&quot;https://example.com/xl.png&quot;)');
+    });
+
+    it('rejects unsafe authored URLs and leaves the background plain', () => {
+      const out = BroadcastBody({
+        config: { ...CONFIG, playerBackgroundImageUrlDesktop: 'javascript:alert(1)' },
+      });
+      expect(out).to.not.include('--sb-player-bg');
+      expect(out).to.not.include('javascript:');
+      expect(out).to.not.include('has-background');
+    });
+
+    it('omits an unsafe tier without dropping the valid tier', () => {
+      const out = BroadcastBody({
+        config: {
+          ...CONFIG,
+          playerBackgroundImageUrlDesktop: 'javascript:alert(1)',
+          playerBackgroundImageUrlDesktopXl: 'https://example.com/xl.png',
+        },
+      });
+      expect(out).to.include('class="sb-live has-background"');
+      expect(out).to.not.include('--sb-player-bg-desktop:');
+      expect(out).to.include('--sb-player-bg-desktop-xl:');
+    });
+
+    it('escapes CSS string delimiters in an authored URL', () => {
+      const out = BroadcastBody({
+        config: { ...CONFIG, playerBackgroundImageUrlDesktop: 'https://example.com/a"b.png' },
+      });
+      expect(out).to.include('a\\&quot;b.png');
+    });
+
+    ['loading', 'error', 'idle'].forEach((status) => {
+      it(`does not apply the live background during ${status}`, () => {
+        sessionsStatus.value = status;
+        const out = BroadcastBody({
+          config: { ...CONFIG, playerBackgroundImageUrlDesktop: 'https://example.com/player.png' },
+        });
+        expect(out).to.not.include('class="sb-live"');
+        expect(out).to.not.include('--sb-player-bg');
+      });
+    });
+  });
+
   // EndedState (unlike PlayerHost/AlsoLiveCarousel/etc.) IS invoked for real by this harness —
   // it's wrapped in its own bare `html`<${EndedState} .../>`` call, the one shape the mock
   // resolves (see the note at the top of this file) — so its actual rendered content is a
@@ -244,6 +326,15 @@ describe('BroadcastBody', () => {
       expect(out).to.not.include('--sb-app-ended-bg');
     });
 
+    it('does not carry the live player background into the ended state', () => {
+      const out = BroadcastBody({
+        config: { ...CONFIG, playerBackgroundImageUrlDesktop: 'https://example.com/player.png' },
+      });
+      expect(out).to.include('sb-ended');
+      expect(out).to.not.include('class="sb-live"');
+      expect(out).to.not.include('--sb-player-bg');
+    });
+
     it('sets each of the four custom properties from its matching config field', () => {
       const out = BroadcastBody({
         config: {
@@ -318,6 +409,20 @@ describe('BroadcastBody', () => {
       clock.tick(1);
       expect(scrollToStub.calledOnce).to.equal(true);
       expect(scrollToStub.firstCall.args[0]).to.include({ top: 0 });
+    });
+
+    it('scrolls through Milo Lenis when present instead of the native scroll', () => {
+      const lenisScrollTo = sinon.spy();
+      window.lenis = { scrollTo: lenisScrollTo };
+      try {
+        scheduleSwitchScroll();
+        clock.tick(SWITCH_SCROLL_DELAY_MS);
+        expect(scrollToStub.called).to.equal(false);
+        expect(lenisScrollTo.calledOnceWith(0)).to.equal(true);
+        expect(lenisScrollTo.firstCall.args[1]).to.include({ force: true });
+      } finally {
+        delete window.lenis;
+      }
     });
   });
 });

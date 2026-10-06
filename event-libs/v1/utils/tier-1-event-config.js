@@ -1,5 +1,6 @@
 import { getMetadata } from './utils.js';
 import { logError, logWarning } from './lana-log.js';
+import { toPagePath } from './constances.js';
 
 // Reads the `tier-1-event-config` metadata once during decorateEvent, before any block's
 // init(), so every block on the page can read it.
@@ -59,12 +60,13 @@ export function getAllowDoubleBooking() {
 }
 
 // Live playback pages, which differ per event. '' when unauthored; caller picks a fallback.
+// Authored with or without `.html`; toPagePath matches whichever form the current host serves.
 export function getHomepagePath() {
-  return tierOneEventConfig.homepagePath || '';
+  return toPagePath(tierOneEventConfig.homepagePath || '');
 }
 
 export function getBroadcastPath() {
-  return tierOneEventConfig.broadcastPath || '';
+  return toPagePath(tierOneEventConfig.broadcastPath || '');
 }
 
 export function getEventStartMs() {
@@ -75,5 +77,5 @@ export function getEventStartMs() {
 // Where Broadcast redirects once every session for the event has aired
 // (session-broadcast/components/EndedState.js).
 export function getSessionGuidePath() {
-  return tierOneEventConfig.sessionGuidePath || '';
+  return toPagePath(tierOneEventConfig.sessionGuidePath || '');
 }

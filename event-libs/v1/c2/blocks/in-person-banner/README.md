@@ -96,6 +96,9 @@ exists for this.
 
 ## Layout
 
+- Below 1024px, the banner uses `display: none` while `#feds-menu-wrapper` has
+  the navigation's `is-open` class. Closing the menu restores the banner's normal
+  display; desktop navigation does not hide it.
 - Desktop: single-row bar, copy centered, `×` on the trailing edge. Copy has a
   `max-width: 800px` before it line-breaks, per Figma.
 - Mobile (`max-width: 767px`): copy left-aligns and the `×` sits at the top-right of a
