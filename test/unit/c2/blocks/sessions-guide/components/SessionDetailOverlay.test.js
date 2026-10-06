@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import { SessionDetailOverlay } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/SessionDetailOverlay.js';
 import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import {
@@ -86,7 +87,10 @@ describe('SessionDetailOverlay', () => {
     liveStreamActiveIds.value = new Set();
   });
 
-  afterEach(() => history.replaceState(null, '', originalUrl));
+  afterEach(() => {
+    sinon.restore();
+    history.replaceState(null, '', originalUrl);
+  });
 
   it('returns null when the active session is not in the catalog', () => {
     sessions.value = [];
@@ -371,6 +375,7 @@ describe('SessionDetailOverlay', () => {
 
     it('keeps the homepage serverTime on the detail overlay Watch now link', () => {
       history.replaceState(null, '', '/max-new.html?serverTime=1794339000000&session=s-1');
+      sinon.useFakeTimers({ now: 1_794_339_070_000 });
       const out = render({
         startTimeUtc: new Date(Date.now() - 0.5 * HOUR).toISOString(),
         endTimeUtc: new Date(Date.now() + 0.5 * HOUR).toISOString(),
@@ -380,7 +385,7 @@ describe('SessionDetailOverlay', () => {
       const template = document.createElement('template');
       template.innerHTML = out;
       expect(template.content.querySelector('.sg-detail__btn--watch').getAttribute('href'))
-        .to.equal('/max/2026/broadcast.html?watch=s-1&serverTime=1794339000000');
+        .to.equal('/max/2026/broadcast.html?watch=s-1&serverTime=1794339070000');
     });
 
     // Regression: a viewer can be sitting on the detail overlay when the session

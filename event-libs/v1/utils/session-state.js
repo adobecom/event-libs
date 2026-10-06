@@ -81,7 +81,7 @@ export function isBroadcastEligible(session) {
   return !session.isLivestreamed && !!session.isOnline;
 }
 
-function buildWatchUrl(path, sessionId) {
+export function buildWatchUrl(path, sessionId, nowMs = getNowMs()) {
   if (!path) return '';
   const serverTime = new URLSearchParams(window.location.search).get('serverTime');
   if (!sessionId && !serverTime) return path;
@@ -93,19 +93,21 @@ function buildWatchUrl(path, sessionId) {
   const base = queryIndex < 0 ? href : href.slice(0, queryIndex);
   const params = new URLSearchParams(queryIndex < 0 ? '' : href.slice(queryIndex + 1));
   if (sessionId) params.set('watch', sessionId);
-  if (serverTime) params.set('serverTime', serverTime);
+  if (serverTime) params.set('serverTime', String(nowMs));
   return `${base}?${params}${hash}`;
 }
 
 // Root-relative, falls back to MAX's pages for pre-authorable configs. `?watch=<id>` tells the
 // Broadcast page which session to commit to; omitted when session.id is absent (pseudo-sessions).
-export function getWatchDestination(session, sessionState) {
-  if (sessionState === 'on-demand') return buildWatchUrl(session.sessionPageUrl);
+export function getWatchDestination(session, sessionState, nowMs = getNowMs()) {
+  if (sessionState === 'on-demand') return buildWatchUrl(session.sessionPageUrl, undefined, nowMs);
   if (sessionState !== 'live') return '';
-  if (session.isLivestreamed) return buildWatchUrl(getHomepagePath() || MAX_EVENT_PAGES.homepage);
+  if (session.isLivestreamed) {
+    return buildWatchUrl(getHomepagePath() || MAX_EVENT_PAGES.homepage, undefined, nowMs);
+  }
   if (session.isOnline) {
     const path = getBroadcastPath() || MAX_EVENT_PAGES.broadcast;
-    return buildWatchUrl(path, session.id);
+    return buildWatchUrl(path, session.id, nowMs);
   }
   return '';
 }

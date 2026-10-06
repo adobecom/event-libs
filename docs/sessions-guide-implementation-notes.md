@@ -313,16 +313,24 @@ content is taller and scrolls.
 `getWatchDestination()` carries the current page's non-empty `serverTime` override to
 homepage, broadcast, and on-demand Watch destinations (MWPW-209738). The guide's live
 cards, detail overlay, and individual session-page Watch now CTA share this routing.
-The timestamp is copied unchanged, not replaced with real time or advanced by the
-time spent on the previous page; the destination starts its simulated clock from
-that same origin.
+The propagated value is the current simulated instant from `getNowMs()`, including
+elapsed time since the source page loaded. The destination resumes there rather
+than rewinding to the original override. Guide Watch controls and the session-page
+CTA refresh their destination at click time, not only when rendered.
 
 Destination query parameters and fragments remain intact, including Broadcast's
 `watch=<session-id>`. Only `serverTime` is copied from the source page, not drawer,
 filter, or campaign parameters. A source override replaces a stale destination
-override. Pages without a non-empty override keep their existing Watch URLs.
+override with the current simulated instant. Pages without a non-empty override
+keep their existing Watch URLs.
 Opening or closing the guide stays on the current page and already preserves the
 override; Broadcast's removal of `watch` also leaves `serverTime` intact.
+
+Authored featured-card homepage and broadcast destinations use the same URL
+builder. Same-page homepage anchor actions still scroll without navigation.
+SWAN FEDS notifications also use shared Watch routing; URLs persisted during a
+`serverTime` QA session retain that simulated timestamp until those notifications
+are cleared or replaced.
 
 ### Session detail links
 

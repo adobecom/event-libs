@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { setSessionsParam, setSessionParam } from '../../../event-libs/v1/c2/blocks/sessions-guide/utils/url.js';
 import { readWatchParam, stripWatchParam } from '../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-url.js';
+import { isSessionLiveNow } from '../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-schedule.js';
 
 // getNowMs()'s SERVER_TIME_ORIGIN is captured once, at session-state.js's first import in the
 // whole @web/test-runner session, from window.location.search at that instant — other test
@@ -48,24 +49,35 @@ describe('session-state: getNowMs / ?serverTime=', () => {
     expect(getNowMs()).to.equal(1_700_000_000_000);
   });
 
-  it('lands on broadcast at the homepage override after opening the guide and choosing Watch now', async () => {
+  it('keeps a session live on broadcast after the source clock crosses its start boundary', async () => {
     const simulatedOrigin = 1_794_339_000_000;
     history.replaceState(null, '', `/max-new.html?serverTime=${simulatedOrigin}`);
     clock = sinon.useFakeTimers({ now: 1_700_000_000_000 });
-    const { getWatchDestination } = await import(`../../../event-libs/v1/utils/session-state.js?t=${Math.random()}`);
+    const source = await import(`../../../event-libs/v1/utils/session-state.js?t=${Math.random()}`);
+    const session = {
+      id: 's1',
+      isOnline: true,
+      startTimeUtc: new Date(simulatedOrigin + 60_000).toISOString(),
+      endTimeUtc: new Date(simulatedOrigin + 3_600_000).toISOString(),
+    };
+    expect(source.deriveSessionState(session, new Set(), source.getNowMs())).to.equal('upcoming');
 
     history.replaceState(null, '', setSessionsParam());
     history.replaceState(null, '', setSessionParam('live-session'));
-    const destination = getWatchDestination({ id: 's1', isOnline: true }, 'live');
-    expect(destination).to.equal(`/max/2026/broadcast.html?watch=s1&serverTime=${simulatedOrigin}`);
+    clock.tick(70_000);
+    const navigationMs = simulatedOrigin + 70_000;
+    expect(source.deriveSessionState(session, new Set(), source.getNowMs())).to.equal('live');
+    const destination = source.getWatchDestination(session, 'live');
+    expect(destination).to.equal(`/max/2026/broadcast.html?watch=s1&serverTime=${navigationMs}`);
 
     history.replaceState(null, '', destination);
     expect(readWatchParam()).to.equal('s1');
     stripWatchParam('s1');
-    expect(window.location.search).to.equal(`?serverTime=${simulatedOrigin}`);
+    expect(window.location.search).to.equal(`?serverTime=${navigationMs}`);
     const { getNowMs } = await import(`../../../event-libs/v1/utils/session-state.js?t=${Math.random()}`);
-    expect(getNowMs()).to.equal(simulatedOrigin);
+    expect(getNowMs()).to.equal(navigationMs);
+    expect(isSessionLiveNow(session, new Set(), getNowMs())).to.be.true;
     clock.tick(5000);
-    expect(getNowMs()).to.equal(simulatedOrigin + 5000);
+    expect(getNowMs()).to.equal(navigationMs + 5000);
   });
 });

@@ -1,5 +1,5 @@
 import { LIBS, safeUrl } from './utils.js';
-import { deriveSessionState, getNowMs, getWatchDestination } from './session-state.js';
+import { buildWatchUrl, deriveSessionState, getNowMs, getWatchDestination } from './session-state.js';
 import { openSessionGuideDetail } from './session-store.js';
 import { getHomepagePath, getBroadcastPath } from './tier-1-event-config.js';
 import { MAX_EVENT_PAGES } from './constances.js';
@@ -9,7 +9,7 @@ function normalizePath(path) {
   return (path || '').replace(/\/$/, '');
 }
 
-function resolveHomepageAction(dataset) {
+function resolveHomepageAction(dataset, nowMs) {
   const homepagePath = getHomepagePath() || window.location.pathname;
   const anchorId = dataset.homepageAnchorId;
 
@@ -17,7 +17,9 @@ function resolveHomepageAction(dataset) {
     return anchorId ? { type: 'scroll', anchorId } : { type: 'none' };
   }
 
-  const url = safeUrl(anchorId ? `${homepagePath}#${anchorId}` : homepagePath);
+  const url = safeUrl(buildWatchUrl(
+    anchorId ? `${homepagePath}#${anchorId}` : homepagePath, undefined, nowMs,
+  ));
   return url ? { type: 'navigate', url } : { type: 'none' };
 }
 
@@ -57,11 +59,11 @@ export function resolveCardAction(dataset, nowMs = getNowMs(), activeStreamIds =
   }
 
   if (state === 'live' && dataset.watchDestination === 'homepage') {
-    return resolveHomepageAction(dataset);
+    return resolveHomepageAction(dataset, nowMs);
   }
 
   if (state === 'live' && dataset.watchDestination === 'broadcast') {
-    const url = safeUrl(getBroadcastPath() || MAX_EVENT_PAGES.broadcast);
+    const url = safeUrl(buildWatchUrl(getBroadcastPath() || MAX_EVENT_PAGES.broadcast, undefined, nowMs));
     return url ? { type: 'navigate', url } : { type: 'none' };
   }
 
@@ -69,7 +71,7 @@ export function resolveCardAction(dataset, nowMs = getNowMs(), activeStreamIds =
     sessionPageUrl: sessionUrl,
     isLivestreamed: dataset.isLivestreamed === 'true',
     isOnline: dataset.isOnline === 'true',
-  }, state));
+  }, state, nowMs));
   return url ? { type: 'navigate', url } : { type: 'none' };
 }
 
