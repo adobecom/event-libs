@@ -402,6 +402,7 @@ async function watchYouTubePlayback(sessionId, iframe) {
 }
 
 function removeMobileRiderPlayer(el) {
+  console.log('removeMobileRiderPlayer called');
   const rider = el.querySelector('.mobile-rider');
   if (!rider) return;
   try { window.__mr_player?.dispose?.(); } catch (e) { /* already disposed or mid-teardown */ }
@@ -537,53 +538,63 @@ export default async function init(el) {
 
   let embeddedPhase = null;
 
+  const announcePhase = (phase) => {
+    BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
+    window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
+  };
+
+  const tearDownPlayer = () => {
+    removeMobileRiderPlayer(el);
+    el.querySelector('.milo-video')?.remove();
+    delete el.dataset.embedded;
+  };
+
+  // Re-embed after the first embed: the winning instance can flip between phases (DVR_BUFFER has no
+  // playlist so the full-width instance wins; ON_DEMAND renders the playlist so the playlist instance
+  // wins). Act on both directions so the now-losing player is torn down + hidden and the now-winning
+  // one un-hides and loads, rather than leaving a stale player visible beside a hidden new one.
+  const reEmbedForPhase = (phase, video, previousPhase) => {
+    if (previousPhase !== phase) announcePhase(phase);
+    if (isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist)) {
+      el.classList.remove('session-video-hidden');
+      preconnectVideoProvider(video.provider);
+      loadVideoPlayer(el, sessionId, video);
+    } else {
+      tearDownPlayer();
+      hideLosingInstance(el);
+    }
+  };
+
+  const embedForPhase = (phase, video) => {
+    const previousPhase = embeddedPhase;
+    embeddedPhase = phase;
+    if (previousPhase === null) {
+      announcePhase(phase);
+      loadWhenDecided(el, sessionId, video);
+    } else {
+      reEmbedForPhase(phase, video, previousPhase);
+    }
+  };
+
   const onPhase = (phase) => {
     if (!el.isConnected) return;
     const video = PLAYABLE_PHASES.includes(phase)
       ? resolveVideoForPhase(phase, sessionTimes, session)
       : null;
 
-    if (video && phase === embeddedPhase) {
-      return;
-    }
+    if (video && phase === embeddedPhase) return;
 
     if (video) {
-      const isFirstEmbed = embeddedPhase === null;
-      const previousPhase = embeddedPhase;
-      embeddedPhase = phase;
-      if (isFirstEmbed) {
-        BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
-        window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
-        loadWhenDecided(el, sessionId, video);
-      } else {
-        if (previousPhase !== phase) {
-          BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
-          window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
-        }
-        const nowWinning = isWinningInstance(el, BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist);
-        if (nowWinning) {
-          el.classList.remove('session-video-hidden');
-          preconnectVideoProvider(video.provider);
-          loadVideoPlayer(el, sessionId, video);
-        } else {
-          removeMobileRiderPlayer(el);
-          el.querySelector('.milo-video')?.remove();
-          delete el.dataset.embedded;
-          hideLosingInstance(el);
-        }
-      }
+      embedForPhase(phase, video);
       return;
     }
 
     // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player and
     // re-announce the phase so the playlist (if it had rendered for ON_DEMAND) can hide itself.
     if (embeddedPhase !== null && !PLAYABLE_PHASES.includes(phase)) {
-      removeMobileRiderPlayer(el);
-      el.querySelector('.milo-video')?.remove();
-      delete el.dataset.embedded;
+      tearDownPlayer();
       embeddedPhase = null;
-      BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
-      window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
+      announcePhase(phase);
       return;
     }
 
