@@ -69,6 +69,8 @@ function render(overrides = {}) {
 }
 
 describe('SessionDetailOverlay', () => {
+  const originalUrl = window.location.href;
+
   before(() => {
     const meta = document.createElement('meta');
     meta.name = 'tier-1-event-config';
@@ -83,6 +85,8 @@ describe('SessionDetailOverlay', () => {
     pendingActions.value = new Set();
     liveStreamActiveIds.value = new Set();
   });
+
+  afterEach(() => history.replaceState(null, '', originalUrl));
 
   it('returns null when the active session is not in the catalog', () => {
     sessions.value = [];
@@ -363,6 +367,20 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.include('Watch now');
       expect(out).to.not.include('Watch on demand');
       expect(out).to.not.include('Add to schedule');
+    });
+
+    it('keeps the homepage serverTime on the detail overlay Watch now link', () => {
+      history.replaceState(null, '', '/max-new.html?serverTime=1794339000000&session=s-1');
+      const out = render({
+        startTimeUtc: new Date(Date.now() - 0.5 * HOUR).toISOString(),
+        endTimeUtc: new Date(Date.now() + 0.5 * HOUR).toISOString(),
+        isOnline: true,
+      });
+      expect(out).to.include('Watch now');
+      const template = document.createElement('template');
+      template.innerHTML = out;
+      expect(template.content.querySelector('.sg-detail__btn--watch').getAttribute('href'))
+        .to.equal('/max/2026/broadcast.html?watch=s-1&serverTime=1794339000000');
     });
 
     // Regression: a viewer can be sitting on the detail overlay when the session

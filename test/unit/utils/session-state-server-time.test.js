@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { setSessionsParam, setSessionParam } from '../../../event-libs/v1/c2/blocks/sessions-guide/utils/url.js';
+import { readWatchParam, stripWatchParam } from '../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-url.js';
 
 // getNowMs()'s SERVER_TIME_ORIGIN is captured once, at session-state.js's first import in the
 // whole @web/test-runner session, from window.location.search at that instant — other test
@@ -44,5 +46,26 @@ describe('session-state: getNowMs / ?serverTime=', () => {
     const { getNowMs } = await import(`../../../event-libs/v1/utils/session-state.js?t=${Math.random()}`);
 
     expect(getNowMs()).to.equal(1_700_000_000_000);
+  });
+
+  it('lands on broadcast at the homepage override after opening the guide and choosing Watch now', async () => {
+    const simulatedOrigin = 1_794_339_000_000;
+    history.replaceState(null, '', `/max-new.html?serverTime=${simulatedOrigin}`);
+    clock = sinon.useFakeTimers({ now: 1_700_000_000_000 });
+    const { getWatchDestination } = await import(`../../../event-libs/v1/utils/session-state.js?t=${Math.random()}`);
+
+    history.replaceState(null, '', setSessionsParam());
+    history.replaceState(null, '', setSessionParam('live-session'));
+    const destination = getWatchDestination({ id: 's1', isOnline: true }, 'live');
+    expect(destination).to.equal(`/max/2026/broadcast.html?watch=s1&serverTime=${simulatedOrigin}`);
+
+    history.replaceState(null, '', destination);
+    expect(readWatchParam()).to.equal('s1');
+    stripWatchParam('s1');
+    expect(window.location.search).to.equal(`?serverTime=${simulatedOrigin}`);
+    const { getNowMs } = await import(`../../../event-libs/v1/utils/session-state.js?t=${Math.random()}`);
+    expect(getNowMs()).to.equal(simulatedOrigin);
+    clock.tick(5000);
+    expect(getNowMs()).to.equal(simulatedOrigin + 5000);
   });
 });

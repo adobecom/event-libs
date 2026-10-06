@@ -308,6 +308,24 @@ content is taller and scrolls.
 
 ## Deep linking
 
+### Server time across Watch navigation
+
+`getWatchDestination()` carries the current page's non-empty `serverTime` override to
+homepage, broadcast, and on-demand Watch destinations (MWPW-209738). The guide's live
+cards, detail overlay, and individual session-page Watch now CTA share this routing.
+The timestamp is copied unchanged, not replaced with real time or advanced by the
+time spent on the previous page; the destination starts its simulated clock from
+that same origin.
+
+Destination query parameters and fragments remain intact, including Broadcast's
+`watch=<session-id>`. Only `serverTime` is copied from the source page, not drawer,
+filter, or campaign parameters. A source override replaces a stale destination
+override. Pages without a non-empty override keep their existing Watch URLs.
+Opening or closing the guide stays on the current page and already preserves the
+override; Broadcast's removal of `watch` also leaves `serverTime` intact.
+
+### Session detail links
+
 `?session=` carries the last path segment of the session's own page url, which the catalog has
 already slugified from `enTitle` + `sessionCode`
 (`.../sessions/acom-ipod-test-session-no-mpc-1003-1`). Derived on demand by
