@@ -8,6 +8,7 @@ import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js'
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
+import { waitForLaunch } from '../../../utils/launch-ready.js';
 
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
@@ -118,6 +119,9 @@ const CONFIG = {
   PLAYER: {
     DEFAULT_OPTIONS: { autoplay: true, controls: true, muted: true },
     CONTAINER_ID: 'mr-adobe',
+    // `mobileRider_container` is the legacy Dexter class the adobe.com Launch property uses to
+    // detect a MobileRider player (media-tracking rule + Alloy streamingMedia.playerName).
+    CONTAINER_CLASS: 'mobile-rider-container mobileRider_container',
     VIDEO_ID: 'idPlayer',
     VIDEO_CLASS: 'mobileRider_viewport',
   },
@@ -188,9 +192,10 @@ class MobileRider {
       }
       this.el.dataset.theme = this.el.classList.contains('dark') ? 'dark' : 'light';
       this.cfg = this.#parseCfg();
-      await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
-
+      // Render the container before any await: Launch checks for it once, at Library Loaded.
       this.#setupDOM();
+      waitForLaunch();
+      await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
 
       const videoId = this.cfg.videoid || this.cfg['video-id'];
       if (this.#isStreamInactive(videoId)) {
@@ -213,6 +218,10 @@ class MobileRider {
 
     this.wrap = this.root.querySelector('.video-wrapper')
       || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
+
+    if (!this.wrap.querySelector('.mobile-rider-container')) {
+      createTag('div', { class: CONFIG.PLAYER.CONTAINER_CLASS }, '', { parent: this.wrap });
+    }
   }
 
   #initInfoBar(cfg, sessionId) {
@@ -340,7 +349,7 @@ class MobileRider {
       this.wrap.innerHTML = '';
 
       const container = createTag('div', {
-        class: 'mobile-rider-container',
+        class: CONFIG.PLAYER.CONTAINER_CLASS,
         id: CONFIG.PLAYER.CONTAINER_ID,
         'data-videoid': vid,
       }, '', { parent: this.wrap });
@@ -352,6 +361,10 @@ class MobileRider {
         playsinline: '',
         poster: this.cfg.poster || this.cfg.thumbnail || '',
       }, '', { parent: container });
+
+      // MobileRider's Adobe analytics plugin captures window.alloy_all once, at embed. Embedding
+      // before Launch loads leaves media sessionDetails unset, so the Launch tracker never starts.
+      await waitForLaunch();
 
       this.#embedRafId = requestAnimationFrame(() => {
         this.#embedRafId = null;

@@ -5,6 +5,7 @@ import { sessions, favorited } from '../../../../event-libs/v1/utils/session-sto
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import { initTierOneEventConfig } from '../../../../event-libs/v1/utils/tier-1-event-config.js';
 import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
+import { resetLaunchWait } from '../../../../event-libs/v1/utils/launch-ready.js';
 
 const defaultHtml = `
 <div class="mobile-rider">
@@ -74,6 +75,10 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       off: sinon.stub(),
       on: sinon.stub(),
     };
+
+    // Launch is loaded by default so embeds aren't held by waitForLaunch().
+    globalThis._satellite = { track: sinon.stub() };
+    resetLaunchWait();
   });
 
   afterEach(() => {
@@ -83,6 +88,8 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     delete globalThis.lana;
     delete globalThis.mobilerider;
     delete globalThis.__mr_player;
+    delete globalThis._satellite;
+    resetLaunchWait();
     riderInstance = null;
     sessions.value = [];
     favorited.value = new Set();
@@ -104,6 +111,16 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(player).to.not.be.null;
       const wrapper = player.querySelector('.video-wrapper');
       expect(wrapper).to.not.be.null;
+    });
+
+    it('should render the Launch-detectable container synchronously, before any await', () => {
+      document.body.innerHTML = defaultHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      // Adobe Launch's media-tracking rule checks `.mobileRider_container` once, at Library Loaded.
+      const container = el.querySelector('.video-wrapper > .mobile-rider-container');
+      expect(container).to.not.be.null;
+      expect(container.classList.contains('mobileRider_container')).to.be.true;
     });
 
     it('should handle initialization errors gracefully', async () => {
@@ -181,6 +198,25 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         riderInstance.injectPlayer('test-video', 'test-skin', 'test-asl');
         await new Promise((resolve) => { setTimeout(resolve, 50); });
         expect(globalThis.mobilerider.embed.called).to.be.true;
+      });
+
+      it('should give the container the legacy mobileRider_container class for Launch', () => {
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        const container = riderInstance.wrap.querySelector('#mr-adobe');
+        expect(container.classList.contains('mobile-rider-container')).to.be.true;
+        expect(container.classList.contains('mobileRider_container')).to.be.true;
+      });
+
+      it('should hold mobilerider.embed until Launch (_satellite) is ready', async () => {
+        delete globalThis._satellite;
+        resetLaunchWait();
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        await new Promise((resolve) => { setTimeout(resolve, 150); });
+        expect(globalThis.mobilerider.embed.called).to.be.false;
+
+        globalThis._satellite = { track: sinon.stub() };
+        await new Promise((resolve) => { setTimeout(resolve, 150); });
+        expect(globalThis.mobilerider.embed.calledOnce).to.be.true;
       });
 
       it('should skip injection when already embedding', () => {
@@ -632,7 +668,8 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
         // Click again — should not add duplicate
         aslBtn.click();
-        expect(container.classList.length).to.equal(2); // mobile-rider-container + isASL
+        // mobile-rider-container + mobileRider_container + isASL
+        expect(container.classList.length).to.equal(3);
       });
     });
   });
