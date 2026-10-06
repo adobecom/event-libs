@@ -104,17 +104,18 @@ describe('LiveUpcomingView', () => {
   // MR streams stay on until ops turns them off, so a finished day can still have a live session.
   // That session stays in the Live carousel; the rest of the day must still list as Previously aired.
   describe('a day with nothing upcoming but a stream still on', () => {
-    // Own start time (15 min after AIRED_SESSION) so it would form its own Previously aired row.
+    // Starts 1 min after AIRED_SESSION: its own Previously aired row, with only a 1-min/day midnight split risk.
     const STILL_STREAMING = {
       ...AIRED_SESSION,
       id: 'mr-live',
       title: 'Keynote Still Streaming',
       mrStreamId: 'mr-1',
       sessionPageUrl: '/mr-live',
-      startTimeUtc: h(-0.75),
+      startTimeUtc: h(-1 + 1 / 60),
       endTimeUtc: h(-0.6),
     };
     const countRows = (markup) => (markup.match(/class="sg-time-row"/g) || []).length;
+    const PREVIOUSLY_AIRED_HEADING = '<h3 class="sg-upcoming-title">Previously aired</h3>';
 
     function render() {
       const store = makeStore([STILL_STREAMING, AIRED_SESSION], AIRED_DAY);
@@ -130,10 +131,10 @@ describe('LiveUpcomingView', () => {
 
     it('still lists the rest of the day as Previously aired, minus the live session', () => {
       const out = render();
-      expect(out).to.include('Previously aired');
+      expect(out).to.include(PREVIOUSLY_AIRED_HEADING);
       expect(out).to.not.include('sg-empty');
       // Two sessions at two start times; only the finished one is listed.
-      expect(countRows(out.split('Previously aired')[1])).to.equal(1);
+      expect(countRows(out.split(PREVIOUSLY_AIRED_HEADING)[1])).to.equal(1);
     });
   });
 
