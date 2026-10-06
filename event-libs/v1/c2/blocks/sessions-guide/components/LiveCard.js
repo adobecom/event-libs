@@ -115,8 +115,10 @@ export function LiveCard({
 
   function handleWatch(e) {
     e.stopPropagation();
+    const destination = safeUrl(getWatchDestination(session, sessionState));
+    if (!destination) return;
     // Live-only same-page switch avoids reloading; on-demand always does a real navigation.
-    if (sessionState === 'live' && isSamePage(watchHref)) {
+    if (sessionState === 'live' && isSamePage(destination)) {
       if (onWatchSamePage) { onWatchSamePage(session); return; }
       // No-op on pages with nothing subscribed to this request (e.g. the homepage).
       requestWatchSameSession(session.id);
@@ -125,7 +127,7 @@ export function LiveCard({
       scrollPageToTop();
       return;
     }
-    window.location.href = watchHref;
+    window.location.href = destination;
   }
 
   let primaryCta;

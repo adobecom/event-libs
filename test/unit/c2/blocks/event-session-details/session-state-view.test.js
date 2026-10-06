@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
   getSessionTimes, getAllSessionTimes, getState, stateForPhase, nextBoundary, formatDateTime,
@@ -755,6 +756,36 @@ describe('session-state-view', () => {
       const watch = primaryCtaSlot.querySelector('.session-watch-now');
       expect(watch).to.not.be.null;
       expect(watch.getAttribute('daa-ll')).to.equal('Watch-Now');
+    });
+
+    it('refreshes a rendered Watch now link to the simulated click-time clock', () => {
+      const originalUrl = window.location.href;
+      const originMs = 1_794_339_000_000;
+      const clock = sinon.useFakeTimers({ now: originMs });
+      let stop;
+      try {
+        history.replaceState(null, '', `/max/2026/sessions/sid.html?serverTime=${originMs}`);
+        onlineFormat();
+        setMetadata('session-times', JSON.stringify([{
+          startTimeMillis: originMs - 60_000,
+          endTimeMillis: originMs + 3_600_000,
+          timezone: 'UTC',
+        }]));
+        const { statusSlot, primaryCtaSlot } = slots();
+        stop = mountSessionState({ statusSlot, primaryCtaSlot });
+        const watch = primaryCtaSlot.querySelector('.session-watch-now');
+        expect(new URL(watch.href).searchParams.get('serverTime')).to.equal(String(originMs));
+
+        clock.tick(70_000);
+        watch.addEventListener('click', (e) => e.preventDefault());
+        watch.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        expect(primaryCtaSlot.querySelector('.session-watch-now')).to.equal(watch);
+        expect(new URL(watch.href).searchParams.get('serverTime')).to.equal(String(originMs + 70_000));
+      } finally {
+        stop?.();
+        clock.restore();
+        history.replaceState(null, '', originalUrl);
+      }
     });
 
     // Add to schedule posts `virtual: true`, which RainFocus rejects unless the session time

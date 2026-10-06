@@ -49,4 +49,18 @@ describe('getWatchDestination — .html follows the current page', () => {
     expect(getWatchDestination(session({ isLivestreamed: true }), 'live')).to.equal('/max');
     expect(getWatchDestination(session({ isOnline: true }), 'live')).to.equal('/max/2026/broadcast?watch=s1');
   });
+
+  it('carries serverTime on .html fallback destinations', () => {
+    window.history.replaceState(null, '', '/max-new.html?serverTime=1794339000000&sessions=');
+    expect(getWatchDestination(session({ isLivestreamed: true }), 'live', 1_794_339_070_000))
+      .to.equal('/max.html?serverTime=1794339070000');
+    expect(getWatchDestination(session({ isOnline: true }), 'live', 1_794_339_070_000))
+      .to.equal('/max/2026/broadcast.html?watch=s1&serverTime=1794339070000');
+  });
+
+  it('carries serverTime without adding a watch param for metadata-only sessions', () => {
+    window.history.replaceState(null, '', '/max/2026/sessions/some-session?serverTime=1794339000000');
+    expect(getWatchDestination(session({ isOnline: true, id: undefined }), 'live', 1_794_339_070_000))
+      .to.equal('/max/2026/broadcast?serverTime=1794339070000');
+  });
 });

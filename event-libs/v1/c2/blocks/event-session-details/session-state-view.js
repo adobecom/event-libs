@@ -167,6 +167,9 @@ function renderWatchNow() {
   const a = createTag('a', {
     class: 'session-primary-cta-btn session-watch-now', href, 'daa-ll': 'Watch-Now',
   });
+  a.addEventListener('click', () => {
+    a.href = getWatchDestination(getWatchSession(), 'live') || BROADCAST_URL;
+  });
   a.innerHTML = `${PLAY_ICON}<span>Watch now</span>`;
   return a;
 }
