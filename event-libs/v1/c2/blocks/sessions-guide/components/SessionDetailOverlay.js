@@ -92,14 +92,17 @@ export function SessionDetailOverlay({ onBack }) {
   const showScheduleCta = !showWatch && schedulingEnabled;
 
   function handleWatch(e) {
+    const destination = safeUrl(getWatchDestination(session, sessionState));
     // Already on the destination page — close the widget and ask it to switch instead of
     // reloading the page out from under the player.
-    if (isLive && isSamePage(watchHref)) {
+    if (isLive && isSamePage(destination)) {
       e.preventDefault();
       requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
       scrollPageToTop();
+    } else if (destination) {
+      e.currentTarget.href = destination;
     }
   }
 
