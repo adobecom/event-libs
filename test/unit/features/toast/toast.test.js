@@ -1,9 +1,14 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { executeServerCommand, sendKeys } from '@web/test-runner-commands';
 
 import {
-  toasts, showToast, hideToast, mountToast,
+  toasts, showToast, hideToast, mountToast, containToasts,
 } from '../../../../event-libs/v1/features/toast/toast.js';
+import { trapFocus } from '../../../../event-libs/v1/c2/blocks/sessions-guide/utils/focus-trap.js';
+import { checkViewAccess } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
+import { auth, sessions } from '../../../../event-libs/v1/utils/session-store.js';
+import { expectAccessible } from '../../helpers/a11y.js';
 
 async function nextFrames(n = 2) {
   for (let i = 0; i < n; i += 1) {
@@ -230,6 +235,113 @@ describe('features/toast', () => {
       } finally {
         clock.restore();
       }
+    });
+
+    describe('modal containment', () => {
+      let drawer;
+      let host;
+      let restoreToasts;
+      let restoreFocus;
+      let originalAuth;
+      let originalSessions;
+      let raf;
+
+      beforeEach(async () => {
+        await executeServerCommand('focus-test-page');
+        raf = sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+        originalAuth = auth.value;
+        originalSessions = sessions.value;
+        auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+        sessions.value = [];
+        drawer = document.createElement('div');
+        drawer.setAttribute('role', 'dialog');
+        drawer.setAttribute('aria-modal', 'true');
+        drawer.setAttribute('aria-label', 'Sessions guide');
+        drawer.innerHTML = '<button id="drawer-first">First</button><button id="drawer-last">Last</button><div class="toast-host"></div>';
+        document.body.append(drawer);
+        host = drawer.querySelector('.toast-host');
+        restoreToasts = containToasts(host);
+        restoreFocus = trapFocus(drawer);
+      });
+
+      afterEach(() => {
+        hideToast();
+        restoreToasts();
+        restoreFocus();
+        drawer.remove();
+        auth.value = originalAuth;
+        sessions.value = originalSessions;
+        raf.restore();
+      });
+
+      it('moves the existing region and restores its page-level mount on cleanup', () => {
+        expect(host.firstElementChild).to.equal(region);
+        expect(mountToast()).to.equal(region);
+        restoreToasts();
+        expect(region.parentElement).to.equal(document.body);
+      });
+
+      it('preserves existing notifications and CTA listeners when moving between hosts', () => {
+        const action = sinon.spy();
+        showToast({ message: 'Sign in', ctaLabel: 'Sign in', ctaAction: action });
+        const toast = region.querySelector('.sg-toast');
+        restoreToasts();
+        restoreToasts = containToasts(host);
+        expect(region.querySelector('.sg-toast')).to.equal(toast);
+        toast.querySelector('.sg-toast__cta').click();
+        expect(action.calledOnce).to.be.true;
+        expect(region.getAttribute('aria-label')).to.equal('1 notification');
+      });
+
+      ['my-sessions', 'my-favorites'].forEach((view) => {
+        it(`reaches and activates the ${view} auth link with Tab and Enter inside the modal`, async () => {
+          expect(checkViewAccess(view, { eventConfig: { registerUrl: '/register' } })).to.equal('live-upcoming');
+          await nextFrames();
+          const cta = region.querySelector('.sg-toast__cta');
+          const activated = sinon.spy((event) => event.preventDefault());
+          cta.addEventListener('click', activated);
+
+          drawer.querySelector('#drawer-last').focus();
+          await sendKeys({ press: 'Tab' });
+          expect(document.activeElement).to.equal(region.querySelector('.sg-toast'));
+          await sendKeys({ press: 'Tab' });
+          expect(document.activeElement).to.equal(cta);
+          expect(cta.getAttribute('href')).to.equal('/register');
+          expect(drawer.contains(document.activeElement)).to.be.true;
+          await sendKeys({ press: 'Enter' });
+          expect(activated.calledOnce).to.be.true;
+
+          region.querySelector('.sg-toast__close').focus();
+          await sendKeys({ press: 'Tab' });
+          expect(document.activeElement.id).to.equal('drawer-first');
+          await sendKeys({ down: 'Shift' });
+          try {
+            await sendKeys({ press: 'Tab' });
+          } finally {
+            await sendKeys({ up: 'Shift' });
+          }
+          expect(document.activeElement).to.equal(region.querySelector('.sg-toast__close'));
+        });
+      });
+
+      it('keeps Tab in the drawer after dismissing its final notification', async () => {
+        showToast({ message: 'Sign in', ctaLabel: 'Sign in', ctaHref: '/register' });
+        await nextFrames();
+        const toast = region.querySelector('.sg-toast');
+        const closeBtn = toast.querySelector('.sg-toast__close');
+        closeBtn.focus();
+        await sendKeys({ press: 'Enter' });
+        toast.dispatchEvent(new TransitionEvent('transitionend', { propertyName: 'opacity' }));
+        expect(document.activeElement).to.equal(region);
+        await sendKeys({ press: 'Tab' });
+        expect(document.activeElement.id).to.equal('drawer-first');
+      });
+
+      it('exposes the auth prompt as accessible content within the modal subtree', async () => {
+        checkViewAccess('my-sessions', { eventConfig: { registerUrl: '/register' } });
+        await nextFrames();
+        await expectAccessible(drawer);
+      });
     });
   });
 });

@@ -169,4 +169,18 @@ describe('DrawerHeader controlsInert', () => {
     const out = DrawerHeader({});
     expect(out).to.not.include('inert');
   });
+
+  it('flags the header as having no date tabs post-event', () => {
+    sessions.value = [{
+      id: 'ended',
+      mrStreamId: null,
+      startTimeUtc: new Date(Date.now() - 4 * 3_600_000).toISOString(),
+      endTimeUtc: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+    }];
+    expect(DrawerHeader({})).to.include('sg-header--no-dates');
+  });
+
+  it('does not flag the header during the event', () => {
+    expect(DrawerHeader({})).to.not.include('sg-header--no-dates');
+  });
 });

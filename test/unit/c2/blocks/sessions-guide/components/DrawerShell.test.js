@@ -77,6 +77,18 @@ describe('DrawerShell scroll ownership', () => {
     const occurrences = out.split('data-lenis-prevent').length - 1;
     expect(occurrences).to.equal(2);
   });
+
+  it('includes the drawer and notification host in one modal subtree', () => {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = DrawerShell();
+    const modal = wrapper.querySelector('[role="dialog"][aria-modal="true"]');
+    const drawer = modal.querySelector('.sg-drawer');
+    const host = modal.querySelector('.sg-drawer__notifications');
+    expect(modal.classList.contains('sg-shell')).to.be.true;
+    expect(modal.getAttribute('aria-label')).to.equal('Sessions guide');
+    expect(host).to.exist;
+    expect(drawer.contains(host)).to.be.false;
+  });
 });
 
 describe('DrawerShell FAB placement', () => {
@@ -176,7 +188,10 @@ describe('DrawerShell collapsed visibility', () => {
         expect(heading.getBoundingClientRect().top).to.be.lessThan(frame.contentWindow.innerHeight);
         expect(style.opacity).to.equal(drawerState === 'hidden' ? '0' : '1');
         expect(drawer.hasAttribute('inert')).to.equal(drawerState === 'hidden');
-        expect(drawer.getAttribute('role')).to.equal(drawerState === 'hidden' ? null : 'dialog');
+        const shell = portal.querySelector('.sg-shell');
+        expect(shell.getAttribute('role')).to.equal(drawerState === 'hidden' ? null : 'dialog');
+        expect(shell.getAttribute('aria-modal')).to.equal(drawerState === 'hidden' ? null : 'true');
+        expect(drawer.hasAttribute('role')).to.be.false;
         expect(!!cta).to.equal(drawerState === 'hidden');
         if (cta) expect(frame.contentWindow.getComputedStyle(cta).opacity).to.equal('1');
       });
@@ -243,6 +258,10 @@ describe('DrawerShell real Preact lifecycle', () => {
       expect(style().opacity).to.equal('1');
       expect(drawer.inert).to.be.false;
       expect(doc.body.style.overflow).to.equal('hidden');
+      const modal = doc.querySelector('[role="dialog"][aria-modal="true"]');
+      expect(modal.classList.contains('sg-shell')).to.be.true;
+      expect(modal.contains(drawer)).to.be.true;
+      expect(modal.querySelector('.sg-drawer__notifications')).to.exist;
 
       doc.querySelector('.sg-close-btn').click();
       await new Promise((resolve) => win.requestAnimationFrame(resolve));
@@ -255,6 +274,7 @@ describe('DrawerShell real Preact lifecycle', () => {
       await settle();
       expect(style().opacity).to.equal('0');
       expect(doc.body.style.overflow).to.equal('');
+      expect(doc.querySelector('[role="dialog"]')).to.be.null;
 
       drawer.style.transition = 'none';
       drawer.style.top = '0px';

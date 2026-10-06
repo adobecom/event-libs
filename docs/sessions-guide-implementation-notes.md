@@ -34,6 +34,17 @@ serves the real bundle without changing the default mock used by the other tests
 Real iPhone 16 Pro Chrome verification remains necessary for the device-only
 symptom, including scrolling with browser controls expanded and collapsed.
 
+## Session detail title wrapping
+
+The shared detail-overlay title uses `text-wrap: balance` at every breakpoint
+(MWPW-208944), matching the individual session page's title treatment
+(MWPW-208937). This evens out multiline titles within the existing summary column,
+including at the reported 1572px viewport, without changing font sizes, column
+widths, spacing, or session copy. Browsers without support retain normal wrapping.
+The layout regression fixture checks computed styles and overflow across mobile,
+tablet, and desktop widths, and compares actual line widths against normal
+wrapping at 1572px.
+
 ## Mobile Safari FAB placement
 
 The Session Guide FAB uses a 24px bottom offset on Mobile Safari (MWPW-208776),
@@ -352,11 +363,12 @@ Product icons are scoped to the product filter category alone, keyed on `product
 `Illustrator` is both a product and an `Audience` value, so matching against the products map
 isn't enough on its own.
 
-At desktop (1280px and above), filter tags have no trailing selection icon (MWPW-208026).
-The current implementation uses a checkmark rather than an X; only that trailing SVG is hidden.
-Selected tags retain their border, bold label, and `aria-pressed` state, and clicking the tag
-still toggles selection. Mobile/tablet checkmarks, product icons, and the panel's close button
-are unchanged. The shared stylesheet covers both the widget portal and full-page guide.
+At desktop (1280px and above), the filter panel's close (X) button is hidden (MWPW-208026),
+not the selected tags' checkmarks. `display: none` removes the button from the layout,
+keyboard focus order, and accessibility tree; Escape, click-away, and Apply still dismiss
+the desktop popover. Mobile/tablet keep their close button. Selection checkmarks, product
+icons, selected styling, and `aria-pressed` are unchanged at every width. The shared
+stylesheet covers both the widget portal and full-page guide.
 
 ---
 
