@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { readFile, setViewport } from '@web/test-runner-commands';
+import { readFile, setViewport, executeServerCommand } from '@web/test-runner-commands';
 import sinon from 'sinon';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
 import {
@@ -127,6 +127,10 @@ describe('upcoming-sessions', () => {
 
     after(() => {
       styles.forEach((link) => link.remove());
+    });
+
+    beforeEach(async () => {
+      await executeServerCommand('focus-test-page');
     });
 
     afterEach(async () => {
