@@ -22,6 +22,22 @@ export function getNowMs() {
 
 const HOUR_MS = 3_600_000;
 
+export function parseVideoDurationMs(value) {
+  if (typeof value !== 'string' || !/^\d+:\d+:\d+$/.test(value.trim())) return null;
+  const [hours, minutes, seconds] = value.trim().split(':').map(Number);
+  const durationMs = ((hours * 3600) + (minutes * 60) + seconds) * 1000;
+  return Number.isSafeInteger(durationMs) && durationMs > 0 ? durationMs : null;
+}
+
+export function getSessionEndMs(session, timingBasis = 'scheduled') {
+  const scheduledEnd = Date.parse(session.endTimeUtc);
+  if (timingBasis !== 'video-duration' || session.mrStreamId) return scheduledEnd;
+  const durationMs = parseVideoDurationMs(session.videoDuration);
+  if (durationMs === null) return scheduledEnd;
+  const videoEnd = Date.parse(session.startTimeUtc) + durationMs;
+  return Number.isFinite(new Date(videoEnd).getTime()) ? videoEnd : scheduledEnd;
+}
+
 // Unlock = sessionEnd + DVR delay, falling back to the event start when there is no session end.
 export function dvrAvailableAtMs(session, eventStartMs) {
   if (session?.dvrDelayHours == null) return null;
@@ -40,12 +56,12 @@ export function isDvrPending(session, nowMs, eventStartMs) {
 }
 
 // MR poll results for mrStreamId sessions, pure time-window for the rest. Computed fresh, never stored.
-export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
+export function deriveSessionState(session, liveStreamActiveIds, nowMs, timingBasis = 'scheduled') {
   // Never airing, so neither the clock nor an active MR stream applies.
   if (session.hasOnDemandFormat) return 'on-demand';
 
   const start = Date.parse(session.startTimeUtc);
-  const end = Date.parse(session.endTimeUtc);
+  const end = getSessionEndMs(session, timingBasis);
 
   if (session.mrStreamId) {
     // Inactive in the poll = on-demand regardless of time.
@@ -55,7 +71,7 @@ export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
     return nowMs >= start ? 'live' : 'upcoming';
   }
 
-  if (nowMs > end) return 'on-demand';
+  if (timingBasis === 'video-duration' ? nowMs >= end : nowMs > end) return 'on-demand';
   if (nowMs >= start) return 'live';
   return 'upcoming';
 }

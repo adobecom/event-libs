@@ -49,7 +49,7 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
     metaFields: ['mrStreamId', 'imageUrl', 'watchDestination', 'homepageAnchorId'],
-    metaHint: 'Mobile Rider stream ID is an optional per-session override — image is required for a session to appear. Watch destination picks where that session\'s card routes once it goes live; Homepage anchor ID (only used when Homepage is picked) is set via that section\'s own Section Metadata "anchor" row.',
+    metaHint: 'Mobile Rider stream ID overrides the catalog Livestream ID; leave it blank to use the catalog ID. Image is required for a session to appear. Watch destination picks where that session\'s card routes once it goes live; Homepage anchor ID (only used when Homepage is picked) is set via that section\'s own Section Metadata "anchor" row.',
     label: 'Featured Sessions',
     blockHint: 'the featured-sessions block',
     linkPrefix: 'event-featured-sessions',
@@ -63,7 +63,7 @@ const HOMEPAGE_FIELD_BY_TYPE = {
       during: 'Watch now',
       after: 'Watch on-demand',
     },
-    ctaHint: 'CTA text shown on every card, chosen per-session by comparing the session\'s own time to the viewer\'s clock — before it starts, while it\'s live, and after it ends. Leave any blank to fall back to its default.',
+    ctaHint: 'CTA text uses the scheduled start plus a valid catalog Video Duration (H:M:S) as the end, falling back to the scheduled end. Mobile Rider Livestream IDs use live polling instead. Displayed times stay scheduled. Regenerate and republish featured links after catalog changes. Leave any CTA text blank to use its default.',
   },
 };
 

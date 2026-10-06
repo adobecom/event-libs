@@ -1,10 +1,13 @@
 import { createTag } from '../../../utils/utils.js';
-import { logError } from '../../../utils/lana-log.js';
+import { logError, logWarning } from '../../../utils/lana-log.js';
+import { parseVideoDurationMs } from '../../../utils/session-state.js';
 import { safeUrl } from '../sessions-guide/utils/url.js';
 import initEventCard from '../event-card/event-card.js';
 import initEventCarousel from '../event-carousel/event-carousel.js';
 
 function setRoutingData(card, entry) {
+  card.dataset.timingBasis = 'video-duration';
+  if (typeof entry.videoDuration === 'string') card.dataset.videoDuration = entry.videoDuration;
   if (entry.sessionId) card.dataset.sessionId = entry.sessionId;
   if (entry.mrStreamId) card.dataset.mrStreamId = entry.mrStreamId;
   if (entry.url) card.dataset.sessionUrl = entry.url;
@@ -21,6 +24,13 @@ function setRoutingData(card, entry) {
   const { startTimeMillis, endTimeMillis } = entry.sessionTime || {};
   if (startTimeMillis) card.dataset.startTimeUtc = new Date(startTimeMillis).toISOString();
   if (endTimeMillis) card.dataset.endTimeUtc = new Date(endTimeMillis).toISOString();
+  if (!entry.mrStreamId && entry.videoDuration != null && entry.videoDuration !== '') {
+    const durationMs = parseVideoDurationMs(entry.videoDuration);
+    const videoEnd = Date.parse(card.dataset.startTimeUtc) + durationMs;
+    if (durationMs === null || !Number.isFinite(new Date(videoEnd).getTime())) {
+      logWarning('featured-sessions', `invalid Video Duration for session ${entry.sessionId}; using scheduled end`);
+    }
+  }
 }
 
 // Mirrors Milo's decorateImageLinks: absolute *.aem.* / *.hlx.* URLs (e.g. an authored

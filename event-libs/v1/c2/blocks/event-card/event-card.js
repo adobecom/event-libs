@@ -1,5 +1,5 @@
 import { createTag, createOptimizedPicture, loadStyle } from '../../../utils/utils.js';
-import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
+import { deriveSessionState, getNowMs, getSessionEndMs } from '../../../utils/session-state.js';
 import { subscribe, registerStreamIds } from '../../../services/sessions/poller.js';
 
 const VARIANTS = ['media-square', 'media-standard', 'media-standard-rev', 'standard-m', 'media-wide', 'media-tall'];
@@ -7,13 +7,15 @@ const DEFAULT_VARIANT = 'media-standard';
 const BLOCK_CSS_URL = new URL('./event-card.css', import.meta.url).href;
 
 const CTA_STATE_ATTR = { upcoming: 'ctaPrior', live: 'ctaDuring', 'on-demand': 'ctaAfter' };
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function refreshCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction) {
   const state = deriveSessionState({
     startTimeUtc: el.dataset.startTimeUtc,
     endTimeUtc: el.dataset.endTimeUtc,
+    videoDuration: el.dataset.videoDuration,
     mrStreamId: el.dataset.mrStreamId,
-  }, getLiveStreamActiveIds(), getNowMs());
+  }, getLiveStreamActiveIds(), getNowMs(), el.dataset.timingBasis);
   const text = cta.dataset[CTA_STATE_ATTR[state]];
   if (text) cta.textContent = text;
 
@@ -26,13 +28,16 @@ function refreshCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction) {
 function scheduleBoundary(atMs, onBoundary) {
   if (!Number.isFinite(atMs)) return;
   const delay = atMs - getNowMs();
-  setTimeout(onBoundary, Math.max(delay, 0));
+  setTimeout(() => {
+    if (atMs > getNowMs()) scheduleBoundary(atMs, onBoundary);
+    else onBoundary();
+  }, Math.min(Math.max(delay, 0), MAX_TIMEOUT_MS));
 }
 
 function attachLiveCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction) {
   const mrStreamId = el.dataset.mrStreamId;
   const startMs = Date.parse(el.dataset.startTimeUtc);
-  const endMs = Date.parse(el.dataset.endTimeUtc);
+  const endMs = getSessionEndMs(el.dataset, el.dataset.timingBasis);
   const refresh = () => refreshCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction);
 
   const state = refresh();

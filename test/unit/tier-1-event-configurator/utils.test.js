@@ -1,7 +1,12 @@
 import { expect } from '@esm-bundle/chai';
 import {
   extractTrackIconSlug, extractProductIconSlug, syncIconConfigWithCatalog, buildSessionAuthorEntry,
+  buildHomepageConfigURL, decodeHomepageConfigParam, copyHomepageConfigLink,
 } from '../../../event-libs/tier-1-event-configurator/utils.js';
+import sinon from 'sinon';
+import {
+  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE,
+} from '../../../event-libs/tier-1-event-configurator/constants.js';
 
 describe('tier-1-event-configurator/utils extractTrackIconSlug', () => {
   it('extracts the slug from a full production federal icon URL', () => {
@@ -230,5 +235,91 @@ describe('tier-1-event-configurator/utils buildSessionAuthorEntry', () => {
   it('omits description when the session has none', () => {
     const entry = buildSessionAuthorEntry(baseSession(), [], {});
     expect(entry).to.not.have.property('description');
+  });
+
+  function videoSession() {
+    return baseSession({
+      customAttributes: [
+        customAttr('Video Duration', [{ value: '00:17:38' }]),
+        customAttr('Mobilerider Video ID (Livestream)', [{ value: 'catalog-mr' }]),
+      ],
+    });
+  }
+
+  it('exports catalog duration and MR identity for featured entries without changing the schedule', () => {
+    const times = [{ sessionId: 'session-1', startTimeMillis: 1000, endTimeMillis: 2000, timezone: 'UTC' }];
+    const result = buildSessionAuthorEntry(
+      videoSession(), times, {}, CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS,
+    );
+    expect(result.videoDuration).to.equal('00:17:38');
+    expect(result.mrStreamId).to.equal('catalog-mr');
+    expect(result.sessionTime).to.deep.equal({ startTimeMillis: 1000, endTimeMillis: 2000, timezone: 'UTC' });
+  });
+
+  it('prefers a trimmed author override and falls back to catalog identity for a blank override', () => {
+    const featured = CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS;
+    expect(buildSessionAuthorEntry(videoSession(), [], { mrStreamId: ' override ' }, featured).mrStreamId)
+      .to.equal('override');
+    expect(buildSessionAuthorEntry(videoSession(), [], { mrStreamId: '   ' }, featured).mrStreamId)
+      .to.equal('catalog-mr');
+    expect(buildSessionAuthorEntry(baseSession(), [], { mrStreamId: '   ' }, featured))
+      .to.not.have.property('mrStreamId');
+  });
+
+  it('leaves upcoming and legacy exports unchanged', () => {
+    [undefined, CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS].forEach((type) => {
+      const result = buildSessionAuthorEntry(videoSession(), [], {}, type);
+      expect(result).to.not.have.property('videoDuration');
+      expect(result).to.not.have.property('mrStreamId');
+      expect(buildSessionAuthorEntry(videoSession(), [], { mrStreamId: 'override' }, type).mrStreamId)
+        .to.equal('override');
+    });
+  });
+
+  it('omits duration and catalog MR ID when the catalog has neither', () => {
+    const result = buildSessionAuthorEntry(baseSession(), [], {}, CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS);
+    expect(result).to.not.have.property('videoDuration');
+    expect(result).to.not.have.property('mrStreamId');
+  });
+
+  it('preserves featured metadata through URL encoding and decoding', () => {
+    const entries = [buildSessionAuthorEntry(videoSession(), [], {}, CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS)];
+    const url = new URL(buildHomepageConfigURL(
+      'adobecom', 'da-events', CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS, 'event-1', 'Featured', entries,
+    ));
+    const decoded = decodeHomepageConfigParam(url.hash.split('=')[1]);
+    expect(decoded.entries).to.deep.equal(JSON.parse(JSON.stringify(entries)));
+  });
+
+  it('selects featured-only enrichment in the actual copied homepage link', async () => {
+    const clipboard = sinon.stub(navigator.clipboard, 'writeText').resolves();
+    const richClipboard = typeof window.ClipboardItem === 'function'
+      ? sinon.stub(window, 'ClipboardItem').value(undefined) : null;
+    try {
+      const configType = CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS;
+      await copyHomepageConfigLink('adobecom', 'da-events', {
+        configType,
+        eventId: 'event-1',
+        config: { homepageFeaturedSessions: ['session-1'] },
+      }, HOMEPAGE_FIELD_BY_TYPE[configType], [videoSession()], []);
+      const text = clipboard.firstCall.args[0];
+      const raw = text.match(/tecHomepage=([^)]*)/)[1];
+      expect(decodeHomepageConfigParam(raw).entries[0]).to.include({
+        videoDuration: '00:17:38', mrStreamId: 'catalog-mr',
+      });
+      const upcoming = CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS;
+      await copyHomepageConfigLink('adobecom', 'da-events', {
+        configType: upcoming,
+        eventId: 'event-1',
+        config: { upcomingSessions: ['session-1'] },
+      }, HOMEPAGE_FIELD_BY_TYPE[upcoming], [videoSession()], []);
+      const upcomingRaw = clipboard.secondCall.args[0].match(/tecHomepage=([^)]*)/)[1];
+      const upcomingEntry = decodeHomepageConfigParam(upcomingRaw).entries[0];
+      expect(upcomingEntry).to.not.have.property('videoDuration');
+      expect(upcomingEntry).to.not.have.property('mrStreamId');
+    } finally {
+      clipboard.restore();
+      richClipboard?.restore();
+    }
   });
 });

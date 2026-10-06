@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import init, { formatSessionDateTime, toRelativeMediaUrl } from '../../../../../event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js';
 
 function entry(overrides = {}) {
@@ -240,6 +241,50 @@ describe('featured-sessions', () => {
 
   describe('per-state CTA text', () => {
     const NOW = Date.now();
+
+    it('hydrates duration and policy without changing displayed scheduled times', async () => {
+      const sessionTime = { startTimeMillis: NOW - 3_600_000, endTimeMillis: NOW + 3_600_000 };
+      const el = buildBlock({
+        entries: [entry({ videoDuration: '00:30:00', isLivestreamed: true, sessionTime })],
+      });
+      await init(el);
+      const card = el.querySelector('.event-card');
+      expect(card.dataset.videoDuration).to.equal('00:30:00');
+      expect(card.dataset.timingBasis).to.equal('video-duration');
+      expect(card.dataset.endTimeUtc).to.equal(new Date(sessionTime.endTimeMillis).toISOString());
+      expect(card.querySelector('.card-description').textContent).to.equal(formatSessionDateTime(sessionTime));
+      expect(card.querySelector('.card-cta').textContent).to.equal('Watch on-demand');
+      expect(card.querySelector('.card-cta').getAttribute('href')).to.equal('https://example.com/sessions/s-001');
+    });
+
+    it('stays live past scheduled end when the video is longer', async () => {
+      const el = buildBlock({
+        entries: [entry({
+          videoDuration: '02:00:00',
+          sessionTime: { startTimeMillis: NOW - 3_600_000, endTimeMillis: NOW - 1000 },
+        })],
+      });
+      await init(el);
+      expect(el.querySelector('.card-cta').textContent).to.equal('Watch now');
+    });
+
+    it('logs an invalid duration once during hydration and uses scheduled-end fallback', async () => {
+      const warning = sinon.spy(window.lana, 'log');
+      try {
+        const el = buildBlock({
+          entries: [entry({
+            videoDuration: 'bad',
+            sessionTime: { startTimeMillis: NOW - 3_600_000, endTimeMillis: NOW - 1000 },
+          })],
+        });
+        await init(el);
+        expect(el.querySelector('.card-cta').textContent).to.equal('Watch on-demand');
+        expect(warning.getCalls().filter((call) => call.args[0].includes('invalid Video Duration')))
+          .to.have.lengthOf(1);
+      } finally {
+        warning.restore();
+      }
+    });
 
     it('defaults to "Learn more" pre-session when config.cta is absent', async () => {
       const el = buildBlock({

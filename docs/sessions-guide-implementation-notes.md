@@ -8,6 +8,31 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ---
 
+## Homepage featured-session timing
+
+Featured-session cards opt into `timingBasis: 'video-duration'`; other Session Guide,
+event-card, playback, SWAN and DVR consumers keep their existing timing behavior.
+For featured entries without a Mobile Rider Livestream ID, CTA text and routing use
+scheduled start plus the catalog's authored `Video Duration`. This is not a measured
+player completion time. Duration must have three non-negative integer H:M:S parts
+with a positive, safe total; overflow minutes such as `00:60:00` are valid. Missing
+or invalid duration falls back to scheduled end. The card becomes on-demand at the
+exact effective end; displayed start/end times remain scheduled.
+
+Tier 1 configurator featured exports include `videoDuration` and use an authored
+Mobile Rider override, otherwise the catalog `Mobilerider Video ID (Livestream)`.
+MR cards still follow polling, regardless of duration. An MR DVR recording ID is not
+a live stream ID, and `Livestreamed Content` alone does not disable video timing.
+Upcoming-session exports are unchanged.
+
+After changing catalog duration or stream identity, regenerate the featured config
+link and republish the authored homepage. `decorate.js` preserves the full copied-link
+payload in `data-featured-sessions-config`; old links without duration use the
+scheduled fallback. For example, a scheduled 18:00-19:00 session with `00:30:00`
+duration displays that scheduled range but switches its CTA to on-demand at 18:30.
+Other surfaces may still use scheduled end; this change does not unlock DVR earlier
+or guarantee that a recording is already playable.
+
 ## Session detail title wrapping
 
 The shared detail-overlay title uses `text-wrap: balance` at every breakpoint

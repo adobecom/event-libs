@@ -2,10 +2,12 @@ import {
   getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
   getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts, getSessionDescription,
-  getSessionIsLivestreamed, getSessionIsOnline,
+  getSessionIsLivestreamed, getSessionIsOnline, extractCustomAttributeValue,
 } from '../v1/services/sessions/sessions-api.js';
 import { logError } from '../v1/utils/lana-log.js';
-import { DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
+import {
+  DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY, CONFIG_TYPES,
+} from './constants.js';
 
 export {
   getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
@@ -137,7 +139,7 @@ export function stringifyConfig(value, indent = '') {
   return JSON.stringify(value);
 }
 
-export function buildSessionAuthorEntry(session, sessionTimes, meta) {
+export function buildSessionAuthorEntry(session, sessionTimes, meta, configType) {
   const match = (sessionTimes || []).find((st) => st.sessionId === session.sessionId);
   const entry = {
     sessionId: session.sessionId,
@@ -155,6 +157,14 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
   if (getSessionIsLivestreamed(session)) entry.isLivestreamed = true;
   if (getSessionIsOnline(session)) entry.isOnline = true;
   if (meta?.mrStreamId) entry.mrStreamId = meta.mrStreamId;
+  if (configType === CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS) {
+    const videoDuration = extractCustomAttributeValue(session, 'Video Duration');
+    if (videoDuration) entry.videoDuration = videoDuration;
+    const mrStreamId = (meta?.mrStreamId || '').trim()
+      || extractCustomAttributeValue(session, 'Mobilerider Video ID (Livestream)').trim();
+    if (mrStreamId) entry.mrStreamId = mrStreamId;
+    else delete entry.mrStreamId;
+  }
   if (meta?.imageUrl) entry.imageUrl = meta.imageUrl;
   if (meta?.watchDestination) entry.watchDestination = meta.watchDestination;
   if (meta?.watchDestination === 'homepage' && meta?.homepageAnchorId) {
@@ -240,7 +250,9 @@ export async function copyHomepageConfigLink(org, repo, row, homepageMeta, sessi
   const metaById = row.config[homepageMeta.metaField] || {};
   const entries = (row.config[homepageMeta.field] || [])
     .filter((id) => sessionsById.has(id))
-    .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
+    .map((id) => buildSessionAuthorEntry(
+      sessionsById.get(id), sessionTimes, metaById[id], row.configType,
+    ));
   const heading = homepageMeta.headingField
     ? (row.config[homepageMeta.headingField] || homepageMeta.label)
     : undefined;

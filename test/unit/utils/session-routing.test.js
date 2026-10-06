@@ -108,6 +108,39 @@ describe('event-card session routing', () => {
       expect(action).to.deep.equal({ type: 'none' });
     });
 
+    it('uses featured video end for routing, even with the livestreamed flag', () => {
+      const dataset = {
+        sessionId: 'sess-1',
+        sessionUrl: '/sessions/s1',
+        isLivestreamed: 'true',
+        timingBasis: 'video-duration',
+        videoDuration: '00:30:00',
+        startTimeUtc: iso(NOW - HOUR),
+        endTimeUtc: iso(NOW + HOUR),
+      };
+      expect(resolveCardAction(dataset, NOW)).to.deep.equal({ type: 'navigate', url: '/sessions/s1' });
+      expect(resolveCardAction({ ...dataset, timingBasis: undefined }, NOW))
+        .to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.homepage });
+    });
+
+    it('keeps featured live overrides until video end and routes on-demand at that exact end', () => {
+      const dataset = {
+        sessionId: 'sess-1',
+        sessionUrl: '/sessions/s1',
+        watchDestination: 'broadcast',
+        timingBasis: 'video-duration',
+        videoDuration: '02:00:00',
+        startTimeUtc: iso(NOW - HOUR),
+        endTimeUtc: iso(NOW - 1),
+      };
+      expect(resolveCardAction(dataset, NOW))
+        .to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.broadcast });
+      expect(resolveCardAction(dataset, NOW + HOUR))
+        .to.deep.equal({ type: 'navigate', url: '/sessions/s1' });
+      expect(resolveCardAction({ ...dataset, mrStreamId: 'mr-1' }, NOW + HOUR, new Set(['mr-1'])))
+        .to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.broadcast });
+    });
+
     describe('authored watchDestination (overrides tag-derived isLivestreamed/isOnline)', () => {
       const originalPath = window.location.pathname + window.location.search;
 
@@ -225,6 +258,23 @@ describe('event-card session routing', () => {
         sessionUrl: 'https://adobe.com/sessions/s1',
       });
       card.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'sess-1' });
+    });
+
+    it('handles featured keyboard activation and CTA clicks with the timing policy attached', () => {
+      const { card, cta } = buildCard({
+        startTimeUtc: iso(realNow + HOUR),
+        endTimeUtc: iso(realNow + 2 * HOUR),
+        sessionUrl: '/sessions/s1',
+      });
+      card.dataset.timingBasis = 'video-duration';
+      card.dataset.videoDuration = '00:30:00';
+      const key = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      card.dispatchEvent(key);
+      expect(key.defaultPrevented).to.equal(true);
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'sess-1' });
+      sessionGuideRequest.value = null;
+      cta.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'sess-1' });
     });
 

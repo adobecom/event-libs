@@ -47,9 +47,15 @@ export function getLiveStreamActiveIds() {
 export function resolveCardAction(dataset, nowMs = getNowMs(), activeStreamIds = liveStreamActiveIds) {
   const { sessionId, sessionUrl, mrStreamId } = dataset;
   const state = deriveSessionState(
-    { startTimeUtc: dataset.startTimeUtc, endTimeUtc: dataset.endTimeUtc, mrStreamId },
+    {
+      startTimeUtc: dataset.startTimeUtc,
+      endTimeUtc: dataset.endTimeUtc,
+      videoDuration: dataset.videoDuration,
+      mrStreamId,
+    },
     activeStreamIds,
     nowMs,
+    dataset.timingBasis,
   );
 
   if (state === 'upcoming') {

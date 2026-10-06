@@ -2626,7 +2626,15 @@ describe('decorateEvent - Array Iteration', () => {
       const parent = document.createElement('div');
       const p = document.createElement('p');
       const config = {
-        eventId: 'event-1', configType: 'homepage-featured-sessions', heading: 'Featured', entries: [{ sessionId: 's1' }],
+        eventId: 'event-1',
+        configType: 'homepage-featured-sessions',
+        heading: 'Featured',
+        entries: [{
+          sessionId: 's1',
+          videoDuration: '00:17:38',
+          mrStreamId: 'catalog-mr',
+          sessionTime: { startTimeMillis: 1750000000000, endTimeMillis: 1750003600000 },
+        }],
       };
       p.appendChild(buildTecHomepageLink(config));
       parent.appendChild(p);
