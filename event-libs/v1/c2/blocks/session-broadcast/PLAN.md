@@ -2482,6 +2482,33 @@ This change is scoped to Session Broadcast, not the homepage widget or session d
 Browser-backed layout tests cover breakpoint boundaries, all four expansion/favorite states,
 the two-line clamp, and a narrower embedding container.
 
+## Desktop container parity with the homepage (MWPW-208525)
+
+Design asked Broadcast to match the container around the homepage's livestream player
+(`.section.livestream-layout.container`). That's Milo's plain `.container`
+(`padding-inline: max(var(--grid-margin-width), (100% - 1920px) / 2)`): an 8.333% gutter from 768px
+(Milo's `--grid-margin-width-base`), with content capped at 1920px past a 2304px viewport. From 1280px
+up, Broadcast now uses the same gutter (`--sb-gutter` on `.sb-app`, falling back to 1920px for
+`--grid-max-width-default`) instead of the old 1192px (1280–1440px) / 1440px (1441px+) caps.
+The homepage section also drops its right padding (`upcoming-sessions.css`) so its player bleeds
+right too; Broadcast keeps the player symmetric and bleeds only the carousels:
+
+- Player, info panel, and ended state: inset by the gutter on both sides; the player grows with
+  the column up to 1920px.
+- Also Live / Up Next: left edge aligns with the player; tracks bleed to the right viewport edge;
+  arrows align with the player's right edge. The Also Live long card stays at Figma's 1156px
+  (node 11091:65811) so the next card peeks in, shrinking only when the column is narrower (1280px).
+- Below 1280px is unchanged (full-bleed player; 24px-left, right-bleeding carousels).
+
+`.sb-app` is an inline-size query container and the gutter is computed in `cqi`, not `100vw`, so a
+classic (non-overlay) scrollbar can't skew the right-edge alignment. Containment doesn't trap fixed
+descendants here (verified in Chrome), and `.sb-app` has none. Removing the 1441px tier also fixes
+a pre-existing near-zero gutter at 1441–1488px (1440px cap with auto margins). Only the 1441px
+player/ended background-image swaps remain at that breakpoint.
+
+`components/container-layout.test.js` covers 375–2560px: gutter, 1920px cap, right bleed, arrow
+alignment, Also Live card width, ended state, and no horizontal overflow.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
