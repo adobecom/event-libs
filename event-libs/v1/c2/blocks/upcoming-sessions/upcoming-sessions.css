@@ -392,19 +392,41 @@
     display: none;
   }
 
+  /*
+   * The track reserves the expanded card height up front and centers cards in it, so a card
+   * growing on hover/focus never changes the track's height. Without this the attached
+   * (bottom-anchored) carousel grows upward and shoves the heading and arrows around. The
+   * negative margin cancels the reserved space at rest so resting spacing is unchanged.
+   */
+  .upcoming-sessions {
+    --upcoming-sessions-card-height: 128px;
+    --upcoming-sessions-card-height-expanded: 150px;
+  }
+
+  .upcoming-sessions-track {
+    min-height: calc(var(--upcoming-sessions-card-height-expanded) + 2 * var(--s2a-spacing-xs, 8px));
+    margin-block: calc((var(--upcoming-sessions-card-height) - var(--upcoming-sessions-card-height-expanded)) / 2);
+  }
+
+  /*
+   * Uniform 24px padding: the body flexes to fill whatever the actions column leaves, and the
+   * 24px between body and actions lives on the actions column's padding-left (not the card's
+   * gap), so it collapses to 0 with the column at rest. Card width and actions width change by
+   * the same 56px over the same transition, so the body (and the title's wrapping) never moves.
+   */
   .upcoming-sessions .sg-card {
     flex-direction: row;
     align-items: stretch;
     width: 375px;
-    min-height: 128px;
+    min-height: var(--upcoming-sessions-card-height);
     padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-lg, 24px);
+    gap: 0;
     border: var(--s2a-border-width-sm, 1px) solid transparent;
   }
 
   .upcoming-sessions .sg-card:is(:hover, :focus-within) {
     width: 431px;
-    min-height: 149px;
+    min-height: var(--upcoming-sessions-card-height-expanded);
     background: #262626;
     border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -418,7 +440,7 @@
 
   .upcoming-sessions .sg-card.is-scheduled:is(:hover, :focus-within),
   .upcoming-sessions .sg-card.is-favorited:is(:hover, :focus-within) {
-    min-height: 149px;
+    min-height: var(--upcoming-sessions-card-height-expanded);
     background: #262626;
     border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -426,8 +448,9 @@
   }
 
   .upcoming-sessions .sg-card__body {
-    flex: none;
-    width: 327px;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
     gap: var(--s2a-spacing-md, 16px);
   }
 
@@ -495,20 +518,30 @@
   .upcoming-sessions .sg-card__actions {
     flex-direction: column;
     width: 0;
+    padding-left: 0;
     gap: var(--s2a-spacing-md, 16px);
     margin-top: 0;
     opacity: 0;
     pointer-events: none;
     align-items: center;
     justify-content: flex-start;
-    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                padding-left 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  /*
+   * .upcoming-sessions-card is repeated to outrank sessions-guide.css's unscoped
+   * `.sg-card.is-scheduled:not(.sg-card--on-demand) .sg-card__actions` (same 0,4,0 specificity,
+   * loaded later on pages with the Session Guide widget), which otherwise wins only for
+   * scheduled cards and swaps in its own 48px width / 16px padding.
+   */
   /* stylelint-disable-next-line no-descending-specificity */
-  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__actions,
-  .upcoming-sessions .sg-card.is-scheduled .sg-card__actions,
-  .upcoming-sessions .sg-card.is-favorited .sg-card__actions {
-    width: var(--s2a-spacing-xl, 32px);
+  .upcoming-sessions .upcoming-sessions-card.sg-card:is(:hover, :focus-within) .sg-card__actions,
+  .upcoming-sessions .upcoming-sessions-card.sg-card.is-scheduled .sg-card__actions,
+  .upcoming-sessions .upcoming-sessions-card.sg-card.is-favorited .sg-card__actions {
+    width: calc(var(--s2a-spacing-xl, 32px) + var(--s2a-spacing-lg, 24px));
+    padding-left: var(--s2a-spacing-lg, 24px);
     opacity: 1;
     pointer-events: auto;
   }

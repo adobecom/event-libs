@@ -122,59 +122,83 @@ function routeCardClick(session) {
   openSessionGuideDetail(action.sessionId);
 }
 
-function buildIconButton({
-  iconSvg, label, pressed, disabled, extraClass, onClick, daaLl,
-}) {
+const BUTTON_STATES = {
+  schedule: {
+    on: { iconSvg: ICON_CALENDAR_CHECK, label: 'Remove from schedule', daaLl: 'Remove-from-Schedule' },
+    off: { iconSvg: ICON_CALENDAR_PLUS, label: 'Add to schedule', daaLl: 'Add-to-Schedule' },
+  },
+  favorite: {
+    on: { iconSvg: ICON_HEART_FILLED, label: 'Remove from favorites', daaLl: 'Remove-from-Favorites' },
+    off: { iconSvg: ICON_HEART_OUTLINE, label: 'Add to favorites', daaLl: 'Add-to-Favorites' },
+  },
+};
+
+function syncIconButton(btn, kind, pressed) {
+  const { iconSvg, label, daaLl } = BUTTON_STATES[kind][pressed ? 'on' : 'off'];
+  if (btn.getAttribute('aria-pressed') === String(pressed) && btn.firstElementChild) return;
+  btn.setAttribute('aria-label', label);
+  btn.setAttribute('aria-pressed', String(pressed));
+  btn.setAttribute('daa-ll', daaLl);
+  const icon = btn.querySelector('.sg-icon-btn__icon')
+    || createTag('span', { class: 'sg-icon-btn__icon', 'aria-hidden': 'true' }, '', { parent: btn });
+  icon.innerHTML = iconSvg;
+}
+
+function buildIconButton({ kind, extraClass, onClick }) {
   const btn = createTag('button', {
     class: ['sg-icon-btn', 'sg-icon-btn--solid', 'sg-icon-btn--on-dark', 'sg-icon-btn--md', extraClass].filter(Boolean).join(' '),
     type: 'button',
-    'aria-label': label,
-    'aria-pressed': String(pressed),
-    ...(daaLl ? { 'daa-ll': daaLl } : {}),
   });
-  if (disabled) btn.disabled = true;
-  createTag('span', { class: 'sg-icon-btn__icon', 'aria-hidden': 'true' }, iconSvg, { parent: btn });
+  btn.dataset.kind = kind;
   btn.addEventListener('click', onClick);
   return btn;
 }
 
-async function handleSchedule(e, session, isScheduled, btn) {
+// Patches state onto the existing card instead of rebuilding it, so a card that is hovered or
+// holds focus keeps :hover/:focus-within (and its expanded width) across schedule/favorite updates.
+function syncCardState(card) {
+  const { sessionId } = card.dataset;
+  const isScheduled = scheduled.value.has(sessionId);
+  const isFavorited = favorited.value.has(sessionId);
+  const isPending = pendingActions.value.has(sessionId);
+
+  card.classList.toggle('is-scheduled', isScheduled);
+  card.classList.toggle('is-favorited', isFavorited);
+  card.classList.toggle('is-pending', isPending);
+
+  card.querySelectorAll('.sg-card__actions .sg-icon-btn').forEach((btn) => {
+    syncIconButton(btn, btn.dataset.kind, btn.dataset.kind === 'schedule' ? isScheduled : isFavorited);
+    btn.disabled = isPending;
+  });
+}
+
+async function handleSchedule(e, session, btn) {
   e.stopPropagation();
+  const isScheduled = scheduled.value.has(session.sessionId);
   btn.disabled = true;
   try {
     await toggleScheduleWithFeedback(toRfSession(session), { eventConfig: getEventConfig(), isScheduled });
   } finally {
-    btn.disabled = false;
+    btn.disabled = pendingActions.value.has(session.sessionId);
   }
 }
 
-async function handleFavorite(e, session, isFavorited, btn) {
+async function handleFavorite(e, session, btn) {
   e.stopPropagation();
+  const isFavorited = favorited.value.has(session.sessionId);
   btn.disabled = true;
   try {
     await toggleFavoriteWithFeedback(toRfSession(session), { eventConfig: getEventConfig(), isFavorited });
   } finally {
-    btn.disabled = false;
+    btn.disabled = pendingActions.value.has(session.sessionId);
   }
 }
 
 export function buildCard(session) {
-  const isScheduled = scheduled.value.has(session.sessionId);
-  const isFavorited = favorited.value.has(session.sessionId);
-  const isPending = pendingActions.value.has(session.sessionId);
-
-  const cardClass = [
-    'sg-card',
-    'upcoming-sessions-card',
-    isScheduled ? 'is-scheduled' : '',
-    isFavorited ? 'is-favorited' : '',
-    isPending ? 'is-pending' : '',
-  ].filter(Boolean).join(' ');
-
   const timeRange = formatTimeRange(session);
 
   const card = createTag('div', {
-    class: cardClass,
+    class: 'sg-card upcoming-sessions-card',
     'data-session-id': session.sessionId,
     role: 'button',
     tabindex: '0',
@@ -208,26 +232,20 @@ export function buildCard(session) {
   actions.addEventListener('click', (e) => e.stopPropagation());
 
   const scheduleBtn = buildIconButton({
-    iconSvg: isScheduled ? ICON_CALENDAR_CHECK : ICON_CALENDAR_PLUS,
-    label: isScheduled ? 'Remove from schedule' : 'Add to schedule',
-    pressed: isScheduled,
-    disabled: isPending,
+    kind: 'schedule',
     extraClass: 'sg-card__btn--schedule',
-    onClick: (e) => handleSchedule(e, session, isScheduled, scheduleBtn),
-    daaLl: isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule',
+    onClick: (e) => handleSchedule(e, session, scheduleBtn),
   });
   actions.append(scheduleBtn);
 
   const favoriteBtn = buildIconButton({
-    iconSvg: isFavorited ? ICON_HEART_FILLED : ICON_HEART_OUTLINE,
-    label: isFavorited ? 'Remove from favorites' : 'Add to favorites',
-    pressed: isFavorited,
-    disabled: isPending,
+    kind: 'favorite',
     extraClass: 'sg-card__btn--favorite',
-    onClick: (e) => handleFavorite(e, session, isFavorited, favoriteBtn),
-    daaLl: isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites',
+    onClick: (e) => handleFavorite(e, session, favoriteBtn),
   });
   actions.append(favoriteBtn);
+
+  syncCardState(card);
 
   const activate = () => routeCardClick(session);
   card.addEventListener('click', activate);
@@ -418,9 +436,12 @@ async function decorate(el) {
 
   let timers = scheduleStateTimers(sessions, dropSession);
 
-  const unsubscribeFavorited = favorited.subscribe(() => renderTrack(track, sessions));
-  const unsubscribeScheduled = scheduled.subscribe(() => renderTrack(track, sessions));
-  const unsubscribePending = pendingActions.subscribe(() => renderTrack(track, sessions));
+  const syncTrackState = () => {
+    track.querySelectorAll(':scope > .upcoming-sessions-card').forEach(syncCardState);
+  };
+  const unsubscribeFavorited = favorited.subscribe(syncTrackState);
+  const unsubscribeScheduled = scheduled.subscribe(syncTrackState);
+  const unsubscribePending = pendingActions.subscribe(syncTrackState);
 
   function onVisibilityChange() {
     if (document.visibilityState !== 'visible') return;
