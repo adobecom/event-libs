@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 
-// Desktop mirrors the homepage livestream section's Milo `.container`: 8.333% gutter, content capped at 1920px.
+// Homepage livestream `.container`: 8.333% gutter, 1920px max content.
 const gutterFor = (width) => Math.max(width * 0.08333, (width - 1920) / 2);
 
 describe('Broadcast container layout', () => {

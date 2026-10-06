@@ -57,8 +57,7 @@
   pointer-events: auto;
 }
 
-/* !important overrides c2-global.css/event-youtube.css's 1192px measure so the player fills its
-   column (full-bleed on tablet, gutter-inset from 1280px); overflow:hidden clips corners. */
+/* !important beats c2-global/event-youtube's 1192px cap; overflow:hidden clips corners. */
 @media (min-width: 768px) {
   .session-broadcast .milo-video,
   .session-broadcast .youtube-video-container {
@@ -79,21 +78,16 @@
   background: var(--s2a-color-gray-900, #000);
 }
 
-/* Desktop column matches the homepage livestream section's Milo `.container`: an 8.333% gutter
-   that widens to keep content at 1920px max. Measured off .sb-app (cqi) instead of 100vw so a
-   classic scrollbar can't skew it. */
+/* Desktop gutter = homepage livestream's Milo `.container` (8.333%, 1920px max content).
+   Measured in cqi on .sb-app so scrollbar width can't skew it. */
 @media (min-width: 1280px) {
   .sb-app {
-    /* 8.333cqi mirrors Milo's 8.333% --grid-margin-width-base (a % can't be reused: it resolves per
-       element, not against .sb-app); keep in sync if Milo's grid changes. */
-
     /* stylelint-disable unit-no-unknown -- Stylelint 14 predates container query units. */
     --sb-gutter: max(8.333cqi, calc((100cqi - var(--grid-max-width-default, 1920px)) / 2));
     --sb-column: calc(100cqi - 2 * var(--sb-gutter));
     /* stylelint-enable unit-no-unknown */
 
-    /* Inline-size containment ignores content for width, so .sb-app must stay in a full-width
-       (block) parent — a shrink-to-fit parent would collapse it to 0. */
+    /* Needs a full-width parent: inline-size containment ignores content width. */
     /* stylelint-disable-next-line property-no-unknown -- Stylelint 14 predates container queries. */
     container-type: inline-size;
   }
@@ -505,9 +499,7 @@
   }
 }
 
-/* Aligns with the shared desktop gutter used by the player and carousels. */
 @media (min-width: 1280px) {
-  /* Top padding grows to 124px. */
   .sb-ended {
     padding-top: var(--s2a-layout-lg, 124px);
     padding-right: var(--sb-gutter);
@@ -686,9 +678,9 @@
 
 .sb-carousel-section--also-live .sg-live-card__actions-time { display: none; }
 
-/* Switches to sessions-guide's horizontal long card, sized to the shared desktop column. */
+/* Switches to sessions-guide's horizontal long card. */
 @media (min-width: 1280px) {
-  /* Left gutter aligns with the player; no right padding so the track bleeds to the viewport edge. */
+  /* No right padding so the track bleeds to the viewport edge. */
   .sb-carousel-section--also-live {
     padding: var(--s2a-spacing-xl, 32px) 0 var(--s2a-spacing-xl, 32px) var(--sb-gutter);
   }
@@ -698,12 +690,12 @@
     gap: var(--s2a-spacing-lg, 24px);
   }
 
-  /* Figma's 1156px long card (rest peeks in from the right); min() keeps it inside the player column at 1280px. */
+  /* Figma's 1156px card; min() keeps it inside the column at 1280px. */
   .sb-carousel-section--also-live .sg-carousel__card-wrap {
     flex: 0 0 min(var(--sb-column), 1156px);
   }
 
-  /* Lifts sessions-guide.css's own 1104px desktop cap; the wrap above sets the width. */
+  /* Lifts sessions-guide's 1104px cap. */
   .sb-carousel-section--also-live .sg-live-card {
     max-width: none;
   }
@@ -909,11 +901,11 @@
     gap: var(--s2a-spacing-md, 16px);
     top: 0;
 
-    /* .sg-carousel now runs to the viewport edge; pull the arrows back to the player's right edge. */
+    /* Aligns arrows with the player's right edge. */
     right: var(--sb-gutter);
   }
 
-  /* Clears sessions-guide.css's -20px bleed — the section's zero right padding already reaches the edge. */
+  /* Cancels sessions-guide's -20px bleed. */
   .sb-carousel-section--also-live .sg-carousel__track,
   .sb-carousel-section--up-next .sg-carousel__track {
     margin-right: 0;
@@ -941,7 +933,6 @@
   }
 }
 
-/* Player/info width comes from .sb-live's desktop gutter padding; this is the type/spacing layer. */
 @media (min-width: 1280px) {
   .sb-info {
     padding: var(--s2a-spacing-xl, 32px) 0;
@@ -961,7 +952,6 @@
 
 /* Upcoming goes dark at desktop too, matching the player/Also Live above; ended-state rules can still override. */
 @media (min-width: 1280px) {
-  /* Same left-gutter/right-bleed split as Also Live. */
   .sb-carousel-section--up-next {
     padding: var(--s2a-spacing-xl, 32px) 0 var(--s2a-spacing-xl, 32px) var(--sb-gutter);
     background: var(--s2a-color-gray-1000, #000);
