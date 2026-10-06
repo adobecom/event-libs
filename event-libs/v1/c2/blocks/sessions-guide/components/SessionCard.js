@@ -163,15 +163,15 @@ export function SessionCard({
     <div class=${cardClass} onclick=${handleClick}
       onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
-        <div class="sg-card__badge-row">
-          <${CategoryBadge} session=${session} size="sm" />
-        </div>
         <button
           class="sg-card__title sg-card__title-btn"
           type="button"
           onclick=${(e) => { e.stopPropagation(); handleClick(); }}
           daa-ll=${cardDaaLl}
         >${session.title}</button>
+        <div class="sg-card__badge-row">
+          <${CategoryBadge} session=${session} size="sm" />
+        </div>
         ${showDescription && session.description && html`<p class="sg-card__description">${session.description}</p>`}
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.primaryTrack}</span>

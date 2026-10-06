@@ -25,13 +25,22 @@ export default {
   },
   middleware: [
     async function mockVendoredPreact(ctx, next) {
-      if (ctx.path === '/event-libs/v1/deps/htm-preact.js') {
+      if (ctx.path === '/event-libs/v1/deps/htm-preact.js' && ctx.query['real-preact'] !== 'true') {
         ctx.path = '/test/unit/mocks/deps/htm-preact.js';
       }
       return next();
     },
   ],
-  plugins: [importMapsPlugin({
+  plugins: [{
+    name: 'focus-test-page',
+    async executeCommand({ command, session }) {
+      if (command !== 'focus-test-page') return undefined;
+      const page = session.browser.getPage?.(session.id);
+      if (!page?.bringToFront) throw new Error('The browser launcher cannot focus a test page');
+      await page.bringToFront();
+      return true;
+    },
+  }, importMapsPlugin({
     imports: {
       'events/': '/event-libs/v1/',
       'events/blocks/': '/event-libs/v1/blocks/',

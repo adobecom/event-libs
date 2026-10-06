@@ -64,7 +64,9 @@ describe('OnDemandView', () => {
   it('shows empty state when no on-demand sessions', () => {
     const store = makeStore([UPCOMING]);
     const View = buildOnDemandView(preact, store);
-    expect(View({})).to.include('sg-empty');
+    const html = View({});
+    expect(html).to.include('sg-empty');
+    expect(html.indexOf('sg-upcoming-title')).to.be.lessThan(html.indexOf('sg-empty'));
   });
 
   it('renders track rows for on-demand sessions', () => {
@@ -94,14 +96,16 @@ describe('OnDemandView', () => {
   it('does not show a recommended carousel when no recommendedSessions are authored', () => {
     const store = makeStore([PAST_DESIGN, PAST_VIDEO]);
     const View = buildOnDemandView(preact, store);
-    expect(View({})).to.not.include('sg-carousel-section--recommended');
+    const html = View({});
+    expect(html).to.not.include('sg-carousel-section--recommended');
+    expect(html.indexOf('sg-upcoming-title')).to.be.lessThan(html.indexOf('sg-time-row'));
   });
 
   it('shows "No results found" instead of the default empty state when search matches nothing', () => {
     const store = makeStore([PAST_DESIGN], { searchQuery: 'nonexistent term' });
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('No results found');
+    expect(html).to.include('No results match your current selection.');
     expect(html).to.not.include('Sessions will be available on demand after the event.');
   });
 
@@ -109,7 +113,7 @@ describe('OnDemandView', () => {
     const store = makeStore([PAST_DESIGN], { activeFilters: { primaryTrack: new Set(['Video']) } });
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('No results found');
+    expect(html).to.include('No results match your current selection.');
     expect(html).to.not.include('Sessions will be available on demand after the event.');
   });
 });

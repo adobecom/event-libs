@@ -1,14 +1,17 @@
+import { getEventConfig } from '../../../../utils/utils.js';
 import { logError } from '../../../../utils/lana-log.js';
+
+const MR_PROD_BASE_URL = 'https://overlay-admin-prod.mobilerider.com';
+const MR_INTEGRATION_BASE_URL = 'https://overlay-admin-integration.mobilerider.com';
+
+const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';
+const getBaseUrl = () => (getEnv() === 'prod' ? MR_PROD_BASE_URL : MR_INTEGRATION_BASE_URL);
 
 /**
  * MobileRider Controller
  * Handles all interactions with the MobileRider API
  */
 class MobileRiderController {
-  constructor() {
-    this.baseUrl = 'https://overlay-admin-integration.mobilerider.com';
-  }
-
   /**
    * Get the status of multiple media items
    * @param {string[]} ids - Array of media IDs to check
@@ -17,7 +20,7 @@ class MobileRiderController {
   async getMediaStatus(ids) {
     try {
       const response = await fetch(
-        `${this.baseUrl}/api/media-status?ids=${ids.join(',')}`,
+        `${getBaseUrl()}/api/media-status?ids=${ids.join(',')}`,
         {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },

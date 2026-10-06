@@ -33,12 +33,12 @@ const BASE_CONFIG = {
   title: '', filterCategories: [], theme: 'dark', recommendedSessions: ['upcoming-1'],
 };
 
-function makeStore(sessionList, activeDay) {
+function makeStore(sessionList, activeDay, extraState = {}) {
   sessions.value = sessionList;
   liveStreamActiveIds.value = new Set();
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { activeDay, guideConfig: { ...BASE_CONFIG } },
+    state: { activeDay, guideConfig: { ...BASE_CONFIG }, ...extraState },
     dispatch: () => {},
   };
   return store;
@@ -49,5 +49,13 @@ describe('LiveUpcomingView (recommendedSessions authored)', () => {
     const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY);
     const View = buildLiveUpcomingView(preact, store);
     expect(View({})).to.include('sg-carousel-section--recommended');
+  });
+
+  it('hides the recommended carousel when search matches nothing', () => {
+    const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY, { searchQuery: 'nonexistent term' });
+    const View = buildLiveUpcomingView(preact, store);
+    const html = View({});
+    expect(html).to.not.include('sg-carousel-section--recommended');
+    expect(html).to.include('No results match your current selection.');
   });
 });
