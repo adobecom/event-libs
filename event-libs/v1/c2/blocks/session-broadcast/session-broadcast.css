@@ -57,8 +57,9 @@
   pointer-events: auto;
 }
 
-/* !important overrides c2-global.css/event-youtube.css; overflow:hidden clips corners. */
-@media (min-width: 768px) and (max-width: 1279px) {
+/* !important overrides c2-global.css/event-youtube.css's 1192px measure so the player fills its
+   column (full-bleed on tablet, gutter-inset from 1280px); overflow:hidden clips corners. */
+@media (min-width: 768px) {
   .session-broadcast .milo-video,
   .session-broadcast .youtube-video-container {
     max-width: none !important;
@@ -78,7 +79,24 @@
   background: var(--s2a-color-gray-900, #000);
 }
 
+/* Desktop column matches the homepage livestream section's Milo `.container`: an 8.333% gutter
+   (Milo's --grid-margin-width-base) that widens to keep content at 1920px max. Measured off .sb-app
+   (cqi) instead of 100vw so a classic scrollbar can't skew it. */
 @media (min-width: 1280px) {
+  .sb-app {
+    /* stylelint-disable unit-no-unknown -- Stylelint 14 predates container query units. */
+    --sb-gutter: max(8.333cqi, calc((100cqi - var(--grid-max-width-default, 1920px)) / 2));
+    --sb-column: calc(100cqi - 2 * var(--sb-gutter));
+    /* stylelint-enable unit-no-unknown */
+
+    /* stylelint-disable-next-line property-no-unknown -- Stylelint 14 predates container queries. */
+    container-type: inline-size;
+  }
+
+  .sb-live {
+    padding-inline: var(--sb-gutter);
+  }
+
   .sb-live.has-background {
     position: relative;
     isolation: isolate;
@@ -482,15 +500,13 @@
   }
 }
 
-/* Aligns with the shared 1192px-centered treatment used by .sb-info/.sb-carousel-section. */
+/* Aligns with the shared desktop gutter used by the player and carousels. */
 @media (min-width: 1280px) {
-  /* Top padding grows to 124px; side padding drops to 0 now that centering provides the room. */
+  /* Top padding grows to 124px. */
   .sb-ended {
-    max-width: 1192px;
-    margin: 0 auto;
     padding-top: var(--s2a-layout-lg, 124px);
-    padding-right: 0;
-    padding-left: 0;
+    padding-right: var(--sb-gutter);
+    padding-left: var(--sb-gutter);
   }
 
   .sb-ended__eyebrow {
@@ -665,21 +681,11 @@
 
 .sb-carousel-section--also-live .sg-live-card__actions-time { display: none; }
 
-/* Switches to sessions-guide's 1104px horizontal long card; only .sg-carousel is capped/centered. */
+/* Switches to sessions-guide's horizontal long card, sized to the shared desktop column. */
 @media (min-width: 1280px) {
-  /* Clears the base left padding so .sg-carousel can center symmetrically for the bleed calc below. */
+  /* Left gutter aligns with the player; no right padding so the track bleeds to the viewport edge. */
   .sb-carousel-section--also-live {
-    padding: var(--s2a-spacing-xl, 32px) 0;
-  }
-
-  .sb-carousel-section--also-live .sg-carousel {
-    max-width: 1192px;
-    margin: 0 auto;
-  }
-
-  /* Gap to the true viewport edge (not .sg-carousel's own boundary) is (100vw - 1192px) / 2. */
-  .sb-carousel-section--also-live .sg-carousel__track {
-    margin-right: calc((100vw - 1192px) / -2);
+    padding: var(--s2a-spacing-xl, 32px) 0 var(--s2a-spacing-xl, 32px) var(--sb-gutter);
   }
 
   .sb-carousel-section--also-live .sg-carousel__cards {
@@ -687,15 +693,14 @@
     gap: var(--s2a-spacing-lg, 24px);
   }
 
-  /* No width of its own, so short titles shrink-wrap the card below its intended cap. */
+  /* Figma's 1156px long card (rest peeks in from the right); min() keeps it inside the player column at 1280px. */
   .sb-carousel-section--also-live .sg-carousel__card-wrap {
-    flex: 0 0 100%;
-    max-width: 1156px;
+    flex: 0 0 min(var(--sb-column), 1156px);
   }
 
-  /* Border/radius match sessions-guide.css's own desktop rule; only max-width differs. */
+  /* Lifts sessions-guide.css's own 1104px desktop cap; the wrap above sets the width. */
   .sb-carousel-section--also-live .sg-live-card {
-    max-width: 1156px;
+    max-width: none;
   }
 
   /* Overrides the <1280px compact-mode height above. */
@@ -898,6 +903,15 @@
   .sb-carousel-section--up-next .sg-carousel__nav {
     gap: var(--s2a-spacing-md, 16px);
     top: 0;
+
+    /* .sg-carousel now runs to the viewport edge; pull the arrows back to the player's right edge. */
+    right: var(--sb-gutter);
+  }
+
+  /* Clears sessions-guide.css's -20px bleed — the section's zero right padding already reaches the edge. */
+  .sb-carousel-section--also-live .sg-carousel__track,
+  .sb-carousel-section--up-next .sg-carousel__track {
+    margin-right: 0;
   }
 
   .sb-carousel-section--also-live .sg-carousel__arrow,
@@ -922,13 +936,12 @@
   }
 }
 
-/* 1192px is the shared 1280-1440px wrapper value; 1441px+ bumps it to 1440px near the end of this file. */
+/* Player/info width comes from .sb-live's desktop gutter padding; this is the type/spacing layer. */
 @media (min-width: 1280px) {
-  /* :not() excludes Also Live/Up Next, which stay full-bleed with only .sg-carousel capped/centered. */
-  .sb-info,
+  /* :not() excludes Also Live/Up Next, which only take the left gutter so their tracks can bleed right. */
   .sb-carousel-section:not(.sb-carousel-section--also-live):not(.sb-carousel-section--up-next) {
-    max-width: 1192px;
-    margin: 0 auto;
+    padding-right: var(--sb-gutter);
+    padding-left: var(--sb-gutter);
   }
 
   .sb-info {
@@ -949,14 +962,10 @@
 
 /* Upcoming goes dark at desktop too, matching the player/Also Live above; ended-state rules can still override. */
 @media (min-width: 1280px) {
+  /* Same left-gutter/right-bleed split as Also Live. */
   .sb-carousel-section--up-next {
-    padding: var(--s2a-spacing-xl, 32px) 0;
+    padding: var(--s2a-spacing-xl, 32px) 0 var(--s2a-spacing-xl, 32px) var(--sb-gutter);
     background: var(--s2a-color-gray-1000, #000);
-  }
-
-  .sb-carousel-section--up-next .sg-carousel {
-    max-width: 1192px;
-    margin: 0 auto;
   }
 
   .sb-carousel-section--up-next .sg-section-title {
@@ -967,11 +976,6 @@
   .sb-carousel-section--up-next .sg-section-title {
     line-height: var(--s2a-typography-line-height-heading-5); /* 100% */
     letter-spacing: var(--s2a-font-letter-spacing-4xl);
-  }
-
-  /* Same edge-bleed reasoning as Also Live above. */
-  .sb-carousel-section--up-next .sg-carousel__track {
-    margin-right: calc((100vw - 1192px) / -2);
   }
 
   .sb-carousel-section--up-next .sg-carousel__cards {
@@ -1040,26 +1044,4 @@
   }
 
   /* .sg-card__description styling now lives in sessions-guide.css. */
-}
-
-/* Repeats each 1280px+ selector at matching specificity so this wins the tie for 1441px+. */
-@media (min-width: 1441px) {
-  .sb-info,
-  .sb-carousel-section:not(.sb-carousel-section--also-live):not(.sb-carousel-section--up-next),
-  .sb-ended,
-  .sb-carousel-section--also-live .sg-carousel,
-  .sb-carousel-section--up-next .sg-carousel {
-    max-width: 1440px;
-  }
-
-  .sb-carousel-section--also-live .sg-carousel__track,
-  .sb-carousel-section--up-next .sg-carousel__track {
-    margin-right: calc((100vw - 1440px) / -2);
-  }
-
-  /* Caps at 1440px (not the foundation's 1480px); !important for the same reason as the tablet override above. */
-  .session-broadcast .milo-video,
-  .session-broadcast .youtube-video-container {
-    max-width: 1440px !important;
-  }
 }
