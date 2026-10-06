@@ -1,4 +1,6 @@
-import { html, useEffect, useRef, useState } from '../../../../deps/htm-preact.js';
+import {
+  html, useEffect, useLayoutEffect, useRef, useState,
+} from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions, sessionsStatus, auth, sessionGuideRequest,
@@ -78,7 +80,7 @@ export function DrawerShell() {
     currentTopRef.current = top;
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = drawerRef.current;
     if (!el) return;
     const { drawerState } = state;
@@ -103,7 +105,7 @@ export function DrawerShell() {
         requestAnimationFrame(() => setTop(getTopMargin(), true));
       });
     } else if (drawerState === 'hidden') {
-      el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+      el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0s 0.45s';
       el.style.top = '100vh';
       expandedRef.current = false;
       currentTopRef.current = 0;

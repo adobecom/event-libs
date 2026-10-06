@@ -1,6 +1,9 @@
 import { expect } from '@esm-bundle/chai';
+import { executeServerCommand } from '@web/test-runner-commands';
 import { resolveSessionGuideRequest, DrawerShell } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerShell.js';
-import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
+import { DrawerHeader } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
+import { buildInitialState, SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
+import { auth, sessionsStatus } from '../../../../../../event-libs/v1/utils/session-store.js';
 
 const SESSION = {
   id: 'session-1',
@@ -126,5 +129,160 @@ describe('DrawerShell FAB placement', () => {
         expect(bounds.left + bounds.width / 2).to.equal(width / 2);
       });
     });
+  });
+});
+
+describe('DrawerShell collapsed visibility', () => {
+  let frame;
+  let previousAuth;
+  let previousStatus;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    previousAuth = auth.value;
+    previousStatus = sessionsStatus.value;
+    auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+    sessionsStatus.value = 'loading';
+    frame = document.createElement('iframe');
+    frame.style.border = '0';
+    frame.style.height = '874px';
+  });
+
+  afterEach(() => {
+    frame.remove();
+    auth.value = previousAuth;
+    sessionsStatus.value = previousStatus;
+    SessionGuideContext._current = null;
+  });
+
+  [375, 402, 768, 1279, 1280, 1440].forEach((width) => {
+    it(`hides the collapsed heading independently of drawer coordinates at ${width}px`, async () => {
+      frame.style.width = `${width}px`;
+      await new Promise((resolve, reject) => {
+        frame.onload = resolve;
+        frame.onerror = reject;
+        frame.src = '/test/unit/c2/blocks/sessions-guide/mocks/fab-placement.html';
+        document.body.appendChild(frame);
+      });
+
+      const doc = frame.contentDocument;
+      const portal = doc.querySelector('.sg-portal');
+      const state = buildInitialState({
+        headings: { loggedOut: 'Unregistered, find more inspiration' },
+      });
+      SessionGuideContext._current = { state, dispatch: () => {} };
+
+      ['hidden', 'expanded', 'hidden', 'peek', 'expanded', 'hidden'].forEach((drawerState) => {
+        state.drawerState = drawerState;
+        portal.innerHTML = DrawerShell();
+        const drawer = portal.querySelector('.sg-drawer');
+        drawer.insertAdjacentHTML('afterbegin', DrawerHeader({}));
+        // Simulate a stale viewport offset: closed content must not rely on being off-screen.
+        drawer.style.top = drawerState === 'peek' ? '40%' : '0px';
+        const style = frame.contentWindow.getComputedStyle(drawer);
+        const heading = drawer.querySelector('.sg-header-title');
+        const cta = portal.querySelector('.sg-cta-btn');
+
+        expect(heading.textContent).to.equal('Unregistered, find more inspiration');
+        expect(heading.getBoundingClientRect().top).to.be.lessThan(frame.contentWindow.innerHeight);
+        expect(style.opacity).to.equal(drawerState === 'hidden' ? '0' : '1');
+        expect(drawer.hasAttribute('inert')).to.equal(drawerState === 'hidden');
+        const shell = portal.querySelector('.sg-shell');
+        expect(shell.getAttribute('role')).to.equal(drawerState === 'hidden' ? null : 'dialog');
+        expect(shell.getAttribute('aria-modal')).to.equal(drawerState === 'hidden' ? null : 'true');
+        expect(drawer.hasAttribute('role')).to.be.false;
+        expect(!!cta).to.equal(drawerState === 'hidden');
+        if (cta) expect(frame.contentWindow.getComputedStyle(cta).opacity).to.equal('1');
+      });
+    });
+  });
+});
+
+describe('DrawerShell real Preact lifecycle', () => {
+  let frame;
+
+  beforeEach(async () => {
+    await executeServerCommand('focus-test-page');
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    frame = document.createElement('iframe');
+    frame.style.border = '0';
+    frame.style.height = '874px';
+  });
+
+  afterEach(() => {
+    frame.remove();
+  });
+
+  [
+    { width: 402, reducedMotion: false },
+    { width: 1440, reducedMotion: false },
+    { width: 402, reducedMotion: true },
+  ].forEach(({ width, reducedMotion }) => {
+    it(`preserves closing motion and restores visibility on reopen at ${width}px, reduced motion: ${reducedMotion}`, async () => {
+      frame.style.width = `${width}px`;
+      await new Promise((resolve, reject) => {
+        frame.onload = resolve;
+        frame.onerror = reject;
+        frame.src = '/test/unit/c2/blocks/sessions-guide/mocks/fab-placement.html';
+        document.body.appendChild(frame);
+      });
+
+      const doc = frame.contentDocument;
+      const win = frame.contentWindow;
+      win.drawerTestReducedMotion = reducedMotion;
+      const importMap = doc.createElement('script');
+      importMap.type = 'importmap';
+      importMap.textContent = JSON.stringify({
+        imports: { '/event-libs/v1/deps/htm-preact.js': '/event-libs/v1/deps/htm-preact.js?real-preact=true' },
+      });
+      doc.head.append(importMap);
+      await new Promise((resolve, reject) => {
+        win.addEventListener('drawer-test-ready', resolve, { once: true });
+        win.addEventListener('error', (event) => reject(event.error || new Error(event.message)), { once: true });
+        const script = doc.createElement('script');
+        script.type = 'module';
+        script.src = '/test/unit/c2/blocks/sessions-guide/mocks/drawer-lifecycle.js';
+        script.onerror = reject;
+        doc.head.append(script);
+      });
+
+      const drawer = doc.querySelector('.sg-drawer');
+      const style = () => win.getComputedStyle(drawer);
+      const settle = () => new Promise((resolve) => win.setTimeout(resolve, 550));
+      expect(style().opacity).to.equal('0');
+
+      doc.querySelector('.sg-cta-btn').click();
+      await settle();
+      expect(style().opacity).to.equal('1');
+      expect(drawer.inert).to.be.false;
+      expect(doc.body.style.overflow).to.equal('hidden');
+      const modal = doc.querySelector('[role="dialog"][aria-modal="true"]');
+      expect(modal.classList.contains('sg-shell')).to.be.true;
+      expect(modal.contains(drawer)).to.be.true;
+      expect(modal.querySelector('.sg-drawer__notifications')).to.exist;
+
+      doc.querySelector('.sg-close-btn').click();
+      await new Promise((resolve) => win.requestAnimationFrame(resolve));
+      expect(drawer.inert).to.be.true;
+      expect(style().opacity).to.equal(reducedMotion ? '0' : '1');
+      if (!reducedMotion) {
+        expect(style().transitionDuration).to.equal('0.45s, 0s');
+        expect(style().transitionDelay).to.equal('0s, 0.45s');
+      }
+      await settle();
+      expect(style().opacity).to.equal('0');
+      expect(doc.body.style.overflow).to.equal('');
+      expect(doc.querySelector('[role="dialog"]')).to.be.null;
+
+      drawer.style.transition = 'none';
+      drawer.style.top = '0px';
+      expect(style().opacity).to.equal('0');
+      doc.querySelector('.sg-cta-btn').click();
+      await settle();
+      expect(style().opacity).to.equal('1');
+      expect(drawer.inert).to.be.false;
+    }).timeout(10000);
   });
 });
