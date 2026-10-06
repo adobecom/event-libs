@@ -101,6 +101,42 @@ describe('LiveUpcomingView', () => {
     expect(View({})).to.not.include('sg-carousel-section--recommended');
   });
 
+  // MR streams stay on until ops turns them off, so a finished day can still have a live session.
+  // That session stays in the Live carousel; the rest of the day must still list as Previously aired.
+  describe('a day with nothing upcoming but a stream still on', () => {
+    // Own start time (15 min after AIRED_SESSION) so it would form its own Previously aired row.
+    const STILL_STREAMING = {
+      ...AIRED_SESSION,
+      id: 'mr-live',
+      title: 'Keynote Still Streaming',
+      mrStreamId: 'mr-1',
+      sessionPageUrl: '/mr-live',
+      startTimeUtc: h(-0.75),
+      endTimeUtc: h(-0.6),
+    };
+    const countRows = (markup) => (markup.match(/class="sg-time-row"/g) || []).length;
+
+    function render() {
+      const store = makeStore([STILL_STREAMING, AIRED_SESSION], AIRED_DAY);
+      liveStreamActiveIds.value = new Set(['mr-1']);
+      return buildLiveUpcomingView(preact, store)({});
+    }
+
+    it('keeps the still-streaming session in the Live carousel', () => {
+      const out = render();
+      expect(out).to.include('sg-carousel-section--live');
+      expect(out).to.not.include('sg-carousel-section--recommended');
+    });
+
+    it('still lists the rest of the day as Previously aired, minus the live session', () => {
+      const out = render();
+      expect(out).to.include('Previously aired');
+      expect(out).to.not.include('sg-empty');
+      // Two sessions at two start times; only the finished one is listed.
+      expect(countRows(out.split('Previously aired')[1])).to.equal(1);
+    });
+  });
+
   it('shows a Previously aired session that matches the active search', () => {
     const store = makeStore([AIRED_SESSION], AIRED_DAY, { searchQuery: 'recorded' });
     const View = buildLiveUpcomingView(preact, store);
