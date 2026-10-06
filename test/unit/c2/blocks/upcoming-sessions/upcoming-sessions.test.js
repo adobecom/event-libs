@@ -747,6 +747,164 @@ describe('upcoming-sessions', () => {
     });
   });
 
+  describe('schedule/favorite state updates', () => {
+    it('patches the existing card in place, keeping focus, instead of rebuilding the track', async () => {
+      const el = buildBlock([session(), session({ sessionId: 'session-2' })]);
+      await init(el);
+      const card = el.querySelector('[data-session-id="session-1"]');
+      const scheduleBtn = card.querySelector('.sg-card__btn--schedule');
+      scheduleBtn.focus();
+
+      pendingActions.value = new Set(['session-1']);
+      expect(scheduleBtn.disabled).to.equal(true);
+      expect(card.classList.contains('is-pending')).to.equal(true);
+
+      scheduled.value = new Set(['session-1']);
+      pendingActions.value = new Set();
+
+      expect(el.querySelector('[data-session-id="session-1"]')).to.equal(card);
+      expect(document.activeElement).to.equal(scheduleBtn);
+      expect(card.classList.contains('is-scheduled')).to.equal(true);
+      expect(card.classList.contains('is-pending')).to.equal(false);
+      expect(scheduleBtn.disabled).to.equal(false);
+      expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('true');
+      expect(scheduleBtn.getAttribute('aria-label')).to.equal('Remove from schedule');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule');
+      expect(el.querySelector('[data-session-id="session-2"]').classList.contains('is-scheduled')).to.equal(false);
+
+      favorited.value = new Set(['session-1']);
+      const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
+      expect(card.classList.contains('is-favorited')).to.equal(true);
+      expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('true');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
+
+      scheduled.value = new Set();
+      expect(card.classList.contains('is-scheduled')).to.equal(false);
+      expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('false');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+    });
+  });
+
+  describe('desktop card layout', () => {
+    let styles;
+    let originalViewport;
+    let noMotion;
+
+    before(async () => {
+      originalViewport = { width: window.innerWidth, height: window.innerHeight };
+      await setViewport({ width: 1440, height: 900 });
+      // sessions-guide.css loads after this block's stylesheet on pages with the Session Guide
+      // widget; its unscoped .sg-card rules must not change this card's geometry.
+      styles = await Promise.all([
+        '/event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.css',
+        '/event-libs/v1/c2/blocks/sessions-guide/sessions-guide.css',
+      ].map(async (href) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        await new Promise((resolve, reject) => {
+          link.onload = resolve;
+          link.onerror = () => reject(new Error(`Failed to load ${href}`));
+          document.head.append(link);
+        });
+        return link;
+      }));
+      noMotion = document.createElement('style');
+      noMotion.textContent = '.upcoming-sessions *, .upcoming-sessions *::after { transition: none !important; }';
+      document.head.append(noMotion);
+    });
+
+    after(async () => {
+      styles.forEach((link) => link.remove());
+      noMotion.remove();
+      await setViewport(originalViewport);
+    });
+
+    const PADDING = 24;
+    const BORDER = 1;
+
+    function expectUniformPadding(card) {
+      const cardRect = card.getBoundingClientRect();
+      const body = card.querySelector('.sg-card__body').getBoundingClientRect();
+      const actions = card.querySelector('.sg-card__actions');
+      expect(body.left - cardRect.left).to.be.closeTo(PADDING + BORDER, 0.5);
+      expect(body.top - cardRect.top).to.be.closeTo(PADDING + BORDER, 0.5);
+      if (getComputedStyle(actions).opacity === '1') {
+        const buttons = [...actions.querySelectorAll('.sg-icon-btn')].filter((btn) => btn.offsetParent);
+        buttons.forEach((btn) => {
+          const rect = btn.getBoundingClientRect();
+          expect(cardRect.right - rect.right).to.be.closeTo(PADDING + BORDER, 0.5);
+          expect(rect.left - body.right).to.be.closeTo(PADDING, 0.5);
+        });
+        expect(buttons[0].getBoundingClientRect().top - cardRect.top).to.be.closeTo(PADDING + BORDER, 0.5);
+      } else {
+        expect(cardRect.right - body.right).to.be.closeTo(PADDING + BORDER, 0.5);
+      }
+    }
+
+    async function buildDesktopBlock() {
+      const el = buildBlock([
+        session({ enTitle: 'A session title long enough to wrap onto a second line in the card' }),
+        session({ sessionId: 'session-2', enTitle: 'Short title', description: 'A short description' }),
+        session({ sessionId: 'session-3' }),
+        session({ sessionId: 'session-4' }),
+      ], 'Upcoming', { dark: true });
+      await init(el);
+      return el;
+    }
+
+    it('keeps a uniform 24px inset at rest, when focused, and when scheduled or favorited', async () => {
+      const el = await buildDesktopBlock();
+      const [first, second, third] = el.querySelectorAll('.upcoming-sessions-card');
+
+      expectUniformPadding(first);
+
+      scheduled.value = new Set(['session-1']);
+      favorited.value = new Set(['session-3']);
+      expect(first.getBoundingClientRect().width).to.be.closeTo(431, 0.5);
+      expectUniformPadding(first);
+      expectUniformPadding(third);
+
+      second.focus();
+      expect(second.getBoundingClientRect().width).to.be.closeTo(431, 0.5);
+      expectUniformPadding(second);
+    });
+
+    it('keeps the body width constant so titles never rewrap as the card expands', async () => {
+      const el = await buildDesktopBlock();
+      const card = el.querySelector('.upcoming-sessions-card');
+      const title = card.querySelector('.sg-card__title');
+      const restingWidth = title.getBoundingClientRect().width;
+      const restingHeight = title.getBoundingClientRect().height;
+
+      card.focus();
+      expect(title.getBoundingClientRect().width).to.be.closeTo(restingWidth, 0.5);
+      expect(title.getBoundingClientRect().height).to.equal(restingHeight);
+
+      card.blur();
+      scheduled.value = new Set(['session-1']);
+      expect(title.getBoundingClientRect().width).to.be.closeTo(restingWidth, 0.5);
+    });
+
+    it('does not move the heading, arrows, or track when a card expands', async () => {
+      const el = await buildDesktopBlock();
+      el.style.position = 'absolute';
+      el.style.bottom = '0';
+      el.style.left = '0';
+      el.style.right = '0';
+      const header = el.querySelector('.upcoming-sessions-header');
+      const track = el.querySelector('.upcoming-sessions-track');
+      const before = { header: header.getBoundingClientRect().top, track: track.offsetHeight };
+
+      const card = el.querySelector('[data-session-id="session-2"]');
+      card.focus();
+      expect(card.getBoundingClientRect().height).to.be.greaterThan(128);
+      expect(header.getBoundingClientRect().top).to.equal(before.header);
+      expect(track.offsetHeight).to.equal(before.track);
+      expect(track.scrollHeight).to.equal(track.clientHeight);
+    });
+  });
+
   describe('theme', () => {
     it('does not add dark-card in a section with no dark style metadata', async () => {
       const el = buildBlock([session()]);
