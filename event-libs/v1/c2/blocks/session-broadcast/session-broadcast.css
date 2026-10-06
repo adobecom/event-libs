@@ -80,15 +80,20 @@
 }
 
 /* Desktop column matches the homepage livestream section's Milo `.container`: an 8.333% gutter
-   (Milo's --grid-margin-width-base) that widens to keep content at 1920px max. Measured off .sb-app
-   (cqi) instead of 100vw so a classic scrollbar can't skew it. */
+   that widens to keep content at 1920px max. Measured off .sb-app (cqi) instead of 100vw so a
+   classic scrollbar can't skew it. */
 @media (min-width: 1280px) {
   .sb-app {
+    /* 8.333cqi mirrors Milo's 8.333% --grid-margin-width-base (a % can't be reused: it resolves per
+       element, not against .sb-app); keep in sync if Milo's grid changes. */
+
     /* stylelint-disable unit-no-unknown -- Stylelint 14 predates container query units. */
     --sb-gutter: max(8.333cqi, calc((100cqi - var(--grid-max-width-default, 1920px)) / 2));
     --sb-column: calc(100cqi - 2 * var(--sb-gutter));
     /* stylelint-enable unit-no-unknown */
 
+    /* Inline-size containment ignores content for width, so .sb-app must stay in a full-width
+       (block) parent — a shrink-to-fit parent would collapse it to 0. */
     /* stylelint-disable-next-line property-no-unknown -- Stylelint 14 predates container queries. */
     container-type: inline-size;
   }
@@ -938,12 +943,6 @@
 
 /* Player/info width comes from .sb-live's desktop gutter padding; this is the type/spacing layer. */
 @media (min-width: 1280px) {
-  /* :not() excludes Also Live/Up Next, which only take the left gutter so their tracks can bleed right. */
-  .sb-carousel-section:not(.sb-carousel-section--also-live):not(.sb-carousel-section--up-next) {
-    padding-right: var(--sb-gutter);
-    padding-left: var(--sb-gutter);
-  }
-
   .sb-info {
     padding: var(--s2a-spacing-xl, 32px) 0;
   }
