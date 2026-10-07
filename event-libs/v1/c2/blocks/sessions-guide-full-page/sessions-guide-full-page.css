@@ -3,9 +3,8 @@
    go below the import. */
 @import '../sessions-guide/sessions-guide.css';
 
-/* Milo's rounded-corner sections use overflow: clip, so on a short page (e.g. no results) the
-   desktop filter panel and view menu were cut off at the footer (MWPW-210137). Unclip vertically
-   only while one is open; x stays clipped so bleeding carousel tracks can't add a scrollbar. */
+/* Milo clips rounded sections, cutting off the desktop filter panel/view menu on a short page
+   (MWPW-210137). Unclip y only while one is open; x stays clipped for bleeding carousels. */
 .section:has(.sg-full-page :is(.sg-filter-panel, .sg-view-menu)) {
   overflow-y: visible;
 }

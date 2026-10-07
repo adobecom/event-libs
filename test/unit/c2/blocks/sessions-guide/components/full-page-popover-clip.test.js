@@ -27,7 +27,7 @@ describe('Short full-page Session Guide popovers', () => {
     return frame.contentDocument;
   }
 
-  // Scrolls the target into view and checks the topmost element at its centre is the target itself.
+  // True when, scrolled into view, nothing (e.g. the footer) covers the element's centre.
   function isReachable(el) {
     el.scrollIntoView({ block: 'center' });
     const box = el.getBoundingClientRect();
