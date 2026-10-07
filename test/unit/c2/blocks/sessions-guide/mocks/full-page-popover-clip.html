@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Short full-page Session Guide popover clipping fixture</title>
+  <link rel="stylesheet" href="/event-libs/v1/c2/blocks/sessions-guide-full-page/sessions-guide-full-page.css">
+  <style>
+    :root {
+      --heading-font-family: var(--s2a-font-family-heading);
+      --body-font-family: var(--s2a-font-family-body);
+    }
+
+    body { margin: 0; }
+
+    /* Mirrors Milo's section-metadata.css: rounded-corner sections clip their content. */
+    .section.rounded-corners-top {
+      position: relative;
+      z-index: 3;
+      overflow: clip;
+      border-radius: 32px 32px 0 0;
+    }
+
+    .fixture-footer {
+      position: relative;
+      height: 1200px;
+      background: #111;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="section rounded-corners-top">
+      <div class="sessions-guide-full-page">
+        <div class="sg-full-page">
+          <div class="sg-full-page__header-wrap">
+            <header class="sg-header">
+              <div class="sg-header-title-row">
+                <h2 class="sg-header-title">Find more inspiration.</h2>
+              </div>
+              <div class="sg-header-controls-collapse">
+                <div class="sg-header-controls-collapse-inner">
+                  <div class="sg-header-controls">
+                    <div class="sg-right-controls">
+                      <div class="sg-view-dropdown-wrap">
+                        <button class="sg-view-btn" type="button" aria-haspopup="listbox">My sessions</button>
+                      </div>
+                      <div class="sg-filter-wrap">
+                        <button class="sg-filter-btn" type="button" aria-label="Filter sessions">Filter</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </header>
+          </div>
+          <!-- Empty results: the page is very short. -->
+          <div class="sg-full-page__body"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <footer class="fixture-footer">Footer</footer>
+</body>
+</html>
