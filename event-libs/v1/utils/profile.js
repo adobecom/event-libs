@@ -1,6 +1,6 @@
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEventAttendee, validateRsvpToken } from './esp-controller.js';
-import { getMetadata, getRsvpToken, waitForAdobeIMS } from './utils.js';
+import { getMetadata, getRsvpToken, waitForImsInstance } from './utils.js';
 
 /**
  * Resolves the visitor's profile from IMS. Always resolves to an object so `imsProfile`
@@ -10,7 +10,10 @@ import { getMetadata, getRsvpToken, waitForAdobeIMS } from './utils.js';
  * - no IMS credential: `{ noProfile: true }`
  */
 export async function getProfile() {
-  if (!window.adobeIMS) await waitForAdobeIMS();
+  // Wait for imslib's own `onImsLibInstance` ready signal — window.adobeIMS can be assigned before
+  // the instance finishes authenticating, so isSignedInUser() would otherwise read false for a
+  // signed-in user on first load.
+  if (!window.adobeIMS?.isSignedInUser?.()) await waitForImsInstance().catch(() => {});
   const { adobeIMS } = window;
   if (!adobeIMS) return { noProfile: true };
   if (adobeIMS.isSignedInUser?.()) return (await adobeIMS.getProfile()) || { noProfile: true };
@@ -28,7 +31,7 @@ export async function lazyCaptureProfile() {
     return;
   }
 
-  await waitForAdobeIMS();
+  await waitForImsInstance().catch(() => {});
   if (window.adobeIMS) captureProfile();
 
   async function captureProfile() {

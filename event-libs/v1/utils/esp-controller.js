@@ -7,7 +7,7 @@ import {
   sanitizeLegacyPhoneFields,
 } from './data-utils.js';
 import { ENV_MAP, sessionCatalogHost } from './constances.js';
-import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
+import { getEventConfig, getEventServiceEnv, waitForImsInstance } from './utils.js';
 import {
   logError, logWarning, logCritical, logInfo,
 } from './lana-log.js';
@@ -60,7 +60,7 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
 
   let getUuid;
   try {
-    const [{ default: importedGetUuid }] = await Promise.all([import(`${miloLibs}/utils/getUuid.js`), waitForIMS ? waitForAdobeIMS() : Promise.resolve()]);
+    const [{ default: importedGetUuid }] = await Promise.all([import(`${miloLibs}/utils/getUuid.js`), waitForIMS ? waitForImsInstance().catch(() => {}) : Promise.resolve()]);
     getUuid = importedGetUuid;
   } catch (error) {
     // Fallback for test environment or when import fails

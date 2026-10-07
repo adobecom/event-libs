@@ -432,6 +432,28 @@ const { waitForAdobeIMS, resetAdobeIMSWatcher } = (() => {
 
 export { waitForAdobeIMS, resetAdobeIMSWatcher };
 
+// waitForAdobeIMS resolves as soon as window.adobeIMS is assigned (it has getAccessToken), but the
+// instance may not have finished authenticating yet — so isSignedInUser() can return false for a
+// signed-in user on first load. imslib dispatches `onImsLibInstance` only once the instance is
+// actually ready; request it via `getImsLibInstance` and wait for the reply. Resolves with the
+// ready instance, or rejects on timeout. Mirrors da-events' registration-cache.js approach.
+export function waitForImsInstance(timeout = 3000) {
+  return new Promise((resolve, reject) => {
+    let timer;
+    const onReady = (e) => {
+      window.removeEventListener('onImsLibInstance', onReady);
+      clearTimeout(timer);
+      if (e?.detail?.instance) resolve(e.detail.instance); else reject();
+    };
+    timer = setTimeout(() => {
+      window.removeEventListener('onImsLibInstance', onReady);
+      reject();
+    }, timeout);
+    window.addEventListener('onImsLibInstance', onReady);
+    window.dispatchEvent(new CustomEvent('getImsLibInstance'));
+  });
+}
+
 /**
  * Returns the campaign ID from the current URL search params if present and valid.
  * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
