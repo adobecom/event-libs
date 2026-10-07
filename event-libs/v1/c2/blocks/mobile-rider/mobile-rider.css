@@ -230,7 +230,9 @@
 
 .mobile-rider .mobile-rider-info-bar-more {
   grid-area: more;
-  display: block;
+
+  /* Hidden until the info bar is expanded (same reveal as the full description below). */
+  display: none;
   justify-self: start;
   margin-bottom: var(--s2a-spacing-md);
   border: none;
@@ -241,6 +243,10 @@
   font-weight: 700;
   padding: 0;
   cursor: pointer;
+}
+
+.mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-more {
+  display: block;
 }
 
 @media (max-width: 767px) {
