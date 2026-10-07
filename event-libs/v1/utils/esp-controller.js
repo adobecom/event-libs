@@ -9,7 +9,7 @@ import {
 import { ENV_MAP, sessionCatalogHost } from './constances.js';
 import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
 import {
-  logError, logWarning, logCritical, logInfo, logRegistrationFailure,
+  logError, logWarning, logCritical, logInfo, logRegistrationFailure, logRegistrationError,
 } from './lana-log.js';
 
 export const getCaasTags = (() => {
@@ -104,8 +104,8 @@ async function parseFailureBody(response) {
 async function readFailureBody(response, scope, readBody = parseFailureBody) {
   try {
     return await readBody(response);
-  } catch (error) {
-    logWarning(scope, 'Failed to read error response', error);
+  } catch {
+    logWarning(scope, 'Failed to read error response');
     return response.status;
   }
 }
@@ -121,16 +121,16 @@ export async function getEvent(eventId, { registration = false } = {}) {
       if (response.status === 404 && !registration) {
         logWarning('esp-controller,get-event', `Event ${eventId} not found on "${eventServiceEnv.name}" ESP env. Verify the event exists in this environment or switch using ?espenv=<env>.`);
       }
-      const log = registration ? logRegistrationFailure : logError;
-      log('esp-controller,get-event', `Failed to get details for event ${eventId}`, response);
+      if (registration) logRegistrationFailure('esp-controller,get-event', response);
+      else logError('esp-controller,get-event', `Failed to get details for event ${eventId}`, response);
       const data = await readFailureBody(response, 'esp-controller,get-event', (resp) => resp.json());
       return { ok: response.ok, status: response.status, error: data };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    const log = registration ? logCritical : logError;
-    log('esp-controller,get-event', `Failed to get details for event ${eventId}`, error);
+    if (registration) logRegistrationError('esp-controller,get-event', error);
+    else logError('esp-controller,get-event', `Failed to get details for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -311,10 +311,10 @@ export async function getAttendee(eventId, { registration = false } = {}) {
 
     if (!response.ok) {
       if (response.status === 404) {
-        logInfo('esp-controller,get-attendee', `No attendee record yet for event ${eventId}`);
+        logInfo('esp-controller,get-attendee', 'No attendee record yet');
       } else {
-        const log = registration ? logRegistrationFailure : logError;
-        log('esp-controller,get-attendee', `Failed to get attendee details for event ${eventId}`, response);
+        if (registration) logRegistrationFailure('esp-controller,get-attendee', response);
+        else logError('esp-controller,get-attendee', `Failed to get attendee details for event ${eventId}`, response);
       }
       const textResp = await readFailureBody(response, 'esp-controller,get-attendee', (resp) => resp.text());
 
@@ -327,8 +327,8 @@ export async function getAttendee(eventId, { registration = false } = {}) {
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    const log = registration ? logCritical : logError;
-    log('esp-controller,get-attendee', `Failed to get attendee for event ${eventId}`, error);
+    if (registration) logRegistrationError('esp-controller,get-attendee', error);
+    else logError('esp-controller,get-attendee', `Failed to get attendee for event ${eventId}`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -352,14 +352,14 @@ export async function createAttendee(eventId, attendeeData, rsvpToken = null) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
 
     if (!response.ok) {
-      logRegistrationFailure('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
+      logRegistrationFailure('esp-controller,create-attendee', response);
       const error = await readFailureBody(response, 'esp-controller,create-attendee');
       return { ok: response.ok, status: response.status, error };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, error);
+    logRegistrationError('esp-controller,create-attendee', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -378,14 +378,14 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
 
     if (!response.ok) {
-      logRegistrationFailure('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
+      logRegistrationFailure('esp-controller,add-attendee-to-event', response);
       const error = await readFailureBody(response, 'esp-controller,add-attendee-to-event');
       return { ok: response.ok, status: response.status, error };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, error);
+    logRegistrationError('esp-controller,add-attendee-to-event', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -402,14 +402,14 @@ export async function updateAttendee(eventId, attendeeData) {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
-      logRegistrationFailure('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
+      logRegistrationFailure('esp-controller,update-attendee', response);
       const error = await readFailureBody(response, 'esp-controller,update-attendee');
       return { ok: response.ok, status: response.status, error };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, error);
+    logRegistrationError('esp-controller,update-attendee', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -430,7 +430,7 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     }
 
     if (!response.ok) {
-      logRegistrationFailure('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, response);
+      logRegistrationFailure('esp-controller,delete-attendee', response);
       const textResp = await readFailureBody(response, 'esp-controller,delete-attendee', (resp) => resp.text());
 
       return {
@@ -443,7 +443,7 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
     if (response.status === 204) return { ok: true, data: { status: 204, attendeeDeleted: true } };
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,delete-attendee', `Failed to delete attendee ${attendeeId ?? 'me'} for event ${eventId}`, error);
+    logRegistrationError('esp-controller,delete-attendee', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -489,9 +489,9 @@ export async function validateRsvpToken(eventId, token) {
 
     if (!response.ok) {
       if (RSVP_TOKEN_INVALID_STATUSES.includes(response.status)) {
-        logInfo('esp-controller,validate-rsvp-token', `RSVP token not usable for event ${eventId}`, response);
+        logInfo('esp-controller,validate-rsvp-token', `RSVP token not usable: http-status=${response.status}`);
       } else {
-        logRegistrationFailure('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, response);
+        logRegistrationFailure('esp-controller,validate-rsvp-token', response);
       }
       const error = await readFailureBody(response, 'esp-controller,validate-rsvp-token');
       return { ok: false, status: response.status, error };
@@ -499,7 +499,7 @@ export async function validateRsvpToken(eventId, token) {
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,validate-rsvp-token', `Failed to validate RSVP token for event ${eventId}`, error);
+    logRegistrationError('esp-controller,validate-rsvp-token', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -677,14 +677,14 @@ export async function registerForSessionTime(sessionTimeId, attendeeId, registra
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/session-times/${sessionTimeId}/attendees/${attendeeId}`, options);
 
     if (!response.ok) {
-      logRegistrationFailure('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, response);
+      logRegistrationFailure('esp-controller,register-session-time', response);
       const error = await readFailureBody(response, 'esp-controller,register-session-time');
       return { ok: false, status: response.status, error };
     }
 
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,register-session-time', `Failed to register for session time ${sessionTimeId}`, error);
+    logRegistrationError('esp-controller,register-session-time', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -703,14 +703,14 @@ export async function unregisterFromSessionTime(sessionTimeId) {
     );
 
     if (!response.ok) {
-      logRegistrationFailure('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, response);
+      logRegistrationFailure('esp-controller,unregister-session-time', response);
       return { ok: false, status: response.status };
     }
 
     if (response.status === 204) return { ok: true };
     return { ok: true, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,unregister-session-time', `Failed to unregister from session time ${sessionTimeId}`, error);
+    logRegistrationError('esp-controller,unregister-session-time', error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -791,7 +791,7 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
     // server-side in one step.
     return await addAttendeeToEvent(eventId, eventAttendeePayload, rsvpToken);
   } catch (error) {
-    logCritical('esp-controller,get-and-create-and-add-attendee', `Unexpected error submitting RSVP for event ${eventId} (campaignId=${attendeeData?.campaignId ?? 'none'})`, error);
+    logCritical('esp-controller,get-and-create-and-add-attendee', 'Unexpected error submitting RSVP');
     return { ok: false, status: 'Unexpected Error', error: error.message };
   }
 }

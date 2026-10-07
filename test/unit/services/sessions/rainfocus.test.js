@@ -224,9 +224,7 @@ describe('services/sessions/rainfocus', () => {
       }
       expect(error).to.be.an('error');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('[rainfocus]');
-      expect(lanaLogStub.firstCall.args[0]).to.include('myData');
-      expect(lanaLogStub.firstCall.args[0]).to.include('503');
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[rainfocus,myData] Request failed: http-status=503');
     });
 
     it('logs a network error before rethrowing', async () => {
@@ -239,8 +237,7 @@ describe('services/sessions/rainfocus', () => {
       }
       expect(error).to.be.an('error');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('[rainfocus] network error calling myData');
-      expect(lanaLogStub.firstCall.args[0]).to.include('offline');
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[rainfocus,myData] Request failed: network-or-runtime');
     });
   });
 
@@ -285,9 +282,7 @@ describe('services/sessions/rainfocus', () => {
             expect(error.message).to.include(`${status}`);
             expect(lanaLogStub.calledOnce).to.be.true;
             expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
-            expect(lanaLogStub.firstCall.args[0]).to.include(name);
-            expect(lanaLogStub.firstCall.args[0]).to.include('st-1');
-            expect(lanaLogStub.firstCall.args[0]).to.include(`${status}`);
+            expect(lanaLogStub.firstCall.args[0]).to.equal(`[rainfocus,${name}] Request failed: http-status=${status}`);
             expect(lanaLogStub.firstCall.args[0]).to.not.include('auth-token');
             expect(lanaLogStub.firstCall.args[0]).to.not.include('rfAuthToken');
             expect(lanaLogStub.firstCall.args[0]).to.not.include('Unavailable');
@@ -324,7 +319,7 @@ describe('services/sessions/rainfocus', () => {
           expect(lanaLogStub.calledOnce).to.be.true;
           expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
           expect(lanaLogStub.firstCall.args[0]).to.not.include('Private attendee details');
-          expect(lanaLogStub.firstCall.args[0]).to.include('SyntaxError');
+          expect(lanaLogStub.firstCall.args[0]).to.equal(`[rainfocus,${name}] Unreadable JSON response`);
         });
 
         it('does not include the auth-bearing request URL from a thrown network error in its log', async () => {
@@ -335,7 +330,7 @@ describe('services/sessions/rainfocus', () => {
           expect(lanaLogStub.calledOnce).to.be.true;
           expect(lanaLogStub.firstCall.args[0]).to.not.include('auth-token');
           expect(lanaLogStub.firstCall.args[0]).to.not.include('rfAuthToken');
-          expect(lanaLogStub.firstCall.args[0]).to.include('st-1');
+          expect(lanaLogStub.firstCall.args[0]).to.equal(`[rainfocus,${name}] Request failed: network-or-runtime`);
           expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
         });
 
@@ -349,6 +344,32 @@ describe('services/sessions/rainfocus', () => {
             expect(lanaLogStub.calledOnce).to.be.true;
             expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'warning' });
             expect(lanaLogStub.firstCall.args[0]).to.not.include('Private attendee details');
+          });
+        });
+
+        const runFor = (id) => {
+          if (name === 'addSession') return addSession(id, `token-${id}`, `profile-${id}`, `https://${id}.example.com/rf/`);
+          if (name === 'removeSession') return removeSession(id, `token-${id}`, `profile-${id}`, `https://${id}.example.com/rf/`);
+          return dropAndSwapSession(id, `old-${id}`, `token-${id}`, `profile-${id}`, `https://${id}.example.com/rf/`);
+        };
+
+        [
+          { category: 'http', respond: () => new Response('Private body', { status: 503 }), message: 'Request failed: http-status=503' },
+          { category: 'network', respond: (url) => { throw new Error(`Private URL: ${url}`); }, message: 'Request failed: network-or-runtime' },
+          { category: 'parse', respond: () => new Response('Private body'), message: 'Unreadable JSON response' },
+          { category: 'business', respond: (url) => ({ ok: true, json: async () => ({ responseCode: url, responseMessage: 'Private body' }) }), message: 'Unexpected business response' },
+        ].forEach(({ category, respond, message }) => {
+          it(`groups ${name} ${category} failures across sessions, profiles, URLs and tokens`, async () => {
+            window.fetch = async (url) => respond(url);
+
+            await failureOf(() => runFor('session-a'));
+            await failureOf(() => runFor('session-b'));
+
+            expect(lanaLogStub.callCount).to.equal(2);
+            expect(lanaLogStub.firstCall.args).to.deep.equal(lanaLogStub.secondCall.args);
+            expect(lanaLogStub.firstCall.args).to.deep.equal([
+              `[rainfocus,${name}] ${message}`, { severity: 'critical', sampleRate: 100 },
+            ]);
           });
         });
 
