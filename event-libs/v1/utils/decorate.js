@@ -32,6 +32,7 @@ import { logWarning, logError } from './lana-log.js';
 import { hydrateBlocks } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
 import { initTierOneEventConfig } from './tier-1-event-config.js';
+import markMobileRiderForLaunch from './mr-launch-marker.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -1226,6 +1227,7 @@ export function applyAreaTheme(area = document) {
 
 export function decorateEvent(parent) {
   hydrateBlocks(parent);
+  markMobileRiderForLaunch(parent);
 
   // handle photos data parsing
   const photosData = parsePhotosData(parent);

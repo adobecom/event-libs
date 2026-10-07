@@ -5,6 +5,7 @@ import { sessions, favorited } from '../../../../event-libs/v1/utils/session-sto
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import { initTierOneEventConfig } from '../../../../event-libs/v1/utils/tier-1-event-config.js';
 import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
+import { resetLaunchWait } from '../../../../event-libs/v1/utils/launch-ready.js';
 
 const defaultHtml = `
 <div class="mobile-rider">
@@ -74,6 +75,10 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       off: sinon.stub(),
       on: sinon.stub(),
     };
+
+    // Launch is loaded by default so embeds aren't held by waitForLaunch().
+    globalThis._satellite = { track: sinon.stub() };
+    resetLaunchWait();
   });
 
   afterEach(() => {
@@ -83,6 +88,8 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     delete globalThis.lana;
     delete globalThis.mobilerider;
     delete globalThis.__mr_player;
+    delete globalThis._satellite;
+    resetLaunchWait();
     riderInstance = null;
     sessions.value = [];
     favorited.value = new Set();
@@ -104,6 +111,12 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(player).to.not.be.null;
       const wrapper = player.querySelector('.video-wrapper');
       expect(wrapper).to.not.be.null;
+    });
+
+    it('should leave a Launch marker synchronously on init', () => {
+      document.body.innerHTML = defaultHtml;
+      riderInstance = init(document.querySelector('.mobile-rider'));
+      expect(document.querySelector('.mobileRider_container.mr-launch-marker')).to.not.be.null;
     });
 
     it('should handle initialization errors gracefully', async () => {
@@ -181,6 +194,29 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         riderInstance.injectPlayer('test-video', 'test-skin', 'test-asl');
         await new Promise((resolve) => { setTimeout(resolve, 50); });
         expect(globalThis.mobilerider.embed.called).to.be.true;
+      });
+
+      it('should hold mobilerider.embed until Launch (_satellite) is ready', async () => {
+        delete globalThis._satellite;
+        resetLaunchWait();
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        await new Promise((resolve) => { setTimeout(resolve, 150); });
+        expect(globalThis.mobilerider.embed.called).to.be.false;
+
+        globalThis._satellite = { track: sinon.stub() };
+        await new Promise((resolve) => { setTimeout(resolve, 150); });
+        expect(globalThis.mobilerider.embed.calledOnce).to.be.true;
+      });
+
+      it('should skip the embed if the container was removed while waiting for Launch', async () => {
+        delete globalThis._satellite;
+        resetLaunchWait();
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        riderInstance.wrap.remove();
+        globalThis._satellite = { track: sinon.stub() };
+        await new Promise((resolve) => { setTimeout(resolve, 250); });
+        expect(globalThis.mobilerider.embed.called).to.be.false;
+        expect(riderInstance.isEmbedding).to.be.false;
       });
 
       it('should skip injection when already embedding', () => {

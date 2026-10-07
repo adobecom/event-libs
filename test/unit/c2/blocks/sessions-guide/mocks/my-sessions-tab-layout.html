@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Full-page My Sessions tab alignment fixture</title>
+  <link rel="stylesheet" href="/event-libs/v1/c2/blocks/sessions-guide/sessions-guide.css">
+  <style>
+    :root {
+      --heading-font-family: var(--s2a-font-family-heading);
+      --body-font-family: var(--s2a-font-family-body);
+    }
+
+    body { margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="sg-full-page">
+    <div class="sg-full-page__header-wrap">
+      <header class="sg-header">
+        <div class="sg-header-title-row">
+          <h2 class="sg-header-title">Find more inspiration.</h2>
+        </div>
+      </header>
+    </div>
+    <div class="sg-full-page__body">
+      <div class="sg-view sg-view--my-sessions">
+        <div class="sg-my-sessions-tab-bar">
+          <button class="sg-my-sessions-tab sg-my-sessions-tab--active" type="button" aria-pressed="true">Upcoming</button>
+          <button class="sg-my-sessions-tab" type="button" aria-pressed="false">On demand</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Same tab bar outside the full page (the drawer widget) — must keep its own gutter. -->
+  <div class="sg-widget-context">
+    <div class="sg-view sg-view--my-sessions">
+      <div class="sg-my-sessions-tab-bar">
+        <button class="sg-my-sessions-tab sg-my-sessions-tab--active" type="button" aria-pressed="true">Upcoming</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
