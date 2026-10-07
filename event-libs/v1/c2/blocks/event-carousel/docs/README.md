@@ -15,8 +15,9 @@ the event-carousel block.
 ## Layout notes
 
 - On tablet and larger viewports (`768px` and up), an `event-carousel` block directly
-  inside a section with Section Metadata `style: stretch` or `stretch-right` gets
-  `margin-right: 24px`. This leaves a gap at the controls block's physical right edge,
+  inside a section with Section Metadata `style: stretch` or `stretch-right`, or
+  inside that section's direct `featured-sessions` block, gets `margin-right: 24px`.
+  This leaves a gap at the controls block's physical right edge,
   without changing the section, sibling card track, or other blocks. Mobile and
   `stretch-left` sections keep their existing margins.
 - The mobile centered-peek gutter (`padding-inline-start` on `.carousel-track`, see

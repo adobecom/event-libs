@@ -81,8 +81,17 @@ describe('event-carousel', () => {
                 <div class="section ${variant}">
                   <div class="event-carousel"></div>
                   <div class="carousel-track"></div>
+                  <div class="featured-sessions">
+                    <div class="event-carousel" id="featured-carousel"></div>
+                    <div class="carousel-track" id="featured-track"></div>
+                  </div>
                   <div class="other-block"></div>
-                  <div class="section"><div class="event-carousel" id="nested"></div></div>
+                  <div class="section">
+                    <div class="event-carousel" id="nested"></div>
+                    <div class="featured-sessions">
+                      <div class="event-carousel" id="nested-featured-carousel"></div>
+                    </div>
+                  </div>
                 </div>
               </main>
             `;
@@ -96,7 +105,12 @@ describe('event-carousel', () => {
             expect(getComputedStyle(carousel).marginLeft, context).to.equal('0px');
             expect(section.getBoundingClientRect().right - carousel.getBoundingClientRect().right, context)
               .to.equal(expectedMargin);
-            ['.section', '.carousel-track', '.other-block', '#nested'].forEach((selector) => {
+            const featured = document.getElementById('featured-carousel');
+            expect(getComputedStyle(featured).marginRight, context).to.equal(`${expectedMargin}px`);
+            expect(getComputedStyle(featured).marginLeft, context).to.equal('0px');
+            expect(featured.parentElement.getBoundingClientRect().right - featured.getBoundingClientRect().right, context)
+              .to.equal(expectedMargin);
+            ['.section', '.carousel-track', '.featured-sessions', '#featured-track', '.other-block', '#nested', '#nested-featured-carousel'].forEach((selector) => {
               expect(getComputedStyle(document.querySelector(selector)).marginRight, context).to.equal('0px');
             });
           });

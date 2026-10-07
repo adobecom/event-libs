@@ -107,7 +107,9 @@
 
 @media (width >= 768px) {
   .section.stretch > .event-carousel,
-  .section.stretch-right > .event-carousel {
+  .section.stretch-right > .event-carousel,
+  .section.stretch > .featured-sessions > .event-carousel,
+  .section.stretch-right > .featured-sessions > .event-carousel {
     margin-right: 24px;
   }
 }
