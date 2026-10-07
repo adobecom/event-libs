@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { readFile } from '@web/test-runner-commands';
+import { readFile, setViewport } from '@web/test-runner-commands';
 import init from '../../../../event-libs/v1/c2/blocks/event-carousel/event-carousel.js';
 
 describe('event-carousel', () => {
@@ -64,6 +64,47 @@ describe('event-carousel', () => {
     await init(el);
 
     expect(document.querySelector('.event-carousel')).to.not.exist;
+  });
+
+  it('adds a right-edge margin only to carousels in right-stretched sections on tablet and larger screens', async () => {
+    const css = await readFile({ path: '../../../../event-libs/v1/c2/blocks/event-carousel/event-carousel.css' });
+    document.head.innerHTML = `<style>${css}</style>`;
+    const originalViewport = { width: window.innerWidth, height: window.innerHeight };
+
+    try {
+      for (const width of [375, 767, 768, 1024, 1440]) {
+        await setViewport({ width, height: originalViewport.height });
+        ['ltr', 'rtl'].forEach((direction) => {
+          ['', 'stretch', 'stretch-left', 'stretch-right', 'stretch-left stretch-right'].forEach((variant) => {
+            document.body.innerHTML = `
+              <main dir="${direction}">
+                <div class="section ${variant}">
+                  <div class="event-carousel"></div>
+                  <div class="carousel-track"></div>
+                  <div class="other-block"></div>
+                  <div class="section"><div class="event-carousel" id="nested"></div></div>
+                </div>
+              </main>
+            `;
+            const section = document.querySelector('.section');
+            const carousel = section.querySelector('.event-carousel');
+            const rightStretched = variant.split(' ').some((value) => ['stretch', 'stretch-right'].includes(value));
+            const expectedMargin = width >= 768 && rightStretched ? 24 : 0;
+            const context = `${variant || 'plain'}, ${direction}, ${width}px`;
+
+            expect(getComputedStyle(carousel).marginRight, context).to.equal(`${expectedMargin}px`);
+            expect(getComputedStyle(carousel).marginLeft, context).to.equal('0px');
+            expect(section.getBoundingClientRect().right - carousel.getBoundingClientRect().right, context)
+              .to.equal(expectedMargin);
+            ['.section', '.carousel-track', '.other-block', '#nested'].forEach((selector) => {
+              expect(getComputedStyle(document.querySelector(selector)).marginRight, context).to.equal('0px');
+            });
+          });
+        });
+      }
+    } finally {
+      await setViewport(originalViewport);
+    }
   });
 
   describe('theme', () => {

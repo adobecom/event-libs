@@ -105,6 +105,13 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
+@media (width >= 768px) {
+  .section.stretch > .event-carousel,
+  .section.stretch-right > .event-carousel {
+    margin-right: 24px;
+  }
+}
+
 @media (width <= 767px) {
   .carousel-arrows {
     justify-content: center;
