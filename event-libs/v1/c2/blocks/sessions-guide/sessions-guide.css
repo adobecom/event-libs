@@ -2572,8 +2572,10 @@
     padding: var(--s2a-spacing-lg) var(--s2a-spacing-20) var(--s2a-spacing-sm);
   }
 
-  /* Full page (Figma 8463:87648): wider side gutter than the widget's drawer. */
-  .sg-full-page .sg-upcoming-title {
+  /* Full page (Figma 8463:87648): wider side gutter than the widget's drawer. The My Sessions /
+     My Favorites tab bar shares it so the tabs line up with the header (MWPW-210088). */
+  .sg-full-page .sg-upcoming-title,
+  .sg-full-page .sg-my-sessions-tab-bar {
     padding-left: 156px;
     padding-right: 156px;
   }
@@ -3432,7 +3434,8 @@
     right: calc(160px - 20px);
   }
 
-  .sg-full-page .sg-upcoming-title {
+  .sg-full-page .sg-upcoming-title,
+  .sg-full-page .sg-my-sessions-tab-bar {
     padding-left: 160px;
     padding-right: 160px;
   }

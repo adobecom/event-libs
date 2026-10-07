@@ -1,6 +1,7 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 import { applyAreaTheme } from '../../utils/decorate.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
+import markMobileRiderForLaunch from '../../utils/mr-launch-marker.js';
 
 /** @param {HTMLElement} host */
 function ensureReparentSet(host) {
@@ -332,6 +333,8 @@ export async function openModalFromPageHashAfterFragment() {
 }
 
 export default async function init(el) {
+  // Before any await: Launch checks for a MobileRider player once, when it loads.
+  markMobileRiderForLaunch(el);
   const eventConfig = getEventConfig();
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
 
