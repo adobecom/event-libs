@@ -1,8 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 import { createTag, getEventConfig } from '../../utils/utils.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
-import { waitForLaunch } from '../../utils/launch-ready.js';
-import markMobileRiderForLaunch from '../../utils/mr-launch-marker.js';
 
 const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
@@ -163,14 +161,6 @@ class MobileRider {
         playsinline: '',
         poster: this.cfg.poster || this.cfg.thumbnail || '',
       }, '', { parent: container });
-
-      // MobileRider's Adobe analytics plugin binds window.alloy_all once, at embed; embedding
-      // before Launch loads leaves media sessionDetails unset and tracking never starts.
-      await waitForLaunch();
-      if (!container.isConnected) {
-        finish();
-        return;
-      }
 
       this.#embedRafId = requestAnimationFrame(() => {
         this.#embedRafId = null;
@@ -455,6 +445,5 @@ function handleAnchorElement(anchor) {
 
 export default (el) => {
   const processedEl = handleAnchorElement(el);
-  markMobileRiderForLaunch(processedEl);
   return new MobileRider(processedEl);
 };

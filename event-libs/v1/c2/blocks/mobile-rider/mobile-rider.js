@@ -8,8 +8,6 @@ import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js'
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
-import { waitForLaunch } from '../../../utils/launch-ready.js';
-import markMobileRiderForLaunch from '../../../utils/mr-launch-marker.js';
 
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
@@ -355,14 +353,6 @@ class MobileRider {
         poster: this.cfg.poster || this.cfg.thumbnail || '',
       }, '', { parent: container });
 
-      // MobileRider's Adobe analytics plugin binds window.alloy_all once, at embed; embedding
-      // before Launch loads leaves media sessionDetails unset and tracking never starts.
-      await waitForLaunch();
-      if (!container.isConnected) {
-        finish();
-        return;
-      }
-
       this.#embedRafId = requestAnimationFrame(() => {
         this.#embedRafId = null;
 
@@ -559,6 +549,5 @@ function handleAnchorElement(anchor) {
 
 export default (el) => {
   const processedEl = handleAnchorElement(el);
-  markMobileRiderForLaunch(processedEl);
   return new MobileRider(processedEl);
 };
