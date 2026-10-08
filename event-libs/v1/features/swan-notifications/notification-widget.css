@@ -10,12 +10,6 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-
-  /* The real UNC icons live in the same container, rendered by a third-party script we
-     don't control the box model of (no source access) — this guards against being visually
-     compressed or buried by whatever that script does. */
-  flex-shrink: 0;
-  z-index: 4;
 }
 
 .swan-notif__bell {
