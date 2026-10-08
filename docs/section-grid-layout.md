@@ -17,6 +17,24 @@ laptop, and desktop each only split if you add their own `grid-tablet-*` /
 
 ## Authoring
 
+### Section horizontal padding
+
+Add any of these values to the Section Metadata `style` row to remove section
+padding on the specified side, at every viewport size:
+
+| Style | Effect |
+|---|---|
+| `stretch` | Sets left and right padding to `0` |
+| `stretch-left` | Sets left padding to `0`; preserves right padding |
+| `stretch-right` | Sets right padding to `0`; preserves left padding |
+
+For example, `style: container-desktop, stretch-left` keeps the container's right
+padding while removing its left padding. These styles also work without `grid`.
+They leave top/bottom padding and padding inside child blocks unchanged. Left and
+right refer to physical sides, including on right-to-left pages.
+
+### Grid layout
+
 **1. Turn a section into a grid** — add a **Section Metadata** block inside that
 section, with a `style` row that includes `grid` (comma-separate with any other style
 values you already use):
