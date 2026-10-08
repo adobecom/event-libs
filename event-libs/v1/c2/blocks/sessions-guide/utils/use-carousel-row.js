@@ -2,6 +2,7 @@ import {
   useState, useRef, useEffect, useLayoutEffect,
 } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { handOffArrowFocus, scrollToAdjacent, watchScrollEdges, widthTransitionRunning } from './carousel-nav.js';
 
 // Must match the breakpoint sessions-guide.css uses to switch into the desktop transform-carousel.
 const DESKTOP_CAROUSEL_QUERY = '(min-width: 1280px)';
@@ -34,6 +35,8 @@ export function useCarouselRow(sessions, cardStateKey) {
   const rowRef = useRef(null);
   const rowHeightRef = useRef(0);
   const collapsingRef = useRef(false);
+  const [resizeTick, setResizeTick] = useState(0);
+  const measuredViewportRef = useRef(0);
 
   // Pins max-height to the real captured height before animating to 0, so the collapse doesn't start from the 600px CSS baseline.
   useLayoutEffect(() => {
@@ -64,6 +67,7 @@ export function useCarouselRow(sessions, cardStateKey) {
     }
     const cards = [...strip.children];
     if (!cards.length) return;
+    measuredViewportRef.current = viewport.offsetWidth;
     const gap = parseFloat(getComputedStyle(strip).columnGap) || 0;
     let newTx = 0;
     let totalWidth = 0;
@@ -84,23 +88,85 @@ export function useCarouselRow(sessions, cardStateKey) {
       last = i;
     }
 
-    setMeasure({
+    const next = {
       tx: newTx,
       showNext: effectiveTotal - newTx > viewport.offsetWidth + 1,
       lastVisible: last,
+    };
+    setMeasure((prev) => (prev.tx === next.tx && prev.showNext === next.showNext
+      && prev.lastVisible === next.lastVisible ? prev : next));
+  }, [offset, cardStateKey, isDesktopCarousel, resizeTick]);
+
+  // Below 1280px the arrows' disabled state follows the native scroll position.
+  const [edges, setEdges] = useState({ atStart: true, atEnd: true });
+  const sessionCount = sessions?.length || 0;
+
+  // Re-measure on viewport/card resize (e.g. cards animating in after crossing into desktop),
+  // skipping hover expansion and running width transitions unless the viewport itself changed.
+  useEffect(() => {
+    const strip = stripRef.current;
+    const viewport = viewportRef.current;
+    if (!isDesktopCarousel || !strip || !viewport || typeof ResizeObserver !== 'function') return undefined;
+    const settling = () => viewport.offsetWidth === measuredViewportRef.current
+      && ([...strip.children].some((c) => c.matches(':hover, :focus-within'))
+        || widthTransitionRunning(strip));
+    const ro = new ResizeObserver(() => {
+      if (!settling()) setResizeTick((n) => n + 1);
     });
-  }, [offset, cardStateKey, isDesktopCarousel]);
+    const onTransitionEnd = (e) => {
+      if (e.propertyName === 'width' && !settling()) setResizeTick((n) => n + 1);
+    };
+    [viewport, ...strip.children].forEach((el) => ro.observe(el));
+    strip.addEventListener('transitionend', onTransitionEnd);
+    return () => {
+      ro.disconnect();
+      strip.removeEventListener('transitionend', onTransitionEnd);
+    };
+  }, [isDesktopCarousel, sessionCount]);
+  useEffect(() => {
+    if (isDesktopCarousel) return undefined;
+    return watchScrollEdges(stripRef.current, (next) => setEdges((prev) => (
+      prev.atStart === next.atStart && prev.atEnd === next.atEnd ? prev : next)));
+  }, [isDesktopCarousel, sessionCount]);
+
+  const [announcement, setAnnouncement] = useState('');
+  const pendingRef = useRef(null);
+  const pressedRef = useRef(null);
+  const announce = (index) => {
+    const title = sessions?.[index]?.title;
+    if (title) setAnnouncement(title);
+  };
+
+  const step = (direction, button) => {
+    pressedRef.current = { button, at: performance.now() };
+    if (isDesktopCarousel) {
+      const next = Math.min(Math.max(0, offset + direction), sessionCount - 1);
+      setOffset(next);
+      announce(next);
+      return;
+    }
+    const target = scrollToAdjacent(stripRef.current, direction, pendingRef);
+    if (target) announce(target.index);
+  };
+
+  const prevDisabled = isDesktopCarousel ? offset <= 0 : edges.atStart;
+  const nextDisabled = isDesktopCarousel ? !showNext : edges.atEnd;
+
+  useEffect(() => { handOffArrowFocus(pressedRef); }, [prevDisabled, nextDisabled]);
 
   return {
     dismissingIds,
     allDismissing,
     offset,
-    setOffset,
     tx,
-    showNext,
     lastVisible,
     stripRef,
     viewportRef,
     rowRef,
+    goPrev: (e) => step(-1, e?.currentTarget),
+    goNext: (e) => step(1, e?.currentTarget),
+    prevDisabled,
+    nextDisabled,
+    announcement,
   };
 }

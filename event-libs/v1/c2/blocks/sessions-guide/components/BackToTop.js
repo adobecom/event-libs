@@ -1,5 +1,5 @@
 import { html, useEffect, useState } from '../../../../deps/htm-preact.js';
-import { scrollBehavior } from '../utils/motion.js';
+import { scrollBehavior, scrollPageToTop } from '../utils/motion.js';
 import { IconArrowUp } from './icons.js';
 
 // Half a screen, with a floor so a short drawer doesn't reveal the button immediately.
@@ -9,7 +9,8 @@ export function shouldShowBackToTop(scrolled, viewportHeight) {
 
 // Honours the motion preference. Exported so the jump is testable on its own.
 export function scrollToTop(scroller) {
-  (scroller || window).scrollTo({ top: 0, behavior: scrollBehavior() });
+  if (scroller) scroller.scrollTo({ top: 0, behavior: scrollBehavior() });
+  else scrollPageToTop();
 }
 
 // scrollerRef omitted falls back to the window as the scroller. focusRef needs tabindex="-1"

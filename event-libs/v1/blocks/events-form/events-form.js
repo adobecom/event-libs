@@ -231,6 +231,11 @@ function constructPayload(form) {
 }
 
 export async function submitForm(bp) {
+  // Guards the direct #rsvp-form-1 anchor path (MWPW-207642): a declined
+  // attendee's fields are disabled in the UI, but block the API call here
+  // too in case submit is ever triggered another way.
+  if (BlockMediator.get('rsvpData')?.registrationStatus === 'declined') return false;
+
   const { form, sanitizeList } = bp;
   const payload = constructPayload(form);
 
@@ -297,6 +302,21 @@ function clearForm(form) {
     } else {
       fe.value = '';
     }
+  });
+}
+
+/**
+ * Locks a declined attendee out of re-submitting the RSVP form while still
+ * rendering it (per MWPW-207642): every focusable/submittable field is
+ * disabled and marked aria-disabled so assistive tech and validation both
+ * treat the form as non-interactive, instead of hiding it outright.
+ */
+function disableForm(form) {
+  form.classList.add('rsvp-form-disabled');
+  form.setAttribute('aria-disabled', 'true');
+  [...form.elements].forEach((fe) => {
+    fe.setAttribute('disabled', true);
+    fe.setAttribute('aria-disabled', 'true');
   });
 }
 
@@ -415,8 +435,7 @@ function showSuccessMsgFirstScreen(bp) {
 
 function showDeclinedMessage(bp) {
   clearForm(bp.form);
-  bp.form.classList.add('hidden');
-  bp.eventHero.classList.add('hidden');
+  disableForm(bp.form);
 
   if (bp.formContainer.querySelector('.rsvp-declined-msg')) return;
 
@@ -424,7 +443,7 @@ function showDeclinedMessage(bp) {
     await dictionaryManager.initialize();
     const msg = getRsvpDeclinedMessage(dictionaryManager);
     const error = createTag('p', { class: 'error rsvp-declined-msg' }, msg);
-    bp.formContainer.append(error);
+    bp.form.before(error);
   })();
 }
 

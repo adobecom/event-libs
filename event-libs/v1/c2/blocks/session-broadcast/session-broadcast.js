@@ -1,6 +1,27 @@
 import { h, render } from '../../../deps/htm-preact.js';
-import { readBlockConfig } from '../../../utils/utils.js';
+import { readBlockConfig, loadStyle } from '../../../utils/utils.js';
 import { BroadcastApp } from './components/BroadcastApp.js';
+
+// Broadcast renders Session Guide components, but the widget that loads their CSS sits in a later
+// section (Milo loads sections in order), so load it here before the first render.
+const SESSIONS_GUIDE_CSS_URL = new URL('../sessions-guide/sessions-guide.css', import.meta.url).href;
+const STYLE_WAIT_MS = 3000;
+
+// Resolves when the stylesheet loads, fails, or times out. Waits on the link itself because
+// loadStyle reuses an existing (possibly still loading) link and calls back immediately.
+export function whenStylesheetReady(link, timeoutMs = STYLE_WAIT_MS) {
+  return new Promise((resolve) => {
+    if (link.sheet) {
+      resolve();
+      return;
+    }
+    link.addEventListener('load', resolve, { once: true });
+    link.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, timeoutMs);
+  });
+}
+
+const loadSessionsGuideStyles = () => whenStylesheetReady(loadStyle(SESSIONS_GUIDE_CSS_URL));
 
 const CONFIG_KEYS = {
   'also-live-title': 'alsoLiveTitle',
@@ -12,6 +33,8 @@ const DEFAULTS = {
   alsoLiveTitle: 'Currently Live',
   upcomingTitle: 'Upcoming',
   viewAllDetailsLabel: 'View all details',
+  playerBackgroundImageUrlDesktop: '',
+  playerBackgroundImageUrlDesktopXl: '',
   sessionEndedImageUrlMobile: '',
   sessionEndedImageUrlTablet: '',
   sessionEndedImageUrlDesktop: '',
@@ -26,6 +49,11 @@ const SESSION_ENDED_IMAGE_LABELS = [
 ];
 
 const LEGACY_SESSION_ENDED_IMAGE_LABEL = 'session ended image';
+
+const PLAYER_BACKGROUND_IMAGE_LABELS = [
+  ['playerBackgroundImageUrlDesktop', 'player background image desktop'],
+  ['playerBackgroundImageUrlDesktopXl', 'player background image desktop xl'],
+];
 
 function getRowValueEl(el, label) {
   const row = [...el.querySelectorAll(':scope > div')]
@@ -127,12 +155,24 @@ function extractSessionEndedImageUrls(el) {
   return applyOptimizationPolicy(Object.fromEntries(keys.map((key, i) => [key, filled[i]])), mobileKey);
 }
 
+function extractPlayerBackgroundImageUrls(el) {
+  const raw = PLAYER_BACKGROUND_IMAGE_LABELS.map(([, label]) => extractRowImageUrl(el, label, true));
+  if (raw.every((url) => !url)) {
+    raw[0] = extractRowImageUrl(el, 'player background image', true);
+  }
+  const filled = fillNearestAvailable(raw).map(stripOptimizationParams);
+  return Object.fromEntries(PLAYER_BACKGROUND_IMAGE_LABELS.map(
+    ([key], i) => [key, filled[i]],
+  ));
+}
+
 // Plain block-content rows, not a Configurator-app JSON blob like sessions-guide.
 export function parseBroadcastConfig(el) {
   const raw = readBlockConfig(el);
   const config = {
     ...DEFAULTS,
     ...extractSessionEndedImageUrls(el),
+    ...extractPlayerBackgroundImageUrls(el),
   };
   Object.entries(CONFIG_KEYS).forEach(([rowKey, configKey]) => {
     if (raw[rowKey]) config[configKey] = raw[rowKey];
@@ -161,6 +201,7 @@ export default async function init(el) {
   const config = parseBroadcastConfig(el);
   el.innerHTML = '';
   el.classList.add('session-broadcast');
+  await loadSessionsGuideStyles();
   render(h(BroadcastApp, { config }), el);
   observeFillHeight(el);
 }

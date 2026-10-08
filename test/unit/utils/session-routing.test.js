@@ -154,7 +154,31 @@ describe('event-card session routing', () => {
         expect(action).to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.broadcast });
       });
 
-      // Runs last: initTierOneEventConfig() is idempotent module state with no reset —
+      it('carries the current simulated instant on an authored broadcast destination', () => {
+        window.history.replaceState(null, '', '/max-new?serverTime=1000');
+        const action = resolveCardAction({
+          watchDestination: 'broadcast',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({
+          type: 'navigate', url: `${MAX_EVENT_PAGES.broadcast}?serverTime=${NOW}`,
+        });
+      });
+
+      it('keeps a same-page homepage anchor action as a scroll with serverTime present', () => {
+        window.history.replaceState(null, '', '/max-new?serverTime=1000');
+        const action = resolveCardAction({
+          watchDestination: 'homepage',
+          homepageAnchorId: 'live-marquee',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'scroll', anchorId: 'live-marquee' });
+        expect(window.location.search).to.equal('?serverTime=1000');
+      });
+
+      // initTierOneEventConfig() is idempotent module state with no reset —
       // once a homepagePath is authored here, it stays authored for the rest of this
       // file's test run, so every case above (which relies on *no* homepagePath being
       // configured) has to come first.
@@ -174,6 +198,30 @@ describe('event-card session routing', () => {
           endTimeUtc: iso(NOW + HOUR),
         }, NOW);
         expect(action).to.deep.equal({ type: 'navigate', url: '/configured-homepage.html#live-marquee' });
+      });
+
+      it('carries the current clock and anchor on cross-page authored homepage navigation', () => {
+        window.history.replaceState(null, '', '/some/other/page.html?serverTime=1000&sessions=');
+        const action = resolveCardAction({
+          watchDestination: 'homepage',
+          homepageAnchorId: 'live-marquee',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({
+          type: 'navigate', url: `/configured-homepage.html?serverTime=${NOW}#live-marquee`,
+        });
+      });
+
+      it('preserves scroll-only behavior on the configured homepage with serverTime present', () => {
+        window.history.replaceState(null, '', '/configured-homepage.html?serverTime=1000');
+        const action = resolveCardAction({
+          watchDestination: 'homepage',
+          homepageAnchorId: 'live-marquee',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'scroll', anchorId: 'live-marquee' });
       });
     });
   });

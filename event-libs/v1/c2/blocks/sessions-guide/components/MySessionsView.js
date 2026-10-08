@@ -80,6 +80,7 @@ export function MySessionsView() {
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;
   const bothEmpty = !hasUpcoming && !hasOnDemand;
+  const noResults = bothEmpty && hasActiveSearchOrFilters(activeFilters, searchQuery);
 
   let effectiveTab = mySessionsTab;
   if (effectiveTab === 'upcoming' && !hasUpcoming) effectiveTab = 'on-demand';
@@ -91,7 +92,7 @@ export function MySessionsView() {
 
   return html`
     <div class="sg-view sg-view--my-sessions">
-      ${live.length > 0 && html`
+      ${live.length > 0 && !noResults && html`
         <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
@@ -103,7 +104,7 @@ export function MySessionsView() {
         </div>
       `}
       ${bothEmpty ? (
-        hasActiveSearchOrFilters(activeFilters, searchQuery)
+        noResults
           ? html`<${NoResultsFound} />`
           : html`
             <div class="sg-my-sessions__empty" role="status" aria-live="polite">
@@ -112,7 +113,7 @@ export function MySessionsView() {
                 class="sg-my-sessions__see-live-btn"
                 type="button"
                 onclick=${() => dispatch({ type: 'SET_VIEW', view: isPost ? 'on-demand' : 'live-upcoming' })}
-              >${isPost ? 'See On demand' : 'See Live & upcoming'}</button>
+              >${isPost ? 'See On demand' : 'See live & upcoming'}</button>
             </div>
           `
       ) : html`

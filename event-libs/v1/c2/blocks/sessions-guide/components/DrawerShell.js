@@ -1,4 +1,6 @@
-import { html, useEffect, useRef, useState } from '../../../../deps/htm-preact.js';
+import {
+  html, useEffect, useLayoutEffect, useRef, useState,
+} from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions, sessionsStatus, auth, sessionGuideRequest,
@@ -14,7 +16,9 @@ import {
 import { trapFocus } from '../utils/focus-trap.js';
 import { prefersReducedMotion } from '../utils/motion.js';
 import { isSafariMobile } from '../utils/browser.js';
+import { usePlayerOverlap } from '../utils/use-player-overlap.js';
 import { logWarning } from '../../../../utils/lana-log.js';
+import { containToasts } from '../../../../features/toast/toast.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
@@ -47,8 +51,11 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
 
 export function DrawerShell() {
   const { state, dispatch } = useSessionGuide();
+  const shellRef = useRef(null);
   const drawerRef = useRef(null);
+  const toastHostRef = useRef(null);
   const bodyScrollRef = useRef(null);
+  const ctaRef = useRef(null);
   const currentTopRef = useRef(0);
   const expandedRef = useRef(false);
   const touchPrevYRef = useRef(0);
@@ -73,7 +80,7 @@ export function DrawerShell() {
     currentTopRef.current = top;
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = drawerRef.current;
     if (!el) return;
     const { drawerState } = state;
@@ -98,7 +105,7 @@ export function DrawerShell() {
         requestAnimationFrame(() => setTop(getTopMargin(), true));
       });
     } else if (drawerState === 'hidden') {
-      el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+      el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0s 0.45s';
       el.style.top = '100vh';
       expandedRef.current = false;
       currentTopRef.current = 0;
@@ -228,6 +235,8 @@ export function DrawerShell() {
   const isOpen = drawerState !== 'hidden';
   const isExpanded = drawerState === 'expanded';
   const hasDetail = !!activeSessionId;
+  // Fades the FAB while it would cover a video player's controls (MWPW-208524).
+  const ctaOverPlayer = usePlayerOverlap(ctaRef, !isOpen);
 
   function closeDrawer() {
     dispatch({ type: 'CLOSE_DRAWER' });
@@ -235,7 +244,15 @@ export function DrawerShell() {
   }
 
   // Milo's shared modal can't wrap this hand-rolled, gesture-driven drawer.
-  useEffect(() => (isOpen ? trapFocus(drawerRef.current, closeDrawer) : undefined), [isOpen]);
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const restoreToasts = containToasts(toastHostRef.current);
+    const restoreFocus = trapFocus(shellRef.current, closeDrawer);
+    return () => {
+      restoreToasts();
+      restoreFocus();
+    };
+  }, [isOpen]);
 
   function openDrawer() {
     const isNarrow = window.matchMedia('(max-width: 1279px)').matches;
@@ -265,15 +282,18 @@ export function DrawerShell() {
   }
 
   return html`
-    <div class="sg-shell">
+    <div
+      class="sg-shell"
+      ref=${shellRef}
+      role=${isOpen ? 'dialog' : undefined}
+      aria-modal=${isOpen ? 'true' : undefined}
+      aria-label=${isOpen ? 'Sessions guide' : undefined}
+    >
       ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true" data-lenis-prevent></div>`}
       <div
         class=${'sg-drawer' + (hasDetail ? ' sg-drawer--detail-open' : '')}
         ref=${drawerRef}
         data-lenis-prevent
-        role=${isOpen ? 'dialog' : undefined}
-        aria-modal=${isOpen ? 'true' : undefined}
-        aria-label=${isOpen ? 'Sessions guide' : undefined}
         inert=${!isOpen ? true : undefined}
       >
         <${DrawerHeader}
@@ -303,7 +323,14 @@ export function DrawerShell() {
           ${!hasDetail && html`<${BackToTop} scrollerRef=${bodyScrollRef} />`}
         </div>
       </div>
-      ${!isOpen && html`<button class=${'sg-cta-btn' + (isOnSafariMobile ? ' sg-cta-btn--safari-mobile' : '')} onclick=${openDrawer} daa-ll="Session-Guide-Open" type="button">
+      <div class="sg-drawer__notifications" ref=${toastHostRef}></div>
+      ${!isOpen && html`<button
+        class=${'sg-cta-btn' + (isOnSafariMobile ? ' sg-cta-btn--safari-mobile' : '') + (ctaOverPlayer ? ' sg-cta-btn--over-player' : '')}
+        ref=${ctaRef}
+        onclick=${openDrawer}
+        daa-ll="Session-Guide-Open"
+        type="button"
+      >
         View all sessions
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
           <path d="M15.75 3H13.75V2C13.75 1.58594 13.4141 1.25 13 1.25C12.5859 1.25 12.25 1.58594 12.25 2V3H7.75V2C7.75 1.58594 7.41406 1.25 7 1.25C6.58594 1.25 6.25 1.58594 6.25 2V3H4.25C3.00928 3 2 4.00977 2 5.25V15.75C2 16.9902 3.00928 18 4.25 18H15.75C16.9907 18 18 16.9902 18 15.75V5.25C18 4.00977 16.9907 3 15.75 3ZM4.25 4.5H6.25V5C6.25 5.41406 6.58594 5.75 7 5.75C7.41406 5.75 7.75 5.41406 7.75 5V4.5H12.25V5C12.25 5.41406 12.5859 5.75 13 5.75C13.4141 5.75 13.75 5.41406 13.75 5V4.5H15.75C16.1636 4.5 16.5 4.83691 16.5 5.25V7H3.5V5.25C3.5 4.83691 3.83643 4.5 4.25 4.5ZM15.75 16.5H4.25C3.83643 16.5 3.5 16.1631 3.5 15.75V8.5H16.5V15.75C16.5 16.1631 16.1636 16.5 15.75 16.5Z" fill="currentColor"/>

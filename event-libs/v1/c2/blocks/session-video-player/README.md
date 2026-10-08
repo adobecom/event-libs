@@ -73,13 +73,13 @@ session's ready-to-embed `videos[]` — entries shaped like `{ provider:
 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&
 end=nothing&learn=on', kind: 'onDemand' }` — confirmed against real data.
 `pickEmbeddableVideo()` is **strictly `onDemand`-only** — a `youtube`/`mpc`
-entry with any other `kind` (e.g. `liveStream`) is never selected, with
-**no fallback**. A session with an embeddable video entry but no
-`onDemand`-kind one is treated identically to having no video at all (the
-block removes itself) — this deliberately does not attempt to show a
-livestream or any other non-on-demand kind. On init, this block reads that
-metadata and loads the matching entry's URL — already fully-formed;
-nothing is constructed client-side — into itself.
+entry with any other `kind` (e.g. `liveStream`) is never selected. In the
+on-demand phase, if no matching entry exists, the block falls back to the
+session's `MPC ID`, then `YouTube ID` custom attribute. With neither a
+matching entry nor a fallback ID, it removes itself. This deliberately
+does not embed a YouTube livestream; the DVR-buffer path uses MobileRider.
+MPC metadata URLs are used as supplied; recognized YouTube sources are
+converted to embed URLs client-side.
 
 If a `.milo-video` is already mounted inside this block, its iframe is
 replaced. **Real pages have been seen with no video block authored at
@@ -93,9 +93,41 @@ Both `mpc` and `youtube` providers are handled — **`youtube`'s exact url
 shape is unconfirmed against real data** (no real sample seen yet), so
 `extractYouTubeId()` extracts an id defensively from whatever shape shows
 up (embed URL, watch URL, or a bare id) rather than assuming one. YouTube
-additionally gets `enablejsapi=1` + an `id` added (Milo's own autoblock
-doesn't add these — it never needs to observe player state), needed for
-state tracking below.
+additionally gets `enablejsapi=1` and a unique `player-` ID, needed for
+state tracking below and the Launch analytics contract.
+
+## YouTube Heartbeat registration
+
+No new block rows or upstream data fields are required. Both the
+`session-times` video source and the `YouTube ID` fallback get
+`enablejsapi=1`, `rel=0`, and `videotype=vod`. The type is derived from this
+block's on-demand-only YouTube playback path, not from a chat flag or a
+new authoring key. The iframe title uses page `title` metadata, then
+`en-title`, then "YouTube video player".
+
+The existing `www.youtube.com` embed host, `origin`, and autoplay behavior
+are preserved. Shared helpers in `c2/utils/youtube-analytics.js` provide
+unique IDs across this block and event-youtube, and call
+`window._satellite.track('trackYoutube')` once per connected iframe after
+document completion. Only the winning layout instance registers; newly
+inserted replacement iframes register separately. An iframe removed before
+document completion is not registered. Unrecognized YouTube sources keep
+the existing raw-URL fallback and are not registered with Launch.
+
+Missing Launch or registration errors are logged without preventing
+playback. Registration is not retried when Launch is absent. The existing
+`YT.Player` callbacks still own local resume, progress, and playlist state;
+Launch owns Heartbeat delivery to Adobe Analytics. No additional YouTube
+API readiness callback or analytics script is introduced by this integration.
+
+Before release, Marketing Tech must verify the Launch plugin can attach
+alongside the existing `YT.Player` without breaking resume, progress,
+playlist advancement, or producing duplicate Heartbeat events. Test an
+actual session page with martech enabled, including metadata and
+custom-attribute video sources, both layout winners, and delayed on-demand
+availability. Confirm play/pause/progress/completion requests in the
+Network panel and the resulting data in Adobe Analytics; unit tests cannot
+prove that delivery.
 
 ## Playback state reporting
 

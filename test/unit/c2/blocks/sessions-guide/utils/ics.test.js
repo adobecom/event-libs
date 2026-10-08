@@ -76,6 +76,51 @@ describe('sessions-guide/utils/ics', () => {
       expect(getProp(withUrl, 'URL')).to.equal('/sessions/foo');
     });
 
+    it('includes the session page link in DESCRIPTION as well as URL for Outlook', () => {
+      const sessionPageUrl = 'https://www.adobe.com/max/2026/sessions/a-session-s1';
+      const lines = unfold(generateICS([session({
+        description: 'About the talk.',
+        speakers: [{ name: 'Ada Lovelace' }, { name: 'Grace Hopper' }],
+        sessionPageUrl,
+      })]));
+      expect(getProp(lines, 'DESCRIPTION')).to.equal(
+        `About the talk.\\n\\nSpeakers: Ada Lovelace\\, Grace Hopper\\n\\nSession page: ${sessionPageUrl}`,
+      );
+      expect(getProp(lines, 'URL')).to.equal(sessionPageUrl);
+    });
+
+    it('includes the session page link even without a description or speakers', () => {
+      const sessionPageUrl = 'https://www.adobe.com/max/2026/sessions/a-session-s1';
+      const lines = unfold(generateICS([session({
+        description: '',
+        speakers: [],
+        sessionPageUrl,
+      })]));
+      expect(getProp(lines, 'DESCRIPTION')).to.equal(`Session page: ${sessionPageUrl}`);
+      expect(getProp(lines, 'URL')).to.equal(sessionPageUrl);
+    });
+
+    it('escapes URL punctuation only in the DESCRIPTION text, not in the URL property', () => {
+      const sessionPageUrl = 'https://www.adobe.com/max/sessions/s1?tracks=a,b;level=1#details';
+      const lines = unfold(generateICS([session({ sessionPageUrl })]));
+      expect(getProp(lines, 'DESCRIPTION')).to.equal(
+        `A description.\\n\\nSession page: ${sessionPageUrl.replace(',', '\\,').replace(';', '\\;')}`,
+      );
+      expect(getProp(lines, 'URL')).to.equal(sessionPageUrl);
+    });
+
+    it('folds long session links without corrupting either property', () => {
+      const sessionPageUrl = `https://www.adobe.com/max/2026/sessions/${'a-long-session-title-'.repeat(10)}s1`;
+      const ics = generateICS([session({ sessionPageUrl })]);
+      const encoder = new TextEncoder();
+      ics.split('\r\n').forEach((line) => {
+        expect(encoder.encode(line).length).to.be.at.most(75);
+      });
+      const lines = unfold(ics);
+      expect(getProp(lines, 'DESCRIPTION')).to.equal(`A description.\\n\\nSession page: ${sessionPageUrl}`);
+      expect(getProp(lines, 'URL')).to.equal(sessionPageUrl);
+    });
+
     it('escapes backslash, semicolon, comma, and newline in TEXT values', () => {
       const lines = unfold(generateICS([session({
         title: 'Weird; Title, With\\Backslash',

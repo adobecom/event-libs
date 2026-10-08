@@ -3,6 +3,7 @@ import sinon from 'sinon';
 import {
   notifications, getEntry, getEntries, upsertEntry, removeEntry, markRead, markAllRead,
   pruneStale, dismissEntry, batchNotifications, flushNotifications,
+  correctEntry,
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
 import { resetNotifications } from './mocks/notification-store.js';
 
@@ -21,6 +22,64 @@ describe('notification-store', () => {
   afterEach(async () => {
     sinon.restore();
     await flushNotifications();
+  });
+
+  describe('timing corrections', () => {
+    it('retains unknown legacy fields while comparing their persisted values structurally', async () => {
+      upsertEntry('RF-1', { stage: 'on-demand', title: 'First', legacy: { source: 'QA' } });
+      await flushNotifications();
+      const expected = getEntry('RF-1');
+      correctEntry('RF-1', { stage: 'reminder' }, expected);
+      await flushNotifications();
+      expect(getEntry('RF-1').stage).to.equal('reminder');
+      expect(getEntry('RF-1').legacy).to.deep.equal({ source: 'QA' });
+    });
+
+    it('corrects a stage without resetting flags, timestamp or sequence', () => {
+      upsertEntry('RF-1', { stage: 'on-demand', title: 'First' });
+      const expected = getEntry('RF-1');
+      markRead('RF-1');
+      dismissEntry('RF-1');
+      correctEntry('RF-1', { stage: 'reminder', title: 'Corrected' }, expected);
+      expect(getEntry('RF-1')).to.include({
+        stage: 'reminder', read: true, dismissed: true,
+        updatedAt: expected.updatedAt, seq: expected.seq,
+      });
+    });
+
+    it('does not overwrite a newer stage while a correction waits for the lock', async () => {
+      upsertEntry('RF-1', { stage: 'on-demand', title: 'Original', endTimeMs: 100 });
+      await flushNotifications();
+      const expected = getEntry('RF-1');
+      correctEntry('RF-1', { stage: 'reminder' }, expected);
+      localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify({
+        'RF-1': { ...expected, endTimeMs: 200, title: 'New catalog' },
+      }));
+      await flushNotifications();
+      expect(getEntry('RF-1').title).to.equal('New catalog');
+      expect(getEntry('RF-1').stage).to.equal('on-demand');
+    });
+
+    it('merges flags changed in another tab before the correction is persisted', async () => {
+      upsertEntry('RF-1', { stage: 'on-demand', title: 'First' });
+      await flushNotifications();
+      const expected = getEntry('RF-1');
+      correctEntry('RF-1', { stage: 'reminder' }, expected);
+      localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify({
+        'RF-1': { ...expected, read: true, dismissed: true },
+      }));
+      await flushNotifications();
+      expect(getEntry('RF-1')).to.include({ stage: 'reminder', read: true, dismissed: true });
+    });
+
+    it('does not resurrect an entry removed while a correction is queued', async () => {
+      upsertEntry('RF-1', { stage: 'on-demand', title: 'First' });
+      await flushNotifications();
+      correctEntry('RF-1', { stage: 'reminder' }, getEntry('RF-1'));
+      localStorage.setItem(LOCAL_STATE_KEY, '{}');
+      await flushNotifications();
+      expect(getEntry('RF-1')).to.equal(undefined);
+    });
   });
 
   describe('upsertEntry', () => {

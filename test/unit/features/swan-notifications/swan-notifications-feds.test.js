@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import {
   notifySessionScheduled, notifySessionUnscheduled, reconcileSwanNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/swan-notifications-feds.js';
@@ -39,6 +40,7 @@ describe('swan-notifications-feds', () => {
   beforeEach(resetNotifications);
 
   afterEach(() => {
+    sinon.restore();
     clearStore();
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
   });
@@ -103,6 +105,73 @@ describe('swan-notifications-feds', () => {
   });
 
   describe('reconcileSwanNotifications', () => {
+    it('uses the exact reminder, start and end boundaries', () => {
+      const now = Date.now();
+      const clock = sinon.stub(Date, 'now').returns(now);
+      const session = makeSession('RF-boundaries', { startOffsetMs: 5 * MIN, endOffsetMs: 65 * MIN });
+      clock.returns(now - 1);
+      notifySessionScheduled(session);
+      expect(getEntry(session.rfCode)).to.equal(undefined);
+      clock.returns(now);
+      reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      expect(getEntry(session.rfCode).stage).to.equal('reminder');
+      clock.returns(now + 5 * MIN);
+      reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      expect(getEntry(session.rfCode).stage).to.equal('live');
+      clock.returns(now + 65 * MIN);
+      reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      expect(getEntry(session.rfCode).stage).to.equal('on-demand');
+    });
+
+    it('corrects a cached on-demand stage after the clock moves backward without resetting flags', () => {
+      const now = Date.now();
+      const clock = sinon.stub(Date, 'now').returns(now);
+      const session = makeSession('RF-clock-reset', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN });
+      clock.returns(now + 63 * MIN);
+      notifySessionScheduled(session);
+      markRead(session.rfCode);
+      dismissEntry(session.rfCode);
+      clock.returns(now);
+      reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      expect(getEntry(session.rfCode).stage).to.equal('reminder');
+      expect(getEntry(session.rfCode).read).to.equal(true);
+      expect(getEntry(session.rfCode).dismissed).to.equal(true);
+    });
+
+    it('removes a premature cached entry but still creates its reminder when the window arrives', () => {
+      const now = Date.now();
+      const clock = sinon.stub(Date, 'now').returns(now);
+      const session = makeSession('RF-premature', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
+      clock.returns(now + 121 * MIN);
+      notifySessionScheduled(session);
+      clock.returns(now);
+      reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      expect(getEntry(session.rfCode)).to.equal(undefined);
+      clock.returns(now + 55 * MIN);
+      reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      expect(getEntry(session.rfCode).stage).to.equal('reminder');
+    });
+
+    it('refreshes corrected catalog times and routing even at the same stage without changing recency', () => {
+      const session = makeSession('RF-catalog-edit', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN });
+      notifySessionScheduled(session);
+      markRead(session.rfCode);
+      const previous = getEntry(session.rfCode);
+      const corrected = { ...session, endTimeUtc: iso(90 * MIN), sessionPageUrl: '/sessions/corrected' };
+      reconcileSwanNotifications(() => [corrected], () => new Set([session.id]));
+      const entry = getEntry(session.rfCode);
+      expect(entry.endTimeMs).to.equal(Date.parse(corrected.endTimeUtc));
+      expect(entry.actionUrl).to.equal(`${location.origin}/sessions/corrected`);
+      expect(entry.updatedAt).to.equal(previous.updatedAt);
+      expect(entry.seq).to.equal(previous.seq);
+      expect(entry.read).to.equal(true);
+    });
+
+    it('rejects an end time before the start time instead of creating an on-demand entry', () => {
+      notifySessionScheduled(makeSession('RF-inverted-times', { startOffsetMs: 2 * MIN, endOffsetMs: -MIN }));
+      expect(getEntry('RF-inverted-times')).to.equal(undefined);
+    });
+
     it('advances a session from reminder to live in place, as a single entry (not a new one)', () => {
       const reminderSession = makeSession('RF-progress', { startOffsetMs: 2 * MIN, endOffsetMs: 120 * MIN });
       notifySessionScheduled(reminderSession);

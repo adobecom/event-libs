@@ -43,6 +43,33 @@ The Figma file (`MAX-2026-UX-SSOT`, branch `f3wtXH32KwrStRx5VbCzed`, section "Se
 
 ## Architecture decisions
 
+### Desktop live-player background (MWPW-207363)
+
+The live player and session info panel support an author-controlled decorative background from the MAX 2026
+[Figma broadcast design](https://www.figma.com/design/zNe8auqfmanqiXWvQBpSyH/branch/PsafLZIADk0bgLrj9Voc6g/MAX-2026-Virtual-VizD-SSOT?node-id=8482-20021).
+There is no bundled/default artwork: the background remains plain until an image is
+authored. Authored images use the design's 60% opacity and cover sizing at desktop
+breakpoints only. Mobile and tablet do not request a background image. Player dimensions,
+controls, nav offsets, and vertical spacing remain unchanged.
+
+| Block-content row | Viewports |
+|---|---|
+| **Player background image desktop** | 1280-1440px |
+| **Player background image desktop xl** | 1441px+ |
+
+Both rows accept an image link or embedded picture. Like the session-ended image rows,
+pictures use the widest source, relative URLs resolve against the authored page, and
+desktop URLs have their optimization query parameters removed. If only one tier is
+authored, it supplies both desktop tiers. Leave both empty or omit them for a plain
+background. The earlier single **Player background image** row remains a fallback when
+neither breakpoint row is populated. Use empty alt text for an embedded decorative image
+(avoid Milo's `|`-delimited video convention).
+
+The background is non-interactive and belongs only to the live wrapper, not the
+loading/error/empty or session-ended states. The info panel has a 64% black backing
+on desktop when an image is authored to keep its text at WCAG AA contrast even with bright artwork.
+The existing **Session ended image** rows remain separate and unchanged.
+
 | Area | Decision | Why |
 |---|---|---|
 | Block type | New Tier 1 C2 Preact block `session-broadcast`, registered in `EVENT_BLOCKS_C2` (`event-libs/v1/libs.js`) | Matches `sessions-guide-full-page`'s precedent — only existing "full custom page" pattern in this codebase |
@@ -113,7 +140,7 @@ Only remaining action, not a blocker: let Analytics (Charlie, building a dimensi
 - **`daa-ll` tagging — found already done**: `Favorite`/`View-All-Details`/`Watch-On-Demand` were already tagged on `SessionInfoPanel.js`/`EndedState.js` back in Phase 1/3, and `Watch-Now`/`Add-to-Schedule`/`Add-to-Favorites` come for free from reusing `LiveCard.js` in both carousels — nothing left to add.
 - New `utils/broadcast-analytics.js`: `trackBroadcastEvent(name)` dynamically imports `sendAnalytics` from `${miloLibs}/blocks/modal/modal.js` (same path `events-form.js` already uses) and fires `sendAnalytics(new Event(name))` — `sendAnalytics` takes no separate payload, so any dimension travels in the event name itself, matching `eventFormSendAnalytics`'s own string-concatenation pattern. `getEntryPoint()` classifies `document.referrer` into `direct`/`external`/`session-guide`/`homepage` — no CTA-tagged entry param exists to read instead, and the ticket's AC doesn't name one.
 - Wired: page view (mount, with entry-point dimension), session switch (`handleSwitchSession`), panel expansion (`SessionInfoPanel`'s caret, fires only on expand not collapse), session-detail-modal open (all three `openSessionGuideDetail` call sites — `SessionInfoPanel`, `AlsoLiveCarousel`, `UpNextCarousel`). Carousel interactions and Add-to-Schedule/Favorite are already covered by the reused `daa-ll` tags above — no separate imperative event for those.
-- **Play/watch-time — intentionally asymmetric, documented in code**: MPC gets real play/pause fidelity for free, since `adobetv.js` already listens on `window` for `postMessage({state, id})` from `video.tv.adobe.com` as a public contract — `MpcPlayerAdapter.js` adds a second listener for the same messages. YouTube gets a single best-effort "started watching" event on mount instead of true `onStateChange` fidelity: `event-youtube.js`'s `buildEmbedUrl()` has no passthrough param for `enablejsapi=1`, and hand-building the iframe ourselves to add one would mean duplicating `buildStream()`'s CSS-dependent markup — not worth it for an analytics nice-to-have. Flagged as a known gap, not silently dropped.
+- **Play/watch-time — intentionally asymmetric, documented in code**: MPC gets real play/pause fidelity for free, since `adobetv.js` already listens on `window` for `postMessage({state, id})` from `video.tv.adobe.com` as a public contract — `MpcPlayerAdapter.js` adds a second listener for the same messages. YouTube's broadcast-specific event remains a single best-effort "started watching" signal on mount instead of true `onStateChange` fidelity. MWPW-209219 adds the required iframe parameters and post-mount Launch registration through event-youtube; YouTube Heartbeat reporting is owned by Launch and requires Marketing Tech's release verification.
 - `EndedState.js` now accepts `sessionEndedImageUrl` (the one previously-parsed-but-unused authored field) and renders it as a plain, decorative (`alt=""`) `<img>` background layer.
 - **Real bug found during actual DA-page testing, not caught by any harness — two rounds**:
   - **Round 1**: the field was originally authored as an *embedded picture* and read via `readBlockConfig`'s raw-`innerHTML` fallback branch, then rendered via `sanitizedRichText` + `dangerouslySetInnerHTML` (mirroring `SessionDetailOverlay.js`'s pattern for authored rich text). This looked correct in the preview harness but silently failed on the real page: Milo's site-wide `decorateImageLinks()` (`libs/utils/utils.js`) runs over *every* `<img>` on the page as part of `decorateSection()` — before any block's own `init()` gets a chance to read its config rows — and converts any `<img alt*="|">` whose pre-`|` segment resolves to an `.mp4` URL into an autoplay background `<video>` (a real, useful convention elsewhere for hero/marquee background video). Many Adobe asset-library images carry that `|`-delimited alt-text convention as stored metadata regardless of which block's config row they're embedded in — happened with two different asset picks in a row.
@@ -174,7 +201,7 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 
 `PlayerHost.js` owns a single mounted adapter at a time, keyed by which video-source field is populated (`youTubeId` / `mpcId` / `mrStreamId` — mutually exclusive). Switching player type unmounts and remounts the whole adapter, never swaps just `src`.
 
-**YouTube adapter**: import `YouTubeChat` from `event-libs/v1/c2/blocks/event-youtube/event-youtube.js` (local, no dynamic Milo import). Per-switch, construct a fresh `new YouTubeChat()` (its `init()`/`buildStream()` isn't meant to be re-run on the same instance — fine, since `PlayerHost` already remounts a fresh adapter on every switch), set `instance.config = { autoplay: 'true' }` and `instance.videoId = <youTubeId>` directly (the same seam its own tests use), call `instance.buildStream()`, append the result. Hits `insertAutoplayIframe()` — a real autoplaying iframe, no click-to-play facade. Leave `chatenabled` unset. **Phase 4 decision, not built**: promoting the iframe to a real `YT.Player` for `onStateChange` fidelity was evaluated and rejected — `buildEmbedUrl()` has no passthrough param for `enablejsapi=1`, and hand-building the iframe to add one would duplicate `buildStream()`'s CSS-dependent markup. Ships with a single best-effort "started watching" event on mount instead (`broadcast-analytics.js`).
+**YouTube adapter**: import `YouTubeChat` from `event-libs/v1/c2/blocks/event-youtube/event-youtube.js` (local, no dynamic Milo import). Per-switch, construct a fresh `new YouTubeChat()`, set `instance.config = { autoplay: 'true', title: session.title, videotype: 'live' }` and `instance.videoId = <youTubeId>` directly, then call `instance.mountStream(connectedContainer)`. Hits `insertAutoplayIframe()` — a real autoplaying iframe, no click-to-play facade. Leave `chatenabled` unset. The shared mount path registers the connected iframe with Launch after document completion (MWPW-209219); Launch owns YouTube Heartbeat tracking. The adapter still sends its separate best-effort "started watching" broadcast event (`broadcast-analytics.js`) and does not construct a `YT.Player` or install `onStateChange` callbacks itself.
 
 **MPC adapter — done**: builds a real (temporarily attached) `<a href="https://video.tv.adobe.com/v/<mpcId>?autoplay=true">`, dynamically imports `${miloLibs}/blocks/adobetv/adobetv.js`, calls `init(a)`. **Autoplay confirmed working** via a live spike. Also injects `adobetv.css` once via a dynamic `<link>`. **Phase 4**: the `postMessage` `{ state: 'play'|'pause' }` events `adobetv.js` itself listens for are now also observed by a second listener in `MpcPlayerAdapter.js`, giving MPC real play/pause analytics fidelity — YouTube's asymmetric best-effort treatment above is the deliberate tradeoff, not an oversight.
 
@@ -190,7 +217,7 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 
 - `daa-ll` + Milo's `decorateDefaultLinkAnalytics` for button-like CTAs — already present from Phase 1/3, plus whatever `LiveCard.js` already tags.
 - `trackBroadcastEvent()` (`utils/broadcast-analytics.js`, dynamically imports `sendAnalytics` from `${miloLibs}/blocks/modal/modal.js`) for page view, session switch, panel expansion, modal open.
-- Video play/watch-time: MPC via the real `postMessage` play/pause listener (full fidelity, free); YouTube via a single best-effort "started watching" event on mount (`YT.Player.onStateChange` fidelity was evaluated and rejected — see the Player abstraction section above for why).
+- Video play/watch-time: MPC via the real `postMessage` play/pause listener (full fidelity, free); YouTube's broadcast-specific event remains a single best-effort "started watching" signal on mount. Separately, event-youtube supplies Launch's iframe contract and registration for YouTube Heartbeat; actual reporting remains subject to Marketing Tech verification.
 - Event taxonomy/schema explicitly unresolved per the ticket/PRD — built against the "Required events" list, expect rework once Analytics confirms. `getEntryPoint()`'s referrer-based heuristic is a best guess for the same reason — no concrete entry-point mechanism is named anywhere in the ticket/PRD.
 
 ### How analytics works here, in event-libs generally, and in Milo (researched 2026-08-31)
@@ -2441,6 +2468,46 @@ and desktop's `::before` rules — identical except for the height difference th
 into one `min-width: 768px` block.
 
 Lint clean, 150/150 tests pass (CSS-only change, no test behavior affected).
+
+## Session description width (MWPW-208757)
+
+The now-playing panel's description uses a fixed 700px width from the tablet breakpoint
+(768px) upward, including desktop and desktop XL. The constraint applies to
+`.sb-info__desc-wrap` in both collapsed and expanded states, whether favorited or not;
+the title, channel badge, and action row retain their existing grid layout. `width: min(700px, 100%)`
+prevents overflow if an embedding container leaves less than 700px available. Mobile retains
+its fluid width and existing collapsed/favorited visibility.
+
+This change is scoped to Session Broadcast, not the homepage widget or session detail overlay.
+Browser-backed layout tests cover breakpoint boundaries, all four expansion/favorite states,
+the two-line clamp, and a narrower embedding container.
+
+## Desktop container parity with the homepage (MWPW-208525)
+
+Design asked Broadcast to match the container around the homepage's livestream player
+(`.section.livestream-layout.container`). That's Milo's plain `.container`
+(`padding-inline: max(var(--grid-margin-width), (100% - 1920px) / 2)`): an 8.333% gutter from 768px
+(Milo's `--grid-margin-width-base`), with content capped at 1920px past a 2304px viewport. From 1280px
+up, Broadcast now uses the same gutter (`--sb-gutter` on `.sb-app`, falling back to 1920px for
+`--grid-max-width-default`) instead of the old 1192px (1280–1440px) / 1440px (1441px+) caps.
+The homepage section also drops its right padding (`upcoming-sessions.css`) so its player bleeds
+right too; Broadcast keeps the player symmetric and bleeds only the carousels:
+
+- Player, info panel, and ended state: inset by the gutter on both sides; the player grows with
+  the column up to 1920px.
+- Also Live / Up Next: left edge aligns with the player; tracks bleed to the right viewport edge;
+  arrows align with the player's right edge. The Also Live long card stays at Figma's 1156px
+  (node 11091:65811) so the next card peeks in, shrinking only when the column is narrower (1280px).
+- Below 1280px is unchanged (full-bleed player; 24px-left, right-bleeding carousels).
+
+`.sb-app` is an inline-size query container and the gutter is computed in `cqi`, not `100vw`, so a
+classic (non-overlay) scrollbar can't skew the right-edge alignment. Containment doesn't trap fixed
+descendants here (verified in Chrome), and `.sb-app` has none. Removing the 1441px tier also fixes
+a pre-existing near-zero gutter at 1441–1488px (1440px cap with auto margins). Only the 1441px
+player/ended background-image swaps remain at that breakpoint.
+
+`components/container-layout.test.js` covers 375–2560px: gutter, 1920px cap, right bleed, arrow
+alignment, Also Live card width, ended state, and no horizontal overflow.
 
 ## Explicitly out of scope (fast-follow)
 

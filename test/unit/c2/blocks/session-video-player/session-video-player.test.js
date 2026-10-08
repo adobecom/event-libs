@@ -7,6 +7,8 @@ import init, {
   convertIsoDurationToSeconds,
 } from '../../../../../event-libs/v1/c2/blocks/session-video-player/session-video-player.js';
 import BlockMediator from '../../../../../event-libs/v1/deps/block-mediator.min.js';
+import { YouTubeChat } from '../../../../../event-libs/v1/c2/blocks/event-youtube/event-youtube.js';
+import { registerYouTubeTracking } from '../../../../../event-libs/v1/c2/utils/youtube-analytics.js';
 
 const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
 const DECISION_KEY = 'videoLayoutDecision';
@@ -130,6 +132,8 @@ describe('session-video-player', () => {
   // on a data-src attribute (which the tests assert via getIframeSrc) and point the live src at
   // about:blank so nothing is ever fetched. Fully fake: no network, no external scripts.
   let originalSetAttribute;
+  let satelliteDescriptor;
+  let readyState;
 
   before(() => {
     originalSetAttribute = HTMLIFrameElement.prototype.setAttribute;
@@ -151,6 +155,13 @@ describe('session-video-player', () => {
     document.head.innerHTML = '';
     localStorage.clear();
     window.lana = { log: sinon.stub() };
+    readyState = sinon.stub(document, 'readyState').get(() => 'complete');
+    satelliteDescriptor = Object.getOwnPropertyDescriptor(window, '_satellite');
+    Object.defineProperty(window, '_satellite', {
+      configurable: true,
+      writable: true,
+      value: { track: sinon.spy() },
+    });
     // Present-but-inert YT global so ensureYouTubeIframeApi() short-circuits instead of injecting
     // the real https://www.youtube.com/iframe_api script (disallowed in unit tests).
     window.YT = {
@@ -160,8 +171,13 @@ describe('session-video-player', () => {
   });
 
   afterEach(() => {
+    document.body.innerHTML = '';
+    readyState.get(() => 'complete');
+    document.dispatchEvent(new Event('readystatechange'));
     delete window.YT;
     sinon.restore();
+    if (satelliteDescriptor) Object.defineProperty(window, '_satellite', satelliteDescriptor);
+    else delete window._satellite;
   });
 
   describe('progress persistence', () => {
@@ -419,6 +435,25 @@ describe('session-video-player', () => {
       expect(playlistPlayer.dataset.embedded).to.equal(undefined);
     });
 
+    it('hides the losing playlist-container instance', async () => {
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+      const { fullWidthPlayer, playlistPlayer } = await initBoth();
+
+      expect(playlistPlayer.classList.contains('session-video-hidden')).to.be.true;
+      expect(fullWidthPlayer.classList.contains('session-video-hidden')).to.be.false;
+    });
+
+    it('embeds only the winner when both instances init under the same decision', async () => {
+      // The winning instance un-hides and embeds; the loser stays hidden with no iframe. Mirrors the
+      // DVR_BUFFER → ON_DEMAND swap's end state where exactly one instance shows the player.
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: true });
+      const { fullWidthPlayer, playlistPlayer } = await initBoth();
+
+      expect(playlistPlayer.classList.contains('session-video-hidden')).to.be.false;
+      expect(playlistPlayer.querySelector('iframe.adobetv')).to.exist;
+      expect(fullWidthPlayer.querySelector('iframe')).to.not.exist;
+    });
+
     /**
      * Regression: two players embedded at once on a real page. Milo's decorateSection()
      * resets `section.className = 'section'` and the Style-row classes are re-applied
@@ -531,8 +566,53 @@ describe('session-video-player', () => {
       expect(fullWidthPlayer.querySelector('.milo-video')).to.exist;
     });
 
+    it('disposes the MobileRider VideoJS player before removing a prior .mobile-rider', async () => {
+      // A DVR_BUFFER → ON_DEMAND swap tears down the MobileRider player and mounts an MPC iframe.
+      // The player's VideoJS instance lives on window.__mr_player; it must be disposed before its
+      // DOM is removed, or orphaned event handlers (userActive → createPlayerWidget) throw
+      // "Cannot read properties of null (reading 'appendChild')" against detached nodes.
+      setMeta('session-times', sessionTimes());
+      setCustomAttributes();
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      const rider = document.createElement('div');
+      rider.className = 'mobile-rider';
+      fullWidthPlayer.append(rider);
+      let disposedBeforeRemoval = null;
+      const dispose = sinon.stub().callsFake(() => { disposedBeforeRemoval = rider.isConnected; });
+      window.__mr_player = { dispose };
+
+      await init(fullWidthPlayer);
+      await flush();
+
+      expect(dispose.calledOnce).to.be.true;
+      // Disposed while the rider was still in the DOM, then removed — never the other way round.
+      expect(disposedBeforeRemoval).to.be.true;
+      expect(fullWidthPlayer.querySelector('.mobile-rider')).to.not.exist;
+      expect(window.__mr_player).to.equal(null);
+      expect(fullWidthPlayer.querySelector('.milo-video')).to.exist;
+
+      delete window.__mr_player;
+    });
+
+    it('does not throw when disposing a .mobile-rider with no VideoJS instance', async () => {
+      setMeta('session-times', sessionTimes());
+      setCustomAttributes();
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      const rider = document.createElement('div');
+      rider.className = 'mobile-rider';
+      fullWidthPlayer.append(rider);
+      window.__mr_player = null;
+
+      await init(fullWidthPlayer);
+      await flush();
+
+      expect(fullWidthPlayer.querySelector('.mobile-rider')).to.not.exist;
+      expect(fullWidthPlayer.querySelector('.milo-video')).to.exist;
+    });
+
     ['https://www.youtube.com/watch?v=abcdefghijk',
       'https://www.youtube.com/embed/abcdefghijk',
+      'https://www.youtube-nocookie.com/embed/abcdefghijk?rel=1',
       'abcdefghijk'].forEach((url) => {
       it(`extracts the youtube id from "${url}"`, async () => {
         setMeta('session-times', sessionTimes({
@@ -542,9 +622,16 @@ describe('session-video-player', () => {
         const el = await embedFullWidth();
 
         const iframe = el.querySelector('iframe.youtube');
-        expect(iframe.id).to.equal('session-video-player-yt-abcdefghijk');
-        expect(getIframeSrc(iframe)).to.contain('/embed/abcdefghijk');
-        expect(getIframeSrc(iframe)).to.contain('enablejsapi=1');
+        expect(iframe.id).to.match(/^player-/);
+        const src = new URL(getIframeSrc(iframe));
+        expect(src.origin).to.equal('https://www.youtube.com');
+        expect(src.pathname).to.equal('/embed/abcdefghijk');
+        expect(src.searchParams.getAll('enablejsapi')).to.deep.equal(['1']);
+        expect(src.searchParams.getAll('rel')).to.deep.equal(['0']);
+        expect(src.searchParams.getAll('videotype')).to.deep.equal(['vod']);
+        expect(src.searchParams.get('origin')).to.equal(window.location.origin);
+        expect(src.searchParams.getAll('autoplay')).to.deep.equal(['1']);
+        expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
       });
     });
 
@@ -558,6 +645,231 @@ describe('session-video-player', () => {
       const iframe = el.querySelector('iframe.youtube');
       expect(getIframeSrc(iframe)).to.equal('https://example.com/nope');
       expect(iframe.id).to.equal('');
+      expect(window._satellite.track.called).to.be.false;
+    });
+  });
+
+  describe('YouTube analytics', () => {
+    beforeEach(() => {
+      authorSession({
+        times: sessionTimes({
+          videos: [{ provider: 'youtube', url: 'https://www.youtube.com/watch?v=abcdefghijk', kind: 'onDemand' }],
+        }),
+        attrs: { mpcId: null, youTubeId: 'abcdefghijk' },
+      });
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+    });
+
+    async function mountPlayer() {
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      await init(fullWidthPlayer);
+      await flush();
+      return fullWidthPlayer;
+    }
+
+    [
+      { title: 'Session title', englishTitle: 'English title', expected: 'Session title' },
+      { title: ' ', englishTitle: ' English title ', expected: 'English title' },
+      { expected: 'YouTube video player' },
+    ].forEach(({ title, englishTitle, expected }) => {
+      it(`uses the existing page metadata title: ${expected}`, async () => {
+        if (title) setMeta('title', title);
+        if (englishTitle) setMeta('en-title', englishTitle);
+        const el = await mountPlayer();
+        expect(el.querySelector('iframe.youtube').title).to.equal(expected);
+      });
+    });
+
+    it('also registers the YouTube ID custom-attribute fallback as vod', async () => {
+      document.querySelector('meta[name="session-times"]').content = sessionTimes({ videos: [] });
+      const el = await mountPlayer();
+      const src = new URL(getIframeSrc(el.querySelector('iframe.youtube')));
+      expect(src.pathname).to.equal('/embed/abcdefghijk');
+      expect(src.searchParams.get('videotype')).to.equal('vod');
+      expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+    });
+
+    [false, true].forEach((hasPlaylist) => {
+      it(`registers only the winning player with hasPlaylist=${hasPlaylist}`, async () => {
+        BlockMediator.set(DECISION_KEY, { hasPlaylist });
+        const { fullWidthPlayer, playlistPlayer } = buildPage();
+        window._satellite.track = sinon.spy(() => {
+          const frames = document.querySelectorAll('.session-video-player iframe.youtube');
+          expect(frames).to.have.lengthOf(1);
+          expect(frames[0].isConnected).to.be.true;
+        });
+        await init(fullWidthPlayer);
+        await init(playlistPlayer);
+        await flush();
+        const winner = hasPlaylist ? playlistPlayer : fullWidthPlayer;
+        const loser = hasPlaylist ? fullWidthPlayer : playlistPlayer;
+        expect(winner.querySelector('iframe.youtube')).to.exist;
+        expect(loser.querySelector('iframe')).not.to.exist;
+        expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+      });
+    });
+
+    it('waits for the layout decision rather than registering detached markup', async () => {
+      BlockMediator.set(DECISION_KEY, null);
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      await init(fullWidthPlayer);
+      await flush();
+      expect(fullWidthPlayer.querySelector('iframe')).not.to.exist;
+      expect(window._satellite.track.called).to.be.false;
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+      await flush();
+      expect(fullWidthPlayer.querySelector('iframe.youtube')).to.exist;
+      expect(window._satellite.track.calledOnce).to.be.true;
+    });
+
+    it('registers a phase-delayed on-demand iframe once, not during simulive', async () => {
+      const now = Date.now();
+      const clock = sinon.useFakeTimers({ now });
+      document.querySelector('meta[name="session-times"]').content = sessionTimes({
+        startTimeMillis: now - HOUR_MS,
+        endTimeMillis: now + 1000,
+        videos: [{ provider: 'youtube', url: 'abcdefghijk', kind: 'onDemand' }],
+      });
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      await init(fullWidthPlayer);
+      await clock.tickAsync(0);
+      expect(fullWidthPlayer.querySelector('iframe')).not.to.exist;
+      expect(window._satellite.track.called).to.be.false;
+      await clock.tickAsync(1600);
+      const iframe = fullWidthPlayer.querySelector('iframe.youtube');
+      expect(new URL(getIframeSrc(iframe)).searchParams.get('videotype')).to.equal('vod');
+      await clock.tickAsync(5000);
+      expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+    });
+
+    it('shares unique IDs and once-only registration with event-youtube', async () => {
+      const el = await mountPlayer();
+      const sessionIframe = el.querySelector('iframe.youtube');
+      const eventPlayer = new YouTubeChat();
+      eventPlayer.config = { autoplay: 'true' };
+      eventPlayer.videoId = 'abcdefghijk';
+      const stream = eventPlayer.mountStream(document.body);
+      const eventIframe = stream.querySelector('iframe.youtube-video');
+      expect(sessionIframe.id).not.to.equal(eventIframe.id);
+      expect(eventIframe.id).to.match(/^player-/);
+      expect(window._satellite.track.callCount).to.equal(2);
+      registerYouTubeTracking(sessionIframe, 'session-video-player');
+      eventPlayer.trackVideo(sessionIframe);
+      expect(window._satellite.track.callCount).to.equal(2);
+    });
+
+    it('registers replacement iframes with a fresh ID without stacking players', async () => {
+      const el = await mountPlayer();
+      const first = el.querySelector('iframe.youtube');
+      await init(el);
+      await flush();
+      const replacement = el.querySelector('iframe.youtube');
+      expect(first.isConnected).to.be.false;
+      expect(replacement.id).not.to.equal(first.id);
+      expect(el.querySelectorAll('.milo-video')).to.have.lengthOf(1);
+      expect(window._satellite.track.callCount).to.equal(2);
+    });
+
+    it('waits for document completion, ignoring frames replaced before registration', async () => {
+      readyState.get(() => 'loading');
+      const el = await mountPlayer();
+      const first = el.querySelector('iframe.youtube');
+      await init(el);
+      await flush();
+      expect(first.isConnected).to.be.false;
+      expect(window._satellite.track.called).to.be.false;
+      readyState.get(() => 'complete');
+      document.dispatchEvent(new Event('readystatechange'));
+      document.dispatchEvent(new Event('readystatechange'));
+      expect(window._satellite.track.calledOnceWithExactly('trackYoutube')).to.be.true;
+    });
+
+    it('does not register a player removed before document completion', async () => {
+      readyState.get(() => 'loading');
+      const el = await mountPlayer();
+      el.remove();
+      readyState.get(() => 'complete');
+      document.dispatchEvent(new Event('readystatechange'));
+      expect(window._satellite.track.called).to.be.false;
+    });
+
+    ['missing', 'throwing'].forEach((failure) => {
+      it(`logs ${failure} Launch without blocking the existing YT.Player`, async () => {
+        window._satellite = failure === 'missing' ? undefined : { track: sinon.stub().throws(new Error('Launch failed')) };
+        const apiPlayer = sinon.spy(window.YT, 'Player');
+        const el = await mountPlayer();
+        const iframe = el.querySelector('iframe.youtube');
+        expect(iframe.isConnected).to.be.true;
+        expect(el.dataset.embedded).to.equal('true');
+        expect(apiPlayer.calledOnce).to.be.true;
+        expect(apiPlayer.firstCall.args[0]).to.equal(iframe.id);
+        const [message, options] = window.lana.log.firstCall.args;
+        expect(message).to.include('[session-video-player]');
+        expect(message).to.include(failure === 'missing' ? 'YouTube tracking unavailable' : 'failed to register YouTube tracking');
+        expect(options.severity).to.equal(failure === 'missing' ? 'warning' : 'error');
+      });
+    });
+
+    it('does not register MPC videos with the YouTube Launch rule', async () => {
+      document.querySelector('meta[name="session-times"]').content = sessionTimes();
+      const el = await mountPlayer();
+      expect(el.querySelector('iframe.adobetv')).to.exist;
+      expect(window._satellite.track.called).to.be.false;
+    });
+
+    it('preserves YT.Player resume, progress, and playlist state callbacks', async () => {
+      const clock = sinon.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      // Concurrent WTR tabs share localStorage; isolate this callback regression's progress.
+      let storedProgress = null;
+      const { getItem, setItem } = Storage.prototype;
+      sinon.stub(Storage.prototype, 'getItem').callsFake(function read(key) {
+        return key === PROGRESS_STORAGE_KEY ? storedProgress : getItem.call(this, key);
+      });
+      sinon.stub(Storage.prototype, 'setItem').callsFake(function write(key, value) {
+        if (key === PROGRESS_STORAGE_KEY) storedProgress = value;
+        else setItem.call(this, key, value);
+      });
+      const stateEvents = [];
+      const onState = (event) => stateEvents.push(event.detail);
+      window.addEventListener('session-video-player:state', onState);
+      let callbacks;
+      window.YT.Player = sinon.spy(function StubPlayer(id, { events }) {
+        callbacks = events;
+      });
+      const api = {
+        getDuration: () => 120,
+        getCurrentTime: sinon.stub().returns(35),
+        seekTo: sinon.spy(),
+      };
+      try {
+        saveVideoProgress('s-1', 35, 120);
+        const el = await mountPlayer();
+        expect(window.YT.Player.firstCall.args[0]).to.equal(el.querySelector('iframe.youtube').id);
+        expect(window._satellite.track.calledOnce).to.be.true;
+        callbacks.onReady({ target: api });
+        expect(api.seekTo.calledOnceWithExactly(35, true)).to.be.true;
+
+        api.getCurrentTime.returns(40);
+        callbacks.onStateChange({ data: window.YT.PlayerState.PLAYING, target: api });
+        clock.tick(5000);
+        expect(getVideoProgress('s-1').secondsWatched).to.equal(40);
+        api.getCurrentTime.returns(45);
+        callbacks.onStateChange({ data: window.YT.PlayerState.PAUSED, target: api });
+        expect(getVideoProgress('s-1').secondsWatched).to.equal(45);
+        api.getCurrentTime.returns(50);
+        clock.tick(5000);
+        expect(getVideoProgress('s-1').secondsWatched).to.equal(45);
+        callbacks.onStateChange({ data: window.YT.PlayerState.ENDED, target: api });
+        expect(getVideoProgress('s-1')).to.include({ secondsWatched: 120, completed: true });
+        expect(stateEvents).to.deep.equal([
+          { sessionId: 's-1', state: 'play' },
+          { sessionId: 's-1', state: 'pause' },
+          { sessionId: 's-1', state: 'ended' },
+        ]);
+        expect(window._satellite.track.calledOnce).to.be.true;
+      } finally {
+        window.removeEventListener('session-video-player:state', onState);
+      }
     });
   });
 

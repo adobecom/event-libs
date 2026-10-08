@@ -170,6 +170,17 @@ describe('store/reducer', () => {
     expect(next.searchQuery).to.equal('typography');
   });
 
+  it('RESET_SEARCH_AND_FILTERS clears filters and search but keeps the day and view', () => {
+    const state = {
+      ...baseState, activeFilters: { topic: new Set(['ai']) }, searchQuery: 'zzz', activeDay: 'd2', activeView: 'on-demand',
+    };
+    const next = reducer(state, { type: 'RESET_SEARCH_AND_FILTERS' });
+    expect(next.activeFilters).to.deep.equal({});
+    expect(next.searchQuery).to.equal('');
+    expect(next.activeDay).to.equal('d2');
+    expect(next.activeView).to.equal('on-demand');
+  });
+
   it('SET_MY_TAB changes mySessionsTab', () => {
     const next = reducer(baseState, { type: 'SET_MY_TAB', tab: 'on-demand' });
     expect(next.mySessionsTab).to.equal('on-demand');

@@ -535,7 +535,7 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 - Live section: `liveSessions()` filtered to `activeDay` — uses `isInLiveNow()` for MR sessions, `isSessionLive()` for non-MR
 - Featured carousel: shown when `live.length === 0`; uses `getFeaturedSessions()` which maps `featuredSessionIds` to day sessions (falls back to deterministic random shuffle keyed on `activeDay`)
 - Upcoming section: `upcomingSessions()` filtered to `activeDay`, then `filterSessions()` applied
-- Previously aired section: shown when both `timeSlots.length === 0 && live.length === 0`; shows all sessions for the day with `forceOnDemand={true}`, grouped by start time
+- Previously aired section: shown when `timeSlots.length === 0` (nothing upcoming that day); shows the day's sessions with `forceOnDemand={true}`, grouped by start time, **minus any still in the Live carousel**. It used to also require `live.length === 0`, but MR streams stay on until ops turns them off, so one lingering stream hid the whole finished day (Recommended stays gated on `live.length === 0`).
 - Empty state: "No sessions scheduled for this day."
 
 ### 3.2 My Sessions view ✅ (`MySessionsView`)
@@ -603,11 +603,25 @@ No longer a Preact component — `mountToast()` builds the toast element once vi
 - `showToast({ message, variant, ctaLabel, ctaAction, ctaHref, duration })` / `hideToast()` are the only two entry points — any block can call them directly
 - CSS is co-located at `event-libs/v1/features/toast/toast.css`, loaded the same way as the conflict modal's
 
+While the widget drawer is open, `DrawerShell` uses `containToasts()` to move the shared
+notification region into its dedicated `.sg-drawer__notifications` host. The `.sg-shell`
+owns the dialog semantics and focus trap, containing both the drawer and notification host.
+The host stays outside the transformed drawer so fixed toast positions remain viewport-relative.
+This keeps auth CTAs inside both the drawer's Tab cycle and its `aria-modal` subtree
+(MWPW-209748), without moving focus away from the triggering control. Cleanup restores the
+same region to its previous page-level mount before restoring focus. Closing/reopening or
+unmounting the drawer preserves queued notifications, timers, and listeners; full-page
+guides retain the page-level mount.
+When the last notification is dismissed, the focus trap also handles the region's
+programmatic (`tabindex="-1"`) focus so the next Tab cannot escape the drawer.
+
 ### 4.5 ICS download ✅
 `utils/ics.js` → `generateICS(sessions)` / `downloadICS(sessions, filename)`:
 - RFC 5545 compliant: `BEGIN:VCALENDAR`, `VEVENT` per session
 - `DTSTART`/`DTEND` in UTC (`Z` suffix)
-- `SUMMARY`, `DESCRIPTION` (includes speaker names), `URL`
+- `SUMMARY`, `DESCRIPTION` (includes speaker names and the individual session page link), `URL`
+- The shared widget/full-page download includes the session page link in `DESCRIPTION` for
+  Outlook, which does not display the `URL` property. `URL` is retained for Apple Calendar.
 - Line folding at 75 octets per RFC 5545 §3.1
 - Triggered by `DownloadButton` in My Sessions view header (only shown when `activeView === 'my-sessions'`)
 

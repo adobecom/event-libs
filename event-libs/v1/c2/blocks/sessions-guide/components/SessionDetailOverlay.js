@@ -21,7 +21,7 @@ import { fetchFederalProductIcon, fetchFederalTrackIcon } from '../../../../feat
 import { getProduct } from '../../../../utils/tier-1-event-config.js';
 import { resolveTrackBadge, resolveNamedTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
-import { scrollBehavior } from '../utils/motion.js';
+import { scrollPageToTop } from '../utils/motion.js';
 import { logError } from '../../../../utils/lana-log.js';
 
 // Collapsed list-pod lengths (Figma products 1325:141847, speakers 1325:141990).
@@ -92,14 +92,17 @@ export function SessionDetailOverlay({ onBack }) {
   const showScheduleCta = !showWatch && schedulingEnabled;
 
   function handleWatch(e) {
+    const destination = safeUrl(getWatchDestination(session, sessionState));
     // Already on the destination page — close the widget and ask it to switch instead of
     // reloading the page out from under the player.
-    if (isLive && isSamePage(watchHref)) {
+    if (isLive && isSamePage(destination)) {
       e.preventDefault();
       requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
-      window.scrollTo({ top: 0, behavior: scrollBehavior() });
+      scrollPageToTop();
+    } else if (destination) {
+      e.currentTarget.href = destination;
     }
   }
 
