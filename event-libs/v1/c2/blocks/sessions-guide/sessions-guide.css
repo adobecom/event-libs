@@ -641,28 +641,35 @@
 
 /* ── CTA Button ──────────────────────────────────────────── */
 
+/* Figma "FAB / Arrow=Yes" (node 7676:247711): 243×52 pill, calendar icon left, decorative
+   arrow circle right. The arrow is part of the single open-guide CTA, not a separate control. */
 .sg-cta-btn {
   position: fixed;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px 38px;
+  gap: 0;
+  height: 52px;
+  padding: 0 9px 0 27px;
   background: rgb(255 255 255 / 80%);
-  backdrop-filter: blur(2px);
+
+  /* Approximates Figma's GLASS effect (refraction/dispersion have no CSS equivalent). */
+  backdrop-filter: blur(12px) saturate(1.4);
   border: 1px solid #e9e9e9;
-  border-radius: 25px;
+  border-radius: 100px;
   font-family: var(--body-font-family);
-  font-weight: var(--s2a-font-weight-adobe-clean-extrabold);
-  font-size: 18px;
-  letter-spacing: -0.54px;
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-size: 16px;
+  letter-spacing: -0.48px;
   line-height: 0.98;
   color: #000;
   cursor: pointer;
   white-space: nowrap;
   box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 60%),
     0 0 2px rgb(0 0 0 / 12%),
     0 2px 6px rgb(0 0 0 / 4%),
     0 4px 12px rgb(0 0 0 / 8%);
@@ -670,6 +677,36 @@
 
   /* The delay rides out the player's brief collapse when a session switch remounts it. */
   transition: opacity 200ms ease 100ms, visibility 0s 100ms;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .sg-cta-btn {
+    background: rgb(255 255 255 / 92%);
+  }
+}
+
+.sg-cta-btn > svg {
+  flex-shrink: 0;
+}
+
+/* Figma's fixed 122px text box, so the arrow's position doesn't shift with font metrics. */
+.sg-cta-btn__label {
+  min-width: 122px;
+}
+
+.sg-cta-btn__arrow {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin-left: 32px;
+  background: rgb(0 0 0 / 4%);
+  border: 1px solid rgb(0 0 0 / 8%);
+  border-radius: 100px;
+  color: #292929;
 }
 
 /* Hidden (and out of the tab order) while it would cover a video player's controls;

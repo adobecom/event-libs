@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { executeServerCommand } from '@web/test-runner-commands';
 import { resolveSessionGuideRequest, DrawerShell } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerShell.js';
 import { DrawerHeader } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
+import { IconArrowUpS2 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/icons.js';
 import { buildInitialState, SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import { auth, sessionsStatus } from '../../../../../../event-libs/v1/utils/session-store.js';
 
@@ -128,6 +129,95 @@ describe('DrawerShell FAB placement', () => {
         expect(frame.contentWindow.innerHeight - bounds.bottom).to.equal(24);
         expect(bounds.left + bounds.width / 2).to.equal(width / 2);
       });
+    });
+  });
+});
+
+describe('DrawerShell FAB design (Figma FAB / Arrow=Yes)', () => {
+  let frame;
+  let previousAuth;
+  let previousStatus;
+
+  // The string html mock drops nested components, so the arrow glyph is filled in by hand
+  // (same as DrawerHeader in the collapsed-visibility test below).
+  function renderClosedShell(target) {
+    const state = buildInitialState({});
+    state.drawerState = 'hidden';
+    SessionGuideContext._current = { state, dispatch: () => {} };
+    target.innerHTML = DrawerShell();
+    target.querySelector('.sg-cta-btn__arrow').innerHTML = IconArrowUpS2();
+    return target.querySelector('.sg-cta-btn');
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    previousAuth = auth.value;
+    previousStatus = sessionsStatus.value;
+    auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+    sessionsStatus.value = 'loading';
+  });
+
+  afterEach(() => {
+    frame?.remove();
+    frame = null;
+    auth.value = previousAuth;
+    sessionsStatus.value = previousStatus;
+    SessionGuideContext._current = null;
+  });
+
+  it('renders calendar icon, label, then a decorative arrow inside one CTA button', () => {
+    const cta = renderClosedShell(document.createElement('div'));
+    const children = [...cta.children];
+
+    expect(children.map((el) => [el.tagName.toLowerCase(), el.getAttribute('class')].filter(Boolean).join('.')))
+      .to.deep.equal(['svg', 'span.sg-cta-btn__label', 'span.sg-cta-btn__arrow']);
+    expect(children[0].getAttribute('aria-hidden')).to.equal('true');
+    expect(cta.querySelector('.sg-cta-btn__arrow').getAttribute('aria-hidden')).to.equal('true');
+    expect(cta.textContent.trim()).to.equal('View all sessions');
+    expect(cta.getAttribute('daa-ll')).to.equal('Session-Guide-Open');
+    // The arrow is part of the CTA, not a second control.
+    expect(cta.querySelectorAll('button, a, [tabindex]')).to.have.length(0);
+  });
+
+  [375, 1440].forEach((width) => {
+    it(`matches the Figma geometry at ${width}px`, async () => {
+      frame = document.createElement('iframe');
+      frame.style.cssText = `border:0;width:${width}px;height:844px`;
+      await new Promise((resolve, reject) => {
+        frame.onload = resolve;
+        frame.onerror = reject;
+        frame.src = '/test/unit/c2/blocks/sessions-guide/mocks/fab-placement.html';
+        document.body.appendChild(frame);
+      });
+      const doc = frame.contentDocument;
+      const cta = renderClosedShell(doc.querySelector('.sg-portal'));
+      const pill = cta.getBoundingClientRect();
+      const rel = (el) => {
+        const box = el.getBoundingClientRect();
+        return { x: box.left - pill.left, y: box.top - pill.top, w: box.width, h: box.height };
+      };
+      const icon = rel(cta.querySelector(':scope > svg'));
+      const label = rel(cta.querySelector('.sg-cta-btn__label'));
+      const arrow = rel(cta.querySelector('.sg-cta-btn__arrow'));
+      const glyph = rel(cta.querySelector('.sg-cta-btn__arrow svg'));
+      const style = frame.contentWindow.getComputedStyle(cta);
+
+      expect(pill.height).to.equal(52);
+      expect(style.borderRadius).to.equal('100px');
+      expect(style.fontSize).to.equal('16px');
+      expect(style.letterSpacing).to.equal('-0.48px');
+      expect(icon).to.deep.equal({ x: 28, y: 16, w: 20, h: 20 });
+      expect(label.x).to.equal(48);
+      expect(label.w).to.be.at.least(122);
+      expect(arrow.x - (label.x + label.w)).to.equal(32);
+      expect(arrow.y).to.equal(10);
+      expect(arrow.w).to.equal(32);
+      expect(arrow.h).to.equal(32);
+      expect(pill.width - (arrow.x + arrow.w)).to.equal(10);
+      expect(glyph).to.deep.equal({ x: arrow.x + 8, y: 18, w: 16, h: 16 });
+      expect(pill.left + pill.width / 2).to.equal(width / 2);
+      expect(frame.contentWindow.innerHeight - pill.bottom).to.equal(24);
     });
   });
 });
