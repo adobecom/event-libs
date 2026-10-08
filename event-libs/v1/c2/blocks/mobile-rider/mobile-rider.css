@@ -253,16 +253,6 @@
   .mobile-rider .mobile-rider-info-bar-title {
     font-size: var(--s2a-font-size-md);
   }
-
-  .mobile-rider .mobile-rider-info-bar {
-    padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-xl);
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1024px) {
-  .mobile-rider .mobile-rider-info-bar {
-    padding: var(--s2a-spacing-lg) 88px var(--s2a-spacing-xl);
-  }
 }
 
 .mobile-rider .mobile-rider-container.is-hidden {
