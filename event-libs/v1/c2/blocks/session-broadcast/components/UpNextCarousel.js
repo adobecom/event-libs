@@ -4,7 +4,7 @@ import { SessionCard } from '../../sessions-guide/components/SessionCard.js';
 import { openSessionDetail } from '../utils/broadcast-analytics.js';
 
 // SessionCard, not LiveCard, matches Figma's "no image" card. timeDisplay="range" gives
-// start–end formatting ("9:15AM - 9:45AM") instead of duration.
+// start–end formatting ("9:15am–9:45am") instead of duration.
 export function UpNextCarousel({ sessions, title = 'Upcoming' }) {
   if (!sessions || !sessions.length) return null;
 

@@ -34,13 +34,13 @@ export function SessionCard({
   const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
 
-  // 'range': session-broadcast's Upcoming section (e.g. "9:15AM - 9:45AM"), reusing the same
-  // start–end formatting LiveCard.js builds for its recommended variant.
+  // 'range': session-broadcast's Upcoming section (e.g. "9:15am–9:45am"), matching the
+  // unspaced en dash LiveCard.js and the homepage cards use.
   let upcomingTimeLabel;
   if (timeDisplay === 'range' && session.endTimeUtc) {
     const startShort = formatShortTime(session.startTimeUtc, userTz);
     const endShort = formatShortTime(session.endTimeUtc, userTz);
-    upcomingTimeLabel = `${startShort} - ${endShort}`;
+    upcomingTimeLabel = `${startShort}–${endShort}`;
   } else if (timeDisplay === 'duration' && session.endTimeUtc) {
     upcomingTimeLabel = formatDuration(session.startTimeUtc, session.endTimeUtc);
   } else {

@@ -191,7 +191,8 @@ describe('SessionCard', () => {
     store.SessionGuideContext._current = makeCtx();
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: UPCOMING_SESSION, timeDisplay: 'range' });
-    expect(html).to.match(/\d+(:\d+)?\s*(AM|PM)\s*-\s*\d+(:\d+)?\s*(AM|PM)/i);
+    expect(html).to.match(/\d+(:\d+)?\s*(AM|PM)–\d+(:\d+)?\s*(AM|PM)/i);
+    expect(html).to.not.match(/(AM|PM)\s+[-–]\s+\d/i);
   });
 
   it('tags the card daa-ll as Session-Card-Navigate on the page surface', () => {
