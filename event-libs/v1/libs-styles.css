@@ -186,3 +186,13 @@ a.con-button.no-event {
 main > .section.nav-offset {
   padding-block-start: var(--global-height-nav, 80px);
 }
+
+.section.stretch,
+.section.stretch-left {
+  padding-left: 0;
+}
+
+.section.stretch,
+.section.stretch-right {
+  padding-right: 0;
+}
