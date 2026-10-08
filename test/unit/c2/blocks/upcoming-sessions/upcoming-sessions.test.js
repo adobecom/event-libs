@@ -927,6 +927,101 @@ describe('upcoming-sessions', () => {
 
       expect(el.classList.contains('dark-card')).to.equal(true);
     });
+
+    describe('late section styling', () => {
+      let styles;
+      let originalViewport;
+      let noMotion;
+
+      before(async () => {
+        originalViewport = { width: window.innerWidth, height: window.innerHeight };
+        styles = await Promise.all(['upcoming-sessions', 'sessions-guide'].map(async (name) => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = `/event-libs/v1/c2/blocks/${name}/${name}.css`;
+          await new Promise((resolve, reject) => {
+            link.onload = resolve;
+            link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+            document.head.append(link);
+          });
+          return link;
+        }));
+        noMotion = document.createElement('style');
+        noMotion.textContent = '.upcoming-sessions *, .upcoming-sessions *::after { transition: none !important; }';
+        document.head.append(noMotion);
+      });
+
+      after(() => {
+        styles.forEach((link) => link.remove());
+        noMotion.remove();
+      });
+
+      afterEach(async () => {
+        await setViewport(originalViewport);
+      });
+
+      function themeStyles(el) {
+        const selectors = [
+          '.upcoming-sessions-heading', '.upcoming-sessions-arrow', '.sg-card',
+          '.sg-card__title', '.sg-card__track', '.sg-card__time', '.sg-card__description',
+          '.sg-category-badge', '.sg-category-badge__icon-color',
+        ];
+        const properties = ['color', 'backgroundColor', 'borderTopColor', 'outlineColor', 'backdropFilter', 'gap'];
+        return [
+          ...selectors.map((selector) => getComputedStyle(el.querySelector(selector))),
+          getComputedStyle(el.querySelector('.sg-card__actions'), '::after'),
+        ].map((style) => properties.map((property) => style[property]));
+      }
+
+      [375, 1024, 1440].forEach((width) => {
+        it(`matches explicit dark-card styling when the section becomes dark after rendering at ${width}px`, async () => {
+          await setViewport({ width, height: 900 });
+          const el = buildBlock([session({ description: 'Session description' })]);
+          const section = el.closest('.section');
+          const wrapper = document.createElement('div');
+          wrapper.className = 'event-marquee-upcoming-wrapper';
+          section.prepend(wrapper);
+          wrapper.append(el);
+          await init(el);
+
+          const lightStyles = themeStyles(el);
+          el.classList.add('dark-card');
+          const darkStyles = themeStyles(el);
+          expect(darkStyles).not.to.deep.equal(lightStyles);
+
+          el.classList.remove('dark-card');
+          section.classList.add('dark');
+          expect(el.classList.contains('dark-card')).to.equal(false);
+          expect(themeStyles(el)).to.deep.equal(darkStyles);
+
+          const card = el.querySelector('.sg-card');
+          const scheduleButton = el.querySelector('.sg-card__btn--schedule');
+          for (const state of ['focus', 'scheduled', 'favorited']) {
+            if (state === 'focus') scheduleButton.focus();
+            if (state === 'scheduled') scheduled.value = new Set(['session-1']);
+            if (state === 'favorited') favorited.value = new Set(['session-1']);
+            const inheritedStyles = themeStyles(el);
+            section.classList.remove('dark');
+            el.classList.add('dark-card');
+            expect(themeStyles(el), state).to.deep.equal(inheritedStyles);
+            el.classList.remove('dark-card');
+            section.classList.add('dark');
+            scheduleButton.blur();
+          }
+
+          card.focus();
+          const focusedStyles = themeStyles(el);
+          section.classList.remove('dark');
+          el.classList.add('dark-card');
+          expect(themeStyles(el)).to.deep.equal(focusedStyles);
+          el.classList.remove('dark-card');
+          card.blur();
+          scheduled.value = new Set();
+          favorited.value = new Set();
+          expect(themeStyles(el)).to.deep.equal(lightStyles);
+        });
+      });
+    });
   });
 
   describe('resolveClickAction', () => {
