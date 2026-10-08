@@ -16,9 +16,10 @@ let dialogEl = null;
 // Must match the page's own modal module: each one registers a page-wide hashchange handler
 // on import, so loading the classic one on a C2 page opens every modal link twice and leaks a
 // scroll lock on close (MWPW-210384).
+const isC2Page = () => getMetadata('foundation') === 'c2';
+
 export function getMiloModalPath(miloLibs) {
-  const dir = getMetadata('foundation') === 'c2' ? 'c2/blocks' : 'blocks';
-  return `${miloLibs}/${dir}/modal/modal.js`;
+  return `${miloLibs}/${isC2Page() ? 'c2/blocks' : 'blocks'}/modal/modal.js`;
 }
 
 async function getMiloModal() {
@@ -105,6 +106,7 @@ export async function showConflictModal(data) {
   loadStyle(new URL('./conflict-modal.css', import.meta.url).href);
   const { getModal } = await getMiloModal();
   const content = buildContent(data, () => hideConflictModal());
+  content.classList.toggle('sg-conflict-modal--c2', isC2Page());
   dialogEl = await getModal(null, { id: 'sg-conflict-modal', content });
 }
 

@@ -1,9 +1,8 @@
 import { openSessionGuideDetail } from '../../../../utils/session-store.js';
 import { logError } from '../../../../utils/lana-log.js';
 
-// Same payload as Milo's blocks/modal/modal.js sendAnalytics, inlined because importing that
-// module registers a second hashchange modal handler on C2 pages: modal links then open twice
-// and closing one leaves the other's scroll lock behind (MWPW-210384).
+// Milo's classic modal.js sendAnalytics payload, inlined: importing that module on a C2 page
+// doubles every modal link and leaks a scroll lock on close (MWPW-210384).
 function fireAnalyticsEvent(name) {
   // eslint-disable-next-line no-underscore-dangle
   window._satellite?.track('event', {
@@ -12,7 +11,7 @@ function fireAnalyticsEvent(name) {
   });
 }
 
-export async function trackBroadcastEvent(name) {
+export function trackBroadcastEvent(name) {
   try {
     // eslint-disable-next-line no-underscore-dangle
     if (window._satellite?.track) {

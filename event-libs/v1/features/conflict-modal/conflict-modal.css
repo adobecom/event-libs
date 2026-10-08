@@ -13,7 +13,7 @@
 
 /* The C2 modal pins its 12px close button 48px in, onto the title line; this keeps the
    icon in the top-right corner where the classic modal placed it, clear of the title. */
-#sg-conflict-modal .dialog-close {
+#sg-conflict-modal:has(> .sg-conflict-modal--c2) .dialog-close {
   top: 13px;
   right: 13px;
 }

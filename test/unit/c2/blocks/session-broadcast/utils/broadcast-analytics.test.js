@@ -54,20 +54,20 @@ describe('broadcast-analytics', () => {
       window._satellite = originalSatellite;
     });
 
-    it('sends the same payload shape as Milo modal.js sendAnalytics', async () => {
+    it('sends the same payload shape as Milo modal.js sendAnalytics', () => {
       // eslint-disable-next-line no-underscore-dangle
       window._satellite = { track: (...args) => calls.push(args) };
-      await trackBroadcastEvent('Broadcast-Page-View | direct');
+      trackBroadcastEvent('Broadcast-Page-View | direct');
       expect(calls).to.deep.equal([['event', {
         xdm: {},
         data: { web: { webInteraction: { name: 'Broadcast-Page-View | direct' } } },
       }]]);
     });
 
-    it('waits for alloy_sendEvent when Launch is not ready yet', async () => {
+    it('waits for alloy_sendEvent when Launch is not ready yet', () => {
       // eslint-disable-next-line no-underscore-dangle
       window._satellite = undefined;
-      await trackBroadcastEvent('Broadcast-Play-Start | s-1');
+      trackBroadcastEvent('Broadcast-Play-Start | s-1');
       expect(calls).to.have.length(0);
 
       // eslint-disable-next-line no-underscore-dangle
@@ -80,24 +80,18 @@ describe('broadcast-analytics', () => {
 
     // Regression (MWPW-210384): Milo's classic modal.js registers a page-wide hashchange
     // handler on import, which doubled every modal on C2 pages and leaked a scroll lock.
-    it('never loads Milo\'s classic modal module', async () => {
+    it('never loads Milo\'s classic modal module', () => {
       // eslint-disable-next-line no-underscore-dangle
       window._satellite = { track: () => {} };
-      await trackBroadcastEvent('Test-Event');
+      trackBroadcastEvent('Test-Event');
       const loaded = performance.getEntriesByType('resource').map((e) => e.name);
       expect(loaded.some((n) => n.includes('/blocks/modal/modal.js'))).to.be.false;
     });
 
-    it('never throws, even if tracking fails', async () => {
+    it('never throws, even if tracking fails', () => {
       // eslint-disable-next-line no-underscore-dangle
       window._satellite = { track: () => { throw new Error('boom'); } };
-      let threw = false;
-      try {
-        await trackBroadcastEvent('Test-Event');
-      } catch {
-        threw = true;
-      }
-      expect(threw).to.be.false;
+      expect(() => trackBroadcastEvent('Test-Event')).to.not.throw();
     });
   });
 });
