@@ -9,6 +9,13 @@
   body:has(#feds-menu-wrapper.is-open) .in-person-banner {
     display: none;
   }
+
+  /* MWPW-210352: UNav flags `unav-no-scroll` on <body> while its Account/notification surfaces
+     are open. Hide (not remove) the fixed nav-overlay banner so the bell/header row isn't
+     crowded by banner text; `visibility` keeps the header's banner-height offset intact. */
+  body.unav-no-scroll .in-person-banner.in-person-banner-nav-overlay {
+    visibility: hidden;
+  }
 }
 
 body:has(.in-person-banner) main > .section:first-child:not(.rounded-corners-top):not(.rounded-corners) {
