@@ -331,6 +331,54 @@ describe('Agenda Module', () => {
       const result = formatTimeRange({}, null, null, 'en-US');
       expect(result).to.equal('');
     });
+
+    describe('time-format metadata', () => {
+      beforeEach(() => { document.head.innerHTML = ''; });
+      after(() => { document.head.innerHTML = ''; });
+
+      it('24h metadata renders a 24h range with the suffix once at the end', () => {
+        setMetadata('time-format', '24h');
+        setMetadata('time-suffix', 'Uhr');
+        const result = formatTimeRange({ startTime: '13:00:00', endTime: '14:45:00' }, null, null, 'de-DE');
+        expect(result).to.equal('13:00 \u2013 14:45 Uhr');
+      });
+
+      it('24h metadata applies to en-US locales too', () => {
+        setMetadata('time-format', '24h');
+        const result = formatTimeRange({ startTime: '09:00:00', endTime: '17:00:00' }, null, null, 'en-US');
+        expect(result).to.equal('09:00 \u2013 17:00');
+      });
+
+      it('24h metadata bypasses the fr-FR locale formatter', () => {
+        setMetadata('time-format', '24h');
+        const result = formatTimeRange({ startTime: '13:30:00' }, null, null, 'fr-FR');
+        expect(result).to.not.contain('h30');
+        expect(result).to.contain('13:30');
+      });
+
+      it('single time gets the suffix after it', () => {
+        setMetadata('time-format', '24h');
+        setMetadata('time-suffix', 'Uhr');
+        expect(formatTimeRange({ startTime: '13:00:00' }, null, null, 'de-DE')).to.equal('13:00 Uhr');
+      });
+
+      it('suffix is ignored without time-format=24h', () => {
+        setMetadata('time-suffix', 'Uhr');
+        expect(formatTimeRange({ startTime: '09:00:00', endTime: '17:00:00' }, null, null, 'en-US')).to.equal('9:00 AM \u2013 5:00 PM');
+      });
+
+      it('midnight renders as 00:xx', () => {
+        setMetadata('time-format', '24h');
+        expect(formatTimeRange({ startTime: '00:15:00' }, null, null, 'en-US')).to.equal('00:15');
+      });
+
+      it('does not leak the 24h state after metadata is removed', () => {
+        setMetadata('time-format', '24h');
+        formatTimeRange({ startTime: '13:00:00' }, null, null, 'en-US');
+        document.head.innerHTML = '';
+        expect(formatTimeRange({ startTime: '13:00:00' }, null, null, 'en-US')).to.equal('1:00 PM');
+      });
+    });
   });
 
   describe('collapsible variant', () => {
