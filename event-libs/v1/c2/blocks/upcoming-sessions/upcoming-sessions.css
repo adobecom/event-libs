@@ -50,7 +50,8 @@
 .upcoming-sessions-heading {
   margin: 0;
   font-size: var(--s2a-font-size-lg, 18px);
-  letter-spacing: var(--s2a-font-letter-spacing-5xl, -0.2px);
+  line-height: var(--s2a-typography-line-height-title-6, 18px);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-6, -0.2px);
   hanging-punctuation: first last;
   color: var(--s2a-color-gray-1000, #000);
 }
