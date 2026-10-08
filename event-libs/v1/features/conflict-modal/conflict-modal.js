@@ -1,6 +1,6 @@
 import { signal } from '../../deps/htm-preact.js';
 import {
-  createTag, loadStyle, LIBS, getEventConfig,
+  createTag, loadStyle, LIBS, getEventConfig, getMetadata,
 } from '../../utils/utils.js';
 import { formatDuration } from '../../utils/date-time-helper.js';
 
@@ -13,9 +13,17 @@ export const conflict = signal(null);
 
 let dialogEl = null;
 
+// Must match the page's own modal module: each one registers a page-wide hashchange handler
+// on import, so loading the classic one on a C2 page opens every modal link twice and leaks a
+// scroll lock on close (MWPW-210384).
+export function getMiloModalPath(miloLibs) {
+  const dir = getMetadata('foundation') === 'c2' ? 'c2/blocks' : 'blocks';
+  return `${miloLibs}/${dir}/modal/modal.js`;
+}
+
 async function getMiloModal() {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
-  return import(`${miloLibs}/blocks/modal/modal.js`);
+  return import(getMiloModalPath(miloLibs));
 }
 
 function buildOption(name, value, session, onSelect) {

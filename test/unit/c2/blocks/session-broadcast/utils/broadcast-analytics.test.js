@@ -40,12 +40,64 @@ describe('broadcast-analytics', () => {
   });
 
   describe('trackBroadcastEvent', () => {
-    // No mocked sendAnalytics exists at test time — the dynamic import of Milo's modal.js
-    // rejects (network access is restricted to localhost in this harness), which the
-    // function swallows and logs via window.lana?.log. This only guards the call contract:
-    // it never throws synchronously regardless of how the async import resolves.
-    it('never throws synchronously, even though the analytics import will fail under test', () => {
-      expect(() => trackBroadcastEvent('Test-Event')).to.not.throw();
+    let calls;
+    let originalSatellite;
+
+    beforeEach(() => {
+      calls = [];
+      // eslint-disable-next-line no-underscore-dangle
+      originalSatellite = window._satellite;
+    });
+
+    afterEach(() => {
+      // eslint-disable-next-line no-underscore-dangle
+      window._satellite = originalSatellite;
+    });
+
+    it('sends the same payload shape as Milo modal.js sendAnalytics', async () => {
+      // eslint-disable-next-line no-underscore-dangle
+      window._satellite = { track: (...args) => calls.push(args) };
+      await trackBroadcastEvent('Broadcast-Page-View | direct');
+      expect(calls).to.deep.equal([['event', {
+        xdm: {},
+        data: { web: { webInteraction: { name: 'Broadcast-Page-View | direct' } } },
+      }]]);
+    });
+
+    it('waits for alloy_sendEvent when Launch is not ready yet', async () => {
+      // eslint-disable-next-line no-underscore-dangle
+      window._satellite = undefined;
+      await trackBroadcastEvent('Broadcast-Play-Start | s-1');
+      expect(calls).to.have.length(0);
+
+      // eslint-disable-next-line no-underscore-dangle
+      window._satellite = { track: (...args) => calls.push(args) };
+      window.dispatchEvent(new Event('alloy_sendEvent'));
+      window.dispatchEvent(new Event('alloy_sendEvent'));
+      expect(calls).to.have.length(1);
+      expect(calls[0][1].data.web.webInteraction.name).to.equal('Broadcast-Play-Start | s-1');
+    });
+
+    // Regression (MWPW-210384): Milo's classic modal.js registers a page-wide hashchange
+    // handler on import, which doubled every modal on C2 pages and leaked a scroll lock.
+    it('never loads Milo\'s classic modal module', async () => {
+      // eslint-disable-next-line no-underscore-dangle
+      window._satellite = { track: () => {} };
+      await trackBroadcastEvent('Test-Event');
+      const loaded = performance.getEntriesByType('resource').map((e) => e.name);
+      expect(loaded.some((n) => n.includes('/blocks/modal/modal.js'))).to.be.false;
+    });
+
+    it('never throws, even if tracking fails', async () => {
+      // eslint-disable-next-line no-underscore-dangle
+      window._satellite = { track: () => { throw new Error('boom'); } };
+      let threw = false;
+      try {
+        await trackBroadcastEvent('Test-Event');
+      } catch {
+        threw = true;
+      }
+      expect(threw).to.be.false;
     });
   });
 });
