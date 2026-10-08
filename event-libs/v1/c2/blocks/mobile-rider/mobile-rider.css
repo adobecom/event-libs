@@ -230,8 +230,6 @@
 
 .mobile-rider .mobile-rider-info-bar-more {
   grid-area: more;
-
-  /* Hidden until the info bar is expanded (same reveal as the full description below). */
   display: none;
   justify-self: start;
   margin-bottom: var(--s2a-spacing-md);
