@@ -92,11 +92,13 @@ Per §8 of the design doc, this block can overlay on the immediately preceding b
 the same section, but only if that block opts in via an `attach-upcoming` class
 (`attachToPrecedingBlock`).
 
+The attached carousel extends to the right edge of its full-width marquee wrapper
+at every breakpoint, including viewports wider than 2300px. At 1920px and above,
+its left padding is `max(220px, (100vw - 1920px) / 2)`, preserving alignment with
+the marquee's capped foreground without capping the carousel itself.
+
 ## CSS notes (`upcoming-sessions.css`)
 
-- Container sections with a direct `.upcoming-sessions` child remove their right
-  padding so the carousel can reach the section edge. Left and authored vertical
-  padding remain unchanged; other container sections are unaffected.
 - Design tokens come from `milo/libs/c2/styles/styles.css` (the C2 foundation
   stylesheet, guaranteed loaded whenever this block's `foundation: c2` metadata is
   present) rather than `c2/styles/tokens.css`, which isn't guaranteed present on a
