@@ -116,7 +116,7 @@ export function SessionDetailOverlay({ onBack }) {
   const endShort = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = showWatch && !endShort
     ? formatSessionTime(session.startTimeUtc, userTz)
-    : [startShort, endShort].filter(Boolean).join(' – ');
+    : [startShort, endShort].filter(Boolean).join('–');
 
   async function handleSchedule(e) {
     e.stopPropagation();

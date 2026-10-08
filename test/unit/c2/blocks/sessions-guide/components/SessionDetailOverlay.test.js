@@ -352,6 +352,19 @@ describe('SessionDetailOverlay', () => {
     });
   });
 
+  describe('time range', () => {
+    it('joins start and end with an unspaced en dash', () => {
+      const out = render({
+        startTimeUtc: '2026-11-10T17:30:00.000Z',
+        endTimeUtc: '2026-11-10T17:45:00.000Z',
+      });
+      const template = document.createElement('template');
+      template.innerHTML = out;
+      expect(template.content.querySelector('.sg-detail__time').textContent)
+        .to.equal('9:30am–9:45am');
+    });
+  });
+
   describe('primary CTA', () => {
     it('offers Add to schedule for an upcoming session', () => {
       const out = render();
