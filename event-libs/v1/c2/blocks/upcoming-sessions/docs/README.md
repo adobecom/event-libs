@@ -92,6 +92,11 @@ Per §8 of the design doc, this block can overlay on the immediately preceding b
 the same section, but only if that block opts in via an `attach-upcoming` class
 (`attachToPrecedingBlock`).
 
+The attached carousel extends to the right edge of its full-width marquee wrapper
+at every breakpoint, including viewports wider than 2300px. At 1920px and above,
+its left padding is `max(220px, (100vw - 1920px) / 2)`, preserving alignment with
+the marquee's capped foreground without capping the carousel itself.
+
 ## CSS notes (`upcoming-sessions.css`)
 
 - Container sections with a direct `.upcoming-sessions` child remove their right
