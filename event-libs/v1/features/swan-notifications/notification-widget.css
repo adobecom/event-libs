@@ -18,6 +18,13 @@
   z-index: 4;
 }
 
+/* MWPW-210352: while UNav's Account menu (or another UNav surface) is open it flags
+   `unav-no-scroll` on <body>. Drop the lift so the bell stays beneath the menu overlay
+   instead of rendering over the in-person banner. */
+body.unav-no-scroll .swan-notif {
+  z-index: auto;
+}
+
 .swan-notif__bell {
   position: relative;
   display: inline-flex;
