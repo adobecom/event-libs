@@ -230,7 +230,7 @@
 
 .mobile-rider .mobile-rider-info-bar-more {
   grid-area: more;
-  display: block;
+  display: none;
   justify-self: start;
   margin-bottom: var(--s2a-spacing-md);
   border: none;
@@ -243,19 +243,13 @@
   cursor: pointer;
 }
 
+.mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-more {
+  display: block;
+}
+
 @media (max-width: 767px) {
   .mobile-rider .mobile-rider-info-bar-title {
     font-size: var(--s2a-font-size-md);
-  }
-
-  .mobile-rider .mobile-rider-info-bar {
-    padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-xl);
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1024px) {
-  .mobile-rider .mobile-rider-info-bar {
-    padding: var(--s2a-spacing-lg) 88px var(--s2a-spacing-xl);
   }
 }
 
