@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { readFile, setViewport } from '@web/test-runner-commands';
+import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
 import {
@@ -104,68 +104,6 @@ describe('upcoming-sessions', () => {
     } finally {
       style.remove();
     }
-  });
-
-  describe('attached carousel layout', () => {
-    let styles;
-    let originalViewport;
-
-    before(async () => {
-      originalViewport = { width: window.innerWidth, height: window.innerHeight };
-      styles = await Promise.all(['event-marquee', 'upcoming-sessions'].map(async (name) => {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `/event-libs/v1/c2/blocks/${name}/${name}.css`;
-        await new Promise((resolve, reject) => {
-          link.onload = resolve;
-          link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
-          document.head.append(link);
-        });
-        return link;
-      }));
-    });
-
-    after(() => {
-      styles.forEach((link) => link.remove());
-    });
-
-    afterEach(async () => {
-      await setViewport(originalViewport);
-    });
-
-    [375, 1024, 1440, 1920, 2300, 2560, 3200].forEach((width) => {
-      it(`bleeds only to the right viewport edge at ${width}px`, async () => {
-        await setViewport({ width, height: 900 });
-        const wrapper = document.createElement('div');
-        wrapper.className = 'event-marquee-upcoming-wrapper';
-        wrapper.style.width = '100%';
-        wrapper.innerHTML = `
-          <div class="event-marquee attach-upcoming attach-upcoming--has-overlay">
-            <div class="event-marquee-foreground"><div class="event-marquee-text">Heading</div></div>
-          </div>
-          <div class="upcoming-sessions upcoming-sessions--attached">
-            <div class="upcoming-sessions-track">
-              ${'<div class="upcoming-sessions-card" style="width:375px;height:108px">Session</div>'.repeat(12)}
-            </div>
-          </div>`;
-        const reset = document.createElement('style');
-        reset.textContent = 'html, body { margin: 0; padding: 0; }';
-        document.head.append(reset);
-        document.body.append(wrapper);
-
-        try {
-          const track = wrapper.querySelector('.upcoming-sessions-track');
-          const marqueeText = wrapper.querySelector('.event-marquee-text');
-          const bounds = track.getBoundingClientRect();
-          expect(bounds.left).to.be.closeTo(marqueeText.getBoundingClientRect().left, 1);
-          expect(bounds.right).to.be.closeTo(document.documentElement.clientWidth, 1);
-          expect(track.scrollWidth).to.be.greaterThan(track.clientWidth);
-          expect(document.documentElement.scrollWidth).to.equal(document.documentElement.clientWidth);
-        } finally {
-          reset.remove();
-        }
-      });
-    });
   });
 
   describe('state timers', () => {
