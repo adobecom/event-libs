@@ -41,10 +41,14 @@ export function LiveUpcomingView() {
   const upcoming = filterSessions(upcomingRaw, activeFilters, searchQuery);
   const timeSlots = groupByStartTime(upcoming);
 
-  // Shown when nothing is upcoming or live; on-demand-only sessions are excluded (On Demand owns them).
-  const previouslyAiredRaw = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
-  const previouslyAiredSlots = (timeSlots.length === 0 && live.length === 0)
-    ? groupByStartTime(filterSessions(previouslyAiredRaw, activeFilters, searchQuery))
+  // Once nothing is upcoming; live sessions (MR streams stay on until ops stops them) stay in the Live carousel.
+  const previouslyAiredSlots = timeSlots.length === 0
+    ? (() => {
+      const liveIds = new Set(live.map((s) => s.id));
+      const previouslyAiredRaw = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz))
+        .filter((s) => !liveIds.has(s.id));
+      return groupByStartTime(filterSessions(previouslyAiredRaw, activeFilters, searchQuery));
+    })()
     : [];
 
   // Live/Recommended ignore search + filters, but hide along with everything else on zero results.

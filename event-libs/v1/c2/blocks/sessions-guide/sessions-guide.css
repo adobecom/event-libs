@@ -207,6 +207,11 @@
   z-index: 50;
 }
 
+/* Off-screen positioning alone can expose the sticky header on iOS (MWPW-208862). */
+.sg-drawer[inert] {
+  opacity: 0;
+}
+
 /* Clip rounded corners without clipping dropdown panels */
 .sg-drawer::before {
   content: '';
@@ -1783,6 +1788,28 @@
   .sg-right-controls {
     width: auto;
     gap: var(--s2a-spacing-md);
+    margin-left: auto;
+  }
+
+  /* Post-event (no date tabs): title shares the controls' row, 6/12 columns on tablet. */
+  .sg-header.sg-header--no-dates {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(max-content, 6fr);
+    column-gap: 72px;
+    align-items: center;
+  }
+
+  .sg-header.sg-header--no-dates .sg-header-title-row {
+    padding-right: 0;
+  }
+
+  .sg-header.sg-header--no-dates .sg-header-controls {
+    padding-left: 0;
+  }
+
+  /* Drawer only: controls now share the close button's row; clear its 16px inset + 19px width. */
+  .sg-drawer .sg-header--no-dates .sg-header-controls {
+    padding-right: calc(35px + var(--s2a-spacing-md));
   }
 
   .sg-view-dropdown-wrap {
@@ -1922,6 +1949,27 @@
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .sg-carousel-section .sg-carousel { row-gap: 20px; }
+}
+
+/* Tablet, no date tabs, search open: flatten the controls wrapper so the search row gets its own
+   full-width grid row below the title and controls, whatever the title's height. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sg-header--no-dates:has(.sg-mobile-search-row--open) :is(.sg-header-controls-collapse, .sg-header-controls-collapse-inner) {
+    display: contents;
+  }
+
+  .sg-header.sg-header--no-dates:has(.sg-mobile-search-row--open) {
+    row-gap: var(--s2a-spacing-lg);
+  }
+
+  .sg-header--no-dates .sg-mobile-search-row {
+    grid-column: 1 / -1;
+  }
+
+  /* The flattened wrapper can't collapse, so hide its contents while a session detail is open. */
+  .sg-drawer--detail-open .sg-header--no-dates:has(.sg-mobile-search-row--open) :is(.sg-header-controls, .sg-mobile-search-row) {
+    display: none;
+  }
 }
 
 /* ── Intermediate Tablet (1024px–1279px) — desktop-style live section ─────── */
@@ -2311,6 +2359,10 @@
     gap: var(--s2a-spacing-md);
   }
 
+  .sg-header.sg-header--no-dates {
+    grid-template-columns: minmax(0, 8fr) minmax(max-content, 4fr);
+  }
+
   /* Full page (Figma 8463:87660): wider side gutter than the widget's drawer, and a shorter
      top padding (xl, not 2xl) — this frame covers desktop only, big desktop (1920) is separate. */
   .sg-full-page__header-wrap .sg-header {
@@ -2520,8 +2572,10 @@
     padding: var(--s2a-spacing-lg) var(--s2a-spacing-20) var(--s2a-spacing-sm);
   }
 
-  /* Full page (Figma 8463:87648): wider side gutter than the widget's drawer. */
-  .sg-full-page .sg-upcoming-title {
+  /* Full page (Figma 8463:87648): wider side gutter than the widget's drawer. The My Sessions /
+     My Favorites tab bar shares it so the tabs line up with the header (MWPW-210088). */
+  .sg-full-page .sg-upcoming-title,
+  .sg-full-page .sg-my-sessions-tab-bar {
     padding-left: 156px;
     padding-right: 156px;
   }
@@ -3380,7 +3434,8 @@
     right: calc(160px - 20px);
   }
 
-  .sg-full-page .sg-upcoming-title {
+  .sg-full-page .sg-upcoming-title,
+  .sg-full-page .sg-my-sessions-tab-bar {
     padding-left: 160px;
     padding-right: 160px;
   }

@@ -56,10 +56,16 @@ the browser can't coalesce both style writes into one paint and skip the visible
 
 ## Re-render / scroll preservation
 
-Live/favorite/schedule updates rebuild every card from scratch (`renderTrack` — state is
-derived fresh per render, not diffed), but the track's `scrollLeft` is captured and
-restored across that rebuild so a background update (e.g. a session going live) doesn't
-yank a mid-browse user back to the start of the carousel.
+Favorite/schedule/pending updates patch each existing card in place (`syncCardState` —
+toggles `is-scheduled`/`is-favorited`/`is-pending` and the buttons' icon, label,
+`aria-pressed`, `daa-ll`, and `disabled`) instead of rebuilding the track. Rebuilding
+dropped the hovered/focused card's `:hover`/`:focus-within`, so it would snap back to its
+resting width and then re-expand once the browser re-evaluated hover. The click handlers
+read the current state at click time, so a patched card never acts on stale state.
+
+A full rebuild (`renderTrack`) only happens on initial render and when the tab becomes
+visible again; it captures and restores the track's `scrollLeft` so it doesn't yank a
+mid-browse user back to the start of the carousel.
 
 ## `?serverTime=<epoch-ms>` override
 
@@ -85,11 +91,6 @@ listener (`el._upcomingSessionsCleanup`) before building new ones.
 Per §8 of the design doc, this block can overlay on the immediately preceding block in
 the same section, but only if that block opts in via an `attach-upcoming` class
 (`attachToPrecedingBlock`).
-
-The attached carousel extends to the right edge of its full-width marquee wrapper
-at every breakpoint, including viewports wider than 2300px. At 1920px and above,
-its left padding is `max(220px, (100vw - 1920px) / 2)`, preserving alignment with
-the marquee's capped foreground without capping the carousel itself.
 
 ## CSS notes (`upcoming-sessions.css`)
 
@@ -128,6 +129,19 @@ the marquee's capped foreground without capping the carousel itself.
      card width) is revealed via `:is(:hover, :focus-within)` or `.is-scheduled`/
      `.is-favorited`, hidden (`width: 0; opacity: 0; pointer-events: none;`)
      otherwise — see MWPW-207701.
+- Desktop card geometry (`@media (min-width: 1280px)`): the card keeps a uniform 24px
+  inset on every side in every state. The card has `gap: 0`; `.sg-card__body` flexes
+  (`flex: 1 1 0`) and the 24px between body and buttons is the actions column's own
+  `padding-left`, so the column goes from `0` to `56px` (24px + 32px buttons) while the
+  card goes from 375px to 431px — the body width (and title wrapping) never changes.
+  The actions rules repeat `.upcoming-sessions-card` to outrank sessions-guide.css's
+  unscoped `.sg-card.is-scheduled:not(.sg-card--on-demand) .sg-card__actions`, which ties
+  on specificity and loads later on pages with the Session Guide widget.
+- Desktop track height: `.upcoming-sessions-track` reserves the expanded card height
+  (`--upcoming-sessions-card-height-expanded`, 150px) and centers cards in it, with a
+  negative `margin-block` cancelling that reservation at rest. A card expanding on
+  hover/focus therefore never changes the track height, so the bottom-anchored attached
+  carousel no longer pushes its heading and arrows up.
 - The dark surface variant is authored as `dark-card` (not `dark`) deliberately —
   `dark` is a reserved global Milo class that paints a solid dark background site-wide,
   which would collide with this block's own local "dark card surface" meaning. There's no

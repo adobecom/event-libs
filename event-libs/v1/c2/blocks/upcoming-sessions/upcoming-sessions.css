@@ -35,7 +35,9 @@
 
 @media (min-width: 1920px) {
   .upcoming-sessions--attached {
-    padding-left: max(220px, (100vw - 1920px) / 2);
+    max-width: 1920px;
+    margin-inline: auto;
+    padding-left: max(0px, 220px - (100vw - 1920px) / 2);
   }
 }
 
@@ -50,12 +52,14 @@
 .upcoming-sessions-heading {
   margin: 0;
   font-size: var(--s2a-font-size-lg, 18px);
-  letter-spacing: var(--s2a-font-letter-spacing-5xl, -0.2px);
+  line-height: var(--s2a-typography-line-height-title-6, 18px);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-6, -0.2px);
   hanging-punctuation: first last;
   color: var(--s2a-color-gray-1000, #000);
 }
 
-.upcoming-sessions.dark-card .upcoming-sessions-heading {
+.upcoming-sessions.dark-card .upcoming-sessions-heading,
+.section.dark .upcoming-sessions .upcoming-sessions-heading {
   color: var(--s2a-color-gray-25, #fff);
 }
 
@@ -312,7 +316,10 @@
 
 .upcoming-sessions.dark-card .sg-card,
 .upcoming-sessions.dark-card .sg-card.is-scheduled,
-.upcoming-sessions.dark-card .sg-card.is-favorited {
+.upcoming-sessions.dark-card .sg-card.is-favorited,
+.section.dark .upcoming-sessions .sg-card,
+.section.dark .upcoming-sessions .sg-card.is-scheduled,
+.section.dark .upcoming-sessions .sg-card.is-favorited {
   background: rgb(10 10 10 / 50%);
   border: 1px solid #505050;
   box-shadow: none;
@@ -322,7 +329,9 @@
   backdrop-filter: blur(var(--s2a-blur-sm, 16px));
 }
 
-.upcoming-sessions.dark-card .sg-card:hover {
+/* stylelint-disable no-descending-specificity */
+.upcoming-sessions.dark-card .sg-card:hover,
+.section.dark .upcoming-sessions .sg-card:hover {
   background: #131313;
   border-color: #505050;
   box-shadow: none;
@@ -331,27 +340,33 @@
   backdrop-filter: none;
 }
 
-.upcoming-sessions.dark-card .sg-card:focus-visible {
+.upcoming-sessions.dark-card .sg-card:focus-visible,
+.section.dark .upcoming-sessions .sg-card:focus-visible {
   outline-color: var(--s2a-color-gray-25, #fff);
 }
 
-/* stylelint-disable no-descending-specificity */
 .upcoming-sessions.dark-card .sg-card__time,
-.upcoming-sessions.dark-card .sg-card__actions::after {
+.upcoming-sessions.dark-card .sg-card__actions::after,
+.section.dark .upcoming-sessions .sg-card__time,
+.section.dark .upcoming-sessions .sg-card__actions::after {
   color: #afafaf;
 }
 
 .upcoming-sessions.dark-card .sg-card__title,
-.upcoming-sessions.dark-card .sg-card__track {
+.upcoming-sessions.dark-card .sg-card__track,
+.section.dark .upcoming-sessions .sg-card__title,
+.section.dark .upcoming-sessions .sg-card__track {
   color: #f2f2f2;
 }
 
-.upcoming-sessions.dark-card .sg-category-badge {
+.upcoming-sessions.dark-card .sg-category-badge,
+.section.dark .upcoming-sessions .sg-category-badge {
   color: #f2f2f2;
   gap: var(--s2a-spacing-2xs, 4px);
 }
 
-.upcoming-sessions.dark-card .sg-card__description {
+.upcoming-sessions.dark-card .sg-card__description,
+.section.dark .upcoming-sessions .sg-card__description {
   color: #afafaf;
 }
 
@@ -365,16 +380,21 @@
  * breakpoint.
  */
 .upcoming-sessions.dark-card .sg-card:is(:hover, :focus-within) .sg-card__title,
-.upcoming-sessions.dark-card .sg-card:is(:hover, :focus-within) .sg-card__track {
+.upcoming-sessions.dark-card .sg-card:is(:hover, :focus-within) .sg-card__track,
+.section.dark .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__title,
+.section.dark .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__track {
   color: #f2f2f2;
 }
 
 .upcoming-sessions.dark-card .sg-card:is(:hover, :focus-within) .sg-card__time,
-.upcoming-sessions.dark-card .sg-card:is(:hover, :focus-within) .sg-card__actions::after {
+.upcoming-sessions.dark-card .sg-card:is(:hover, :focus-within) .sg-card__actions::after,
+.section.dark .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__time,
+.section.dark .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__actions::after {
   color: #afafaf;
 }
 
-.upcoming-sessions.dark-card .sg-card:is(:hover, :focus-within) .sg-category-badge {
+.upcoming-sessions.dark-card .sg-card:is(:hover, :focus-within) .sg-category-badge,
+.section.dark .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-category-badge {
   color: #f2f2f2;
 }
 /* stylelint-enable no-descending-specificity */
@@ -392,19 +412,41 @@
     display: none;
   }
 
+  /*
+   * The track reserves the expanded card height up front and centers cards in it, so a card
+   * growing on hover/focus never changes the track's height. Without this the attached
+   * (bottom-anchored) carousel grows upward and shoves the heading and arrows around. The
+   * negative margin cancels the reserved space at rest so resting spacing is unchanged.
+   */
+  .upcoming-sessions {
+    --upcoming-sessions-card-height: 128px;
+    --upcoming-sessions-card-height-expanded: 150px;
+  }
+
+  .upcoming-sessions-track {
+    min-height: calc(var(--upcoming-sessions-card-height-expanded) + 2 * var(--s2a-spacing-xs, 8px));
+    margin-block: calc((var(--upcoming-sessions-card-height) - var(--upcoming-sessions-card-height-expanded)) / 2);
+  }
+
+  /*
+   * Uniform 24px padding: the body flexes to fill whatever the actions column leaves, and the
+   * 24px between body and actions lives on the actions column's padding-left (not the card's
+   * gap), so it collapses to 0 with the column at rest. Card width and actions width change by
+   * the same 56px over the same transition, so the body (and the title's wrapping) never moves.
+   */
   .upcoming-sessions .sg-card {
     flex-direction: row;
     align-items: stretch;
     width: 375px;
-    min-height: 128px;
+    min-height: var(--upcoming-sessions-card-height);
     padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-lg, 24px);
+    gap: 0;
     border: var(--s2a-border-width-sm, 1px) solid transparent;
   }
 
   .upcoming-sessions .sg-card:is(:hover, :focus-within) {
     width: 431px;
-    min-height: 149px;
+    min-height: var(--upcoming-sessions-card-height-expanded);
     background: #262626;
     border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -418,7 +460,7 @@
 
   .upcoming-sessions .sg-card.is-scheduled:is(:hover, :focus-within),
   .upcoming-sessions .sg-card.is-favorited:is(:hover, :focus-within) {
-    min-height: 149px;
+    min-height: var(--upcoming-sessions-card-height-expanded);
     background: #262626;
     border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -426,8 +468,9 @@
   }
 
   .upcoming-sessions .sg-card__body {
-    flex: none;
-    width: 327px;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
     gap: var(--s2a-spacing-md, 16px);
   }
 
@@ -495,20 +538,30 @@
   .upcoming-sessions .sg-card__actions {
     flex-direction: column;
     width: 0;
+    padding-left: 0;
     gap: var(--s2a-spacing-md, 16px);
     margin-top: 0;
     opacity: 0;
     pointer-events: none;
     align-items: center;
     justify-content: flex-start;
-    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                padding-left 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  /*
+   * .upcoming-sessions-card is repeated to outrank sessions-guide.css's unscoped
+   * `.sg-card.is-scheduled:not(.sg-card--on-demand) .sg-card__actions` (same 0,4,0 specificity,
+   * loaded later on pages with the Session Guide widget), which otherwise wins only for
+   * scheduled cards and swaps in its own 48px width / 16px padding.
+   */
   /* stylelint-disable-next-line no-descending-specificity */
-  .upcoming-sessions .sg-card:is(:hover, :focus-within) .sg-card__actions,
-  .upcoming-sessions .sg-card.is-scheduled .sg-card__actions,
-  .upcoming-sessions .sg-card.is-favorited .sg-card__actions {
-    width: var(--s2a-spacing-xl, 32px);
+  .upcoming-sessions .upcoming-sessions-card.sg-card:is(:hover, :focus-within) .sg-card__actions,
+  .upcoming-sessions .upcoming-sessions-card.sg-card.is-scheduled .sg-card__actions,
+  .upcoming-sessions .upcoming-sessions-card.sg-card.is-favorited .sg-card__actions {
+    width: calc(var(--s2a-spacing-xl, 32px) + var(--s2a-spacing-lg, 24px));
+    padding-left: var(--s2a-spacing-lg, 24px);
     opacity: 1;
     pointer-events: auto;
   }
@@ -520,13 +573,17 @@
   /* stylelint-disable no-descending-specificity */
   .upcoming-sessions.dark-card .sg-card,
   .upcoming-sessions.dark-card .sg-card.is-scheduled,
-  .upcoming-sessions.dark-card .sg-card.is-favorited {
+  .upcoming-sessions.dark-card .sg-card.is-favorited,
+  .section.dark .upcoming-sessions .sg-card,
+  .section.dark .upcoming-sessions .sg-card.is-scheduled,
+  .section.dark .upcoming-sessions .sg-card.is-favorited {
     background: rgb(10 10 10 / 35%);
     border: 1px solid #505050;
     backdrop-filter: blur(var(--s2a-blur-sm, 16px));
   }
 
-  .upcoming-sessions.dark-card .sg-card:hover {
+  .upcoming-sessions.dark-card .sg-card:hover,
+  .section.dark .upcoming-sessions .sg-card:hover {
     background: #131313;
     border-color: #505050;
     backdrop-filter: none;
@@ -535,16 +592,21 @@
 
   /* stylelint-disable no-descending-specificity */
   .upcoming-sessions.dark-card .sg-card__time,
-  .upcoming-sessions.dark-card .sg-card__actions::after {
+  .upcoming-sessions.dark-card .sg-card__actions::after,
+  .section.dark .upcoming-sessions .sg-card__time,
+  .section.dark .upcoming-sessions .sg-card__actions::after {
     color: rgb(255 255 255 / 64%);
   }
 
   .upcoming-sessions.dark-card .sg-card__title,
-  .upcoming-sessions.dark-card .sg-card__track {
+  .upcoming-sessions.dark-card .sg-card__track,
+  .section.dark .upcoming-sessions .sg-card__title,
+  .section.dark .upcoming-sessions .sg-card__track {
     color: var(--s2a-color-gray-25, #fff);
   }
 
-  .upcoming-sessions.dark-card .sg-category-badge {
+  .upcoming-sessions.dark-card .sg-category-badge,
+  .section.dark .upcoming-sessions .sg-category-badge {
     color: var(--s2a-color-gray-25, #fff);
   }
   /* stylelint-enable no-descending-specificity */
@@ -660,6 +722,7 @@
   color: currentcolor;
 }
 
-.upcoming-sessions.dark-card .sg-category-badge__icon-color {
+.upcoming-sessions.dark-card .sg-category-badge__icon-color,
+.section.dark .upcoming-sessions .sg-category-badge__icon-color {
   color: var(--s2a-color-gray-25, #fff);
 }

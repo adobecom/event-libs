@@ -8,6 +8,43 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ---
 
+## Collapsed widget visibility
+
+The widget stays mounted while closed, preserving its view and scroll state.
+`inert` prevents interaction but does not visually hide content, and moving the
+drawer to `top: 100vh` is not a sufficient visibility guarantee on real iOS
+browsers with changing viewport geometry (MWPW-208862). The closed drawer now
+has zero opacity, masking the entire subtree, including its sticky heading and
+any descendants with their own visibility rules. This prevents the unregistered
+"Find more inspiration" heading from leaking over the host page or a full-page
+Session Guide.
+
+The opacity change is delayed until the existing 450ms closing slide ends;
+the layout effect sets the transition before paint so closing does not snap
+invisible before the delay is applied. Opening clears that delay before sliding
+in. Reduced-motion users hide the drawer immediately. Peek and expanded states,
+header layout, dropdown overflow,
+and the separate "View all sessions" FAB are unchanged. Regression coverage
+forces the closed drawer into visible viewport coordinates to verify hiding
+does not depend on viewport height, at mobile, tablet, and desktop widths.
+An isolated iframe loads the actual Preact bundle via an import map for
+open/close/reopen and reduced-motion coverage, rather than relying on the
+unit suite's no-op effect mocks. The `real-preact=true` test-runner query opt-out
+serves the real bundle without changing the default mock used by the other tests.
+Real iPhone 16 Pro Chrome verification remains necessary for the device-only
+symptom, including scrolling with browser controls expanded and collapsed.
+
+## Session detail title wrapping
+
+The shared detail-overlay title uses `text-wrap: balance` at every breakpoint
+(MWPW-208944), matching the individual session page's title treatment
+(MWPW-208937). This evens out multiline titles within the existing summary column,
+including at the reported 1572px viewport, without changing font sizes, column
+widths, spacing, or session copy. Browsers without support retain normal wrapping.
+The layout regression fixture checks computed styles and overflow across mobile,
+tablet, and desktop widths, and compares actual line widths against normal
+wrapping at 1572px.
+
 ## Mobile Safari FAB placement
 
 The Session Guide FAB uses a 24px bottom offset on Mobile Safari (MWPW-208776),
@@ -296,6 +333,32 @@ content is taller and scrolls.
 ---
 
 ## Deep linking
+
+### Server time across Watch navigation
+
+`getWatchDestination()` carries the current page's non-empty `serverTime` override to
+homepage, broadcast, and on-demand Watch destinations (MWPW-209738). The guide's live
+cards, detail overlay, and individual session-page Watch now CTA share this routing.
+The propagated value is the current simulated instant from `getNowMs()`, including
+elapsed time since the source page loaded. The destination resumes there rather
+than rewinding to the original override. Guide Watch controls and the session-page
+CTA refresh their destination at click time, not only when rendered.
+
+Destination query parameters and fragments remain intact, including Broadcast's
+`watch=<session-id>`. Only `serverTime` is copied from the source page, not drawer,
+filter, or campaign parameters. A source override replaces a stale destination
+override with the current simulated instant. Pages without a non-empty override
+keep their existing Watch URLs.
+Opening or closing the guide stays on the current page and already preserves the
+override; Broadcast's removal of `watch` also leaves `serverTime` intact.
+
+Authored featured-card homepage and broadcast destinations use the same URL
+builder. Same-page homepage anchor actions still scroll without navigation.
+SWAN FEDS notifications also use shared Watch routing; URLs persisted during a
+`serverTime` QA session retain that simulated timestamp until those notifications
+are cleared or replaced.
+
+### Session detail links
 
 `?session=` carries the last path segment of the session's own page url, which the catalog has
 already slugified from `enTitle` + `sessionCode`

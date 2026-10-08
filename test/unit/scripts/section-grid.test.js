@@ -18,6 +18,41 @@ describe('section grid layout (CSS)', () => {
   const top = (id) => document.getElementById(id).getBoundingClientRect().top;
   const left = (id) => document.getElementById(id).getBoundingClientRect().left;
 
+  ['ltr', 'rtl'].forEach((direction) => {
+    ['', 'container-desktop'].forEach((container) => {
+      ['stretch', 'stretch-left', 'stretch-right', 'stretch-left stretch-right'].forEach((variant) => {
+        it(`removes only the requested section padding for ${variant} (${container || 'plain'}, ${direction})`, () => {
+          document.head.insertAdjacentHTML('afterbegin', `
+            <style>.section, #non-section { padding: 12px 32px 20px 24px; }</style>
+          `);
+          document.body.innerHTML = `
+            <main dir="${direction}" style="width: 1400px">
+              <div class="section ${container}" id="baseline"></div>
+              <div class="section ${container} ${variant}" id="stretched"></div>
+              <div class="${variant}" id="non-section"></div>
+            </main>
+          `;
+
+          const baseline = getComputedStyle(document.getElementById('baseline'));
+          const stretched = getComputedStyle(document.getElementById('stretched'));
+          const classes = variant.split(' ');
+          const removesLeft = classes.includes('stretch') || classes.includes('stretch-left');
+          const removesRight = classes.includes('stretch') || classes.includes('stretch-right');
+
+          expect(parseFloat(baseline.paddingLeft)).to.be.greaterThan(0);
+          expect(parseFloat(baseline.paddingRight)).to.be.greaterThan(0);
+          expect(stretched.paddingLeft).to.equal(removesLeft ? '0px' : baseline.paddingLeft);
+          expect(stretched.paddingRight).to.equal(removesRight ? '0px' : baseline.paddingRight);
+          expect(stretched.paddingTop).to.equal(baseline.paddingTop);
+          expect(stretched.paddingBottom).to.equal(baseline.paddingBottom);
+          const nonSection = getComputedStyle(document.getElementById('non-section'));
+          expect(nonSection.paddingLeft).to.equal('24px');
+          expect(nonSection.paddingRight).to.equal('32px');
+        });
+      });
+    });
+  });
+
   it('stacks each column independently, not coupled to the other column\'s row count', () => {
     document.body.innerHTML = `
       <main>

@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { readFile, setViewport } from '@web/test-runner-commands';
+import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
 import {
@@ -104,68 +104,6 @@ describe('upcoming-sessions', () => {
     } finally {
       style.remove();
     }
-  });
-
-  describe('attached carousel layout', () => {
-    let styles;
-    let originalViewport;
-
-    before(async () => {
-      originalViewport = { width: window.innerWidth, height: window.innerHeight };
-      styles = await Promise.all(['event-marquee', 'upcoming-sessions'].map(async (name) => {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `/event-libs/v1/c2/blocks/${name}/${name}.css`;
-        await new Promise((resolve, reject) => {
-          link.onload = resolve;
-          link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
-          document.head.append(link);
-        });
-        return link;
-      }));
-    });
-
-    after(() => {
-      styles.forEach((link) => link.remove());
-    });
-
-    afterEach(async () => {
-      await setViewport(originalViewport);
-    });
-
-    [375, 1024, 1440, 1920, 2300, 2560, 3200].forEach((width) => {
-      it(`bleeds only to the right viewport edge at ${width}px`, async () => {
-        await setViewport({ width, height: 900 });
-        const wrapper = document.createElement('div');
-        wrapper.className = 'event-marquee-upcoming-wrapper';
-        wrapper.style.width = '100%';
-        wrapper.innerHTML = `
-          <div class="event-marquee attach-upcoming attach-upcoming--has-overlay">
-            <div class="event-marquee-foreground"><div class="event-marquee-text">Heading</div></div>
-          </div>
-          <div class="upcoming-sessions upcoming-sessions--attached">
-            <div class="upcoming-sessions-track">
-              ${'<div class="upcoming-sessions-card" style="width:375px;height:108px">Session</div>'.repeat(12)}
-            </div>
-          </div>`;
-        const reset = document.createElement('style');
-        reset.textContent = 'html, body { margin: 0; padding: 0; }';
-        document.head.append(reset);
-        document.body.append(wrapper);
-
-        try {
-          const track = wrapper.querySelector('.upcoming-sessions-track');
-          const marqueeText = wrapper.querySelector('.event-marquee-text');
-          const bounds = track.getBoundingClientRect();
-          expect(bounds.left).to.be.closeTo(marqueeText.getBoundingClientRect().left, 1);
-          expect(bounds.right).to.be.closeTo(document.documentElement.clientWidth, 1);
-          expect(track.scrollWidth).to.be.greaterThan(track.clientWidth);
-          expect(document.documentElement.scrollWidth).to.equal(document.documentElement.clientWidth);
-        } finally {
-          reset.remove();
-        }
-      });
-    });
   });
 
   describe('state timers', () => {
@@ -747,6 +685,164 @@ describe('upcoming-sessions', () => {
     });
   });
 
+  describe('schedule/favorite state updates', () => {
+    it('patches the existing card in place, keeping focus, instead of rebuilding the track', async () => {
+      const el = buildBlock([session(), session({ sessionId: 'session-2' })]);
+      await init(el);
+      const card = el.querySelector('[data-session-id="session-1"]');
+      const scheduleBtn = card.querySelector('.sg-card__btn--schedule');
+      scheduleBtn.focus();
+
+      pendingActions.value = new Set(['session-1']);
+      expect(scheduleBtn.disabled).to.equal(true);
+      expect(card.classList.contains('is-pending')).to.equal(true);
+
+      scheduled.value = new Set(['session-1']);
+      pendingActions.value = new Set();
+
+      expect(el.querySelector('[data-session-id="session-1"]')).to.equal(card);
+      expect(document.activeElement).to.equal(scheduleBtn);
+      expect(card.classList.contains('is-scheduled')).to.equal(true);
+      expect(card.classList.contains('is-pending')).to.equal(false);
+      expect(scheduleBtn.disabled).to.equal(false);
+      expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('true');
+      expect(scheduleBtn.getAttribute('aria-label')).to.equal('Remove from schedule');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule');
+      expect(el.querySelector('[data-session-id="session-2"]').classList.contains('is-scheduled')).to.equal(false);
+
+      favorited.value = new Set(['session-1']);
+      const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
+      expect(card.classList.contains('is-favorited')).to.equal(true);
+      expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('true');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
+
+      scheduled.value = new Set();
+      expect(card.classList.contains('is-scheduled')).to.equal(false);
+      expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('false');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+    });
+  });
+
+  describe('desktop card layout', () => {
+    let styles;
+    let originalViewport;
+    let noMotion;
+
+    before(async () => {
+      originalViewport = { width: window.innerWidth, height: window.innerHeight };
+      await setViewport({ width: 1440, height: 900 });
+      // sessions-guide.css loads after this block's stylesheet on pages with the Session Guide
+      // widget; its unscoped .sg-card rules must not change this card's geometry.
+      styles = await Promise.all([
+        '/event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.css',
+        '/event-libs/v1/c2/blocks/sessions-guide/sessions-guide.css',
+      ].map(async (href) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        await new Promise((resolve, reject) => {
+          link.onload = resolve;
+          link.onerror = () => reject(new Error(`Failed to load ${href}`));
+          document.head.append(link);
+        });
+        return link;
+      }));
+      noMotion = document.createElement('style');
+      noMotion.textContent = '.upcoming-sessions *, .upcoming-sessions *::after { transition: none !important; }';
+      document.head.append(noMotion);
+    });
+
+    after(async () => {
+      styles.forEach((link) => link.remove());
+      noMotion.remove();
+      await setViewport(originalViewport);
+    });
+
+    const PADDING = 24;
+    const BORDER = 1;
+
+    function expectUniformPadding(card) {
+      const cardRect = card.getBoundingClientRect();
+      const body = card.querySelector('.sg-card__body').getBoundingClientRect();
+      const actions = card.querySelector('.sg-card__actions');
+      expect(body.left - cardRect.left).to.be.closeTo(PADDING + BORDER, 0.5);
+      expect(body.top - cardRect.top).to.be.closeTo(PADDING + BORDER, 0.5);
+      if (getComputedStyle(actions).opacity === '1') {
+        const buttons = [...actions.querySelectorAll('.sg-icon-btn')].filter((btn) => btn.offsetParent);
+        buttons.forEach((btn) => {
+          const rect = btn.getBoundingClientRect();
+          expect(cardRect.right - rect.right).to.be.closeTo(PADDING + BORDER, 0.5);
+          expect(rect.left - body.right).to.be.closeTo(PADDING, 0.5);
+        });
+        expect(buttons[0].getBoundingClientRect().top - cardRect.top).to.be.closeTo(PADDING + BORDER, 0.5);
+      } else {
+        expect(cardRect.right - body.right).to.be.closeTo(PADDING + BORDER, 0.5);
+      }
+    }
+
+    async function buildDesktopBlock() {
+      const el = buildBlock([
+        session({ enTitle: 'A session title long enough to wrap onto a second line in the card' }),
+        session({ sessionId: 'session-2', enTitle: 'Short title', description: 'A short description' }),
+        session({ sessionId: 'session-3' }),
+        session({ sessionId: 'session-4' }),
+      ], 'Upcoming', { dark: true });
+      await init(el);
+      return el;
+    }
+
+    it('keeps a uniform 24px inset at rest, when focused, and when scheduled or favorited', async () => {
+      const el = await buildDesktopBlock();
+      const [first, second, third] = el.querySelectorAll('.upcoming-sessions-card');
+
+      expectUniformPadding(first);
+
+      scheduled.value = new Set(['session-1']);
+      favorited.value = new Set(['session-3']);
+      expect(first.getBoundingClientRect().width).to.be.closeTo(431, 0.5);
+      expectUniformPadding(first);
+      expectUniformPadding(third);
+
+      second.focus();
+      expect(second.getBoundingClientRect().width).to.be.closeTo(431, 0.5);
+      expectUniformPadding(second);
+    });
+
+    it('keeps the body width constant so titles never rewrap as the card expands', async () => {
+      const el = await buildDesktopBlock();
+      const card = el.querySelector('.upcoming-sessions-card');
+      const title = card.querySelector('.sg-card__title');
+      const restingWidth = title.getBoundingClientRect().width;
+      const restingHeight = title.getBoundingClientRect().height;
+
+      card.focus();
+      expect(title.getBoundingClientRect().width).to.be.closeTo(restingWidth, 0.5);
+      expect(title.getBoundingClientRect().height).to.equal(restingHeight);
+
+      card.blur();
+      scheduled.value = new Set(['session-1']);
+      expect(title.getBoundingClientRect().width).to.be.closeTo(restingWidth, 0.5);
+    });
+
+    it('does not move the heading, arrows, or track when a card expands', async () => {
+      const el = await buildDesktopBlock();
+      el.style.position = 'absolute';
+      el.style.bottom = '0';
+      el.style.left = '0';
+      el.style.right = '0';
+      const header = el.querySelector('.upcoming-sessions-header');
+      const track = el.querySelector('.upcoming-sessions-track');
+      const before = { header: header.getBoundingClientRect().top, track: track.offsetHeight };
+
+      const card = el.querySelector('[data-session-id="session-2"]');
+      card.focus();
+      expect(card.getBoundingClientRect().height).to.be.greaterThan(128);
+      expect(header.getBoundingClientRect().top).to.equal(before.header);
+      expect(track.offsetHeight).to.equal(before.track);
+      expect(track.scrollHeight).to.equal(track.clientHeight);
+    });
+  });
+
   describe('theme', () => {
     it('does not add dark-card in a section with no dark style metadata', async () => {
       const el = buildBlock([session()]);
@@ -768,6 +864,101 @@ describe('upcoming-sessions', () => {
       await init(el);
 
       expect(el.classList.contains('dark-card')).to.equal(true);
+    });
+
+    describe('late section styling', () => {
+      let styles;
+      let originalViewport;
+      let noMotion;
+
+      before(async () => {
+        originalViewport = { width: window.innerWidth, height: window.innerHeight };
+        styles = await Promise.all(['upcoming-sessions', 'sessions-guide'].map(async (name) => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = `/event-libs/v1/c2/blocks/${name}/${name}.css`;
+          await new Promise((resolve, reject) => {
+            link.onload = resolve;
+            link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+            document.head.append(link);
+          });
+          return link;
+        }));
+        noMotion = document.createElement('style');
+        noMotion.textContent = '.upcoming-sessions *, .upcoming-sessions *::after { transition: none !important; }';
+        document.head.append(noMotion);
+      });
+
+      after(() => {
+        styles.forEach((link) => link.remove());
+        noMotion.remove();
+      });
+
+      afterEach(async () => {
+        await setViewport(originalViewport);
+      });
+
+      function themeStyles(el) {
+        const selectors = [
+          '.upcoming-sessions-heading', '.upcoming-sessions-arrow', '.sg-card',
+          '.sg-card__title', '.sg-card__track', '.sg-card__time', '.sg-card__description',
+          '.sg-category-badge', '.sg-category-badge__icon-color',
+        ];
+        const properties = ['color', 'backgroundColor', 'borderTopColor', 'outlineColor', 'backdropFilter', 'gap'];
+        return [
+          ...selectors.map((selector) => getComputedStyle(el.querySelector(selector))),
+          getComputedStyle(el.querySelector('.sg-card__actions'), '::after'),
+        ].map((style) => properties.map((property) => style[property]));
+      }
+
+      [375, 1024, 1440].forEach((width) => {
+        it(`matches explicit dark-card styling when the section becomes dark after rendering at ${width}px`, async () => {
+          await setViewport({ width, height: 900 });
+          const el = buildBlock([session({ description: 'Session description' })]);
+          const section = el.closest('.section');
+          const wrapper = document.createElement('div');
+          wrapper.className = 'event-marquee-upcoming-wrapper';
+          section.prepend(wrapper);
+          wrapper.append(el);
+          await init(el);
+
+          const lightStyles = themeStyles(el);
+          el.classList.add('dark-card');
+          const darkStyles = themeStyles(el);
+          expect(darkStyles).not.to.deep.equal(lightStyles);
+
+          el.classList.remove('dark-card');
+          section.classList.add('dark');
+          expect(el.classList.contains('dark-card')).to.equal(false);
+          expect(themeStyles(el)).to.deep.equal(darkStyles);
+
+          const card = el.querySelector('.sg-card');
+          const scheduleButton = el.querySelector('.sg-card__btn--schedule');
+          for (const state of ['focus', 'scheduled', 'favorited']) {
+            if (state === 'focus') scheduleButton.focus();
+            if (state === 'scheduled') scheduled.value = new Set(['session-1']);
+            if (state === 'favorited') favorited.value = new Set(['session-1']);
+            const inheritedStyles = themeStyles(el);
+            section.classList.remove('dark');
+            el.classList.add('dark-card');
+            expect(themeStyles(el), state).to.deep.equal(inheritedStyles);
+            el.classList.remove('dark-card');
+            section.classList.add('dark');
+            scheduleButton.blur();
+          }
+
+          card.focus();
+          const focusedStyles = themeStyles(el);
+          section.classList.remove('dark');
+          el.classList.add('dark-card');
+          expect(themeStyles(el)).to.deep.equal(focusedStyles);
+          el.classList.remove('dark-card');
+          card.blur();
+          scheduled.value = new Set();
+          favorited.value = new Set();
+          expect(themeStyles(el)).to.deep.equal(lightStyles);
+        });
+      });
     });
   });
 

@@ -1,4 +1,6 @@
-import { html, useEffect, useRef, useState } from '../../../../deps/htm-preact.js';
+import {
+  html, useEffect, useLayoutEffect, useRef, useState,
+} from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions, sessionsStatus, auth, sessionGuideRequest,
@@ -16,6 +18,7 @@ import { prefersReducedMotion } from '../utils/motion.js';
 import { isSafariMobile } from '../utils/browser.js';
 import { usePlayerOverlap } from '../utils/use-player-overlap.js';
 import { logWarning } from '../../../../utils/lana-log.js';
+import { containToasts } from '../../../../features/toast/toast.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
@@ -48,7 +51,9 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
 
 export function DrawerShell() {
   const { state, dispatch } = useSessionGuide();
+  const shellRef = useRef(null);
   const drawerRef = useRef(null);
+  const toastHostRef = useRef(null);
   const bodyScrollRef = useRef(null);
   const ctaRef = useRef(null);
   const currentTopRef = useRef(0);
@@ -75,7 +80,7 @@ export function DrawerShell() {
     currentTopRef.current = top;
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = drawerRef.current;
     if (!el) return;
     const { drawerState } = state;
@@ -100,7 +105,7 @@ export function DrawerShell() {
         requestAnimationFrame(() => setTop(getTopMargin(), true));
       });
     } else if (drawerState === 'hidden') {
-      el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+      el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0s 0.45s';
       el.style.top = '100vh';
       expandedRef.current = false;
       currentTopRef.current = 0;
@@ -239,7 +244,15 @@ export function DrawerShell() {
   }
 
   // Milo's shared modal can't wrap this hand-rolled, gesture-driven drawer.
-  useEffect(() => (isOpen ? trapFocus(drawerRef.current, closeDrawer) : undefined), [isOpen]);
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const restoreToasts = containToasts(toastHostRef.current);
+    const restoreFocus = trapFocus(shellRef.current, closeDrawer);
+    return () => {
+      restoreToasts();
+      restoreFocus();
+    };
+  }, [isOpen]);
 
   function openDrawer() {
     const isNarrow = window.matchMedia('(max-width: 1279px)').matches;
@@ -269,15 +282,18 @@ export function DrawerShell() {
   }
 
   return html`
-    <div class="sg-shell">
+    <div
+      class="sg-shell"
+      ref=${shellRef}
+      role=${isOpen ? 'dialog' : undefined}
+      aria-modal=${isOpen ? 'true' : undefined}
+      aria-label=${isOpen ? 'Sessions guide' : undefined}
+    >
       ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true" data-lenis-prevent></div>`}
       <div
         class=${'sg-drawer' + (hasDetail ? ' sg-drawer--detail-open' : '')}
         ref=${drawerRef}
         data-lenis-prevent
-        role=${isOpen ? 'dialog' : undefined}
-        aria-modal=${isOpen ? 'true' : undefined}
-        aria-label=${isOpen ? 'Sessions guide' : undefined}
         inert=${!isOpen ? true : undefined}
       >
         <${DrawerHeader}
@@ -307,6 +323,7 @@ export function DrawerShell() {
           ${!hasDetail && html`<${BackToTop} scrollerRef=${bodyScrollRef} />`}
         </div>
       </div>
+      <div class="sg-drawer__notifications" ref=${toastHostRef}></div>
       ${!isOpen && html`<button
         class=${'sg-cta-btn' + (isOnSafariMobile ? ' sg-cta-btn--safari-mobile' : '') + (ctaOverPlayer ? ' sg-cta-btn--over-player' : '')}
         ref=${ctaRef}
