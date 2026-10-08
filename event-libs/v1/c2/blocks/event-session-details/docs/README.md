@@ -338,8 +338,10 @@ engine), `Legal Disclaimer` (end of the abstract).
 Reads the full session abstract from the `event-details` metadata — **not** the shorter
 `description`, which is the SEO summary (both are present on a page, with different copy).
 
-The description collapses to `--desc-lines` (6) via a native `line-clamp`, with a Show
-more/less toggle. No character-count truncation — line-based, so it stays responsive.
+On mobile and tablet (< 1024px) the description collapses to `--desc-lines` (6) via a
+native `line-clamp`, with a Show more/less toggle. From 1024px (desktop) the full text
+shows with no clamp and no toggle (MWPW-210273). No character-count truncation —
+line-based, so it stays responsive.
 
 **Line breaks.** Plain-text metadata is run through `normalizeMultilineText()` (CRLF and
 literal `\n` / `\t` escapes → real newlines / spaces), set via `textContent`, and rendered
