@@ -1,7 +1,3 @@
-.section.container:has(> .upcoming-sessions) {
-  padding-right: 0;
-}
-
 .upcoming-sessions {
   position: relative;
   box-sizing: border-box;
@@ -35,9 +31,7 @@
 
 @media (min-width: 1920px) {
   .upcoming-sessions--attached {
-    max-width: 1920px;
-    margin-inline: auto;
-    padding-left: max(0px, 220px - (100vw - 1920px) / 2);
+    padding-left: max(220px, (100vw - 1920px) / 2);
   }
 }
 
