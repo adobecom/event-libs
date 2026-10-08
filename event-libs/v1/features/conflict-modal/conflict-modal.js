@@ -13,9 +13,7 @@ export const conflict = signal(null);
 
 let dialogEl = null;
 
-// Must match the page's own modal module: each one registers a page-wide hashchange handler
-// on import, so loading the classic one on a C2 page opens every modal link twice and leaks a
-// scroll lock on close (MWPW-210384).
+// Must match the page's modal module; the classic one on a C2 page doubles modals (MWPW-210384).
 const isC2Page = () => getMetadata('foundation') === 'c2';
 
 export function getMiloModalPath(miloLibs) {

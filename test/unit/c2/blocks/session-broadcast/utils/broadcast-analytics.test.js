@@ -78,8 +78,7 @@ describe('broadcast-analytics', () => {
       expect(calls[0][1].data.web.webInteraction.name).to.equal('Broadcast-Play-Start | s-1');
     });
 
-    // Regression (MWPW-210384): Milo's classic modal.js registers a page-wide hashchange
-    // handler on import, which doubled every modal on C2 pages and leaked a scroll lock.
+    // Regression (MWPW-210384): loading it doubled every modal on C2 pages.
     it('never loads Milo\'s classic modal module', () => {
       // eslint-disable-next-line no-underscore-dangle
       window._satellite = { track: () => {} };

@@ -1,8 +1,7 @@
 import { openSessionGuideDetail } from '../../../../utils/session-store.js';
 import { logError } from '../../../../utils/lana-log.js';
 
-// Milo's classic modal.js sendAnalytics payload, inlined: importing that module on a C2 page
-// doubles every modal link and leaks a scroll lock on close (MWPW-210384).
+// Milo's classic sendAnalytics payload; importing its modal.js doubles C2 modals (MWPW-210384).
 function fireAnalyticsEvent(name) {
   // eslint-disable-next-line no-underscore-dangle
   window._satellite?.track('event', {
