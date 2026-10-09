@@ -151,6 +151,7 @@ local-start-time-millis: 1733356800000  // December 4, 2025
 - Agenda times represent local time in event timezone on event date
 - Supports millisecond timestamps and ISO date strings
 - Locale-aware formatting via `toLocaleTimeString()`
+- Series-level 24h/suffix: set `time-format=24h` (and optionally `time-suffix=Uhr`) page metadata; see [date-time-formatting-guide.md](./date-time-formatting-guide.md#24-hour-time-and-suffix-per-series)
 - Error handling prevents crashes from invalid data
 
 ## Migration

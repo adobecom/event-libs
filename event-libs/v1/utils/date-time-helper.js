@@ -15,6 +15,32 @@ export function applyLocaleFormat(hours, minutes, locale) {
   return new Intl.DateTimeFormat(locale, DEFAULT_TIME_FORMAT_OPTIONS).format(date);
 }
 
+/**
+ * Per-series time display settings, authored as page metadata:
+ *   time-format: '24h' opts in to 24-hour times (anything else keeps the default behavior)
+ *   time-suffix: text appended once after a time or time range (e.g. 'Uhr'); only used with 24h
+ * @param {boolean} [force24h=false] - Treat as 24h regardless of metadata (e.g. the agenda `24h` variant)
+ * @returns {{ is24h: boolean, suffix: string }}
+ */
+export function getTimeFormatSettings(force24h = false) {
+  const is24h = force24h || String(getMetadata('time-format') || '').trim().toLowerCase() === '24h';
+  const suffix = is24h ? String(getMetadata('time-suffix') || '').trim() : '';
+  return { is24h, suffix };
+}
+
+// h23 (not hour12:false) so midnight renders 00:xx instead of 24:xx.
+const TIME_24H_OPTIONS = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
+
+// Formats a date and inserts the suffix right after the minutes (before any timezone label).
+function formatWithSuffix(date, locale, options, suffix) {
+  const parts = new Intl.DateTimeFormat(locale, options).formatToParts(date);
+  const text = (list) => list.map((part) => part.value).join('');
+  if (!suffix) return text(parts);
+  const minuteIndex = parts.map((part) => part.type).lastIndexOf('minute');
+  if (minuteIndex === -1) return `${text(parts)} ${suffix}`;
+  return `${text(parts.slice(0, minuteIndex + 1))} ${suffix}${text(parts.slice(minuteIndex + 1))}`;
+}
+
 // Shared duration formatter with compact units: "30m", "1h", "1h 15m".
 export function formatDuration(startUtc, endUtc) {
   const totalMin = Math.round((Date.parse(endUtc) - Date.parse(startUtc)) / 60000);
@@ -79,6 +105,12 @@ export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US', 
     if (!hideTimezoneLabel) options.timeZoneName = 'short';
     if (timezone) options.timeZone = timezone;
 
+    const { is24h, suffix } = getTimeFormatSettings();
+    if (is24h) {
+      delete options.hour12;
+      return formatWithSuffix(date, locale, { ...options, ...TIME_24H_OPTIONS }, suffix);
+    }
+
     return date.toLocaleString(locale, options);
   } catch (error) {
     logError('date-time-helper,convert-utc-timestamp', 'Error converting timestamp to local date time', error);
@@ -138,8 +170,15 @@ function getLocalTimeZone(timestamp, locale, timezone = null) {
  * @returns {string} Time interval (e.g., '13:00 - 14:45')
  */
 function getTimeInterval(startTimestamp, endTimestamp, locale, timezone = null) {
-  const options = { hour: '2-digit', minute: '2-digit' };
+  const { is24h, suffix } = getTimeFormatSettings();
+  const options = is24h ? { ...TIME_24H_OPTIONS } : { hour: '2-digit', minute: '2-digit' };
   if (timezone) options.timeZone = timezone;
+
+  if (is24h) {
+    const start24 = formatWithSuffix(new Date(startTimestamp), locale, options, '');
+    const end24 = formatWithSuffix(new Date(endTimestamp), locale, options, suffix);
+    return `${start24} - ${end24}`;
+  }
 
   const startTime = new Date(startTimestamp).toLocaleTimeString(locale, options);
   const endTime = new Date(endTimestamp).toLocaleTimeString(locale, options);
@@ -319,9 +358,12 @@ function getDateOnly(timestamp, locale, timezone = null) {
  * @param {boolean} [opts.includeTimeZone=false] - Whether to include timezone abbreviation
  * @param {string|null} [opts.timezone=null] - Optional IANA timezone; if null, uses viewer's local timezone
  * @param {boolean} [opts.hideTimezoneLabel=false] - When true, forces the timezone abbreviation off
+ * @param {boolean} [opts.includeSuffix=false] - When true, appends the authored `time-suffix` (24h only)
  * @returns {string} Formatted time string
  */
-function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = null, hideTimezoneLabel = false } = {}) {
+function getTimeOnly(timestamp, locale, {
+  includeTimeZone = false, timezone = null, hideTimezoneLabel = false, includeSuffix = false,
+} = {}) {
   const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
   if (Number.isNaN(timestampNum)) return '';
 
@@ -342,9 +384,11 @@ function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = nu
       return `${timeStr} ${tzAbbr}`;
     }
 
-    const options = { hour: 'numeric', minute: '2-digit', hour12: true };
+    const { is24h, suffix } = getTimeFormatSettings();
+    const options = is24h ? { ...TIME_24H_OPTIONS } : { hour: 'numeric', minute: '2-digit', hour12: true };
     if (showTimeZone) options.timeZoneName = 'short';
     if (timezone) options.timeZone = timezone;
+    if (is24h) return formatWithSuffix(date, locale, options, includeSuffix ? suffix : '');
     return date.toLocaleTimeString(locale, options);
   } catch (error) {
     logError('date-time-helper,time-only', 'Error getting time only', error);
@@ -373,7 +417,9 @@ export function createSmartDateRange(startTimestamp, endTimestamp, locale, timez
   if (areTimestampsOnSameDay(startTimestamp, endTimestamp, timezone)) {
     const date = getDateOnly(startTimestamp, locale, timezone);
     const startTime = getTimeOnly(startTimestamp, locale, { timezone });
-    const endTime = getTimeOnly(endTimestamp, locale, { includeTimeZone: true, timezone, hideTimezoneLabel });
+    const endTime = getTimeOnly(endTimestamp, locale, {
+      includeTimeZone: true, timezone, hideTimezoneLabel, includeSuffix: true,
+    });
 
     if (!date || !startTime || !endTime) return startDateTime;
 

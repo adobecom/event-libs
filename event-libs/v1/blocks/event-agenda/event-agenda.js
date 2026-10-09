@@ -1,12 +1,19 @@
 import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
-import { LOCALE_FORMATTERS, applyLocaleFormat } from '../../utils/date-time-helper.js';
+import { LOCALE_FORMATTERS, applyLocaleFormat, getTimeFormatSettings } from '../../utils/date-time-helper.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
 
-const TIME_FORMAT_OPTIONS = {
-  hour: 'numeric',
-  minute: 'numeric',
-  hour12: true,
-};
+// Set by init() from the block's `24h` variant; the series-level `time-format` metadata is read per call.
+let blockIs24h = false;
+
+function timeFormatSettings() {
+  return getTimeFormatSettings(blockIs24h);
+}
+
+function timeFormatOptions() {
+  return timeFormatSettings().is24h
+    ? { hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }
+    : { hour: 'numeric', minute: 'numeric', hour12: true };
+}
 
 /**
  * Parses event date from various formats (milliseconds, ISO string, or numeric string)
@@ -60,14 +67,15 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
     
     // Iteratively refine to find correct UTC timestamp for local time in event timezone
     let guess = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
-    
+    const { is24h } = timeFormatSettings();
+
     for (let attempt = 0; attempt < 3; attempt++) {
       const formatted = guess.toLocaleString('en-US', {
         timeZone: eventTimezone,
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: false,
+        hourCycle: 'h23',
       });
       
       const match = formatted.match(/(\d+):(\d+):(\d+)/);
@@ -76,8 +84,8 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
       const [, gotHour, gotMin, gotSec] = match.map(Number);
       
       if (gotHour === hours && gotMin === minutes && gotSec === seconds) {
-        if (TIME_FORMAT_OPTIONS.hour12 && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](gotHour, gotMin);
-        return guess.toLocaleTimeString(locale, { ...TIME_FORMAT_OPTIONS, timeZone: eventTimezone });
+        if (!is24h && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](gotHour, gotMin);
+        return guess.toLocaleTimeString(locale, { ...timeFormatOptions(), timeZone: eventTimezone });
       }
 
       const wantedSeconds = hours * 3600 + minutes * 60 + seconds;
@@ -85,8 +93,8 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
       guess = new Date(guess.getTime() + (wantedSeconds - gotSeconds) * 1000);
     }
 
-    if (TIME_FORMAT_OPTIONS.hour12 && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](hours, minutes);
-    return guess.toLocaleTimeString(locale, { ...TIME_FORMAT_OPTIONS, timeZone: eventTimezone });
+    if (!is24h && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](hours, minutes);
+    return guess.toLocaleTimeString(locale, { ...timeFormatOptions(), timeZone: eventTimezone });
   } catch (error) {
     logError('event-agenda', 'Error converting event time', error);
     return '';
@@ -102,10 +110,10 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
  */
 export function convertToLocaleTimeFormat(time, locale) {
   const [hours, minutes, seconds] = time.split(':').map(Number);
-  if (TIME_FORMAT_OPTIONS.hour12) return applyLocaleFormat(hours, minutes, locale);
+  if (!timeFormatSettings().is24h) return applyLocaleFormat(hours, minutes, locale);
   const date = new Date();
   date.setHours(hours, minutes, seconds, 0);
-  return new Intl.DateTimeFormat(locale, TIME_FORMAT_OPTIONS).format(date);
+  return new Intl.DateTimeFormat(locale, timeFormatOptions()).format(date);
 }
 
 function formatSingleTime(time, eventTimezone, eventStartMillis, locale) {
@@ -119,9 +127,12 @@ function formatSingleTime(time, eventTimezone, eventStartMillis, locale) {
 
 export function formatTimeRange(agenda, eventTimezone, eventStartMillis, locale) {
   const start = formatSingleTime(agenda.startTime, eventTimezone, eventStartMillis, locale);
-  if (!agenda.endTime) return start;
+  if (!start) return '';
+  const { suffix } = timeFormatSettings();
+  const withSuffix = (text) => (suffix ? `${text} ${suffix}` : text);
+  if (!agenda.endTime) return withSuffix(start);
   const end = formatSingleTime(agenda.endTime, eventTimezone, eventStartMillis, locale);
-  return end ? `${start} \u2013 ${end}` : start;
+  return end ? `${start} \u2013 ${withSuffix(end)}` : withSuffix(start);
 }
 
 export default async function init(el) {
@@ -130,8 +141,7 @@ export default async function init(el) {
     return;
   }
 
-  const is24HourFormat = el.classList.contains('24h');
-  TIME_FORMAT_OPTIONS.hour12 = !is24HourFormat;
+  blockIs24h = el.classList.contains('24h');
 
   const container = createTag('div', { class: 'agenda-container' }, '', { parent: el });
   const agendaItemsCol = createTag('div', { class: 'agenda-items' }, '', { parent: container });
