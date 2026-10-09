@@ -1,6 +1,6 @@
 import { signal } from '../../deps/htm-preact.js';
 import {
-  createTag, loadStyle, LIBS, getEventConfig,
+  createTag, loadStyle, LIBS, getEventConfig, getMetadata,
 } from '../../utils/utils.js';
 import { formatDuration } from '../../utils/date-time-helper.js';
 
@@ -13,9 +13,16 @@ export const conflict = signal(null);
 
 let dialogEl = null;
 
+// Must match the page's modal module; the classic one on a C2 page doubles modals (MWPW-210384).
+const isC2Page = () => getMetadata('foundation') === 'c2';
+
+export function getMiloModalPath(miloLibs) {
+  return `${miloLibs}/${isC2Page() ? 'c2/blocks' : 'blocks'}/modal/modal.js`;
+}
+
 async function getMiloModal() {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
-  return import(`${miloLibs}/blocks/modal/modal.js`);
+  return import(getMiloModalPath(miloLibs));
 }
 
 function buildOption(name, value, session, onSelect) {
@@ -97,6 +104,7 @@ export async function showConflictModal(data) {
   loadStyle(new URL('./conflict-modal.css', import.meta.url).href);
   const { getModal } = await getMiloModal();
   const content = buildContent(data, () => hideConflictModal());
+  content.classList.toggle('sg-conflict-modal--c2', isC2Page());
   dialogEl = await getModal(null, { id: 'sg-conflict-modal', content });
 }
 
