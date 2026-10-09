@@ -118,7 +118,7 @@ describe('SessionCard', () => {
       frame = document.createElement('iframe');
       frame.style.cssText = 'border:0;width:390px;height:400px';
       frame.srcdoc = `<link rel="stylesheet" href="${window.location.origin}/event-libs/v1/c2/blocks/sessions-guide/sessions-guide.css">
-        <div class="sg-card" style="width:223px">${renderCard(UPCOMING_SESSION)}</div>`;
+        <div style="width:223px">${renderCard(UPCOMING_SESSION)}</div>`;
       await new Promise((resolve) => { frame.onload = resolve; document.body.append(frame); });
       const win = frame.contentWindow;
       const button = frame.contentDocument.querySelector('button.sg-card__title');
