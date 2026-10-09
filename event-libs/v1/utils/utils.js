@@ -432,6 +432,23 @@ const { waitForAdobeIMS, resetAdobeIMSWatcher } = (() => {
 
 export { waitForAdobeIMS, resetAdobeIMSWatcher };
 
+export function waitForImsInstance(timeout = 15000) {
+  return new Promise((resolve, reject) => {
+    let timer;
+    const onReady = (e) => {
+      window.removeEventListener('onImsLibInstance', onReady);
+      clearTimeout(timer);
+      if (e?.detail?.instance) resolve(e.detail.instance); else reject();
+    };
+    timer = setTimeout(() => {
+      window.removeEventListener('onImsLibInstance', onReady);
+      reject();
+    }, timeout);
+    window.addEventListener('onImsLibInstance', onReady);
+    window.dispatchEvent(new CustomEvent('getImsLibInstance'));
+  });
+}
+
 /**
  * Returns the campaign ID from the current URL search params if present and valid.
  * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
