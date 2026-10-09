@@ -168,7 +168,7 @@ export function SessionCard({
           type="button"
           onclick=${(e) => { e.stopPropagation(); handleClick(); }}
           daa-ll=${cardDaaLl}
-        >${session.title}</button>
+        ><span class="sg-card__title-text">${session.title}</span></button>
         <div class="sg-card__badge-row">
           <${CategoryBadge} session=${session} size="sm" />
         </div>

@@ -100,6 +100,38 @@ describe('SessionCard', () => {
     expect(badgeRowIndex).to.equal(titleIndex + 1);
   });
 
+  // MWPW-209870: WebKit ignores line-clamp on a <button>, so the clamp must sit on an inner span.
+  describe('title clamp (WebKit)', () => {
+    let frame;
+
+    afterEach(() => frame?.remove());
+
+    it('wraps the title text in a span inside the title button', () => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = renderCard(UPCOMING_SESSION);
+      const text = wrap.querySelector('button.sg-card__title > .sg-card__title-text');
+      expect(text.tagName).to.equal('SPAN');
+      expect(text.textContent).to.equal('Building with AI');
+    });
+
+    it('clamps the span to 2 lines, not the button, below 1280px', async () => {
+      frame = document.createElement('iframe');
+      frame.style.cssText = 'border:0;width:390px;height:400px';
+      frame.srcdoc = `<link rel="stylesheet" href="${window.location.origin}/event-libs/v1/c2/blocks/sessions-guide/sessions-guide.css">
+        <div class="sg-card" style="width:223px">${renderCard(UPCOMING_SESSION)}</div>`;
+      await new Promise((resolve) => { frame.onload = resolve; document.body.append(frame); });
+      const win = frame.contentWindow;
+      const button = frame.contentDocument.querySelector('button.sg-card__title');
+      const text = button.querySelector('.sg-card__title-text');
+      text.textContent = 'Cut Above the Rest: Finding Your Signature Style for Social Media Creators';
+
+      expect(win.getComputedStyle(text).display).to.not.equal('inline');
+      expect(win.getComputedStyle(text).webkitLineClamp).to.equal('2');
+      expect(win.getComputedStyle(button).display).to.equal('block');
+      expect(text.getBoundingClientRect().height).to.equal(40);
+    });
+  });
+
   it('applies is-scheduled class when session is scheduled', () => {
     scheduled.value = new Set(['session-1']);
     const html = renderCard(UPCOMING_SESSION);
