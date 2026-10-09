@@ -1,4 +1,5 @@
 import HtmlSanitizer from '../../../../deps/html-sanitizer.js';
+import { hasHtmlMarkup, htmlToPlainText } from '../../../../utils/utils.js';
 
 // Some catalog copy is authored as HTML rather than plain text — `Legal Disclaimer` arrives as
 // `<p><b>…</b></p><br/> <p><b>… <a href="…">Terms of Use</a> …</b></p>` — so it has to be
@@ -21,4 +22,16 @@ export function sanitizedRichText(raw) {
     anchor.setAttribute('rel', 'noopener noreferrer');
   });
   return doc.body.innerHTML;
+}
+
+// Session descriptions arrive as either raw HTML or plain text. Returns sanitized markup for the
+// former and null for the latter, which callers render as text with `white-space: pre-line`.
+export function descriptionHtml(raw) {
+  return hasHtmlMarkup(raw) ? sanitizedRichText(raw) : null;
+}
+
+// Tag-free description for one-line previews, search, and calendar files. Normalized sessions
+// carry it precomputed; anything else (fixtures, ad-hoc objects) is flattened on demand.
+export function sessionDescriptionText(session) {
+  return session?.descriptionText ?? htmlToPlainText(session?.description);
 }

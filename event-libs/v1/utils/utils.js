@@ -179,6 +179,36 @@ export function normalizeMultilineText(text) {
     .trim();
 }
 
+const HTML_TAG = /<\/?[a-z][^>]*>/i;
+
+export function hasHtmlMarkup(text) {
+  return HTML_TAG.test(String(text ?? ''));
+}
+
+const PLAIN_TEXT_BLOCKS = 'p, div, li, ul, ol, dt, dd, blockquote, pre, tr, h1, h2, h3, h4, h5, h6';
+
+// Flattens authored HTML to readable plain text (paragraph/list/`<br>` breaks kept as "\n") for
+// places that can't render markup: one-line previews, search, and calendar files. DOMParser
+// documents are inert, so this never runs scripts or loads images.
+export function htmlToPlainText(html) {
+  if (!html) return '';
+  if (!hasHtmlMarkup(html)) return normalizeMultilineText(html);
+  const { body } = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  body.querySelectorAll('script, style, template').forEach((el) => el.remove());
+  // Source whitespace between tags isn't a line break; only the markup decides where breaks go.
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    node.data = node.data.replace(/\s+/g, ' ');
+  }
+  body.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
+  body.querySelectorAll('li').forEach((li) => li.prepend('- '));
+  body.querySelectorAll(PLAIN_TEXT_BLOCKS).forEach((el) => el.append('\n'));
+  const text = body.textContent
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{2,}/g, '\n');
+  return normalizeMultilineText(text);
+}
+
 export function setMetadata(name, value, doc = document) {
   const attr = name && name.includes('og:') ? 'property' : 'name';
   const meta = doc.head.querySelector(`meta[${attr}="${name}"]`);

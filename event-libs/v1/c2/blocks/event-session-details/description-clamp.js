@@ -1,14 +1,14 @@
-import { createTag, getMetadata, normalizeMultilineText } from '../../../utils/utils.js';
+import {
+  createTag, getMetadata, normalizeMultilineText, hasHtmlMarkup,
+} from '../../../utils/utils.js';
 
 const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-const HTML_TAG = /<\/?[a-z][^>]*>/i;
 
 let instances = 0;
 
 // Authored HTML keeps its own structure; plain text keeps its line breaks via `pre-line`.
 function createDescriptionBody(raw, id) {
-  if (HTML_TAG.test(raw)) {
+  if (hasHtmlMarkup(raw)) {
     return createTag('p', { class: 'session-description-text', id }, raw);
   }
   const body = createTag('p', { class: 'session-description-text is-plain-text', id });

@@ -260,7 +260,8 @@ class MobileRider {
 
     const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description', id: panelId }, cfg['session-description'] || '', { parent: bar });
     const paintDescription = (session) => {
-      const text = session?.description || cfg['session-description'] || '';
+      // Catalog descriptions may be HTML; this text-only bar shows the tag-free form.
+      const text = session?.descriptionText || session?.description || cfg['session-description'] || '';
       descriptionEl.textContent = text;
       descriptionEl.classList.toggle('is-hidden', !text);
     };

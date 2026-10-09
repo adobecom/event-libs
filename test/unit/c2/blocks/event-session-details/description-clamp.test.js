@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { setViewport } from '@web/test-runner-commands';
+import { executeServerCommand, setViewport } from '@web/test-runner-commands';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import { renderDescriptionClamp } from '../../../../../event-libs/v1/c2/blocks/event-session-details/description-clamp.js';
 
@@ -66,8 +66,10 @@ describe('Description "More" Clamp', () => {
   describe('responsive clamp (MWPW-210273)', () => {
     const LONG = Array.from({ length: 60 }, (_, i) => `Sentence number ${i} about creative workflows.`).join(' ');
 
-    // The outer beforeEach resets <head>, so the stylesheet is attached per test.
+    // The outer beforeEach resets <head>, so the stylesheet is attached per test. The page is focused
+    // because a background page in a concurrent run never fires the rAF/ResizeObserver this waits on.
     beforeEach(async () => {
+      await executeServerCommand('focus-test-page');
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = '/event-libs/v1/c2/blocks/event-session-details/description-clamp.css';

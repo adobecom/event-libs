@@ -2,7 +2,8 @@ import { expect } from '@esm-bundle/chai';
 
 import {
   getValidCampaignIdFromUrl, resolveRoutedCampaignId, resetCampaignMapCache, getRsvpToken,
-  shouldForceGuestSignIn, safeUrl, isNonProdHost, normalizeMultilineText,
+  shouldForceGuestSignIn, safeUrl, isNonProdHost, normalizeMultilineText, hasHtmlMarkup,
+  htmlToPlainText,
 } from '../../../event-libs/v1/utils/utils.js';
 
 describe('normalizeMultilineText', () => {
@@ -29,6 +30,43 @@ describe('normalizeMultilineText', () => {
 
   it('leaves single-line copy untouched', () => {
     expect(normalizeMultilineText('How do you embrace new technology?')).to.equal('How do you embrace new technology?');
+  });
+});
+
+describe('hasHtmlMarkup', () => {
+  it('detects opening, closing, and self-closing tags', () => {
+    expect(hasHtmlMarkup('<p>Intro</p>')).to.be.true;
+    expect(hasHtmlMarkup('Line<br/>Next')).to.be.true;
+  });
+
+  it('ignores plain text, including stray angle brackets', () => {
+    expect(hasHtmlMarkup('Speed < quality > cost')).to.be.false;
+    expect(hasHtmlMarkup('')).to.be.false;
+    expect(hasHtmlMarkup(undefined)).to.be.false;
+  });
+});
+
+describe('htmlToPlainText', () => {
+  it('returns an empty string for empty input', () => {
+    expect(htmlToPlainText('')).to.equal('');
+    expect(htmlToPlainText(null)).to.equal('');
+  });
+
+  it('normalizes plain text without treating it as markup', () => {
+    expect(htmlToPlainText('Intro\\n\\nA < B')).to.equal('Intro\n\nA < B');
+  });
+
+  it('keeps paragraph, list, and <br> breaks and drops the tags', () => {
+    const html = '<p>Intro</p>\n<p><strong>Key takeaways:</strong></p>\n<ul>\n  <li>One</li>\n  <li>Two &amp; three</li>\n</ul><p>Line<br>break</p>';
+    expect(htmlToPlainText(html)).to.equal('Intro\nKey takeaways:\n- One\n- Two & three\nLine\nbreak');
+  });
+
+  it('never executes markup while flattening it', () => {
+    window.htmlToPlainTextRan = false;
+    const out = htmlToPlainText('<p>Safe</p><img src="x" onerror="window.htmlToPlainTextRan = true"><script>window.htmlToPlainTextRan = true;</script>');
+    expect(out).to.equal('Safe');
+    expect(window.htmlToPlainTextRan).to.be.false;
+    delete window.htmlToPlainTextRan;
   });
 });
 

@@ -130,6 +130,11 @@ describe('sessions-guide/utils/ics', () => {
       expect(getProp(lines, 'DESCRIPTION')).to.equal('Line one\\nLine two');
     });
 
+    it('writes an HTML description as plain text, without tags', () => {
+      const lines = unfold(generateICS([session({ description: '<p>Intro</p><ul><li>One</li></ul>' })]));
+      expect(getProp(lines, 'DESCRIPTION')).to.equal('Intro\\n- One');
+    });
+
     it('normalizes CRLF and lone CR in descriptions to the same escaped \\n', () => {
       const crlf = unfold(generateICS([session({ id: 'a', description: 'One\r\nTwo' })]));
       const cr = unfold(generateICS([session({ id: 'b', description: 'One\rTwo' })]));

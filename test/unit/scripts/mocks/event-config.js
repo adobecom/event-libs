@@ -565,6 +565,11 @@ export function setupGlobalMocks() {
         getProfile: () => Promise.resolve({ name: 'Test User' }),
         signIn: () => {}
     };
+
+    // Stand in for imslib's ready handshake so waitForImsInstance() resolves instead of waiting 15s.
+    window.addEventListener('getImsLibInstance', () => {
+        window.dispatchEvent(new CustomEvent('onImsLibInstance', { detail: { instance: window.adobeIMS } }));
+    });
     
     // Mock feds
     window.feds = {

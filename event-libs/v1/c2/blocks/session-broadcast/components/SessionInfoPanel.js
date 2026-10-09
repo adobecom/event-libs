@@ -7,6 +7,7 @@ import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { logError } from '../../../../utils/lana-log.js';
 import { CategoryBadge } from '../../sessions-guide/components/CategoryBadge.js';
+import { descriptionHtml } from '../../sessions-guide/utils/rich-text.js';
 import {
   IconHeartFilled, IconHeartOutline, IconShare, IconChevronRight,
 } from '../../sessions-guide/components/icons.js';
@@ -21,6 +22,7 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
 
   if (!session) return null;
 
+  const richDescription = descriptionHtml(session.description);
   const isFavorited = favorited.value.has(session.id);
   const isPending = pendingActions.value.has(session.id);
 
@@ -102,7 +104,9 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
       </div>
       ${session.description && html`
         <div class=${'sb-info__desc-wrap' + (expanded ? ' is-expanded' : '')} id="sb-info-desc">
-          <p class="sb-info__desc">${session.description}</p>
+          ${richDescription
+    ? html`<div class="sb-info__desc is-rich-text" dangerouslySetInnerHTML=${{ __html: richDescription }}></div>`
+    : html`<div class="sb-info__desc">${session.description}</div>`}
         </div>
       `}
       ${expanded && html`
