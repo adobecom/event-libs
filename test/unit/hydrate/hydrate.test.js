@@ -451,8 +451,8 @@ describe('consumer hydrator registration', () => {
 
     hydrateBlocks(document);
 
-    expect(lanaLogs).to.include('Hydrator failed for block throwing-block: boom');
-    expect(lanaLogs).to.include('Hydrator not found for block: missing-hydrator-block');
+    expect(lanaLogs).to.include('[hydrate,registry] Hydrator failed for block throwing-block: boom');
+    expect(lanaLogs).to.include('[hydrate,registry] Hydrator not found for block: missing-hydrator-block');
   });
 
   it('continues hydrating later blocks after one throws', () => {
@@ -578,7 +578,7 @@ describe('hydration logging', () => {
     window.dispatchEvent(new Event('load'));
     await Promise.resolve();
 
-    expect(logs).to.include('Hydrator not found for block: no-hydrator-block');
+    expect(logs).to.include('[hydrate,registry] Hydrator not found for block: no-hydrator-block');
     window.lana = originalLana;
   });
 
@@ -599,7 +599,7 @@ describe('hydration logging', () => {
 
     await new Promise((resolve) => { setTimeout(resolve, 350); });
 
-    expect(logs).to.include('Hydrator not found for block: no-hydrator-poll-block');
+    expect(logs).to.include('[hydrate,registry] Hydrator not found for block: no-hydrator-poll-block');
     window.lana = originalLana;
   });
 });

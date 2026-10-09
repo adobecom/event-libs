@@ -1,5 +1,3 @@
-import { getEventServiceEnv } from './utils.js';
-
 const PII_KEY_PATTERN = /email|name|phone|address|token|password|dob|birthdate/i;
 
 function redactPii(key, value) {
@@ -9,6 +7,7 @@ function redactPii(key, value) {
 
 function serializeLogData(data) {
   if (typeof data === 'string') return data;
+  if (data instanceof SyntaxError) return 'SyntaxError';
   if (data instanceof Error) return `${data.name}: ${data.message}`;
   if (typeof Response !== 'undefined' && data instanceof Response) {
     return `status=${data.status} ok=${data.ok} url=${data.url}`;
@@ -20,26 +19,12 @@ function serializeLogData(data) {
   }
 }
 
-function getClientContext() {
-  try {
-    const { userAgent, language } = navigator;
-    const viewport = `${window.innerWidth}x${window.innerHeight}`;
-    const { name: env } = getEventServiceEnv();
-    return `ua=${userAgent},viewport=${viewport},lang=${language},env=${env}`;
-  } catch {
-    return '';
-  }
-}
-
 function send(severity, scope, message, data) {
   const suffix = data === undefined ? '' : `: ${serializeLogData(data)}`;
-  const context = ['warning', 'error', 'critical'].includes(severity)
-    ? ` | ${getClientContext()}`
-    : '';
-  const options = { tags: scope, severity };
+  const options = { severity };
   if (severity === 'critical') options.sampleRate = 100;
   else if (severity === 'error') options.sampleRate = 10;
-  window.lana?.log(`[${scope}] ${message}${suffix}${context}`, options);
+  window.lana?.log(`[${scope}] ${message}${suffix}`, options);
 }
 
 export function logDebug(scope, message, data) {
@@ -60,4 +45,16 @@ export function logError(scope, message, data) {
 
 export function logCritical(scope, message, data) {
   send('critical', scope, message, data);
+}
+
+export function logRegistrationFailure(scope, response) {
+  const status = Number.isInteger(response?.status) && response.status >= 100 && response.status <= 599
+    ? response.status : 'unknown';
+  const isClientRejection = status >= 400 && status < 500 && status !== 408 && status !== 429;
+  const log = isClientRejection ? logWarning : logCritical;
+  log(scope, `Request failed: http-status=${status}`);
+}
+
+export function logRegistrationError(scope, error) {
+  logCritical(scope, error instanceof SyntaxError ? 'Invalid JSON response' : 'Request failed: network-or-runtime');
 }

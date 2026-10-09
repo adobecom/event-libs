@@ -224,9 +224,7 @@ describe('services/sessions/rainfocus', () => {
       }
       expect(error).to.be.an('error');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('[rainfocus]');
-      expect(lanaLogStub.firstCall.args[0]).to.include('myData');
-      expect(lanaLogStub.firstCall.args[0]).to.include('503');
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[rainfocus,myData] Request failed: http-status=503');
     });
 
     it('logs a network error before rethrowing', async () => {
@@ -239,8 +237,195 @@ describe('services/sessions/rainfocus', () => {
       }
       expect(error).to.be.an('error');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('[rainfocus] network error calling myData');
-      expect(lanaLogStub.firstCall.args[0]).to.include('offline');
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[rainfocus,myData] Request failed: network-or-runtime');
+    });
+  });
+
+  describe('schedule mutation severity', () => {
+    let lanaLogStub;
+
+    const operations = [
+      { name: 'addSession', run: () => addSession('st-1', 'auth-token', 'profile-1', 'https://example.com/rf/') },
+      { name: 'removeSession', run: () => removeSession('st-1', 'auth-token', 'profile-1', 'https://example.com/rf/') },
+      { name: 'dropSwapSession', run: () => dropAndSwapSession('st-1', 'st-old', 'auth-token', 'profile-1', 'https://example.com/rf/') },
+    ];
+
+    beforeEach(() => {
+      lanaLogStub = sinon.stub(window.lana, 'log');
+    });
+
+    afterEach(() => {
+      lanaLogStub.restore();
+    });
+
+    const failureOf = async (run) => {
+      let error;
+      try {
+        await run();
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      return error;
+    };
+
+    operations.forEach(({ name, run }) => {
+      describe(name, () => {
+        [408, 429, 500, 503].forEach((status) => {
+          it(`reports HTTP ${status} once as critical without logging the auth-bearing URL`, async () => {
+            const response = new Response('Unavailable', { status });
+            Object.defineProperty(response, 'url', { value: `https://example.com/rf/${name}?rfAuthToken=auth-token` });
+            window.fetch = async () => response;
+
+            const error = await failureOf(run);
+
+            expect(error.message).to.include(`${status}`);
+            expect(lanaLogStub.calledOnce).to.be.true;
+            expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+            expect(lanaLogStub.firstCall.args[0]).to.equal(`[rainfocus,${name}] Request failed: http-status=${status}`);
+            expect(lanaLogStub.firstCall.args[0]).to.not.include('auth-token');
+            expect(lanaLogStub.firstCall.args[0]).to.not.include('rfAuthToken');
+            expect(lanaLogStub.firstCall.args[0]).to.not.include('Unavailable');
+          });
+        });
+
+        [400, 401, 403, 404, 409, 422].forEach((status) => {
+          it(`does not report HTTP ${status} as critical`, async () => {
+            stubFetch({}, { ok: false, status });
+
+            await failureOf(run);
+
+            expect(lanaLogStub.calledOnce).to.be.true;
+            expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'warning' });
+          });
+        });
+
+        it('reports network failure once as critical and rethrows the original error', async () => {
+          const originalError = new Error('offline');
+          window.fetch = async () => { throw originalError; };
+
+          const error = await failureOf(run);
+
+          expect(error).to.equal(originalError);
+          expect(lanaLogStub.calledOnce).to.be.true;
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+        });
+
+        it('reports an unreadable successful response once as critical', async () => {
+          window.fetch = async () => new Response('Private attendee details');
+
+          await failureOf(run);
+
+          expect(lanaLogStub.calledOnce).to.be.true;
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+          expect(lanaLogStub.firstCall.args[0]).to.not.include('Private attendee details');
+          expect(lanaLogStub.firstCall.args[0]).to.equal(`[rainfocus,${name}] Unreadable JSON response`);
+        });
+
+        it('does not include the auth-bearing request URL from a thrown network error in its log', async () => {
+          window.fetch = async (url) => { throw new Error(`Failed to fetch ${url}`); };
+
+          await failureOf(run);
+
+          expect(lanaLogStub.calledOnce).to.be.true;
+          expect(lanaLogStub.firstCall.args[0]).to.not.include('auth-token');
+          expect(lanaLogStub.firstCall.args[0]).to.not.include('rfAuthToken');
+          expect(lanaLogStub.firstCall.args[0]).to.equal(`[rainfocus,${name}] Request failed: network-or-runtime`);
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+        });
+
+        ['13', '27'].forEach((responseCode) => {
+          it(`keeps expected business rejection ${responseCode} non-critical without logging the response message`, async () => {
+            stubFetch({ responseCode, responseMessage: 'Private attendee details' });
+
+            const error = await failureOf(run);
+
+            if (responseCode === '27') expect(error).to.be.an.instanceOf(RfAccessError);
+            expect(lanaLogStub.calledOnce).to.be.true;
+            expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'warning' });
+            expect(lanaLogStub.firstCall.args[0]).to.not.include('Private attendee details');
+          });
+        });
+
+        const runFor = (id) => {
+          if (name === 'addSession') return addSession(id, `token-${id}`, `profile-${id}`, `https://${id}.example.com/rf/`);
+          if (name === 'removeSession') return removeSession(id, `token-${id}`, `profile-${id}`, `https://${id}.example.com/rf/`);
+          return dropAndSwapSession(id, `old-${id}`, `token-${id}`, `profile-${id}`, `https://${id}.example.com/rf/`);
+        };
+
+        [
+          { category: 'http', respond: () => new Response('Private body', { status: 503 }), message: 'Request failed: http-status=503' },
+          { category: 'network', respond: (url) => { throw new Error(`Private URL: ${url}`); }, message: 'Request failed: network-or-runtime' },
+          { category: 'parse', respond: () => new Response('Private body'), message: 'Unreadable JSON response' },
+          { category: 'business', respond: (url) => ({ ok: true, json: async () => ({ responseCode: url, responseMessage: 'Private body' }) }), message: 'Unexpected business response' },
+        ].forEach(({ category, respond, message }) => {
+          it(`groups ${name} ${category} failures across sessions, profiles, URLs and tokens`, async () => {
+            window.fetch = async (url) => respond(url);
+
+            await failureOf(() => runFor('session-a'));
+            await failureOf(() => runFor('session-b'));
+
+            expect(lanaLogStub.callCount).to.equal(2);
+            expect(lanaLogStub.firstCall.args).to.deep.equal(lanaLogStub.secondCall.args);
+            expect(lanaLogStub.firstCall.args).to.deep.equal([
+              `[rainfocus,${name}] ${message}`, { severity: 'critical', sampleRate: 100 },
+            ]);
+          });
+        });
+
+        [{ responseCode: '99' }, {}, null].forEach((body) => {
+          it(`reports an unexpected business response ${JSON.stringify(body)} once as critical`, async () => {
+            stubFetch(body);
+
+            await failureOf(run);
+
+            expect(lanaLogStub.calledOnce).to.be.true;
+            expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+          });
+        });
+
+        ['0', '15'].forEach((responseCode) => {
+          it(`does not report success or already-scheduled response ${responseCode} as a failure`, async () => {
+            stubFetch({ responseCode });
+
+            expect(await run()).to.deep.equal({ responseCode });
+            expect(lanaLogStub.called).to.be.false;
+          });
+        });
+      });
+    });
+
+    const nonSchedulingOperations = [
+      { name: 'myData', run: () => fetchMyData('auth-token', 'profile-1', 'https://example.com/rf/') },
+      { name: 'favorite', run: () => toggleSessionInterest('st-1', 's-1', 'auth-token', 'profile-1', 'https://example.com/rf/') },
+    ];
+    nonSchedulingOperations.forEach(({ name, run }) => {
+      it(`keeps ${name} network failures non-critical`, async () => {
+        window.fetch = async () => { throw new Error('offline'); };
+
+        await failureOf(run);
+
+        expect(lanaLogStub.calledOnce).to.be.true;
+        expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'error', sampleRate: 10 });
+      });
+
+      it(`keeps ${name} HTTP failures non-critical`, async () => {
+        stubFetch({}, { ok: false, status: 503 });
+
+        await failureOf(run);
+
+        expect(lanaLogStub.calledOnce).to.be.true;
+        expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'warning' });
+      });
+    });
+
+    it('keeps an unexpected favorites business response non-critical', async () => {
+      stubFetch({ responseCode: '99' });
+
+      await failureOf(nonSchedulingOperations[1].run);
+
+      expect(lanaLogStub.calledOnce).to.be.true;
+      expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'error', sampleRate: 10 });
     });
   });
 });

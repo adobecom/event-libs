@@ -1,4 +1,6 @@
-import { logError, logWarning } from '../../utils/lana-log.js';
+import {
+  logError, logWarning, logCritical, logRegistrationFailure,
+} from '../../utils/lana-log.js';
 
 // RainFocus schedule/favorites API. Endpoint/profile id come from tier-1-event-config,
 // falling back to the defaults below.
@@ -33,6 +35,12 @@ const ENDPOINTS = {
   ATTENDEE: 'attendeeAccess',
 };
 
+const SCHEDULE_ENDPOINTS = new Set([
+  ENDPOINTS.ADD_TO_SCHEDULE,
+  ENDPOINTS.REMOVE_FROM_SCHEDULE,
+  ENDPOINTS.ADD_AND_REMOVE_FROM_SCHEDULE,
+]);
+
 function buildUrl(rfApiUrl, endpoint, params) {
   const base = rfApiUrl || DEFAULT_RF_API_URL;
   // Trailing slash so the endpoint appends rather than replaces the last segment.
@@ -44,19 +52,27 @@ function buildUrl(rfApiUrl, endpoint, params) {
 }
 
 async function rawFetch(rfApiUrl, endpoint, params) {
-  const url = buildUrl(rfApiUrl, endpoint, params);
+  const isScheduleChange = SCHEDULE_ENDPOINTS.has(endpoint);
+  const failureLog = isScheduleChange ? logCritical : logError;
+  const scope = `rainfocus,${endpoint}`;
   let resp;
   try {
-    resp = await fetch(url);
+    resp = await fetch(buildUrl(rfApiUrl, endpoint, params));
   } catch (err) {
-    logError('rainfocus', `network error calling ${endpoint}`, err);
+    failureLog(scope, 'Request failed: network-or-runtime');
     throw err;
   }
   if (!resp.ok) {
-    logWarning('rainfocus', `${endpoint} request failed`, resp);
+    if (isScheduleChange) logRegistrationFailure(scope, resp);
+    else logWarning(scope, `Request failed: http-status=${resp.status}`);
     throw new Error(`RainFocus API request failed with status ${resp.status}`);
   }
-  return resp.json();
+  try {
+    return await resp.json();
+  } catch (err) {
+    failureLog(scope, 'Unreadable JSON response');
+    throw err;
+  }
 }
 
 // Distinguishes RF's not-registered rejection from other write failures.
@@ -68,18 +84,24 @@ export class RfAccessError extends Error {
 }
 
 // Only write calls carry a responseCode (0/15 = success); reads never do.
-function handleWriteResponse(data) {
+function handleWriteResponse(data, endpoint) {
   const responseCode = data?.responseCode;
+  const scope = `rainfocus,${endpoint}`;
   switch (responseCode) {
     case '0': // success
     case '15': // this exact item is already in schedule — not a failure
       return data;
     case '13': // schedule conflict
+      logWarning(scope, 'Schedule conflict: response-code=13');
       throw new Error('RainFocus schedule conflict');
     case '27': // insufficient access to schedule this session — not registered
+      logWarning(scope, 'Insufficient access: response-code=27');
       throw new RfAccessError(data?.responseMessage || 'Insufficient access to schedule this session');
-    default:
+    default: {
+      const log = SCHEDULE_ENDPOINTS.has(endpoint) ? logCritical : logError;
+      log(scope, 'Unexpected business response');
       throw new Error(`RainFocus API error, responseCode: ${responseCode}`);
+    }
   }
 }
 
@@ -115,14 +137,14 @@ export async function addSession(sessionTimeId, rfAuthToken, rfApiProfileId, rfA
     // Required, or RF defaults to in-person-only and rejects with responseCode 27.
     rfApiProfileId, rfAuthToken, sessionTimeId, virtual: true,
   });
-  return handleWriteResponse(data);
+  return handleWriteResponse(data, ENDPOINTS.ADD_TO_SCHEDULE);
 }
 
 export async function removeSession(sessionTimeId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.REMOVE_FROM_SCHEDULE, {
     rfApiProfileId, rfAuthToken, sessionTimeId,
   });
-  return handleWriteResponse(data);
+  return handleWriteResponse(data, ENDPOINTS.REMOVE_FROM_SCHEDULE);
 }
 
 // Atomic drop-and-add. dropSessionItems is semicolon-separated RF sessionTimeIds.
@@ -130,14 +152,14 @@ export async function dropAndSwapSession(sessionTimeId, dropSessionItems, rfAuth
   const data = await rawFetch(rfApiUrl, ENDPOINTS.ADD_AND_REMOVE_FROM_SCHEDULE, {
     rfApiProfileId, rfAuthToken, sessionTimeId, dropSessionItems,
   });
-  return handleWriteResponse(data);
+  return handleWriteResponse(data, ENDPOINTS.ADD_AND_REMOVE_FROM_SCHEDULE);
 }
 
 export async function toggleSessionInterest(sessionTimeId, sessionId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.TOGGLE_FAVORITES, {
     rfApiProfileId, rfAuthToken, sessionTimeId, sessionId,
   });
-  return handleWriteResponse(data);
+  return handleWriteResponse(data, ENDPOINTS.TOGGLE_FAVORITES);
 }
 
 export async function fetchAttendeeAccess(sessionTimeId, rfAuthToken, rfApiProfileId, rfApiUrl) {

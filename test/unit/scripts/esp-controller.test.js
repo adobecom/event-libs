@@ -252,14 +252,14 @@ describe('Adobe Event Service API', () => {
       expect(error.ok).to.be.false;
     });
 
-    it('should report the failure to lana with the eventId', async () => {
+    it('should report attendee creation failure without splitting the message by eventId', async () => {
       sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
       await api.createAttendee('event-123', { name: 'John Doe' });
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
-      expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
-      expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[esp-controller,create-attendee] Request failed: http-status=400');
+      expect(lanaLogStub.firstCall.args[1].severity).to.equal('warning');
+      expect(lanaLogStub.firstCall.args[1]).to.not.have.property('sampleRate');
     });
 
     it('should report the failure to lana even if the response body never resolves', async () => {
@@ -363,15 +363,14 @@ describe('Adobe Event Service API', () => {
       expect(error.ok).to.be.false;
     });
 
-    it('should report the failure to lana with the eventId and attendeeId', async () => {
+    it('should report attendee addition failure without eventId or attendeeId', async () => {
       sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
       await api.addAttendeeToEvent('event-123', { attendeeId: 'att-1' });
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
-      expect(lanaLogStub.firstCall.args[0]).to.include('att-1');
-      expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
-      expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[esp-controller,add-attendee-to-event] Request failed: http-status=400');
+      expect(lanaLogStub.firstCall.args[1].severity).to.equal('warning');
+      expect(lanaLogStub.firstCall.args[1]).to.not.have.property('sampleRate');
     });
 
     it('should report the failure to lana even if the response body never resolves', async () => {
@@ -461,15 +460,14 @@ describe('Adobe Event Service API', () => {
       expect(error.ok).to.be.false;
     });
 
-    it('should report the failure to lana with the eventId and attendeeId', async () => {
+    it('should report attendee update failure without eventId or attendeeId', async () => {
       sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
       await api.updateAttendee('event-123', { attendeeId: 'att-1', name: 'John Doe' });
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
-      expect(lanaLogStub.firstCall.args[0]).to.include('att-1');
-      expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
-      expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[esp-controller,update-attendee] Request failed: http-status=400');
+      expect(lanaLogStub.firstCall.args[1].severity).to.equal('warning');
+      expect(lanaLogStub.firstCall.args[1]).to.not.have.property('sampleRate');
     });
 
     it('should report the failure to lana even if the response body never resolves', async () => {
@@ -506,13 +504,12 @@ describe('Adobe Event Service API', () => {
       expect(error.ok).to.be.false;
     });
 
-    it('should report the failure to lana with the eventId and attendeeId', async () => {
+    it('should report attendee deletion failure without eventId or attendeeId', async () => {
       sandbox.stub(window, 'fetch').onFirstCall().resolves({ text: () => 'Gone', ok: false });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
       await api.deleteAttendeeFromEvent('event-123', 'att-1');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
-      expect(lanaLogStub.firstCall.args[0]).to.include('att-1');
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[esp-controller,delete-attendee] Request failed: http-status=unknown');
       expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
       expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
     });
@@ -538,7 +535,7 @@ describe('Adobe Event Service API', () => {
 
     it('should return an error if registration fails', async () => {
       sandbox.stub(window, 'fetch').resolves({
-        json: () => ({ message: 'Conflict' }),
+        text: () => JSON.stringify({ message: 'Conflict' }),
         ok: false,
         status: 409,
       });
@@ -548,9 +545,9 @@ describe('Adobe Event Service API', () => {
       expect(result.status).to.equal(409);
     });
 
-    it('should report a registration failure to lana as critical, part of the RSVP flow', async () => {
+    it('should report a registration conflict to lana as warning, not an outage', async () => {
       sandbox.stub(window, 'fetch').resolves({
-        json: () => ({ message: 'Conflict' }),
+        text: () => JSON.stringify({ message: 'Conflict' }),
         ok: false,
         status: 409,
       });
@@ -558,8 +555,8 @@ describe('Adobe Event Service API', () => {
 
       await api.registerForSessionTime('time-1', 'me', { registrationStatus: 'registered' });
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
-      expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
+      expect(lanaLogStub.firstCall.args[1].severity).to.equal('warning');
+      expect(lanaLogStub.firstCall.args[1]).to.not.have.property('sampleRate');
     });
 
     it('should handle network errors', async () => {
@@ -587,14 +584,14 @@ describe('Adobe Event Service API', () => {
       expect(result.status).to.equal(409);
     });
 
-    it('should report an unregistration failure to lana as critical, part of the RSVP flow', async () => {
+    it('should report an unregistration conflict to lana as warning, not an outage', async () => {
       sandbox.stub(window, 'fetch').resolves({ ok: false, status: 409 });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
 
       await api.unregisterFromSessionTime('time-1');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
-      expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
+      expect(lanaLogStub.firstCall.args[1].severity).to.equal('warning');
+      expect(lanaLogStub.firstCall.args[1]).to.not.have.property('sampleRate');
     });
 
     it('should handle network errors', async () => {
@@ -668,7 +665,7 @@ describe('Adobe Event Service API', () => {
     });
 
     it('should return an error for a used/expired/revoked/unknown token', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
+      sandbox.stub(window, 'fetch').resolves({ text: () => '{"message":"Gone"}', ok: false, status: 410 });
       const result = await api.validateRsvpToken('event-123', 'tok-1');
       expect(result.ok).to.be.false;
       expect(result.status).to.equal(410);
@@ -681,17 +678,16 @@ describe('Adobe Event Service API', () => {
       expect(result.status).to.equal('Network Error');
     });
 
-    it('should report the failure to lana with the eventId, never the token', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
+    it('should report an unusable token without eventId or token', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => '{"message":"Gone"}', ok: false, status: 410 });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
       await api.validateRsvpToken('event-123', 'tok-1');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
-      expect(lanaLogStub.firstCall.args[0]).to.not.include('tok-1');
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[esp-controller,validate-rsvp-token] RSVP token not usable: http-status=410');
     });
 
     it('should log a used/expired/revoked/unknown token (401/404/409/410) as info, since it is expected control flow', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
+      sandbox.stub(window, 'fetch').resolves({ text: () => '{"message":"Gone"}', ok: false, status: 410 });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
       await api.validateRsvpToken('event-123', 'tok-1');
       expect(lanaLogStub.firstCall.args[1].severity).to.equal('info');
@@ -699,7 +695,7 @@ describe('Adobe Event Service API', () => {
     });
 
     it('should log a genuine validation failure (e.g. a 500) as critical, part of the RSVP flow', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Server error' }), ok: false, status: 500 });
+      sandbox.stub(window, 'fetch').resolves({ text: () => '{"message":"Server error"}', ok: false, status: 500 });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
       await api.validateRsvpToken('event-123', 'tok-1');
       expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
@@ -723,6 +719,141 @@ describe('Adobe Event Service API', () => {
     });
   });
 
+  describe('registration failure severity', () => {
+    const operations = [
+      { name: 'createAttendee', args: ['event-123', { attendeeId: 'att-1' }, 'tok-1'] },
+      { name: 'addAttendeeToEvent', args: ['event-123', { attendeeId: 'att-1' }, 'tok-1'] },
+      { name: 'updateAttendee', args: ['event-123', { attendeeId: 'att-1' }] },
+      { name: 'deleteAttendeeFromEvent', args: ['event-123', 'att-1'], rawText: true },
+      { name: 'registerForSessionTime', args: ['time-1', 'me', { registrationStatus: 'registered' }] },
+      { name: 'unregisterFromSessionTime', args: ['time-1'], noBody: true },
+      { name: 'validateRsvpToken', args: ['event-123', 'tok-1'] },
+    ];
+
+    operations.forEach(({
+      name, args, rawText, noBody,
+    }) => {
+      describe(name, () => {
+        [400, 401, 403, 404, 409, 410, 422].forEach((status) => {
+          it(`does not escalate an HTTP ${status} rejection to critical`, async () => {
+            const body = JSON.stringify({ code: 'Rejected' });
+            sandbox.stub(window, 'fetch').resolves(new Response(body, { status }));
+            const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+            const result = await api[name](...args);
+
+            expect(result.ok).to.be.false;
+            expect(result.status).to.equal(status);
+            if (!noBody) expect(result.error).to.deep.equal(rawText ? body : { code: 'Rejected' });
+            expect(lanaLogStub.calledOnce).to.be.true;
+            const expectedSeverity = name === 'validateRsvpToken' && [401, 404, 409, 410].includes(status)
+              ? 'info' : 'warning';
+            expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: expectedSeverity });
+            expect(lanaLogStub.firstCall.args[0]).to.not.include('tok-1');
+          });
+        });
+
+        [408, 429, 500, 502, 503].forEach((status) => {
+          it(`reports an HTTP ${status} registration service failure once as critical`, async () => {
+            sandbox.stub(window, 'fetch').resolves(new Response('Service unavailable', { status }));
+            const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+            const result = await api[name](...args);
+
+            expect(result.ok).to.be.false;
+            expect(result.status).to.equal(status);
+            if (!noBody) expect(result.error).to.equal('Service unavailable');
+            expect(lanaLogStub.calledOnce).to.be.true;
+            expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+            expect(lanaLogStub.firstCall.args[0]).to.include(`http-status=${status}`);
+          });
+        });
+
+        it('reports a network failure once as critical', async () => {
+          sandbox.stub(window, 'fetch').rejects(new Error('offline'));
+          const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+          const result = await api[name](...args);
+
+          expect(result).to.deep.equal({ ok: false, status: 'Network Error', error: 'offline' });
+          expect(lanaLogStub.calledOnce).to.be.true;
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+          expect(lanaLogStub.firstCall.args[0]).to.match(/^\[esp-controller,[a-z-]+\] Request failed: network-or-runtime$/);
+        });
+
+        it('groups HTTP failures across event, attendee, session, and token identities', async () => {
+          const fetchStub = sandbox.stub(window, 'fetch');
+          const lanaLogStub = sandbox.stub(window.lana, 'log');
+          for (let i = 0; i < 2; i += 1) {
+            const response = new Response(`Failure body ${i}`, { status: 503 });
+            Object.defineProperty(response, 'url', { value: `https://example.com/events/${i}?token=${i}` });
+            fetchStub.resolves(response);
+            const variedArgs = args.map((arg) => (typeof arg === 'string' ? `${arg}-${i}` : { ...arg, attendeeId: `attendee-${i}` }));
+            // eslint-disable-next-line no-await-in-loop
+            const result = await api[name](...variedArgs);
+            expect(result.status).to.equal(503);
+          }
+          expect(lanaLogStub.callCount).to.equal(2);
+          expect(lanaLogStub.firstCall.args).to.deep.equal(lanaLogStub.secondCall.args);
+          expect(lanaLogStub.firstCall.args[0]).to.match(/^\[esp-controller,[a-z-]+\] Request failed: http-status=503$/);
+        });
+
+        it('reports malformed success JSON once without including response body text', async () => {
+          sandbox.stub(window, 'fetch').resolves(new Response('PRIVATE ATTENDEE BODY'));
+          const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+          const result = await api[name](...args);
+
+          expect(result.ok).to.be.false;
+          expect(result.status).to.equal('Network Error');
+          expect(lanaLogStub.calledOnce).to.be.true;
+          expect(lanaLogStub.firstCall.args[0]).to.match(/^\[esp-controller,[a-z-]+\] Invalid JSON response$/);
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+        });
+
+        if (!noBody) {
+          [400, 503].forEach((status) => {
+            it(`preserves HTTP ${status} when reading its failure body throws, without another critical log`, async () => {
+              const response = new Response(null, { status });
+              sandbox.stub(response, 'text').rejects(new Error('body unavailable'));
+              sandbox.stub(window, 'fetch').resolves(response);
+              const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+              const result = await api[name](...args);
+
+              expect(result).to.deep.equal({ ok: false, status, error: status });
+              const severities = lanaLogStub.getCalls().map((call) => call.args[1].severity);
+              expect(severities).to.deep.equal([status === 503 ? 'critical' : 'warning', 'warning']);
+            });
+          });
+        }
+      });
+    });
+
+    it('keeps a full-session response non-critical and available for the waitlist retry', async () => {
+      const error = { code: 'SessionTimeFull', message: 'No seats left' };
+      sandbox.stub(window, 'fetch').resolves(new Response(JSON.stringify(error), { status: 409 }));
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+      const result = await api.registerForSessionTime('time-1', 'me', { registrationStatus: 'registered' });
+
+      expect(result).to.deep.equal({ ok: false, status: 409, error });
+      expect(lanaLogStub.calledOnce).to.be.true;
+      expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'warning' });
+    });
+
+    it('does not escalate a stale token with a non-JSON body during load-time validation', async () => {
+      sandbox.stub(window, 'fetch').resolves(new Response('Gone', { status: 410 }));
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
+
+      expect(result).to.deep.equal({ ok: false, status: 410, error: 'Gone' });
+      expect(lanaLogStub.calledOnce).to.be.true;
+      expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'info' });
+    });
+  });
+
   describe('getAndCreateAndAddAttendee', () => {
     const eventId = 'event-123';
     const attendeeData = { firstName: 'John', lastName: 'Doe', email: 'john@test.com' };
@@ -730,6 +861,188 @@ describe('Adobe Event Service API', () => {
 
     beforeEach(() => {
       BlockMediator.set('imsProfile', { account_type: 'type1' });
+    });
+
+    ['event', 'attendee'].forEach((lookup) => {
+      ['http', 'network', 'parse'].forEach((category) => {
+        it(`groups ${lookup} ${category} prerequisite failures across event and campaign identities`, async () => {
+          const fetchStub = sandbox.stub(window, 'fetch');
+          const lanaLogStub = sandbox.stub(window.lana, 'log');
+          for (let i = 0; i < 2; i += 1) {
+            fetchStub.resetBehavior();
+            const nextCall = fetchStub.callCount;
+            const failureCall = lookup === 'event' ? nextCall : nextCall + 1;
+            if (lookup === 'attendee') {
+              fetchStub.onCall(nextCall).resolves(new Response(JSON.stringify({ eventId: `event-${i}`, isFull: false })));
+            }
+            const detail = `PRIVATE RESPONSE ${i}`;
+            if (category === 'network') fetchStub.onCall(failureCall).rejects(new Error(detail));
+            else fetchStub.onCall(failureCall).resolves(new Response(category === 'http' ? JSON.stringify({ message: detail }) : detail, { status: category === 'http' ? 503 : 200 }));
+
+            // eslint-disable-next-line no-await-in-loop
+            const result = await api.getAndCreateAndAddAttendee(`event-${i}`, { ...attendeeData, campaignId: `campaign-${i}` });
+
+            expect(result.ok).to.be.false;
+            expect(result.status).to.equal(category === 'http' ? 503 : 'Network Error');
+          }
+          expect(lanaLogStub.callCount).to.equal(2);
+          expect(lanaLogStub.firstCall.args).to.deep.equal(lanaLogStub.secondCall.args);
+          const messages = {
+            http: 'Request failed: http-status=503',
+            network: 'Request failed: network-or-runtime',
+            parse: 'Invalid JSON response',
+          };
+          expect(lanaLogStub.firstCall.args).to.deep.equal([
+            `[esp-controller,get-${lookup}] ${messages[category]}`,
+            { severity: 'critical', sampleRate: 100 },
+          ]);
+        });
+      });
+
+      [400, 401, 403, 409, 410, 422, 408, 429, 500, 503].forEach((status) => {
+        it(`preserves and classifies HTTP ${status} from the ${lookup} prerequisite during submission`, async () => {
+          const fetchStub = sandbox.stub(window, 'fetch');
+          const failure = new Response(JSON.stringify({ message: 'Lookup failed' }), { status });
+          if (lookup === 'event') {
+            fetchStub.onCall(0).resolves(failure);
+          } else {
+            fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+            fetchStub.onCall(1).resolves(failure);
+          }
+          const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+          const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+          expect(result.ok).to.be.false;
+          expect(result.status).to.equal(status);
+          expect(result.error).to.deep.equal(lookup === 'event' ? { message: 'Lookup failed' } : '{"message":"Lookup failed"}');
+          expect(fetchStub.callCount).to.equal(lookup === 'event' ? 1 : 2);
+          expect(lanaLogStub.calledOnce).to.be.true;
+          const isCritical = [408, 429, 500, 503].includes(status);
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal(isCritical
+            ? { severity: 'critical', sampleRate: 100 } : { severity: 'warning' });
+          expect(lanaLogStub.firstCall.args[0]).to.equal(`[esp-controller,get-${lookup}] Request failed: http-status=${status}`);
+        });
+      });
+
+      it(`reports a network failure in the ${lookup} prerequisite once as critical during submission`, async () => {
+        const fetchStub = sandbox.stub(window, 'fetch');
+        if (lookup === 'event') {
+          fetchStub.onCall(0).rejects(new Error('offline'));
+        } else {
+          fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+          fetchStub.onCall(1).rejects(new Error('offline'));
+        }
+        const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+        const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+        expect(result).to.deep.equal({ ok: false, status: 'Network Error', error: 'offline' });
+        expect(lanaLogStub.calledOnce).to.be.true;
+        expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+      });
+
+      it(`does not emit a second critical log when the ${lookup} failure body cannot be read`, async () => {
+        const fetchStub = sandbox.stub(window, 'fetch');
+        const response = new Response(null, { status: 503 });
+        sandbox.stub(response, lookup === 'event' ? 'json' : 'text').rejects(new Error('body unavailable'));
+        if (lookup === 'event') {
+          fetchStub.onCall(0).resolves(response);
+        } else {
+          fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+          fetchStub.onCall(1).resolves(response);
+        }
+        const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+        const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+        expect(result).to.deep.equal({ ok: false, status: 503, error: 503 });
+        expect(lanaLogStub.getCalls().map((call) => call.args[1].severity)).to.deep.equal(['critical', 'warning']);
+      });
+
+      it(`keeps ${lookup} prerequisite failures at error outside a submission`, async () => {
+        sandbox.stub(window, 'fetch').resolves(new Response('{}', { status: 503 }));
+        const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+        await (lookup === 'event' ? api.getEvent(eventId) : api.getAttendee(eventId));
+
+        expect(lanaLogStub.calledOnce).to.be.true;
+        expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'error', sampleRate: 10 });
+      });
+
+      it(`reports a malformed successful ${lookup} response once as critical during submission`, async () => {
+        const fetchStub = sandbox.stub(window, 'fetch');
+        if (lookup === 'event') {
+          fetchStub.onCall(0).resolves(new Response('PRIVATE EVENT BODY'));
+        } else {
+          fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+          fetchStub.onCall(1).resolves(new Response('PRIVATE ATTENDEE BODY'));
+        }
+        const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+        const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+        expect(result.ok).to.be.false;
+        expect(lanaLogStub.calledOnce).to.be.true;
+        expect(lanaLogStub.firstCall.args[0]).to.equal(`[esp-controller,get-${lookup}] Invalid JSON response`);
+        expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+      });
+    });
+
+    it('keeps a missing event non-critical during submission', async () => {
+      sandbox.stub(window, 'fetch').resolves(new Response('{"message":"Not found"}', { status: 404 }));
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+      expect(result.status).to.equal(404);
+      expect(lanaLogStub.calledOnce).to.be.true;
+      expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'warning' });
+    });
+
+    it('creates a first-time attendee after a 404 lookup without a critical log', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+      fetchStub.onCall(1).resolves(new Response('Not found', { status: 404 }));
+      fetchStub.onCall(2).resolves(new Response(JSON.stringify(attendeeResp)));
+      fetchStub.onCall(3).resolves(new Response('{"registrationStatus":"registered"}'));
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+      expect(result.ok).to.be.true;
+      expect(fetchStub.callCount).to.equal(4);
+      expect(lanaLogStub.calledOnce).to.be.true;
+      expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'info' });
+    });
+
+    ['lookup', 'create', 'update'].forEach((operation) => {
+      [{}, null].forEach((body) => {
+        it(`reports an unusable successful attendee ${operation} response ${JSON.stringify(body)} once as critical`, async () => {
+          const fetchStub = sandbox.stub(window, 'fetch');
+          fetchStub.onCall(0).resolves(new Response(JSON.stringify({ eventId, isFull: false })));
+          if (operation === 'create') {
+            BlockMediator.set('imsProfile', { account_type: 'guest' });
+            fetchStub.onCall(1).resolves(new Response(JSON.stringify(body)));
+          } else if (operation === 'lookup') {
+            fetchStub.onCall(1).resolves(new Response(JSON.stringify(body)));
+          } else {
+            fetchStub.onCall(1).resolves(new Response(JSON.stringify(attendeeResp)));
+            fetchStub.onCall(2).resolves(new Response(JSON.stringify(body)));
+          }
+          const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+          const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+
+          expect(result.ok).to.be.false;
+          expect(result.status).to.equal('Unexpected Error');
+          expect(fetchStub.callCount).to.equal(operation === 'update' ? 3 : 2);
+          expect(lanaLogStub.calledOnce).to.be.true;
+          expect(lanaLogStub.firstCall.args[0]).to.equal('[esp-controller,get-and-create-and-add-attendee] Unexpected error submitting RSVP');
+          expect(result.error).to.include('missing attendeeId');
+          expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'critical', sampleRate: 100 });
+        });
+      });
     });
 
     it('should register when event is not full and no campaign', async () => {
@@ -811,11 +1124,14 @@ describe('Adobe Event Service API', () => {
       const fetchStub = sandbox.stub(window, 'fetch');
       fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
       fetchStub.onCall(1).resolves({ text: () => JSON.stringify({ message: 'Gone' }), ok: false, status: 410 });
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
 
       const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData, 'tok-1');
       expect(result.ok).to.be.false;
       expect(result.status).to.equal(410);
       expect(fetchStub.callCount).to.equal(2);
+      expect(lanaLogStub.calledOnce).to.be.true;
+      expect(lanaLogStub.firstCall.args[1]).to.deep.equal({ severity: 'warning' });
     });
 
     it('should waitlist when event is full regardless of campaign', async () => {
@@ -933,7 +1249,7 @@ describe('Adobe Event Service API', () => {
       expect(result.data.registrationStatus).to.equal('registered');
     });
 
-    it('should catch an unexpected/synchronous error and report it to lana with the eventId', async () => {
+    it('should catch an unexpected/synchronous error without splitting the log by eventId', async () => {
       BlockMediator.set('imsProfile', undefined);
       sandbox.stub(window, 'fetch').onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
@@ -943,7 +1259,7 @@ describe('Adobe Event Service API', () => {
       expect(result.ok).to.be.false;
       expect(result.status).to.equal('Unexpected Error');
       expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include(eventId);
+      expect(lanaLogStub.firstCall.args[0]).to.equal('[esp-controller,get-and-create-and-add-attendee] Unexpected error submitting RSVP');
       expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
       expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
     });
