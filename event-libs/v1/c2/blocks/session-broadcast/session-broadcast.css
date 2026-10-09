@@ -1022,8 +1022,7 @@
     background: #fff;
   }
 
-  /* Explicit 2-line clamp so a future width change can't silently drop it. On the inner span:
-     WebKit ignores line-clamp on the <button> title (MWPW-209870). */
+  /* Explicit 2-line clamp, on the span since WebKit ignores it on buttons (MWPW-209870). */
   .sb-carousel-section--up-next .sg-card__title-text {
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;

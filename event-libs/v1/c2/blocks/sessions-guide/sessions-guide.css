@@ -1529,8 +1529,7 @@
 }
 
 /* Figma's small card title is a fixed two lines (40px), so every card in a row is the same height.
-   Below 1280px only: desktop sizes its title separately. The clamp sits on the inner span because
-   WebKit (Safari and every iOS browser) ignores line-clamp on a <button> (MWPW-209870). */
+   Below 1280px only. On the span: WebKit ignores line-clamp on buttons (MWPW-209870). */
 @media (max-width: 1279px) {
   .sg-card__title-text {
     /* stylelint-disable-next-line value-no-vendor-prefix */

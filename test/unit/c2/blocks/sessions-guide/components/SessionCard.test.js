@@ -100,7 +100,7 @@ describe('SessionCard', () => {
     expect(badgeRowIndex).to.equal(titleIndex + 1);
   });
 
-  // MWPW-209870: WebKit ignores line-clamp on a <button>, so the clamp must sit on an inner span.
+  // MWPW-209870: WebKit ignores line-clamp on buttons, so the clamp sits on an inner span.
   describe('title clamp (WebKit)', () => {
     let frame;
 
