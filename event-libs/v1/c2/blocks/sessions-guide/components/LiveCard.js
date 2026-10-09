@@ -186,7 +186,7 @@ export function LiveCard({
               onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
               aria-label=${titleAriaLabel}
               daa-ll="Session-Card-Open"
-            >${session.title}</button>`;
+            ><span class="sg-live-card__title-text">${session.title}</span></button>`;
 
   // Current layout: horizontal, divider-separated, used everywhere except the new mobile 'live' case below.
   const metaBlock = html`

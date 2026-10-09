@@ -1162,9 +1162,14 @@
 
   /* Reserved at 2 lines' height so a 1-line title doesn't leave its card shorter than a 2-line one. */
   min-height: calc(2 * 1.1em);
+}
+
+/* On the span: WebKit ignores line-clamp on buttons (MWPW-209870). */
+.sg-live-card__title-text {
   /* stylelint-disable-next-line value-no-vendor-prefix */
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1518,9 +1523,6 @@
   color: var(--s2a-color-gray-900);
   line-height: 1.25;
   overflow: hidden;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
   margin: 0;
   min-width: 0;
   width: 100%;
@@ -1529,11 +1531,15 @@
 }
 
 /* Figma's small card title is a fixed two lines (40px), so every card in a row is the same height.
-   Below 1280px only: desktop sizes its title separately. */
+   Below 1280px only. On the span: WebKit ignores line-clamp on buttons (MWPW-209870). */
 @media (max-width: 1279px) {
-  .sg-card__title {
+  .sg-card__title-text {
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 }
 
@@ -2784,11 +2790,6 @@
     font-size: var(--s2a-font-size-3xl);
     color: #292929;
     margin-top: 0;
-    /* stylelint-disable-next-line value-no-vendor-prefix */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: #fff; }
