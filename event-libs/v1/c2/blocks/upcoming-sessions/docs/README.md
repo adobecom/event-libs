@@ -13,6 +13,8 @@ removed entirely rather than switching to a live badge/routing — every visible
 always in the "upcoming" state, so a click can only ever mean "open the Session Guide
 detail view" (`resolveClickAction`).
 
+The heading uses balanced text wrapping without forced line breaks or word grouping.
+
 ## Time display
 
 `formatTimeRange()` always renders in the *viewer's* local timezone, not the authored
@@ -99,9 +101,6 @@ the marquee's capped foreground without capping the carousel itself.
 
 ## CSS notes (`upcoming-sessions.css`)
 
-- Container sections with a direct `.upcoming-sessions` child remove their right
-  padding so the carousel can reach the section edge. Left and authored vertical
-  padding remain unchanged; other container sections are unaffected.
 - Design tokens come from `milo/libs/c2/styles/styles.css` (the C2 foundation
   stylesheet, guaranteed loaded whenever this block's `foundation: c2` metadata is
   present) rather than `c2/styles/tokens.css`, which isn't guaranteed present on a
@@ -142,6 +141,10 @@ the marquee's capped foreground without capping the carousel itself.
   The actions rules repeat `.upcoming-sessions-card` to outrank sessions-guide.css's
   unscoped `.sg-card.is-scheduled:not(.sg-card--on-demand) .sg-card__actions`, which ties
   on specificity and loads later on pages with the Session Guide widget.
+- Mobile/tablet card geometry (<1280px): the body does not grow into the card's
+  unused minimum-height space. The card's 16px gap is therefore the entire vertical
+  distance between the track badge and the action buttons, for both short and wrapped
+  titles. The desktop body retains its existing flexible layout.
 - Desktop track height: `.upcoming-sessions-track` reserves the expanded card height
   (`--upcoming-sessions-card-height-expanded`, 150px) and centers cards in it, with a
   negative `margin-block` cancelling that reservation at rest. A card expanding on

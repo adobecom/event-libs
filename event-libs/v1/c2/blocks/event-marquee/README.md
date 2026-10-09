@@ -126,6 +126,16 @@ Metadata** for a section holding this block — that pads/narrows `.section`
 itself (Milo's own grid classes) independently of the marquee's own padding,
 and fights with it. Leave the section's `style` field unset.
 
+Direct body paragraphs under `.event-marquee-text` use a 327px width below
+1024px, 329px from 1024px, 400px from 1440px, and 490px from 1920px upward.
+Their width is capped at the text column's available width to avoid overflow on
+narrow screens. CTA/action paragraphs and nested paragraphs are not constrained.
+
+Direct H1 headings use a 327px width below 1440px, 570px from 1440px,
+and 525px from 1920px upward, also capped at the available width. From 1440px to 1919px,
+the text column is 570px wide to accommodate the heading. H1 text uses balanced
+wrapping to distribute words across lines without forced breaks.
+
 ## Variants
 
 There is no explicit "variant" field to author. Two things are auto-detected

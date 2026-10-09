@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import { setViewport } from '@web/test-runner-commands';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import { renderDescriptionClamp } from '../../../../../event-libs/v1/c2/blocks/event-session-details/description-clamp.js';
 
@@ -60,5 +61,74 @@ describe('Description "More" Clamp', () => {
     expect(el.classList.contains('is-expanded')).to.be.false;
     expect(toggle.textContent).to.equal('Show more');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Description');
+  });
+
+  describe('responsive clamp (MWPW-210273)', () => {
+    const LONG = Array.from({ length: 60 }, (_, i) => `Sentence number ${i} about creative workflows.`).join(' ');
+
+    // The outer beforeEach resets <head>, so the stylesheet is attached per test.
+    beforeEach(async () => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/event-libs/v1/c2/blocks/event-session-details/description-clamp.css';
+      await new Promise((resolve, reject) => {
+        link.onload = resolve;
+        link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+        document.head.append(link);
+      });
+    });
+
+    beforeEach(() => {
+      document.body.innerHTML = '';
+      setMetadata('event-details', LONG);
+    });
+
+    afterEach(async () => {
+      document.body.innerHTML = '';
+      await setViewport({ width: 800, height: 600 });
+    });
+
+    const mount = async () => {
+      const el = renderDescriptionClamp();
+      document.body.append(el);
+      await new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); });
+      return {
+        body: el.querySelector('.session-description-text'),
+        toggle: el.querySelector('.session-description-toggle'),
+      };
+    };
+
+    it('clamps the text and offers the toggle on mobile', async () => {
+      await setViewport({ width: 375, height: 800 });
+      const { body, toggle } = await mount();
+      expect(body.scrollHeight).to.be.greaterThan(body.clientHeight + 1);
+      expect(toggle.hidden).to.be.false;
+      expect(getComputedStyle(toggle).display).to.not.equal('none');
+    });
+
+    it('clamps the text and offers the toggle on tablet', async () => {
+      await setViewport({ width: 800, height: 800 });
+      const { body, toggle } = await mount();
+      expect(body.scrollHeight).to.be.greaterThan(body.clientHeight + 1);
+      expect(toggle.hidden).to.be.false;
+    });
+
+    it('shows the full text with no toggle on desktop', async () => {
+      await setViewport({ width: 1280, height: 800 });
+      const { body, toggle } = await mount();
+      expect(body.scrollHeight).to.be.at.most(body.clientHeight + 1);
+      expect(getComputedStyle(body).overflow).to.equal('visible');
+      expect(getComputedStyle(toggle).display).to.equal('none');
+    });
+
+    it('drops the toggle when a mobile viewport is resized to desktop', async () => {
+      await setViewport({ width: 375, height: 800 });
+      const { body, toggle } = await mount();
+      expect(toggle.hidden).to.be.false;
+      await setViewport({ width: 1280, height: 800 });
+      await new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); });
+      expect(getComputedStyle(toggle).display).to.equal('none');
+      expect(body.scrollHeight).to.be.at.most(body.clientHeight + 1);
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { readFile, setViewport } from '@web/test-runner-commands';
+import { setViewport } from '@web/test-runner-commands';
 import sinon from 'sinon';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
 import {
@@ -79,33 +79,6 @@ describe('upcoming-sessions', () => {
     });
   });
 
-  it('removes only right padding from the upcoming-sessions container section', async () => {
-    const css = await readFile({
-      path: '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.css',
-    });
-    const style = document.createElement('style');
-    style.textContent = `.container { padding: 24px 72px 40px; } ${css}`;
-    document.head.append(style);
-
-    try {
-      const block = buildBlock([]);
-      const section = block.parentElement;
-      section.classList.add('container');
-      const unrelatedSection = document.createElement('div');
-      unrelatedSection.className = 'section container';
-      document.body.append(unrelatedSection);
-
-      const computed = getComputedStyle(section);
-      expect(computed.paddingRight).to.equal('0px');
-      expect(computed.paddingLeft).to.equal('72px');
-      expect(computed.paddingTop).to.equal('24px');
-      expect(computed.paddingBottom).to.equal('40px');
-      expect(getComputedStyle(unrelatedSection).paddingRight).to.equal('72px');
-    } finally {
-      style.remove();
-    }
-  });
-
   describe('attached carousel layout', () => {
     let styles;
     let originalViewport;
@@ -131,6 +104,20 @@ describe('upcoming-sessions', () => {
 
     afterEach(async () => {
       await setViewport(originalViewport);
+    });
+
+    [375, 1024].forEach((width) => {
+      it(`balances the heading text at ${width}px without changing its content`, async () => {
+        await setViewport({ width, height: 900 });
+        const text = 'Catch these upcoming sessions.';
+        const el = buildBlock([], text);
+        await init(el);
+        const heading = el.querySelector('.upcoming-sessions-heading');
+        expect(getComputedStyle(heading).textWrap).to.equal('balance');
+        expect(heading.textContent).to.equal(text);
+        expect(el.getAttribute('aria-label')).to.equal(text);
+        expect(heading.children.length).to.equal(0);
+      });
     });
 
     [375, 1024, 1440, 1920, 2300, 2560, 3200].forEach((width) => {
@@ -785,6 +772,69 @@ describe('upcoming-sessions', () => {
     });
   });
 
+  describe('mobile and tablet card layout', () => {
+    let styles;
+    let originalViewport;
+
+    before(async () => {
+      originalViewport = { width: window.innerWidth, height: window.innerHeight };
+      styles = await Promise.all(['upcoming-sessions', 'sessions-guide'].map(async (name) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `/event-libs/v1/c2/blocks/${name}/${name}.css`;
+        await new Promise((resolve, reject) => {
+          link.onload = resolve;
+          link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+          document.head.append(link);
+        });
+        return link;
+      }));
+    });
+
+    after(() => {
+      styles.forEach((link) => link.remove());
+    });
+
+    afterEach(async () => {
+      await setViewport(originalViewport);
+    });
+
+    [375, 768, 1024, 1279].forEach((width) => {
+      [false, true].forEach((dark) => {
+        it(`keeps exactly 16px between tracks and icons at ${width}px in ${dark ? 'dark' : 'light'} cards`, async () => {
+          await setViewport({ width, height: 900 });
+          const el = buildBlock([
+            session({ enTitle: 'Short title' }),
+            session({
+              sessionId: 'session-2',
+              enTitle: 'A session title long enough to wrap onto a second line in the card',
+              description: 'Hidden on mobile and tablet',
+              additionalTracks: ['Design'],
+            }),
+          ], 'Upcoming', { dark });
+          await init(el);
+
+          for (const state of ['rest', 'focus', 'scheduled', 'favorited']) {
+            if (state === 'scheduled') scheduled.value = new Set(['session-1', 'session-2']);
+            if (state === 'favorited') favorited.value = new Set(['session-1', 'session-2']);
+            el.querySelectorAll('.upcoming-sessions-card').forEach((card) => {
+              if (state === 'focus') card.querySelector('.sg-card__btn--schedule').focus();
+              const badge = card.querySelector('.sg-card__badge-row .sg-category-badge');
+              const badgeBottom = badge.getBoundingClientRect().bottom;
+              const bodyBottom = card.querySelector('.sg-card__body').getBoundingClientRect().bottom;
+              expect(bodyBottom, state).to.be.closeTo(badgeBottom, 0.5);
+              card.querySelectorAll('.sg-icon-btn').forEach((button) => {
+                expect(button.getBoundingClientRect().top - badgeBottom, state).to.be.closeTo(16, 0.5);
+              });
+              expect(card.getBoundingClientRect().height).to.be.at.least(168);
+              card.querySelector('.sg-card__btn--schedule').blur();
+            });
+          }
+        });
+      });
+    });
+  });
+
   describe('desktop card layout', () => {
     let styles;
     let originalViewport;
@@ -897,7 +947,7 @@ describe('upcoming-sessions', () => {
       const before = { header: header.getBoundingClientRect().top, track: track.offsetHeight };
 
       const card = el.querySelector('[data-session-id="session-2"]');
-      card.focus();
+      card.focus({ preventScroll: true });
       expect(card.getBoundingClientRect().height).to.be.greaterThan(128);
       expect(header.getBoundingClientRect().top).to.equal(before.header);
       expect(track.offsetHeight).to.equal(before.track);
@@ -926,6 +976,101 @@ describe('upcoming-sessions', () => {
       await init(el);
 
       expect(el.classList.contains('dark-card')).to.equal(true);
+    });
+
+    describe('late section styling', () => {
+      let styles;
+      let originalViewport;
+      let noMotion;
+
+      before(async () => {
+        originalViewport = { width: window.innerWidth, height: window.innerHeight };
+        styles = await Promise.all(['upcoming-sessions', 'sessions-guide'].map(async (name) => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = `/event-libs/v1/c2/blocks/${name}/${name}.css`;
+          await new Promise((resolve, reject) => {
+            link.onload = resolve;
+            link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+            document.head.append(link);
+          });
+          return link;
+        }));
+        noMotion = document.createElement('style');
+        noMotion.textContent = '.upcoming-sessions *, .upcoming-sessions *::after { transition: none !important; }';
+        document.head.append(noMotion);
+      });
+
+      after(() => {
+        styles.forEach((link) => link.remove());
+        noMotion.remove();
+      });
+
+      afterEach(async () => {
+        await setViewport(originalViewport);
+      });
+
+      function themeStyles(el) {
+        const selectors = [
+          '.upcoming-sessions-heading', '.upcoming-sessions-arrow', '.sg-card',
+          '.sg-card__title', '.sg-card__track', '.sg-card__time', '.sg-card__description',
+          '.sg-category-badge', '.sg-category-badge__icon-color',
+        ];
+        const properties = ['color', 'backgroundColor', 'borderTopColor', 'outlineColor', 'backdropFilter', 'gap'];
+        return [
+          ...selectors.map((selector) => getComputedStyle(el.querySelector(selector))),
+          getComputedStyle(el.querySelector('.sg-card__actions'), '::after'),
+        ].map((style) => properties.map((property) => style[property]));
+      }
+
+      [375, 1024, 1440].forEach((width) => {
+        it(`matches explicit dark-card styling when the section becomes dark after rendering at ${width}px`, async () => {
+          await setViewport({ width, height: 900 });
+          const el = buildBlock([session({ description: 'Session description' })]);
+          const section = el.closest('.section');
+          const wrapper = document.createElement('div');
+          wrapper.className = 'event-marquee-upcoming-wrapper';
+          section.prepend(wrapper);
+          wrapper.append(el);
+          await init(el);
+
+          const lightStyles = themeStyles(el);
+          el.classList.add('dark-card');
+          const darkStyles = themeStyles(el);
+          expect(darkStyles).not.to.deep.equal(lightStyles);
+
+          el.classList.remove('dark-card');
+          section.classList.add('dark');
+          expect(el.classList.contains('dark-card')).to.equal(false);
+          expect(themeStyles(el)).to.deep.equal(darkStyles);
+
+          const card = el.querySelector('.sg-card');
+          const scheduleButton = el.querySelector('.sg-card__btn--schedule');
+          for (const state of ['focus', 'scheduled', 'favorited']) {
+            if (state === 'focus') scheduleButton.focus();
+            if (state === 'scheduled') scheduled.value = new Set(['session-1']);
+            if (state === 'favorited') favorited.value = new Set(['session-1']);
+            const inheritedStyles = themeStyles(el);
+            section.classList.remove('dark');
+            el.classList.add('dark-card');
+            expect(themeStyles(el), state).to.deep.equal(inheritedStyles);
+            el.classList.remove('dark-card');
+            section.classList.add('dark');
+            scheduleButton.blur();
+          }
+
+          card.focus();
+          const focusedStyles = themeStyles(el);
+          section.classList.remove('dark');
+          el.classList.add('dark-card');
+          expect(themeStyles(el)).to.deep.equal(focusedStyles);
+          el.classList.remove('dark-card');
+          card.blur();
+          scheduled.value = new Set();
+          favorited.value = new Set();
+          expect(themeStyles(el)).to.deep.equal(lightStyles);
+        });
+      });
     });
   });
 

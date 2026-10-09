@@ -1,6 +1,6 @@
 /* ── Conflict Modal content ───────────────────────────────────────
    Positioning, backdrop, focus trap, Escape-to-close, close (X) button, and
-   scroll lock are all owned by Milo's shared modal (blocks/modal/modal.js) —
+   scroll lock are all owned by Milo's shared modal (classic or C2, per page) —
    this file only styles the content passed in as `custom.content`.
    Matches Figma: https://www.figma.com/design/pvyJnydCu9sE6msA1BHz9Z/Sessions-Guide-FINAL_Eng-Handoff-051526?node-id=9173-1502546 ── */
 
@@ -9,6 +9,12 @@
    unaffected (the curtain is a generic-classed sibling inserted after the dialog). */
 #sg-conflict-modal ~ .modal-curtain {
   background: rgb(0 0 0 / 60%);
+}
+
+/* The C2 modal's close button lands on the title line; keep it in the corner. */
+#sg-conflict-modal:has(> .sg-conflict-modal--c2) .dialog-close {
+  top: 13px;
+  right: 13px;
 }
 
 .sg-conflict-modal {
