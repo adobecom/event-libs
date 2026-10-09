@@ -289,28 +289,13 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   let emitted = false;
   let stopped = false;
 
-  const t0 = Date.now();
-  const emitIfChanged = (source) => {
+  const emitIfChanged = () => {
     if (stopped) return;
-    const wasEmitted = emitted;
     emitted = true;
     const phase = getPlaybackPhase(session, {
       nowMs: getNowMs(),
       eventStartMs: resolveEventStartMs(),
       liveStreamActiveIds,
-    });
-    // TEMP DEBUG - first-emit / poll timing diagnosis (prod vs preview on-demand flash)
-    // eslint-disable-next-line no-console
-    console.log('[watch] emitIfChanged', {
-      source,
-      msSinceStart: Date.now() - t0,
-      isFirstEmit: !wasEmitted,
-      phase,
-      lastPhase,
-      changed: phase !== lastPhase,
-      mrStreamId: session.mrStreamId,
-      activeIds: [...liveStreamActiveIds],
-      isLiveNow: session.mrStreamId ? liveStreamActiveIds.has(session.mrStreamId) : 'n/a',
     });
     if (phase !== lastPhase) {
       lastPhase = phase;
@@ -324,22 +309,22 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
     const boundary = nextPhaseBoundaryMs(session, { nowMs, eventStartMs: resolveEventStartMs() });
     if (boundary == null) return;
     const delay = Math.min((boundary - nowMs) + 500, 2 ** 31 - 1);
-    timerId = setTimeout(() => { emitIfChanged('clock-tick'); scheduleNextClockTick(); }, delay);
+    timerId = setTimeout(() => { emitIfChanged(); scheduleNextClockTick(); }, delay);
   };
 
   let unsubscribePoll = () => {};
   if (session.mrStreamId) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
-      emitIfChanged('poll-result');
+      emitIfChanged();
     }, [session.mrStreamId]);
     registerStreamIds([session.mrStreamId]);
     // Defer the first emit until the poll answers, so a live session doesn't briefly show DVR first.
     // But if the poll never answers (endpoint down), fall back to a clock-based phase after a short
     // wait so the player never stays blank; a later poll result still overrides it.
-    firstEmitTimerId = setTimeout(() => { if (!emitted) emitIfChanged('fallback-timeout'); }, POLL_FIRST_EMIT_FALLBACK_MS);
+    firstEmitTimerId = setTimeout(() => { if (!emitted) emitIfChanged(); }, POLL_FIRST_EMIT_FALLBACK_MS);
   } else {
-    emitIfChanged('no-mr-immediate');
+    emitIfChanged();
   }
   scheduleNextClockTick();
 

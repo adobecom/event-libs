@@ -30,24 +30,13 @@ async function tick(g) {
   const ids = [...g.refCounts.keys()];
   if (!ids.length) return;
   g.inFlight = true;
-  // TEMP DEBUG - MR poll env/timing diagnosis (prod vs preview on-demand flash)
-  const mrEnv = getEventApiConfig()?.mrEnv ?? deriveMrEnv();
-  const pollStart = Date.now();
   try {
-    const { active, inactive } = await fetchLiveStatus(ids, mrEnv);
+    const { active, inactive } = await fetchLiveStatus(ids, getEventApiConfig()?.mrEnv ?? deriveMrEnv());
     const result = { active: [...active], inactive: [...inactive] };
     lastResult = result;
     lastQueriedIds = ids;
-    // TEMP DEBUG
-    // eslint-disable-next-line no-console
-    console.log('[poller] tick done', {
-      mrEnv, ids, tookMs: Date.now() - pollStart, active: result.active, inactive: result.inactive,
-    });
     listeners.forEach((entry) => entry.notify(result, ids));
   } catch (error) {
-    // TEMP DEBUG
-    // eslint-disable-next-line no-console
-    console.log('[poller] tick FAILED', { mrEnv, ids, tookMs: Date.now() - pollStart, error: error?.message });
     logError('poller', 'poll failed', error);
   } finally {
     g.inFlight = false;
