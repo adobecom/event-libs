@@ -131,8 +131,8 @@ Direct body paragraphs under `.event-marquee-text` use a 327px width below
 Their width is capped at the text column's available width to avoid overflow on
 narrow screens. CTA/action paragraphs and nested paragraphs are not constrained.
 
-Direct H1 headings use the same breakpoints with widths of 327px, 398px, 570px,
-and 525px respectively, also capped at the available width. From 1440px to 1919px,
+Direct H1 headings use a 327px width below 1440px, 570px from 1440px,
+and 525px from 1920px upward, also capped at the available width. From 1440px to 1919px,
 the text column is 570px wide to accommodate the heading.
 
 ## Variants

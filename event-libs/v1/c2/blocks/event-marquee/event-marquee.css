@@ -201,10 +201,6 @@
     width: 329px;
   }
 
-  .event-marquee-text > h1 {
-    width: 398px;
-  }
-
   .event-marquee-media video {
     height: 100%;
     object-fit: cover;
