@@ -32,6 +32,10 @@ import { logWarning, logError } from './lana-log.js';
 import { hydrateBlocks } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
 import { initTierOneEventConfig } from './tier-1-event-config.js';
+import { seedYouTubeForLaunch } from '../c2/utils/youtube-launch-seed.js';
+
+// Must run at load: Launch scans for a YouTube iframe once, ~3s into the page.
+seedYouTubeForLaunch();
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
