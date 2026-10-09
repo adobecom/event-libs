@@ -12,6 +12,7 @@ import { IconButton } from './IconButton.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
+import { sessionDescriptionText } from '../utils/rich-text.js';
 
 export const buildSessionCard = () => SessionCard;
 
@@ -49,6 +50,7 @@ export function SessionCard({
   // Not watchable until the DVR window elapses (sessionEnd + delay; see dvrAvailableAtMs).
   const dvrPending = onDemand && isDvrPending(session, nowMs, getEventApiConfig()?.eventStartMs);
   const timeLabel = onDemand ? (dvrPending ? 'AVAILABLE SOON' : 'ON DEMAND') : upcomingTimeLabel;
+  const descriptionText = showDescription ? sessionDescriptionText(session) : '';
 
   const cardClass = [
     'sg-card',
@@ -172,7 +174,7 @@ export function SessionCard({
         <div class="sg-card__badge-row">
           <${CategoryBadge} session=${session} size="sm" />
         </div>
-        ${showDescription && session.description && html`<p class="sg-card__description">${session.description}</p>`}
+        ${showDescription && descriptionText && html`<p class="sg-card__description">${descriptionText}</p>`}
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.primaryTrack}</span>
           <span class="sg-card__footer-badge"><${CategoryBadge} session=${session} size="sm" /></span>

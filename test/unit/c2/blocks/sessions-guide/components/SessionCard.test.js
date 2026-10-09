@@ -218,6 +218,19 @@ describe('SessionCard', () => {
       expect(html).to.include('Learn AI integration.');
     });
 
+    it('shows an HTML description as tag-free preview text', () => {
+      const store = buildStore(preact);
+      store.SessionGuideContext._current = makeCtx();
+      const SessionCard = buildSessionCard(preact, store);
+      const html = SessionCard({
+        session: { ...UPCOMING_SESSION, description: '<p>Learn <strong>AI</strong> integration.</p>' },
+        showDescription: true,
+      });
+      expect(html).to.include('Learn AI integration.');
+      expect(html).to.not.include('<strong>');
+      expect(html).to.not.include('&lt;');
+    });
+
     it('omits the description when showDescription is true but the session has none', () => {
       const store = buildStore(preact);
       store.SessionGuideContext._current = makeCtx();
