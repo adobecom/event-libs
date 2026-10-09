@@ -139,6 +139,10 @@ the marquee's capped foreground without capping the carousel itself.
   The actions rules repeat `.upcoming-sessions-card` to outrank sessions-guide.css's
   unscoped `.sg-card.is-scheduled:not(.sg-card--on-demand) .sg-card__actions`, which ties
   on specificity and loads later on pages with the Session Guide widget.
+- Mobile/tablet card geometry (<1280px): the body does not grow into the card's
+  unused minimum-height space. The card's 16px gap is therefore the entire vertical
+  distance between the track badge and the action buttons, for both short and wrapped
+  titles. The desktop body retains its existing flexible layout.
 - Desktop track height: `.upcoming-sessions-track` reserves the expanded card height
   (`--upcoming-sessions-card-height-expanded`, 150px) and centers cards in it, with a
   negative `margin-block` cancelling that reservation at rest. A card expanding on

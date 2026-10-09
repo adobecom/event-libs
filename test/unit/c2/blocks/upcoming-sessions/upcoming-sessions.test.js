@@ -758,6 +758,69 @@ describe('upcoming-sessions', () => {
     });
   });
 
+  describe('mobile and tablet card layout', () => {
+    let styles;
+    let originalViewport;
+
+    before(async () => {
+      originalViewport = { width: window.innerWidth, height: window.innerHeight };
+      styles = await Promise.all(['upcoming-sessions', 'sessions-guide'].map(async (name) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `/event-libs/v1/c2/blocks/${name}/${name}.css`;
+        await new Promise((resolve, reject) => {
+          link.onload = resolve;
+          link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+          document.head.append(link);
+        });
+        return link;
+      }));
+    });
+
+    after(() => {
+      styles.forEach((link) => link.remove());
+    });
+
+    afterEach(async () => {
+      await setViewport(originalViewport);
+    });
+
+    [375, 768, 1024, 1279].forEach((width) => {
+      [false, true].forEach((dark) => {
+        it(`keeps exactly 16px between tracks and icons at ${width}px in ${dark ? 'dark' : 'light'} cards`, async () => {
+          await setViewport({ width, height: 900 });
+          const el = buildBlock([
+            session({ enTitle: 'Short title' }),
+            session({
+              sessionId: 'session-2',
+              enTitle: 'A session title long enough to wrap onto a second line in the card',
+              description: 'Hidden on mobile and tablet',
+              additionalTracks: ['Design'],
+            }),
+          ], 'Upcoming', { dark });
+          await init(el);
+
+          for (const state of ['rest', 'focus', 'scheduled', 'favorited']) {
+            if (state === 'scheduled') scheduled.value = new Set(['session-1', 'session-2']);
+            if (state === 'favorited') favorited.value = new Set(['session-1', 'session-2']);
+            el.querySelectorAll('.upcoming-sessions-card').forEach((card) => {
+              if (state === 'focus') card.querySelector('.sg-card__btn--schedule').focus();
+              const badge = card.querySelector('.sg-card__badge-row .sg-category-badge');
+              const badgeBottom = badge.getBoundingClientRect().bottom;
+              const bodyBottom = card.querySelector('.sg-card__body').getBoundingClientRect().bottom;
+              expect(bodyBottom, state).to.be.closeTo(badgeBottom, 0.5);
+              card.querySelectorAll('.sg-icon-btn').forEach((button) => {
+                expect(button.getBoundingClientRect().top - badgeBottom, state).to.be.closeTo(16, 0.5);
+              });
+              expect(card.getBoundingClientRect().height).to.be.at.least(168);
+              card.querySelector('.sg-card__btn--schedule').blur();
+            });
+          }
+        });
+      });
+    });
+  });
+
   describe('desktop card layout', () => {
     let styles;
     let originalViewport;
@@ -870,7 +933,7 @@ describe('upcoming-sessions', () => {
       const before = { header: header.getBoundingClientRect().top, track: track.offsetHeight };
 
       const card = el.querySelector('[data-session-id="session-2"]');
-      card.focus();
+      card.focus({ preventScroll: true });
       expect(card.getBoundingClientRect().height).to.be.greaterThan(128);
       expect(header.getBoundingClientRect().top).to.equal(before.header);
       expect(track.offsetHeight).to.equal(before.track);
