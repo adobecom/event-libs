@@ -223,6 +223,10 @@
   line-clamp: 2;
 }
 
+.mobile-rider .mobile-rider-info-bar-description.is-plain-text {
+  white-space: pre-line;
+}
+
 .mobile-rider .mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-description {
   -webkit-line-clamp: unset;
   line-clamp: unset;
@@ -250,6 +254,16 @@
 @media (max-width: 767px) {
   .mobile-rider .mobile-rider-info-bar-title {
     font-size: var(--s2a-font-size-md);
+  }
+
+  .mobile-rider .mobile-rider-info-bar {
+    padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-xl);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .mobile-rider .mobile-rider-info-bar {
+    padding: var(--s2a-spacing-lg) 88px var(--s2a-spacing-xl);
   }
 }
 
@@ -318,4 +332,14 @@
   inset: auto;
   margin: 0;
   text-align: left;
+}
+
+/* Authored HTML descriptions: tidy the first/last block's outer margins so the 2-line clamp and
+   bottom spacing stay consistent with the plain-text variant. */
+.mobile-rider .mobile-rider-info-bar-description > :first-child {
+  margin-top: 0;
+}
+
+.mobile-rider .mobile-rider-info-bar-description > :last-child {
+  margin-bottom: 0;
 }
