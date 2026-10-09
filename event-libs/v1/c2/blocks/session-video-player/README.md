@@ -93,7 +93,7 @@ Both `mpc` and `youtube` providers are handled — **`youtube`'s exact url
 shape is unconfirmed against real data** (no real sample seen yet), so
 `extractYouTubeId()` extracts an id defensively from whatever shape shows
 up (embed URL, watch URL, or a bare id) rather than assuming one. YouTube
-additionally gets `enablejsapi=1` and a unique `player-` ID, needed for
+additionally gets `enablejsapi=1` and a `player-<videoId>` ID, needed for
 state tracking below and the Launch analytics contract.
 
 ## YouTube Heartbeat registration

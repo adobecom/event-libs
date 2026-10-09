@@ -104,7 +104,7 @@ function buildMiloVideo(video) {
     createTag('iframe', {
       src,
       class: 'youtube',
-      id: youtubeId ? createYouTubePlayerId() : '',
+      id: youtubeId ? createYouTubePlayerId(youtubeId) : '',
       webkitallowfullscreen: '',
       mozallowfullscreen: '',
       allowfullscreen: '',

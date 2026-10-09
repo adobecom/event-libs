@@ -18,9 +18,9 @@ Authored as key/value rows on the block:
 
 ## Analytics integration
 
-Each video iframe has a unique ID beginning with `player-`. Both autoplay and
+Each video iframe has an ID of `player-<videoId>` (a `-<n>` suffix is added only if that ID is already on the page). Both autoplay and
 click-to-play URLs include `enablejsapi=1`, `rel=0`, and the resolved `videotype`.
-The privacy-enhanced embed host remains `www.youtube-nocookie.com`.
+The embed host is `www.youtube.com`: Launch's detection selector matches `src*="youtube.com"`, which `youtube-nocookie.com` does not satisfy.
 ID generation, required parameters, and once-only Launch registration are shared
 with `session-video-player` through `c2/utils/youtube-analytics.js`.
 
@@ -43,8 +43,8 @@ adapter uses the shared mount path with `videotype: 'live'`.
 
 ### Release verification
 
-Marketing Tech must confirm that the current post-AEP Launch rule detects
-`youtube-nocookie.com` and supports this registration timing, including multiple
+Marketing Tech must confirm that the current post-AEP Launch rule supports this
+registration timing, including multiple
 independently tracked players. Confirm play, pause, progress, and completion
 Heartbeat requests on a preview using the intended Launch configuration, and
 verify the resulting video data in Adobe Analytics.

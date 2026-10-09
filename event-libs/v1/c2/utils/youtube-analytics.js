@@ -3,11 +3,14 @@ import { logError, logWarning } from '../../utils/lana-log.js';
 let playerCount = 0;
 const registeredIframes = new WeakSet();
 
-export function createYouTubePlayerId() {
+export function createYouTubePlayerId(videoId) {
+  const base = `player-${String(videoId ?? '').replace(/[^\w-]/g, '')}`;
+  if (base !== 'player-' && !document.getElementById(base)) return base;
+
   let id;
   do {
     playerCount += 1;
-    id = `player-${playerCount}`;
+    id = base === 'player-' ? `player-${playerCount}` : `${base}-${playerCount}`;
   } while (document.getElementById(id));
   return id;
 }
