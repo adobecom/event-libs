@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import { readFile } from '@web/test-runner-commands';
+import { readFile, setViewport } from '@web/test-runner-commands';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import { sessions } from '../../../../event-libs/v1/utils/session-store.js';
 import init from '../../../../event-libs/v1/c2/blocks/event-marquee/event-marquee.js';
@@ -79,6 +79,82 @@ describe('event-marquee', () => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
     sessions.value = [];
+  });
+
+  describe('responsive heading and body paragraph widths', () => {
+    let originalViewport;
+
+    before(() => {
+      originalViewport = { width: window.innerWidth, height: window.innerHeight };
+    });
+
+    beforeEach(async () => {
+      const reset = document.createElement('style');
+      reset.textContent = 'html, body { margin: 0; padding: 0; }';
+      document.head.append(reset);
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/event-libs/v1/c2/blocks/event-marquee/event-marquee.css';
+      await new Promise((resolve, reject) => {
+        link.onload = resolve;
+        link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+        document.head.append(link);
+      });
+    });
+
+    afterEach(async () => {
+      await setViewport(originalViewport);
+    });
+
+    [
+      [320, 272, 272], [375, 327, 327], [768, 327, 327], [1023, 327, 327],
+      [1024, 329, 327], [1439, 329, 327], [1440, 400, 570], [1919, 400, 570],
+      [1920, 490, 525], [2560, 490, 525],
+    ].forEach(([width, paragraphWidth, headingWidth]) => {
+      [false, true].forEach((split) => {
+        it(`uses ${paragraphWidth}px body paragraphs at ${width}px in the ${split ? 'split' : 'text'} variant`, async () => {
+          await setViewport({ width, height: 900 });
+          document.body.innerHTML = body;
+          const el = document.querySelector('.event-marquee');
+          const originalHeading = el.querySelector('h2');
+          const heading = document.createElement('h1');
+          heading.textContent = originalHeading.textContent;
+          originalHeading.replaceWith(heading);
+          if (split) {
+            const asset = document.createElement('div');
+            asset.innerHTML = '<picture><img src="./background.jpg" alt=""></picture>';
+            el.lastElementChild.append(asset);
+          }
+          await init(el);
+          const text = el.querySelector('.event-marquee-text');
+          const paragraph = text.querySelector(':scope > p:not(.action-area)');
+          expect(paragraph.getBoundingClientRect().width).to.be.closeTo(paragraphWidth, 0.5);
+          expect(paragraph.getBoundingClientRect().right).to.be.at.most(text.getBoundingClientRect().right + 0.5);
+          expect(heading.getBoundingClientRect().width).to.be.closeTo(headingWidth, 0.5);
+          expect(getComputedStyle(heading).textWrap).to.equal('balance');
+          expect(heading.getBoundingClientRect().right).to.be.at.most(text.getBoundingClientRect().right + 0.5);
+          expect(document.documentElement.scrollWidth).to.equal(document.documentElement.clientWidth);
+        });
+      });
+    });
+
+    it('does not constrain action paragraphs or nested paragraphs', async () => {
+      await setViewport({ width: 1024, height: 900 });
+      document.body.innerHTML = `
+        <div class="event-marquee">
+          <div class="event-marquee-foreground">
+            <div class="event-marquee-text">
+              <p>Body copy</p>
+              <p class="action-area" style="width: 100%">Actions</p>
+              <div style="width: 100%"><p>Nested copy</p></div>
+            </div>
+          </div>
+        </div>`;
+      const text = document.querySelector('.event-marquee-text');
+      expect(text.querySelector(':scope > p:not(.action-area)').getBoundingClientRect().width).to.equal(329);
+      expect(text.querySelector('.action-area').getBoundingClientRect().width).to.equal(text.getBoundingClientRect().width);
+      expect(text.querySelector(':scope > div > p').getBoundingClientRect().width).to.equal(text.getBoundingClientRect().width);
+    });
   });
 
   describe('Text/CTA variant', () => {

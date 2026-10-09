@@ -49,6 +49,7 @@
   line-height: var(--s2a-typography-line-height-title-6, 18px);
   letter-spacing: var(--s2a-typography-letter-spacing-heading-6, -0.2px);
   hanging-punctuation: first last;
+  text-wrap: balance;
   color: var(--s2a-color-gray-1000, #000);
 }
 
@@ -175,7 +176,7 @@
 }
 
 .upcoming-sessions .sg-card__body {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   width: 100%;
   align-self: stretch;
