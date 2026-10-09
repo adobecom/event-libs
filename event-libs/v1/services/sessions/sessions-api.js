@@ -1,5 +1,7 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
-import { getEventServiceEnv, getEventConfig, normalizeMultilineText } from '../../utils/utils.js';
+import {
+  getEventServiceEnv, getEventConfig, normalizeMultilineText, htmlToPlainText,
+} from '../../utils/utils.js';
 import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
 
@@ -32,8 +34,12 @@ function stripRfPrefix(id) {
   return id ? id.replace(/^rf-/, '') : '';
 }
 
-export function normalizeSessions(rawSessions) {
-  return rawSessions.map((s) => ({
+function normalizeSession(s) {
+  // May be raw HTML or plain text with "\n" breaks; renderers sanitize the former and use
+  // `white-space: pre-line` for the latter. `descriptionText` is the tag-free form for previews,
+  // search, and calendar files.
+  const description = normalizeMultilineText(s.description);
+  return {
     id: s.id || '',
     // What an author searches RainFocus by; not to be confused with rfCode/rfSessionId.
     sessionCode: s.sessionCode || '',
@@ -41,8 +47,8 @@ export function normalizeSessions(rawSessions) {
     // Session-level id; favoriting keys on this, scheduling on rfCode.
     rfSessionId: s.rfSessionId || '',
     title: s.title || '',
-    // Kept as plain text with "\n" breaks; renderers use `white-space: pre-line`.
-    description: normalizeMultilineText(s.description),
+    description,
+    descriptionText: htmlToPlainText(description),
     startTimeUtc: s.startTimeUtc || '',
     endTimeUtc: s.endTimeUtc || '',
     duration: s.duration || 0,
@@ -84,7 +90,11 @@ export function normalizeSessions(rawSessions) {
     customAttributeValues: s.customAttributeValues || {},
     customAttributeLabels: s.customAttributeLabels || {},
     ...(s.legalDisclaimer ? { legalDisclaimer: s.legalDisclaimer } : {}),
-  }));
+  };
+}
+
+export function normalizeSessions(rawSessions) {
+  return rawSessions.map((s) => normalizeSession(s));
 }
 
 // MAX26 name first, MAX25 fallback. Exported so the configurator shares one copy.

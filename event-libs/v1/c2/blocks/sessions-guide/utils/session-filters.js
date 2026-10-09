@@ -1,6 +1,7 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
 import { deriveSessionState, isInLiveNow } from '../../../../utils/session-state.js';
 import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../../utils/tier-1-event-config.js';
+import { sessionDescriptionText } from './rich-text.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
   return sessions.filter((s) => getSessionDayKey(s, userTz) === activeDay);
@@ -216,7 +217,7 @@ export function hasActiveSearchOrFilters(activeFilters, searchQuery) {
 function matchesSearch(session, q) {
   return (
     session.title?.toLowerCase().includes(q)
-    || session.description?.toLowerCase().includes(q)
+    || sessionDescriptionText(session).toLowerCase().includes(q)
     || session.speakers?.some((sp) => sp.name?.toLowerCase().includes(q))
     || session.primaryTrack?.toLowerCase().includes(q)
     || session.type?.toLowerCase().includes(q)
