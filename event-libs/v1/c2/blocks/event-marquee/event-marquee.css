@@ -49,13 +49,14 @@
 :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
   top: calc(var(--s2a-spacing-80) + var(--s2a-spacing-lg));
   bottom: auto;
+  right: calc(max(0px, (100vw - 1920px) / 2) + var(--s2a-spacing-lg));
 }
 
 @media (min-width: 1280px) {
   :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
     top: calc(var(--s2a-spacing-3xl) + var(--s2a-spacing-xl));
     bottom: auto;
-    right: calc(max(0px, (100vw - 1920px) / 2) + var(--s2a-spacing-xl));
+    right: calc(max(0px, (100vw - 1920px) / 2) + var(--s2a-spacing-lg));
   }
 }
 
