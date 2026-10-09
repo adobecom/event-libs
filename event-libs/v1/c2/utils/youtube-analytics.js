@@ -1,13 +1,17 @@
 import { logError, logWarning } from '../../utils/lana-log.js';
+import { activateLaunchYouTube } from './youtube-launch-seed.js';
 
 let playerCount = 0;
 const registeredIframes = new WeakSet();
 
-export function createYouTubePlayerId() {
+export function createYouTubePlayerId(videoId) {
+  const base = `player-${String(videoId ?? '').replace(/[^\w-]/g, '')}`;
+  if (base !== 'player-' && !document.getElementById(base)) return base;
+
   let id;
   do {
     playerCount += 1;
-    id = `player-${playerCount}`;
+    id = base === 'player-' ? `player-${playerCount}` : `${base}-${playerCount}`;
   } while (document.getElementById(id));
   return id;
 }
@@ -36,6 +40,7 @@ export function registerYouTubeTracking(iframe, scope) {
         return;
       }
       satellite.track('trackYoutube');
+      activateLaunchYouTube();
     } catch (err) {
       logError(scope, 'failed to register YouTube tracking', err);
     }
