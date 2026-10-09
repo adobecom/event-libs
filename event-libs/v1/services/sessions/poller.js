@@ -113,9 +113,6 @@ export function subscribe(listener, watchIds) {
     },
   };
   listeners.add(entry);
-  // Replay the most recent poll result to this new subscriber if it already covers the watched
-  // ids — otherwise a listener that subscribed after the immediate poll returned would wait a full
-  // interval (and its own short fallback timer would flash a wrong, poll-less phase first).
   if (lastResult && (!watchSet || lastQueriedIds.some((id) => watchSet.has(id)))) {
     queueMicrotask(() => {
       if (listeners.has(entry)) entry.notify(lastResult, lastQueriedIds);
