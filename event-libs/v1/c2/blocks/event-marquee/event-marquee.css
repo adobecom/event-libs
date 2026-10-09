@@ -104,6 +104,7 @@
 .event-marquee-text > h1 {
   width: 327px;
   max-width: 100%;
+  text-wrap: balance;
 }
 
 .event-marquee-text > :not(.action-area):has(+ .action-area) {

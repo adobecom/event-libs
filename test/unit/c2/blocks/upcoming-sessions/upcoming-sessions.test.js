@@ -106,6 +106,20 @@ describe('upcoming-sessions', () => {
       await setViewport(originalViewport);
     });
 
+    [375, 1024].forEach((width) => {
+      it(`balances the heading text at ${width}px without changing its content`, async () => {
+        await setViewport({ width, height: 900 });
+        const text = 'Catch these upcoming sessions.';
+        const el = buildBlock([], text);
+        await init(el);
+        const heading = el.querySelector('.upcoming-sessions-heading');
+        expect(getComputedStyle(heading).textWrap).to.equal('balance');
+        expect(heading.textContent).to.equal(text);
+        expect(el.getAttribute('aria-label')).to.equal(text);
+        expect(heading.children.length).to.equal(0);
+      });
+    });
+
     [375, 1024, 1440, 1920, 2300, 2560, 3200].forEach((width) => {
       it(`bleeds only to the right viewport edge at ${width}px`, async () => {
         await setViewport({ width, height: 900 });

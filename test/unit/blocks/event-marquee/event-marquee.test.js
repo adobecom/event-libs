@@ -131,6 +131,7 @@ describe('event-marquee', () => {
           expect(paragraph.getBoundingClientRect().width).to.be.closeTo(paragraphWidth, 0.5);
           expect(paragraph.getBoundingClientRect().right).to.be.at.most(text.getBoundingClientRect().right + 0.5);
           expect(heading.getBoundingClientRect().width).to.be.closeTo(headingWidth, 0.5);
+          expect(getComputedStyle(heading).textWrap).to.equal('balance');
           expect(heading.getBoundingClientRect().right).to.be.at.most(text.getBoundingClientRect().right + 0.5);
           expect(document.documentElement.scrollWidth).to.equal(document.documentElement.clientWidth);
         });

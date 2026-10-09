@@ -13,6 +13,8 @@ removed entirely rather than switching to a live badge/routing — every visible
 always in the "upcoming" state, so a click can only ever mean "open the Session Guide
 detail view" (`resolveClickAction`).
 
+The heading uses balanced text wrapping without forced line breaks or word grouping.
+
 ## Time display
 
 `formatTimeRange()` always renders in the *viewer's* local timezone, not the authored

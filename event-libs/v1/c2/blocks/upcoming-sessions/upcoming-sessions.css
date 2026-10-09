@@ -49,6 +49,7 @@
   line-height: var(--s2a-typography-line-height-title-6, 18px);
   letter-spacing: var(--s2a-typography-letter-spacing-heading-6, -0.2px);
   hanging-punctuation: first last;
+  text-wrap: balance;
   color: var(--s2a-color-gray-1000, #000);
 }
 

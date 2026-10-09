@@ -133,7 +133,8 @@ narrow screens. CTA/action paragraphs and nested paragraphs are not constrained.
 
 Direct H1 headings use a 327px width below 1440px, 570px from 1440px,
 and 525px from 1920px upward, also capped at the available width. From 1440px to 1919px,
-the text column is 570px wide to accommodate the heading.
+the text column is 570px wide to accommodate the heading. H1 text uses balanced
+wrapping to distribute words across lines without forced breaks.
 
 ## Variants
 
