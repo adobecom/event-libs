@@ -222,9 +222,9 @@ coalesced, and unchanged state does not rebuild the widget. Temporary storage-wr
 failures are logged and retried during reconciliation and subsequent actions. If browser
 storage remains unavailable through a page reload, in-memory fallback actions cannot
 survive that reload.
-Reminder, live, and on-demand are distinct stages: dismissal survives repeated ticks
-and reloads at the same stage; a genuine stage advance intentionally surfaces an
-unread notification again.
+A session has a single notification entry that advances through reminder, live, and
+on-demand. Read and dismissed state survive repeated ticks, reloads, and stage
+advances, so an advance neither re-increments the badge nor un-dismisses the entry.
 
 The current catalog timestamps and the shared `getNowMs()` clock are authoritative.
 If a `serverTime` reset or catalog correction leaves a cached notification ahead of
