@@ -788,6 +788,71 @@ describe('session-state-view', () => {
       }
     });
 
+    // MWPW-210531: Broadcast only opens a specific session when Watch now carries ?watch=<id>.
+    describe('Watch now destination', () => {
+      const originMs = 1_794_339_000_000;
+      let clock;
+      let stop;
+      let originalUrl;
+
+      const ONLINE = { name: 'Format', inputType: 'multi-select', enabled: true, values: [{ value: 'online', label: 'Online' }] };
+      const LIVESTREAMED = { name: 'Livestreamed Content', inputType: 'text', enabled: true, values: [{ value: 'Live' }] };
+
+      const mountLive = (attributes = [ONLINE]) => {
+        setMetadata('custom-attributes', JSON.stringify(attributes));
+        setMetadata('session-times', JSON.stringify([{
+          startTimeMillis: originMs - 60_000, endTimeMillis: originMs + 3_600_000, timezone: 'UTC',
+        }]));
+        const { statusSlot, primaryCtaSlot } = slots();
+        stop = mountSessionState({ statusSlot, primaryCtaSlot });
+        return primaryCtaSlot.querySelector('.session-watch-now');
+      };
+
+      beforeEach(() => {
+        originalUrl = window.location.href;
+        clock = sinon.useFakeTimers({ now: originMs });
+        history.replaceState(null, '', `/max/2026/sessions/os709.html?serverTime=${originMs}`);
+      });
+
+      afterEach(() => {
+        stop?.();
+        clock.restore();
+        history.replaceState(null, '', originalUrl);
+      });
+
+      it('sends an online session to Broadcast with its id as ?watch=, keeping serverTime', () => {
+        setMetadata('session-id', '5e25cec1-7733-4c82-a583-d8ea7b96dd6f');
+        const watch = mountLive();
+        const url = new URL(watch.href);
+        expect(url.pathname).to.match(/\/broadcast(\.html)?$/);
+        expect(url.searchParams.get('watch')).to.equal('5e25cec1-7733-4c82-a583-d8ea7b96dd6f');
+        expect(url.searchParams.get('serverTime')).to.equal(String(originMs));
+      });
+
+      it('keeps ?watch= when the link is refreshed at click time', () => {
+        setMetadata('session-id', 'sid-1');
+        const watch = mountLive();
+        clock.tick(70_000);
+        watch.addEventListener('click', (e) => e.preventDefault());
+        watch.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        const url = new URL(watch.href);
+        expect(url.searchParams.get('watch')).to.equal('sid-1');
+        expect(url.searchParams.get('serverTime')).to.equal(String(originMs + 70_000));
+      });
+
+      it('still sends a livestreamed session to the homepage, without ?watch=', () => {
+        setMetadata('session-id', 'sid-1');
+        const url = new URL(mountLive([ONLINE, LIVESTREAMED]).href);
+        expect(url.pathname).to.not.match(/broadcast/);
+        expect(url.searchParams.has('watch')).to.be.false;
+      });
+
+      it('omits ?watch= when the page has no session-id', () => {
+        const watch = mountLive();
+        expect(new URL(watch.href).searchParams.has('watch')).to.be.false;
+      });
+    });
+
     // Add to schedule posts `virtual: true`, which RainFocus rejects unless the session time
     // is `virtualTime`. That flag is not synced to the page; Format `online` predicts it
     // exactly across all 166 published MAX26 sessions, so it is the gate. See MWPW-205503.
