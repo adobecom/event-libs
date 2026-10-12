@@ -10,3 +10,6 @@ Shared helpers for the `release-stage` and `release-prod` skills. This isn't a s
 
 Both need `git` with `origin` fetched; `collect-release.mjs` and `--pr` also need an authenticated
 `gh` CLI.
+
+`gh` calls are pinned to the `origin` repo (`origin-repo.mjs`), so they read the right PRs even in
+clones that also have an `upstream` remote. Run the scripts from inside the repo being released.
