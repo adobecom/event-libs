@@ -417,6 +417,7 @@ async function loadMobileRiderPlayer(el, video) {
   if (video.skinId) rider.dataset.extractedSkinId = video.skinId;
   rider.dataset.extractedAutoplay = 'true';
   initMobileRider(rider);
+  removeLoaderPlaceholder(el);
   el.dataset.embedded = 'true';
 }
 
@@ -447,6 +448,7 @@ function loadVideoPlayer(el, sessionId, video) {
     if (iframe.id) registerYouTubeTracking(iframe, LOG_SCOPE);
   } else watchMpcPlayback(sessionId, iframe);
 
+  removeLoaderPlaceholder(el);
   el.dataset.embedded = 'true';
 }
 
@@ -462,6 +464,22 @@ function isWinningInstance(el, hasPlaylist) {
 function hideLosingInstance(el) {
   if (closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
   el.classList.add('session-video-hidden');
+}
+
+// The main (.session-video-container) instance reserves its 16:9 slot and shows a loader from first
+// paint, so the body below doesn't jump when the video mounts later. The playlist-container instance
+// reserves nothing — it only grows if it wins the layout decision. Done synchronously at init,
+// before the async phase/poll/playlist decision resolves.
+function showLoaderPlaceholder(el) {
+  if (!closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
+  if (el.querySelector('.session-video-player-loader')) return;
+  el.classList.add('session-video-loading');
+  createTag('div', { class: 'session-video-player-loader', 'aria-hidden': 'true' }, '', { parent: el });
+}
+
+function removeLoaderPlaceholder(el) {
+  el.classList.remove('session-video-loading');
+  el.querySelector('.session-video-player-loader')?.remove();
 }
 
 function awaitEmbedDecision(el) {
@@ -535,6 +553,10 @@ export default async function init(el) {
   }
   const { sessionId, session, sessionTimes } = model;
 
+  // Reserve the main slot + show a loader immediately so the body doesn't jump when the video
+  // mounts later (no-op for the playlist-container instance).
+  showLoaderPlaceholder(el);
+
   let embeddedPhase = null;
 
   const onPhase = (phase) => {
@@ -574,6 +596,11 @@ export default async function init(el) {
       }
       return;
     }
+
+    // Non-playable phase: no video belongs in this slot right now, so drop the loader placeholder
+    // (its reserved box collapses). Covers both first-resolve PRE_EVENT/SIMULIVE/WATCH_LIVE and a
+    // teardown back out of a playable phase.
+    removeLoaderPlaceholder(el);
 
     // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player and
     // re-announce the phase so the playlist (if it had rendered for ON_DEMAND) can hide itself.
