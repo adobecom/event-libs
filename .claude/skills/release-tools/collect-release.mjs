@@ -60,6 +60,10 @@ console.log(JSON.stringify({
   repo: REPO,
   range: `origin/${base}..origin/${head}`,
   commits: subjects.length,
+  // For the release summary: files changed by the promotion, commits only on base, and the head SHA.
+  changedFiles: run('git', ['diff', '--name-only', `origin/${base}...origin/${head}`]).split('\n').filter(Boolean).length,
+  baseOnlyCommits: Number(run('git', ['rev-list', '--count', `origin/${head}..origin/${base}`])),
+  headSha: run('git', ['rev-parse', `origin/${head}`]),
   alreadyInBase,
   features,
   promotions: prs.filter((p) => p.isPromotion),
