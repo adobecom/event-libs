@@ -4,6 +4,7 @@
 // back to a local diff with the same filters as .github/workflows/pr-changed-files-comment.yml.
 // Usage: node .claude/skills/release-tools/purge-urls.mjs main stage [--pr 525] [--verify]
 import { execFileSync } from 'node:child_process';
+import originRepo from './origin-repo.mjs';
 
 const args = process.argv.slice(2);
 const prIndex = args.indexOf('--pr');
@@ -40,7 +41,7 @@ function isNonServedFile(path) {
 let files = null;
 let source = '';
 if (pr) {
-  const comments = JSON.parse(run('gh', ['api', `repos/{owner}/{repo}/issues/${pr}/comments`, '--paginate']));
+  const comments = JSON.parse(run('gh', ['api', `repos/${originRepo()}/issues/${pr}/comments`, '--paginate']));
   const bot = comments.find((c) => c.body.includes(MARKER));
   if (bot) {
     files = [...bot.body.matchAll(/^<domain>\/(.+)$/gm)].map((m) => m[1].trim());

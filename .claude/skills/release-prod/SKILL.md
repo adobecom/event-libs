@@ -42,6 +42,7 @@ node .claude/skills/release-tools/collect-release.mjs main stage
 - `features`: the individual PRs (with Jira) to list.
 - `promotions`: the `dev` → `stage` PRs covered (e.g. #516, #519); name them in the summary.
 - `noJira`: list those PRs anyway, marked "no Jira cited".
+- `alreadyInBase: true` means the range is a no-op for `main`: say so and stop.
 
 ## 4. Write the PR
 - **Title:** `<train> Prod Release` (e.g. `T3-26.42 Prod Release`).

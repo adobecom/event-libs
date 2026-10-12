@@ -43,6 +43,9 @@ node .claude/skills/release-tools/collect-release.mjs stage dev
 The JSON has `features` (PR number, title, author, Jira), `promotions`, `jira` (deduped) and
 `noJira` (PRs without a ticket: list them anyway, marked "no Jira cited").
 If `unresolved` isn't empty, look those PRs up manually.
+If `alreadyInBase` is `true`, everything in the range already reached `stage` another way (e.g. the
+same branch was also merged straight into `stage`): don't open a promotion, tell the user it's a
+no-op and stop.
 
 ## 4. Write the PR
 - **Title:** `<train>: Promote dev to stage` (e.g. `T3-26.42: Promote dev to stage`).
