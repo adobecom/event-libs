@@ -180,15 +180,15 @@ export function upsertEntry(rfCode, entry) {
     const prev = current[rfCode];
     // An advancement computed before another tab's removal must not recreate it.
     if ((expectedExisting && !prev) || STAGE_RANK[prev?.stage] > STAGE_RANK[entry.stage]) return current;
-    const stageChanged = !prev || prev.stage !== entry.stage;
     const sequence = Math.max(0, ...Object.values(current).map((value) => value.seq || 0)) + 1;
     return {
       ...current,
       [rfCode]: {
         ...prev,
         ...entry,
-        read: stageChanged ? false : (prev?.read ?? false),
-        dismissed: stageChanged ? false : (prev?.dismissed ?? false),
+        // One entry per session: a stage advance keeps the user's read/dismiss choice.
+        read: prev?.read ?? false,
+        dismissed: prev?.dismissed ?? false,
         updatedAt: now,
         seq: sequence,
       },
