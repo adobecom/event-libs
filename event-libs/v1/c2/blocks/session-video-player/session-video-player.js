@@ -533,6 +533,9 @@ function loadWhenDecided(el, sessionId, video) {
     try {
       const isWinner = await awaitEmbedDecision(el);
       if (!isWinner) {
+        // Lost the layout decision (video goes to the other container) — drop the reserved loader
+        // so the main instance doesn't keep a spinner above the real player.
+        removeLoaderPlaceholder(el);
         hideLosingInstance(el);
         return;
       }
