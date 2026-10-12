@@ -267,6 +267,17 @@ function buildWidget(mount) {
     });
   }
 
+  // UNav's profile menu keeps its trigger and open state inside <account-menu-trigger>'s shadow
+  // DOM, out of reach of the selector above, so click its trigger to close it (MWPW-208294).
+  // Bound ahead of bindNotificationPanel(): that click bubbles to document and must land before
+  // the panel adds its outside-click listener, or it would close the panel it just opened.
+  button.addEventListener('click', () => {
+    if (button.getAttribute('aria-expanded') === 'true') return;
+    document.querySelectorAll('header.global-navigation account-menu-trigger').forEach((menu) => {
+      menu.shadowRoot?.querySelector('[aria-expanded="true"]')?.click();
+    });
+  });
+
   const resetPanel = bindNotificationPanel(panel, button, header, () => {
     closeOtherGnavPopups();
     if (notificationsReady.value) markAllRead();
