@@ -162,6 +162,8 @@ Project-specific slash commands:
 - `/event-a11y` — WCAG 2.1 AA accessibility workflow for event-libs blocks, in three modes: **audit** (severity-ranked report, no edits), **fix** (targeted changes), or **add** (instrument a bare block). Static source review against a per-element checklist plus an ARIA pattern guide; ends with lint + unit-test verification. Ported from `adobecom/unity`'s `unity-a11y` — see [.claude/skills/event-a11y/README.md](.claude/skills/event-a11y/README.md) for what was adapted. Complements the runtime axe-core audit inside `/build-block-from-figma`.
 - `/event-libs-a11y` — audit, fix, or add WCAG 2.1 AA accessibility for event-libs blocks, features, and utilities, with repo-specific DOM patterns, scoped changes, targeted verification, and structured reports.
 - `/event-libs-preact-a11y` — audit, fix, or add accessibility for Preact/HTM components such as the sessions guide, including Context/Signals state, reactive ARIA, portals, focus lifecycle, and test-layer limitations.
+- `/release-stage` — open the `dev` → `stage` release PR for a release train (e.g. `T3-26.42`): collects PRs and Jira tickets, writes the body, waits for CI, then lists the manual steps (approval, merge commit, post-merge checks). Never merges.
+- `/release-prod` — open the `stage` → `main` prod release PR, generate the Akamai purge list for `www.adobe.com` and `business.adobe.com`, and list the manual steps: Akamai CCP purge, `--verify` after purging, smoke tests, and the manual EMC `npm run deploy:prod`. Never merges. Shared scripts: `.claude/skills/release-tools/`.
 
 ### Accessibility
 
