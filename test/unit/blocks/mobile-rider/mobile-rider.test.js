@@ -1135,6 +1135,28 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(shareBtn.getAttribute('aria-label')).to.equal('Share Opening Keynote');
     });
 
+    // MWPW-210449: HTML descriptions go through the same sanitizer as Session Guide/Broadcast.
+    it('renders an HTML description sanitized, dropping scripts and event handlers', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      sessions.value = [{
+        id: 's-100',
+        rfCode: 'rf-100',
+        description: '<p>Intro</p><ul><li>One</li></ul><img src="x" onerror="window.__xss = 1"><script>window.__xss = 1</script>',
+      }];
+      // Counts, not elements: chai printing a DOM node on failure hangs the test runner.
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      expect(desc.querySelector('p')?.textContent).to.equal('Intro');
+      expect(desc.querySelector('li')?.textContent).to.equal('One');
+      expect(desc.querySelectorAll('script').length).to.equal(0);
+      expect(desc.querySelectorAll('[onerror]').length).to.equal(0);
+      expect(desc.textContent.includes('<p>')).to.equal(false);
+      expect(desc.classList.contains('is-plain-text')).to.equal(false);
+    });
+
     it('does not render a Favorite button until the session resolves from the store', async () => {
       document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');

@@ -59,3 +59,17 @@
 .session-description-toggle[aria-expanded="true"] svg {
   transform: rotate(180deg);
 }
+
+/* Desktop shows the full description: no clamp, no toggle (MWPW-210273). Tablet/mobile keep both. */
+@media (min-width: 1024px) {
+  .session-description-text {
+    display: block;
+    overflow: visible;
+    line-clamp: unset;
+    -webkit-line-clamp: unset;
+  }
+
+  .session-description-toggle {
+    display: none;
+  }
+}

@@ -12,6 +12,7 @@ import { IconButton } from './IconButton.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
+import { sessionDescriptionText } from '../utils/rich-text.js';
 
 export const buildSessionCard = () => SessionCard;
 
@@ -34,13 +35,13 @@ export function SessionCard({
   const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
 
-  // 'range': session-broadcast's Upcoming section (e.g. "9:15AM - 9:45AM"), reusing the same
-  // start–end formatting LiveCard.js builds for its recommended variant.
+  // 'range': session-broadcast's Upcoming section (e.g. "9:15am–9:45am"), matching the
+  // unspaced en dash LiveCard.js and the homepage cards use.
   let upcomingTimeLabel;
   if (timeDisplay === 'range' && session.endTimeUtc) {
     const startShort = formatShortTime(session.startTimeUtc, userTz);
     const endShort = formatShortTime(session.endTimeUtc, userTz);
-    upcomingTimeLabel = `${startShort} - ${endShort}`;
+    upcomingTimeLabel = `${startShort}–${endShort}`;
   } else if (timeDisplay === 'duration' && session.endTimeUtc) {
     upcomingTimeLabel = formatDuration(session.startTimeUtc, session.endTimeUtc);
   } else {
@@ -49,6 +50,7 @@ export function SessionCard({
   // Not watchable until the DVR window elapses (sessionEnd + delay; see dvrAvailableAtMs).
   const dvrPending = onDemand && isDvrPending(session, nowMs, getEventApiConfig()?.eventStartMs);
   const timeLabel = onDemand ? (dvrPending ? 'AVAILABLE SOON' : 'ON DEMAND') : upcomingTimeLabel;
+  const descriptionText = showDescription ? sessionDescriptionText(session) : '';
 
   const cardClass = [
     'sg-card',
@@ -168,11 +170,11 @@ export function SessionCard({
           type="button"
           onclick=${(e) => { e.stopPropagation(); handleClick(); }}
           daa-ll=${cardDaaLl}
-        >${session.title}</button>
+        ><span class="sg-card__title-text">${session.title}</span></button>
         <div class="sg-card__badge-row">
           <${CategoryBadge} session=${session} size="sm" />
         </div>
-        ${showDescription && session.description && html`<p class="sg-card__description">${session.description}</p>`}
+        ${showDescription && descriptionText && html`<p class="sg-card__description">${descriptionText}</p>`}
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.primaryTrack}</span>
           <span class="sg-card__footer-badge"><${CategoryBadge} session=${session} size="sm" /></span>

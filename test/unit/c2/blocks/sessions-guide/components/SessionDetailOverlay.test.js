@@ -251,6 +251,21 @@ describe('SessionDetailOverlay', () => {
       expect(headingIndex).to.be.lessThan(descIndex);
     });
 
+    it('renders a plain-text description as text, without the rich-text modifier', () => {
+      const out = render({ description: 'Intro\nKey takeaways' });
+      expect(out).to.match(/<div[^>]*class="sg-detail__desc"/);
+      expect(out).to.include('Intro\nKey takeaways');
+      expect(out).to.not.include('is-rich-text');
+    });
+
+    // The htm stub doesn't serialize dangerouslySetInnerHTML, so only the wrapper is asserted
+    // here; the sanitized markup itself is covered in utils/rich-text.test.js.
+    it('renders an HTML description through the rich-text wrapper, never as escaped text', () => {
+      const out = render({ description: '<p>Intro</p><ul><li>One</li></ul>' });
+      expect(out).to.match(/<div[^>]*class="sg-detail__desc is-rich-text"/);
+      expect(out).to.not.include('&lt;p&gt;');
+    });
+
     it('omits the heading when the session has no description', () => {
       const out = render({ description: '' });
       expect(out).to.not.include('Session details');
@@ -349,6 +364,19 @@ describe('SessionDetailOverlay', () => {
     it('falls back to a placeholder when a speaker has no photo', () => {
       const out = render({ speakers: [speakers[0]] });
       expect(out).to.include('sg-detail__speaker-photo--placeholder');
+    });
+  });
+
+  describe('time range', () => {
+    it('joins start and end with an unspaced en dash', () => {
+      const out = render({
+        startTimeUtc: '2026-11-10T17:30:00.000Z',
+        endTimeUtc: '2026-11-10T17:45:00.000Z',
+      });
+      const template = document.createElement('template');
+      template.innerHTML = out;
+      expect(template.content.querySelector('.sg-detail__time').textContent)
+        .to.equal('9:30am–9:45am');
     });
   });
 

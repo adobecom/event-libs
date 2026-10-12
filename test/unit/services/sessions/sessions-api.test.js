@@ -1062,6 +1062,18 @@ describe('services/sessions/sessions-api', () => {
     it('defaults description to an empty string', () => {
       const [normalized] = normalizeSessions([{ id: 's-1' }]);
       expect(normalized.description).to.equal('');
+      expect(normalized.descriptionText).to.equal('');
+    });
+
+    it('keeps an HTML description as markup and adds a tag-free descriptionText', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1', description: '<p>Intro</p><ul><li>One</li></ul>' }]);
+      expect(normalized.description).to.equal('<p>Intro</p><ul><li>One</li></ul>');
+      expect(normalized.descriptionText).to.equal('Intro\n- One');
+    });
+
+    it('mirrors a plain-text description into descriptionText', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1', description: 'Intro\\nOne' }]);
+      expect(normalized.descriptionText).to.equal('Intro\nOne');
     });
 
     it('defaults resources/mrStreamId to [] / null when the raw session provides neither', () => {

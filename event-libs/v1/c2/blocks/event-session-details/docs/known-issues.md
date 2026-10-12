@@ -172,14 +172,15 @@ single row of two — the desktop limit likely wants to be 4.
 
 **Fix:** confirm each limit and whether any are responsive (owner: Kat).
 
-## 7. Desktop behavior is deferred in three places
+## 7. Desktop behavior is deferred in two places (description clamp fixed)
 
 **Files:** `description-clamp.js`, `event-speakers.js`, `event-session-resources.js`
 
 **Impact:** the description clamp and the speakers/resources toggles were specified as
-mobile-only — desktop should show the full text and all items with no toggle. All of them
+mobile-only — desktop should show the full text and all items with no toggle. The
+description clamp is now fixed (MWPW-210273: unclamped from 1024px). Speakers and resources
 currently truncate at **every** width: none of the `.is-overflow` rules sit inside a media
-query, and `--desc-lines` is unconditional. Noted in the original tickets as part of "the
+query. Noted in the original tickets as part of "the
 desktop pass".
 
 Speakers and resources previously named their constant `MOBILE_LIMIT`, which described that

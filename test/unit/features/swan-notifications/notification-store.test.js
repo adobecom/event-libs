@@ -91,7 +91,7 @@ describe('notification-store', () => {
       expect(getEntry('RF-1').updatedAt).to.be.at.least(before);
     });
 
-    it('preserves read/dismiss and fields at the same stage, but resets flags on advancement', () => {
+    it('preserves read/dismiss and fields at the same stage and across a stage advance', () => {
       upsertEntry('RF-1', { stage: 'reminder', title: 'First', actionUrl: '/a' });
       markRead('RF-1');
       dismissEntry('RF-1');
@@ -99,8 +99,9 @@ describe('notification-store', () => {
       expect(getEntry('RF-1').read).to.equal(true);
       expect(getEntry('RF-1').dismissed).to.equal(true);
       upsertEntry('RF-1', { stage: 'live', title: 'Live' });
-      expect(getEntry('RF-1').read).to.equal(false);
-      expect(getEntry('RF-1').dismissed).to.equal(false);
+      expect(getEntry('RF-1').stage).to.equal('live');
+      expect(getEntry('RF-1').read).to.equal(true);
+      expect(getEntry('RF-1').dismissed).to.equal(true);
       expect(getEntry('RF-1').actionUrl).to.equal('/a');
     });
 

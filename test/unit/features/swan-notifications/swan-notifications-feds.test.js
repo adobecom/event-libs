@@ -184,7 +184,7 @@ describe('swan-notifications-feds', () => {
       expect(getEntries().filter((e) => e.rfCode === 'RF-progress')).to.have.lengthOf(1);
     });
 
-    it('re-flags the entry unread on a stage advance', () => {
+    it('keeps the entry read across a stage advance', () => {
       const reminderSession = makeSession('RF-unread', { startOffsetMs: 2 * MIN, endOffsetMs: 120 * MIN });
       notifySessionScheduled(reminderSession);
       // Simulate the user having already opened the panel and read the reminder.
@@ -193,7 +193,18 @@ describe('swan-notifications-feds', () => {
 
       const liveSession = makeSession('RF-unread', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
       reconcileSwanNotifications(() => [liveSession], () => new Set([liveSession.id]));
-      expect(getEntry('RF-unread').read).to.equal(false);
+      expect(getEntry('RF-unread').stage).to.equal('live');
+      expect(getEntry('RF-unread').read).to.equal(true);
+    });
+
+    it('leaves an unread entry unread (no extra badge) across stage advances', () => {
+      const rfCode = 'RF-stays-unread';
+      notifySessionScheduled(makeSession(rfCode, { startOffsetMs: 2 * MIN, endOffsetMs: 120 * MIN }));
+      const live = makeSession(rfCode, { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      reconcileSwanNotifications(() => [live], () => new Set([live.id]));
+      const onDemand = makeSession(rfCode, { startOffsetMs: -30 * MIN, endOffsetMs: -MIN });
+      reconcileSwanNotifications(() => [onDemand], () => new Set([onDemand.id]));
+      expect(getEntries().filter((e) => !e.read)).to.have.lengthOf(1);
     });
 
     it('never re-applies a stage already reached, even across repeated reconcile calls at the same time', () => {
@@ -274,7 +285,7 @@ describe('swan-notifications-feds', () => {
       expect(getEntry('RF-dismissed').read).to.equal(true); // still marked read, from before dismiss
     });
 
-    it('resurfaces (undismissed, unread) an entry once its stage genuinely advances after being dismissed', () => {
+    it('keeps a dismissed entry dismissed (and read) when its stage advances', () => {
       const rfCode = 'RF-dismissed-then-live';
       const reminderSession = makeSession(rfCode, { startOffsetMs: 2 * MIN, endOffsetMs: 120 * MIN });
       notifySessionScheduled(reminderSession);
@@ -286,8 +297,8 @@ describe('swan-notifications-feds', () => {
       reconcileSwanNotifications(() => [liveSession], () => new Set([liveSession.id]));
 
       expect(getEntry(rfCode).stage).to.equal('live');
-      expect(getEntry(rfCode).dismissed).to.equal(false);
-      expect(getEntry(rfCode).read).to.equal(false);
+      expect(getEntry(rfCode).dismissed).to.equal(true);
+      expect(getEntry(rfCode).read).to.equal(true);
     });
 
     it('does not recreate expired on-demand notifications on subsequent ticks', () => {
