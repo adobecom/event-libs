@@ -49,17 +49,11 @@ no-op and stop.
 
 ## 4. Write the PR
 - **Title:** `<train>: Promote dev to stage` (e.g. `T3-26.42: Promote dev to stage`).
-- **Body:** keep the repo template (`.github/pull_request_template.md`) headings:
-  1. One-line summary naming the train.
-  2. Changes grouped by area, one bullet per PR: `- <short description> (#<pr>, MWPW-<id>)`.
-     Typical groups: **Session Guide**, **Broadcast / Video / Sessions**, **Homepage / Upcoming
-     Sessions / Banner**, **RSVP / Notifications / Calendar**, **CI / Tests / Tooling**.
-     Mention reverts and their pairs in a short **Release notes** section.
-  3. `Resolves:` followed by every Jira ticket as `[MWPW-x](https://jira.corp.adobe.com/browse/MWPW-x)`.
-  4. `Test URLs:`
-     - Before: `https://stage--event-libs--adobecom.aem.live/?martech=off`
-     - After: `https://dev--event-libs--adobecom.aem.live/?martech=off`
-- Format reference: event-libs #516.
+- **Body:** follow `.claude/skills/release-tools/pr-body-template.md`: release counts, a
+  **Area | Ticket | Resolution | PRs** table covering every PR, release accounting, test URLs
+  (`stage` → `dev`), and validation on the `dev` head SHA (`headSha`). Run `npm run lint` on that
+  SHA for the validation line; the test result comes from the PR's CI in step 5, so update the
+  body once CI finishes.
 
 ```bash
 gh pr create --base stage --head dev --title "<train>: Promote dev to stage" --body-file <file>

@@ -46,16 +46,10 @@ node .claude/skills/release-tools/collect-release.mjs main stage
 
 ## 4. Write the PR
 - **Title:** `<train> Prod Release` (e.g. `T3-26.42 Prod Release`).
-- **Body** (format reference: event-libs #525), keeping the repo template's `Resolves:` and
-  `Test URLs:` sections:
-  1. `Production release <train>: promotes stage → main with all changes since the last prod
-     release (#<previous>). Covers the stage promotions (#a, #b, …).`
-  2. Changes grouped by area, one bullet per PR: `- <short description> (#<pr>, MWPW-<id>)`.
-  3. **Release notes**: reverts, temporary flags, anything shipping in another repo.
-  4. `Resolves:` with every Jira ticket linked.
-  5. `Test URLs:`
-     - Before: `https://main--event-libs--adobecom.aem.live/?martech=off`
-     - After: `https://stage--event-libs--adobecom.aem.live/?martech=off`
+- **Body:** follow `.claude/skills/release-tools/pr-body-template.md`, as for stage, with a
+  production opening sentence that names the previous prod release (#<previous>) and the stage
+  promotions covered (`promotions` from step 3). Test URLs go `main` → `stage`; validation is on
+  the `stage` head SHA. Update the body with the CI result after step 5.
 
 ```bash
 gh pr create --base main --head stage --title "<train> Prod Release" --body-file <file>
