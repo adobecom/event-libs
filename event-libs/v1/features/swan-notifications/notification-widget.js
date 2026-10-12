@@ -191,7 +191,7 @@ function buildWidget(mount) {
   tooltip.append(createTag('span', { class: 'swan-notif__tooltip-tip' }));
   tooltip.append(createTag('span', { class: 'swan-notif__tooltip-label' }, dictionaryManager.getValue('Notifications')));
 
-  // Lets the list scroll under Milo's Lenis smooth scroll.
+  // data-lenis-prevent (here and on the scroller): scroll inside Milo's Lenis smooth scroll.
   const panel = createTag('dialog', {
     id: 'swan-notifications-panel',
     class: 'swan-notif__panel', 'aria-label': dictionaryManager.getValue('Notifications'), 'data-lenis-prevent': '',
@@ -222,19 +222,18 @@ function buildWidget(mount) {
     });
   }
 
-  // UNav's profile menu is in <account-menu-trigger>'s shadow DOM with its own state: click its
-  // trigger to close it. Bound before bindNotificationPanel() so its outside-click can't see it.
-  button.addEventListener('click', () => {
-    if (button.getAttribute('aria-expanded') === 'true') return;
+  // UNav's profile menu is in <account-menu-trigger>'s shadow DOM with its own state, so the
+  // selector above misses it and only a click on its trigger closes it.
+  function closeAccountMenu() {
     document.querySelectorAll('header.global-navigation account-menu-trigger').forEach((menu) => {
       menu.shadowRoot?.querySelector('[aria-expanded="true"]')?.click();
     });
-  });
+  }
 
   const resetPanel = bindNotificationPanel(panel, button, header, () => {
     closeOtherGnavPopups();
     if (notificationsReady.value) markAllRead();
-  });
+  }, closeAccountMenu);
 
   // Re-mount after a gnav re-render and reset the dialog's modal/scroll state.
   new MutationObserver(() => {
