@@ -27,6 +27,19 @@ describe('SessionInfoPanel', () => {
     expect(out).to.include('A session about everything.');
   });
 
+  it('renders a plain-text description as text, without the rich-text modifier', () => {
+    const out = SessionInfoPanel({ session: SESSION });
+    expect(out).to.match(/<div[^>]*class="sb-info__desc"/);
+    expect(out).to.not.include('is-rich-text');
+  });
+
+  // The htm stub doesn't serialize dangerouslySetInnerHTML; the markup is covered by rich-text tests.
+  it('renders an HTML description through the rich-text wrapper, never as escaped text', () => {
+    const out = SessionInfoPanel({ session: { ...SESSION, description: '<p>Intro</p><ul><li>One</li></ul>' } });
+    expect(out).to.match(/<div[^>]*class="sb-info__desc is-rich-text"/);
+    expect(out).to.not.include('&lt;p&gt;');
+  });
+
   it('shows Add-to-Favorites when not favorited', () => {
     const out = SessionInfoPanel({ session: SESSION });
     expect(out).to.include('daa-ll="Add-to-Favorites"');

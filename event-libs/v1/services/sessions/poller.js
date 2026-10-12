@@ -6,6 +6,10 @@ const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
 const groups = new Map();
 const listeners = new Set();
+// Last successful poll result + which ids it covered, so a listener that subscribes AFTER the
+// immediate poll already returned can be replayed the answer instead of waiting a full interval.
+let lastResult = null;
+let lastQueriedIds = [];
 
 function group(intervalMs) {
   let g = groups.get(intervalMs);
@@ -29,6 +33,8 @@ async function tick(g) {
   try {
     const { active, inactive } = await fetchLiveStatus(ids, getEventApiConfig()?.mrEnv ?? deriveMrEnv());
     const result = { active: [...active], inactive: [...inactive] };
+    lastResult = result;
+    lastQueriedIds = ids;
     listeners.forEach((entry) => entry.notify(result, ids));
   } catch (error) {
     logError('poller', 'poll failed', error);
@@ -107,6 +113,11 @@ export function subscribe(listener, watchIds) {
     },
   };
   listeners.add(entry);
+  if (lastResult && (!watchSet || lastQueriedIds.some((id) => watchSet.has(id)))) {
+    queueMicrotask(() => {
+      if (listeners.has(entry)) entry.notify(lastResult, lastQueriedIds);
+    });
+  }
   return () => listeners.delete(entry);
 }
 

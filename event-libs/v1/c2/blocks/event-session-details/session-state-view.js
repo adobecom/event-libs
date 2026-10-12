@@ -156,6 +156,8 @@ export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc =
 
 function getWatchSession(doc = document) {
   return {
+    // Broadcast needs `?watch=<id>` to open this session instead of auto-picking (MWPW-210531).
+    id: getMetadata('session-id', doc) || undefined,
     isLivestreamed: getAttrText('Livestreamed Content', doc).toLowerCase() === 'live',
     isOnline: getAttrValues('Format', doc).some((v) => (v.value || '').toLowerCase() === 'online'),
     sessionPageUrl: getMetadata('url', doc) || '',

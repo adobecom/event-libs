@@ -106,6 +106,20 @@ describe('upcoming-sessions', () => {
       await setViewport(originalViewport);
     });
 
+    [375, 1024].forEach((width) => {
+      it(`balances the heading text at ${width}px without changing its content`, async () => {
+        await setViewport({ width, height: 900 });
+        const text = 'Catch these upcoming sessions.';
+        const el = buildBlock([], text);
+        await init(el);
+        const heading = el.querySelector('.upcoming-sessions-heading');
+        expect(getComputedStyle(heading).textWrap).to.equal('balance');
+        expect(heading.textContent).to.equal(text);
+        expect(el.getAttribute('aria-label')).to.equal(text);
+        expect(heading.children.length).to.equal(0);
+      });
+    });
+
     [375, 1024, 1440, 1920, 2300, 2560, 3200].forEach((width) => {
       it(`bleeds only to the right viewport edge at ${width}px`, async () => {
         await setViewport({ width, height: 900 });
@@ -663,6 +677,20 @@ describe('upcoming-sessions', () => {
       expect(description.textContent).to.equal('Learn the fundamentals of Adobe Express.');
     });
 
+    // MWPW-210449: the hover preview shows HTML catalog descriptions as text, not raw tags.
+    it('renders an HTML description as plain text', () => {
+      const card = buildCard(session({ description: '<p>Get a front-row seat.</p><ul><li>New features</li></ul>' }));
+      const text = card.querySelector('.sg-card__description').textContent;
+      expect(/<\/?(p|ul|li)>/.test(text)).to.equal(false);
+      expect(text).to.include('Get a front-row seat.');
+      expect(text).to.include('New features');
+    });
+
+    it('omits the description paragraph when an HTML description has no text', () => {
+      const card = buildCard(session({ description: '<p></p>' }));
+      expect(card.querySelectorAll('.sg-card__description').length).to.equal(0);
+    });
+
     it('omits the description paragraph entirely when the payload does not supply one (TEC homepage payload may not carry it yet)', () => {
       const card = buildCard(session());
       expect(card.querySelector('.sg-card__description')).to.equal(null);
@@ -755,6 +783,69 @@ describe('upcoming-sessions', () => {
       expect(card.classList.contains('is-scheduled')).to.equal(false);
       expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('false');
       expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+    });
+  });
+
+  describe('mobile and tablet card layout', () => {
+    let styles;
+    let originalViewport;
+
+    before(async () => {
+      originalViewport = { width: window.innerWidth, height: window.innerHeight };
+      styles = await Promise.all(['upcoming-sessions', 'sessions-guide'].map(async (name) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `/event-libs/v1/c2/blocks/${name}/${name}.css`;
+        await new Promise((resolve, reject) => {
+          link.onload = resolve;
+          link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+          document.head.append(link);
+        });
+        return link;
+      }));
+    });
+
+    after(() => {
+      styles.forEach((link) => link.remove());
+    });
+
+    afterEach(async () => {
+      await setViewport(originalViewport);
+    });
+
+    [375, 768, 1024, 1279].forEach((width) => {
+      [false, true].forEach((dark) => {
+        it(`keeps exactly 16px between tracks and icons at ${width}px in ${dark ? 'dark' : 'light'} cards`, async () => {
+          await setViewport({ width, height: 900 });
+          const el = buildBlock([
+            session({ enTitle: 'Short title' }),
+            session({
+              sessionId: 'session-2',
+              enTitle: 'A session title long enough to wrap onto a second line in the card',
+              description: 'Hidden on mobile and tablet',
+              additionalTracks: ['Design'],
+            }),
+          ], 'Upcoming', { dark });
+          await init(el);
+
+          for (const state of ['rest', 'focus', 'scheduled', 'favorited']) {
+            if (state === 'scheduled') scheduled.value = new Set(['session-1', 'session-2']);
+            if (state === 'favorited') favorited.value = new Set(['session-1', 'session-2']);
+            el.querySelectorAll('.upcoming-sessions-card').forEach((card) => {
+              if (state === 'focus') card.querySelector('.sg-card__btn--schedule').focus();
+              const badge = card.querySelector('.sg-card__badge-row .sg-category-badge');
+              const badgeBottom = badge.getBoundingClientRect().bottom;
+              const bodyBottom = card.querySelector('.sg-card__body').getBoundingClientRect().bottom;
+              expect(bodyBottom, state).to.be.closeTo(badgeBottom, 0.5);
+              card.querySelectorAll('.sg-icon-btn').forEach((button) => {
+                expect(button.getBoundingClientRect().top - badgeBottom, state).to.be.closeTo(16, 0.5);
+              });
+              expect(card.getBoundingClientRect().height).to.be.at.least(168);
+              card.querySelector('.sg-card__btn--schedule').blur();
+            });
+          }
+        });
+      });
     });
   });
 
@@ -870,7 +961,7 @@ describe('upcoming-sessions', () => {
       const before = { header: header.getBoundingClientRect().top, track: track.offsetHeight };
 
       const card = el.querySelector('[data-session-id="session-2"]');
-      card.focus();
+      card.focus({ preventScroll: true });
       expect(card.getBoundingClientRect().height).to.be.greaterThan(128);
       expect(header.getBoundingClientRect().top).to.equal(before.header);
       expect(track.offsetHeight).to.equal(before.track);

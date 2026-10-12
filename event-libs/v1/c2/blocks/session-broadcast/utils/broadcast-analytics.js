@@ -1,21 +1,23 @@
-import { LIBS, getEventConfig } from '../../../../utils/utils.js';
 import { openSessionGuideDetail } from '../../../../utils/session-store.js';
 import { logError } from '../../../../utils/lana-log.js';
 
-// sendAnalytics takes a real Event, not a payload — any dimension travels in the event name.
-let sendAnalyticsPromise;
-function loadSendAnalytics() {
-  if (!sendAnalyticsPromise) {
-    const miloLibs = getEventConfig()?.miloConfig?.miloLibs ?? LIBS;
-    sendAnalyticsPromise = import(`${miloLibs}/blocks/modal/modal.js`).then((m) => m.sendAnalytics);
-  }
-  return sendAnalyticsPromise;
+// Milo's classic sendAnalytics payload; importing its modal.js doubles C2 modals (MWPW-210384).
+function fireAnalyticsEvent(name) {
+  // eslint-disable-next-line no-underscore-dangle
+  window._satellite?.track('event', {
+    xdm: {},
+    data: { web: { webInteraction: { name } } },
+  });
 }
 
-export async function trackBroadcastEvent(name) {
+export function trackBroadcastEvent(name) {
   try {
-    const sendAnalytics = await loadSendAnalytics();
-    sendAnalytics(new Event(name));
+    // eslint-disable-next-line no-underscore-dangle
+    if (window._satellite?.track) {
+      fireAnalyticsEvent(name);
+    } else {
+      window.addEventListener('alloy_sendEvent', () => fireAnalyticsEvent(name), { once: true });
+    }
   } catch (err) {
     logError('session-broadcast', 'analytics failed', err);
   }

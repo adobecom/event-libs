@@ -7,6 +7,7 @@ import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 describe('Profile Functions', () => {
   let clock;
   let metaEventId;
+  let imsInstanceListener;
 
   beforeEach(() => {
     clock = sinon.useFakeTimers();
@@ -15,6 +16,13 @@ describe('Profile Functions', () => {
     window.adobeProfile = null;
     window.fedsConfig = null;
     window.adobeIMS = null;
+
+    // Stand in for imslib: reply to getProfile()'s `getImsLibInstance` request with the current
+    // window.adobeIMS as the ready instance, so waitForImsInstance() resolves instead of timing out.
+    imsInstanceListener = () => {
+      window.dispatchEvent(new CustomEvent('onImsLibInstance', { detail: { instance: window.adobeIMS } }));
+    };
+    window.addEventListener('getImsLibInstance', imsInstanceListener);
     setEventConfig({}, {
       miloLibs: '/libs',
       env: { name: 'local' },
@@ -34,6 +42,7 @@ describe('Profile Functions', () => {
   });
 
   afterEach(() => {
+    window.removeEventListener('getImsLibInstance', imsInstanceListener);
     clock.restore();
     sinon.restore();
 

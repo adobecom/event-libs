@@ -1693,6 +1693,9 @@ describe('Metadata Massaging', () => {
     if (templateMeta) document.head.removeChild(templateMeta);
     const customAttrsMeta = document.head.querySelector('meta[name="custom-attributes"]');
     if (customAttrsMeta) document.head.removeChild(customAttrsMeta);
+    ['time-format', 'time-suffix'].forEach((name) => {
+      document.head.querySelector(`meta[name="${name}"]`)?.remove();
+    });
   });
 
   function setHideTimezoneLabelAttribute(value) {
@@ -1873,6 +1876,32 @@ describe('Metadata Massaging', () => {
     expect(result).to.have.property('user-event-date-time-range');
     expect(result['user-event-date-time-range']).to.be.a('string');
     expect(result['user-event-date-time-range']).to.match(/\w{3} \d{2} \| \d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M \w{3}/);
+  });
+
+  it('should render 24h times with the Uhr suffix when time-format and time-suffix are set', () => {
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('custom-date-time-format', '{LLL} {dd} | {timeRange}');
+    setMetadata('time-format', '24h');
+    setMetadata('time-suffix', 'Uhr');
+
+    const result = massageMetadata('de-DE');
+
+    expect(result['user-start-date-time']).to.not.match(/AM|PM/i);
+    expect(result['user-end-date-time']).to.match(/\d{2}:\d{2} Uhr/);
+    expect(result['user-event-date-time-range']).to.match(/\d{2}:\d{2} - \d{2}:\d{2} Uhr$/);
+    expect(result['user-event-date-time-range'].match(/Uhr/g)).to.have.length(1);
+  });
+
+  it('should keep 12h output when time-format is not set', () => {
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('time-suffix', 'Uhr');
+
+    const result = massageMetadata('en-US');
+
+    expect(result['user-end-date-time']).to.match(/[AP]M/);
+    expect(result['user-end-date-time']).to.not.contain('Uhr');
   });
 
   it('should omit the timezone abbreviation everywhere when the hide-timezone-label custom attribute is true', () => {

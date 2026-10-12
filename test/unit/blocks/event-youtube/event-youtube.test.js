@@ -106,7 +106,7 @@ describe('Event YouTube Module', () => {
         };
 
         const autoplayUrl = youtubeChat.buildEmbedUrl(true);
-        expect(autoplayUrl).to.include('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+        expect(autoplayUrl).to.include('https://www.youtube.com/embed/dQw4w9WgXcQ');
         expect(autoplayUrl).to.include('autoplay=1');
         expect(autoplayUrl).to.include('mute=1');
         expect(autoplayUrl).to.include('controls=1');
@@ -114,7 +114,7 @@ describe('Event YouTube Module', () => {
         expect(new URL(autoplayUrl).searchParams.getAll('autoplay')).to.deep.equal(['1']);
 
         const noAutoplayUrl = youtubeChat.buildEmbedUrl(false);
-        expect(noAutoplayUrl).to.include('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+        expect(noAutoplayUrl).to.include('https://www.youtube.com/embed/dQw4w9WgXcQ');
         expect(noAutoplayUrl).to.not.include('autoplay=1');
         expect(noAutoplayUrl).to.not.include('mute=1');
         expect(noAutoplayUrl).to.include('controls=1');
@@ -207,8 +207,10 @@ describe('Event YouTube Module', () => {
         expect(links.length).to.be.greaterThan(0);
 
         const hrefs = Array.from(links).map((link) => link.href);
-        expect(hrefs).to.include('https://www.youtube-nocookie.com/');
         expect(hrefs).to.include('https://www.youtube.com/');
+        expect(hrefs).to.not.include('https://www.youtube-nocookie.com/');
+        expect(hrefs).to.include('https://www.youtube.com/');
+        expect(hrefs).to.not.include('https://www.youtube-nocookie.com/');
 
         document.head.innerHTML = originalHead;
       });
@@ -248,11 +250,12 @@ describe('Event YouTube Module', () => {
     describe('createVideoIframe', () => {
       it('should create iframe with correct attributes', () => {
         youtubeChat.config = { videotitle: 'Test Video' };
-        const src = 'https://www.youtube-nocookie.com/embed/test';
+        youtubeChat.videoId = 'dQw4w9WgXcQ';
+        const src = 'https://www.youtube.com/embed/test';
         const iframe = youtubeChat.createVideoIframe(src);
 
         expect(iframe.classList.contains('youtube-video')).to.be.true;
-        expect(iframe.id).to.match(/^player-/);
+        expect(iframe.id).to.equal('player-dQw4w9WgXcQ');
         expect(iframe.src).to.equal(src);
         expect(iframe.title).to.equal('Test Video');
         expect(iframe.loading).to.equal('lazy');
@@ -351,9 +354,9 @@ describe('Event YouTube Module', () => {
 
           const iframe = parent.querySelector('iframe.youtube-video');
           const url = new URL(iframe.src);
-          expect(iframe.id).to.match(/^player-/);
+          expect(iframe.id).to.equal('player-dQw4w9WgXcQ');
           expect(iframe.title).to.equal('Authored video title');
-          expect(url.origin).to.equal('https://www.youtube-nocookie.com');
+          expect(url.origin).to.equal('https://www.youtube.com');
           expect(url.pathname).to.equal('/embed/dQw4w9WgXcQ');
           expect(url.searchParams.getAll('enablejsapi')).to.deep.equal(['1']);
           expect(url.searchParams.getAll('rel')).to.deep.equal(['0']);
@@ -416,13 +419,17 @@ describe('Event YouTube Module', () => {
 
     it('avoids IDs already used by another player on the page', () => {
       const first = player.createVideoIframe(player.buildEmbedUrl());
-      const nextCount = Number(first.id.slice('player-'.length)) + 1;
-      const otherPlayer = document.createElement('div');
-      otherPlayer.id = `player-${nextCount}`;
-      document.body.append(otherPlayer);
+      document.body.append(first);
       const second = player.createVideoIframe(player.buildEmbedUrl());
-      expect(second.id).not.to.equal(otherPlayer.id);
+      expect(first.id).to.equal('player-dQw4w9WgXcQ');
+      expect(second.id).to.match(/^player-dQw4w9WgXcQ-\d+$/);
       expect(second.id).not.to.equal(first.id);
+    });
+
+    it('falls back to a counter ID when the video ID has no usable characters', () => {
+      player.videoId = '!!';
+      const iframe = player.createVideoIframe(player.buildEmbedUrl());
+      expect(iframe.id).to.match(/^player-\d+$/);
     });
 
     it('does not track detached construction or iframe creation', () => {

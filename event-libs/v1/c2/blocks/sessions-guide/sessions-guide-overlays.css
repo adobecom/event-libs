@@ -461,6 +461,28 @@
   white-space: pre-line;
 }
 
+/* Authored HTML carries its own structure; source newlines between tags are not line breaks. */
+.sg-detail__desc.is-rich-text {
+  white-space: normal;
+}
+
+.sg-detail__desc.is-rich-text :is(p, ul, ol) {
+  margin: 0 0 0.75em;
+}
+
+.sg-detail__desc.is-rich-text :is(ul, ol) {
+  padding-inline-start: 1.25em;
+}
+
+.sg-detail__desc.is-rich-text > :last-child {
+  margin-bottom: 0;
+}
+
+.sg-detail__desc.is-rich-text a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .sg-detail__more-icon {
   display: inline-block;
   width: 8px;

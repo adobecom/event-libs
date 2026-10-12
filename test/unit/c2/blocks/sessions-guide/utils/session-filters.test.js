@@ -333,6 +333,15 @@ describe('session-filters/filterSessions', () => {
     expect(filterSessions(withCodes, null, 's001').map((s) => s.id)).to.deep.equal(['a']);
     expect(filterSessions(withCodes, null, 'S002').map((s) => s.id)).to.deep.equal(['b']);
   });
+
+  it('searches the description text, not its HTML tags', () => {
+    const withHtml = [
+      { id: 'a', title: 'Foo', description: '<p>Learn <strong>lettering</strong></p>' },
+      { id: 'b', title: 'Bar', description: 'Plain copy' },
+    ];
+    expect(filterSessions(withHtml, null, 'lettering').map((s) => s.id)).to.deep.equal(['a']);
+    expect(filterSessions(withHtml, null, 'strong').map((s) => s.id)).to.deep.equal([]);
+  });
 });
 
 // Override, when present, always wins swimlane placement and the badge regardless of

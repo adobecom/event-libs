@@ -1,4 +1,5 @@
 import { logWarning, logError } from '../../../../utils/lana-log.js';
+import { sessionDescriptionText } from './rich-text.js';
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -76,7 +77,7 @@ export function generateICS(sessions) {
     }
 
     const speakerNames = s.speakers?.map((sp) => sp.name).filter(Boolean).join(', ') || '';
-    const descParts = [s.description, speakerNames ? `Speakers: ${speakerNames}` : ''].filter(Boolean);
+    const descParts = [sessionDescriptionText(s), speakerNames ? `Speakers: ${speakerNames}` : ''].filter(Boolean);
     // Outlook does not display VEVENT's URL, so include it in the body as well.
     if (s.sessionPageUrl) descParts.push(`Session page: ${s.sessionPageUrl}`);
 
