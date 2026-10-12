@@ -12,7 +12,7 @@ import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../..
 import { showToast } from '../../../../features/toast/toast.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
 import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
-import { sanitizedRichText } from '../utils/rich-text.js';
+import { sanitizedRichText, descriptionHtml } from '../utils/rich-text.js';
 import {
   IconHeartFilled, IconHeartOutline, IconLinkOut, IconCalendarCheck, IconCalendarPlus,
 } from './icons.js';
@@ -70,6 +70,7 @@ export function SessionDetailOverlay({ onBack }) {
 
   const session = sessions.value.find((s) => s.id === activeSessionId);
   if (!session) return null;
+  const richDescription = descriptionHtml(session.description);
 
   // Establishes a re-render dependency on time-driven session-state transitions.
   // eslint-disable-next-line no-unused-expressions
@@ -259,7 +260,9 @@ export function SessionDetailOverlay({ onBack }) {
                 <div class="sg-detail__details">
                   <h3 class="sg-detail__section-label">Session details</h3>
                   <div class=${'sg-detail__desc-wrap' + (descExpanded ? ' is-expanded' : '')} id="sg-detail-desc">
-                    <p class="sg-detail__desc">${session.description}</p>
+                    ${richDescription
+    ? html`<div class="sg-detail__desc is-rich-text" dangerouslySetInnerHTML=${{ __html: richDescription }}></div>`
+    : html`<div class="sg-detail__desc">${session.description}</div>`}
                   </div>
                   <button
                     class="sg-detail__more"

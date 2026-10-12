@@ -327,6 +327,28 @@
   white-space: pre-line;
 }
 
+/* Authored HTML carries its own structure; source newlines between tags are not line breaks. */
+.sb-info__desc.is-rich-text {
+  white-space: normal;
+}
+
+.sb-info__desc.is-rich-text :is(p, ul, ol) {
+  margin: 0 0 0.5em;
+}
+
+.sb-info__desc.is-rich-text :is(ul, ol) {
+  padding-inline-start: 1.25em;
+}
+
+.sb-info__desc.is-rich-text > :last-child {
+  margin-bottom: 0;
+}
+
+.sb-info__desc.is-rich-text a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .sb-info__view-all {
   grid-area: viewall;
   align-self: flex-start;
@@ -1022,8 +1044,8 @@
     background: #fff;
   }
 
-  /* Explicit 2-line clamp so a future width change can't silently drop it. */
-  .sb-carousel-section--up-next .sg-card__title {
+  /* Explicit 2-line clamp, on the span since WebKit ignores it on buttons (MWPW-209870). */
+  .sb-carousel-section--up-next .sg-card__title-text {
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
     -webkit-line-clamp: 2;

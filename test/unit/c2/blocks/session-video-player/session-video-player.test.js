@@ -622,7 +622,7 @@ describe('session-video-player', () => {
         const el = await embedFullWidth();
 
         const iframe = el.querySelector('iframe.youtube');
-        expect(iframe.id).to.match(/^player-/);
+        expect(iframe.id).to.equal('player-abcdefghijk');
         const src = new URL(getIframeSrc(iframe));
         expect(src.origin).to.equal('https://www.youtube.com');
         expect(src.pathname).to.equal('/embed/abcdefghijk');

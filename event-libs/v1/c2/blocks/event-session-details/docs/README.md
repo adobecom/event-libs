@@ -348,8 +348,11 @@ literal `\n` / `\t` escapes → real newlines / spaces), set via `textContent`, 
 with `white-space: pre-line` (`.is-plain-text`), so authored paragraph and list breaks show
 as soon as the metadata carries them. Metadata containing HTML tags is rendered as markup
 instead, without `pre-line`. The Sessions Guide detail overlay and Session Broadcast info
-panel apply the same normalization (in `sessions-api.js`) and `pre-line` rule to catalog
-descriptions.
+panel follow the same split for catalog descriptions: HTML goes through `descriptionHtml()`
+(the vendored sanitizer, links forced to a new tab) and renders as markup (`.is-rich-text`);
+plain text keeps the `pre-line` rule. Text-only surfaces — Guide card previews, search, `.ics`
+files, and the Mobile Rider info bar — use the tag-free `descriptionText` that
+`normalizeSessions()` derives with `htmlToPlainText()`.
 
 The clamp's **automatic ellipsis is the affordance**. It replaced an earlier
 gradient-fade-to-card: fading otherwise-legible text pushes it under the 4.5:1 contrast
