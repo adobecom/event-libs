@@ -10,6 +10,7 @@ import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js'
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
+import { sanitizedRichText } from '../sessions-guide/utils/rich-text.js';
 
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
@@ -269,7 +270,8 @@ class MobileRider {
     const paintDescription = (session) => {
       const text = session?.descriptionText || session?.description || cfg['session-description'] || '';
       // Authored HTML keeps its structure; plain text keeps its line breaks via pre-line CSS.
-      if (HTML_TAG.test(text)) descriptionEl.innerHTML = text;
+      // Sanitized like the Session Guide/Broadcast descriptions: this HTML comes from ESP or authoring.
+      if (HTML_TAG.test(text)) descriptionEl.innerHTML = sanitizedRichText(text);
       else descriptionEl.textContent = normalizeMultilineText(text);
       descriptionEl.classList.toggle('is-plain-text', !HTML_TAG.test(text));
       descriptionEl.classList.toggle('is-hidden', !text);
