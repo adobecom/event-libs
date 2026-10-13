@@ -466,10 +466,6 @@ function hideLosingInstance(el) {
   el.classList.add('session-video-hidden');
 }
 
-// The main (.session-video-container) instance reserves its 16:9 slot and shows a loader from first
-// paint, so the body below doesn't jump when the video mounts later. The playlist-container instance
-// reserves nothing — it only grows if it wins the layout decision. Done synchronously at init,
-// before the async phase/poll/playlist decision resolves.
 function showLoaderPlaceholder(el) {
   if (!closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
   if (el.querySelector('.session-video-player-loader')) return;
@@ -599,10 +595,6 @@ export default async function init(el) {
       }
       return;
     }
-
-    // Non-playable phase: no video belongs in this slot right now, so drop the loader placeholder
-    // (its reserved box collapses). Covers both first-resolve PRE_EVENT/SIMULIVE/WATCH_LIVE and a
-    // teardown back out of a playable phase.
     removeLoaderPlaceholder(el);
 
     // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player and
