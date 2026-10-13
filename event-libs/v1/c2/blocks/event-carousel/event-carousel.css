@@ -16,6 +16,18 @@
   scroll-snap-align: start;
 }
 
+/* Firefox makes the scrolling track a tab stop; an inset ring would paint under its cards (MWPW-209400). */
+.carousel-track:focus-visible {
+  outline: var(--s2a-border-width-md, 2px) solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: var(--s2a-border-width-md, 2px);
+}
+
+/* Inset, so the track's overflow can't clip it. */
+.carousel-track > .event-card:focus-visible {
+  outline: var(--s2a-border-width-md, 2px) solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: calc(-1 * var(--s2a-border-width-md, 2px));
+}
+
 .carousel-controls {
   display: flex;
   flex-direction: column;
