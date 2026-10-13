@@ -691,6 +691,56 @@ describe('notification-widget', function widgetTests() {
       expect(outside.getAttribute('aria-expanded')).to.equal('true');
       outside.remove();
     });
+
+    // MWPW-208294: UNav's profile menu lives in <account-menu-trigger>'s shadow DOM and keeps its
+    // own open state, so only a click on its trigger closes it (setting the attribute doesn't).
+    describe('UNav account menu (shadow DOM)', () => {
+      let host;
+      let shadowTrigger;
+      let menuOpen;
+
+      beforeEach(() => {
+        host = document.createElement('account-menu-trigger');
+        const root = host.attachShadow({ mode: 'open' });
+        shadowTrigger = document.createElement('div');
+        menuOpen = true;
+        shadowTrigger.setAttribute('aria-expanded', 'true');
+        shadowTrigger.addEventListener('click', () => {
+          menuOpen = !menuOpen;
+          shadowTrigger.setAttribute('aria-expanded', String(menuOpen));
+        });
+        root.append(shadowTrigger);
+        gnav.append(host);
+      });
+
+      it('closes an open account menu when the bell opens', () => {
+        bell().click();
+        expect(menuOpen).to.be.false;
+        expect(shadowTrigger.getAttribute('aria-expanded')).to.equal('false');
+      });
+
+      it('keeps the bell panel open after closing the account menu', () => {
+        bell().click();
+        expect(panel().hidden).to.be.false;
+        expect(bell().getAttribute('aria-expanded')).to.equal('true');
+      });
+
+      it('leaves a closed account menu closed', () => {
+        shadowTrigger.click();
+        expect(menuOpen).to.be.false;
+        bell().click();
+        expect(menuOpen).to.be.false;
+      });
+
+      it('does not touch the account menu when the bell closes', () => {
+        bell().click();
+        menuOpen = true;
+        shadowTrigger.setAttribute('aria-expanded', 'true');
+        bell().click();
+        expect(bell().getAttribute('aria-expanded')).to.equal('false');
+        expect(menuOpen).to.be.true;
+      });
+    });
   });
 
   describe('analytics attributes', () => {

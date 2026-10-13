@@ -1,6 +1,7 @@
 // Native modal dialogs escape gnav's clipping/stacking contexts on mobile;
 // show() keeps the desktop dialog in its existing bell-relative position.
-export function bindNotificationPanel(panel, button, header, onOpen) {
+// onBeforeOpen runs before the outside-click listener exists, so its clicks can't close the panel.
+export function bindNotificationPanel(panel, button, header, onOpen, onBeforeOpen = () => {}) {
   const mobile = window.matchMedia('(width < 900px)');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let phase = 'closed';
@@ -166,8 +167,12 @@ export function bindNotificationPanel(panel, button, header, onOpen) {
 
   button.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (phase === 'open') closePanel();
-    else openPanel();
+    if (phase === 'open') {
+      closePanel();
+      return;
+    }
+    onBeforeOpen();
+    openPanel();
   });
 
   // Native backdrop events target the dialog itself; distinguish them from a

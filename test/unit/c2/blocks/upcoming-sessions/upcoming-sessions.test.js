@@ -677,6 +677,20 @@ describe('upcoming-sessions', () => {
       expect(description.textContent).to.equal('Learn the fundamentals of Adobe Express.');
     });
 
+    // MWPW-210449: the hover preview shows HTML catalog descriptions as text, not raw tags.
+    it('renders an HTML description as plain text', () => {
+      const card = buildCard(session({ description: '<p>Get a front-row seat.</p><ul><li>New features</li></ul>' }));
+      const text = card.querySelector('.sg-card__description').textContent;
+      expect(/<\/?(p|ul|li)>/.test(text)).to.equal(false);
+      expect(text).to.include('Get a front-row seat.');
+      expect(text).to.include('New features');
+    });
+
+    it('omits the description paragraph when an HTML description has no text', () => {
+      const card = buildCard(session({ description: '<p></p>' }));
+      expect(card.querySelectorAll('.sg-card__description').length).to.equal(0);
+    });
+
     it('omits the description paragraph entirely when the payload does not supply one (TEC homepage payload may not carry it yet)', () => {
       const card = buildCard(session());
       expect(card.querySelector('.sg-card__description')).to.equal(null);
