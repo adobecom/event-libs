@@ -6,10 +6,11 @@ const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="
 
 let instances = 0;
 
-// Authored HTML keeps its own structure; plain text keeps its line breaks via `pre-line`.
+// Authored HTML keeps its own structure (a div, since it carries its own <p>/<ul> blocks);
+// plain text keeps its line breaks via `pre-line`.
 function createDescriptionBody(raw, id) {
   if (hasHtmlMarkup(raw)) {
-    return createTag('p', { class: 'session-description-text', id }, raw);
+    return createTag('div', { class: 'session-description-text is-rich-text', id }, raw);
   }
   const body = createTag('p', { class: 'session-description-text is-plain-text', id });
   body.textContent = normalizeMultilineText(raw);
