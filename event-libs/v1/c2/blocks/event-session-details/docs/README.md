@@ -347,7 +347,10 @@ line-based, so it stays responsive.
 literal `\n` / `\t` escapes → real newlines / spaces), set via `textContent`, and rendered
 with `white-space: pre-line` (`.is-plain-text`), so authored paragraph and list breaks show
 as soon as the metadata carries them. Metadata containing HTML tags is rendered as markup
-instead, without `pre-line`. The Sessions Guide detail overlay and Session Broadcast info
+instead, without `pre-line`, in a `<div class="session-description-text is-rich-text">` (a
+`<div>` because the authored HTML brings its own `<p>`/`<ul>` blocks). Its paragraphs and
+lists use the Sessions Guide detail overlay's spacing (`margin: 0 0 0.75em`, list indent
+`1.25em`, no margin after the last block; MWPW-210941). The Sessions Guide detail overlay and Session Broadcast info
 panel follow the same split for catalog descriptions: HTML goes through `descriptionHtml()`
 (the vendored sanitizer, links forced to a new tab) and renders as markup (`.is-rich-text`);
 plain text keeps the `pre-line` rule. Text-only surfaces — Guide card previews, search, `.ics`

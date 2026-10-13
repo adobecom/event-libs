@@ -39,8 +39,17 @@ describe('Description "More" Clamp', () => {
     setMetadata('event-details', 'Intro<br>Line two with <strong>bold</strong>');
     const body = renderDescriptionClamp().querySelector('.session-description-text');
     expect(body.classList.contains('is-plain-text')).to.be.false;
+    expect(body.classList.contains('is-rich-text')).to.be.true;
     expect(body.querySelector('br')).to.exist;
     expect(body.querySelector('strong').textContent).to.equal('bold');
+  });
+
+  it('wraps authored paragraphs in a div so they are not nested inside a <p>', () => {
+    setMetadata('event-details', '<p>First.</p><p>Second.</p><ul><li>One</li></ul>');
+    const body = renderDescriptionClamp().querySelector('.session-description-text');
+    expect(body.tagName).to.equal('DIV');
+    expect(body.querySelectorAll(':scope > p').length).to.equal(2);
+    expect(body.querySelectorAll(':scope > ul').length).to.equal(1);
   });
 
   it('starts collapsed and the toggle flips expanded state + label', () => {
@@ -131,6 +140,31 @@ describe('Description "More" Clamp', () => {
       await new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); });
       expect(getComputedStyle(toggle).display).to.equal('none');
       expect(body.scrollHeight).to.be.at.most(body.clientHeight + 1);
+    });
+
+    describe('rich-text spacing (MWPW-210941)', () => {
+      beforeEach(() => {
+        setMetadata('event-details', `<p>${LONG}</p><p>Second paragraph.</p><ul><li>One</li><li>Two</li></ul>`);
+      });
+
+      it('separates paragraphs and lists like the Session Guide overlay', async () => {
+        await setViewport({ width: 1280, height: 800 });
+        const { body } = await mount();
+        const [first, second] = body.querySelectorAll(':scope > p');
+        const list = body.querySelector(':scope > ul');
+        const fontSize = parseFloat(getComputedStyle(body).fontSize);
+        expect(parseFloat(getComputedStyle(first).marginBottom)).to.equal(fontSize * 0.75);
+        expect(parseFloat(getComputedStyle(second).marginBottom)).to.equal(fontSize * 0.75);
+        expect(parseFloat(getComputedStyle(list).marginTop)).to.equal(0);
+        expect(parseFloat(getComputedStyle(list).marginBottom)).to.equal(0);
+      });
+
+      it('still clamps a long rich description on mobile', async () => {
+        await setViewport({ width: 375, height: 800 });
+        const { body, toggle } = await mount();
+        expect(body.scrollHeight).to.be.greaterThan(body.clientHeight + 1);
+        expect(toggle.hidden).to.be.false;
+      });
     });
   });
 });
