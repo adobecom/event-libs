@@ -42,13 +42,13 @@ describe('SessionInfoPanel', () => {
 
   it('shows Add-to-Favorites when not favorited', () => {
     const out = SessionInfoPanel({ session: SESSION });
-    expect(out).to.include('daa-ll="Add-to-Favorites"');
+    expect(out).to.include('daa-ll="Add-to-Favorites-Livestream-Details"');
   });
 
   it('shows Remove-from-Favorites once favorited', () => {
     favorited.value = new Set(['s-1']);
     const out = SessionInfoPanel({ session: SESSION });
-    expect(out).to.include('daa-ll="Remove-from-Favorites"');
+    expect(out).to.include('daa-ll="Remove-from-Favorites-Livestream-Details"');
   });
 
   // Collapsed has two Figma variants of its own (node 9935:12816 not-favorited vs 4975:45446
@@ -92,7 +92,7 @@ describe('SessionInfoPanel', () => {
 
   it('shows a Share action alongside Favorite', () => {
     const out = SessionInfoPanel({ session: SESSION });
-    expect(out).to.include('daa-ll="Share"');
+    expect(out).to.include('daa-ll="Share-Livestream-Details"');
   });
 
   // The caret/expand toggle uses local component state, which the mocked htm-preact's

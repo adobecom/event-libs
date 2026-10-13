@@ -176,6 +176,15 @@ describe('SessionCard', () => {
     expect(onDemand).to.include('to favorites');
   });
 
+  it('keeps the plain favorite label by default and appends daaLlSuffix when given (MWPW-210975)', () => {
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Add-to-Favorites"');
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx();
+    const SessionCard = buildSessionCard(preact, store);
+    expect(SessionCard({ session: UPCOMING_SESSION, daaLlSuffix: 'Upcoming' }))
+      .to.include('daa-ll="Add-to-Favorites-Upcoming"');
+  });
+
   it('shows aria-pressed=true on schedule button when scheduled', () => {
     scheduled.value = new Set(['session-1']);
     const html = renderCard(UPCOMING_SESSION);

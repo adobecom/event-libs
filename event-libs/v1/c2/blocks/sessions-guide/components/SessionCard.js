@@ -6,6 +6,7 @@ import {
 import { isDvrPending } from '../../../../utils/session-state.js';
 import { scheduled, favorited, pendingActions, getEventApiConfig } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
+import { withDaaLlSuffix } from '../utils/analytics.js';
 import { setSessionParam, sessionParamValue, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
@@ -18,6 +19,7 @@ export const buildSessionCard = () => SessionCard;
 
 export function SessionCard({
   session, forceOnDemand = false, timeDisplay = 'duration', onCardClick, showDescription = false,
+  daaLlSuffix,
 }) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig, activeView } = state;
@@ -215,7 +217,7 @@ export function SessionCard({
           onclick=${handleFavorite}
           pressed=${isFavorited}
           disabled=${isPending}
-          daaLl=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
+          daaLl=${withDaaLlSuffix(isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites', daaLlSuffix)}
         >
           ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
         </${IconButton}>`}
