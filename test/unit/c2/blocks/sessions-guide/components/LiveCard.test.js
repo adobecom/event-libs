@@ -174,6 +174,14 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now"');
   });
 
+  it('keeps the plain favorite label by default and appends daaLlSuffix when given (MWPW-210975)', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Favorites"');
+    expect(LiveCard({ session: LIVE_SESSION, daaLlSuffix: 'More-Live' }))
+      .to.include('daa-ll="Add-to-Favorites-More-Live"');
+  });
+
   it('labels the watch button "Watch on demand" once the session has gone on demand', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);

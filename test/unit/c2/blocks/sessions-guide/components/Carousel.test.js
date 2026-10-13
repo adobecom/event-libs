@@ -93,6 +93,17 @@ describe('Carousel', () => {
     expect(html).to.include('sg-carousel__arrow--next');
   });
 
+  it('labels the arrows for analytics only when arrowDaaLl is passed (MWPW-210975)', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    const labelled = Carousel({ sessions: [SESSION_A, SESSION_B], arrowDaaLl: 'More-Live' });
+    expect(labelled).to.include('daa-ll="More-Live-Previous"');
+    expect(labelled).to.include('daa-ll="More-Live-Next"');
+    const plain = Carousel({ sessions: [SESSION_A, SESSION_B] });
+    expect(plain).to.not.include('-Previous"');
+    expect(plain).to.not.include('-Next"');
+  });
+
   it('renders the left time gutter when formatTime is supplied', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);
