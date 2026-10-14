@@ -19,7 +19,8 @@ function resolveDuration({ ctaLabel, duration }) {
 }
 
 export function showToast({
-  message, variant = 'neutral', ctaLabel = null, ctaAction = null, ctaHref = null, duration, key = null,
+  message, variant = 'neutral', ctaLabel = null, ctaAction = null, ctaHref = null, ctaDaaLl = null,
+  duration, key = null,
 } = {}) {
   // Actionable toasts cap at one per `key`: a repeat trigger while one's showing is a no-op.
   if (key && ctaLabel && toasts.value.some((t) => t.key === key)) return null;
@@ -33,6 +34,7 @@ export function showToast({
     ctaLabel,
     ctaAction,
     ctaHref,
+    ctaDaaLl,
     key,
     duration: resolveDuration({ ctaLabel, duration }),
   }, ...toasts.value];
@@ -112,12 +114,15 @@ function renderToastContent(el, data) {
       ? createTag('a', { class: 'sg-toast__cta', href: data.ctaHref })
       : createTag('button', { class: 'sg-toast__cta', type: 'button' });
     cta.textContent = data.ctaLabel;
+    if (data.ctaDaaLl) cta.setAttribute('daa-ll', data.ctaDaaLl);
     if (!data.ctaHref) cta.addEventListener('click', data.ctaAction);
     body.append(cta);
   }
   el.append(body);
 
-  const closeBtn = createTag('button', { class: 'sg-toast__close', 'aria-label': 'Dismiss notification', type: 'button' }, CLOSE_ICON);
+  const closeBtn = createTag('button', {
+    class: 'sg-toast__close', 'aria-label': 'Dismiss notification', type: 'button', 'daa-ll': 'Toast-Close',
+  }, CLOSE_ICON);
   el.append(closeBtn);
 
   return closeBtn;

@@ -16,6 +16,8 @@ export function AlsoLiveCarousel({ sessions, title = 'Currently Live', onSwitchS
         onWatchSamePage=${onSwitchSession}
         showDurationBadge=${true}
         forceLive=${true}
+        arrowDaaLl="More-Live"
+        cardDaaLlSuffix="More-Live"
       />
     </div>
   `;

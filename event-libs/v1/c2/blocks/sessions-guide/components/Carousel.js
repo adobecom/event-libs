@@ -13,6 +13,8 @@ export function Carousel({
   sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
   CardComponent = LiveCard, timeDisplay, showDurationBadge, showDescription, forceLive,
   pageByGroup = false, resetKey,
+  // Optional analytics labels: arrows become `${arrowDaaLl}-Previous/-Next`; cards get the suffix.
+  arrowDaaLl, cardDaaLlSuffix,
 }) {
   // Hooks run before the empty-list bail-out, to keep hook order stable across renders.
   const [offset, setOffset] = useState(0);
@@ -168,7 +170,7 @@ export function Carousel({
               class="sg-carousel__card-wrap"
               key=${s.id}
               inert=${paged && (i < clampedOffset || i > lastVisible) ? true : undefined}
-            ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} showDurationBadge=${showDurationBadge} showDescription=${showDescription} forceLive=${forceLive} /></div>`)}
+            ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} showDurationBadge=${showDurationBadge} showDescription=${showDescription} forceLive=${forceLive} daaLlSuffix=${cardDaaLlSuffix} /></div>`)}
           </div>
         </div>
         ${sessions.length > 1 && html`
@@ -177,6 +179,7 @@ export function Carousel({
               class="sg-carousel__arrow sg-carousel__arrow--prev"
               onclick=${goPrev}
               aria-label=${`Previous session, ${title}`}
+              daa-ll=${arrowDaaLl ? `${arrowDaaLl}-Previous` : undefined}
               disabled=${atStart}
               type="button"
             >
@@ -188,6 +191,7 @@ export function Carousel({
               class="sg-carousel__arrow sg-carousel__arrow--next"
               onclick=${goNext}
               aria-label=${`Next session, ${title}`}
+              daa-ll=${arrowDaaLl ? `${arrowDaaLl}-Next` : undefined}
               disabled=${atEnd}
               type="button"
             >
