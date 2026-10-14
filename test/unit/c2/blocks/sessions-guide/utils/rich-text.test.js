@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
-import { sanitizedRichText } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/rich-text.js';
+import {
+  sanitizedRichText, descriptionHtml, sessionDescriptionText,
+} from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/rich-text.js';
 
 // The real `Legal Disclaimer` value from the ESP catalog.
 const REAL = '<p><b>This content is copyrighted by Adobe Inc. Any recording and posting of this content is strictly prohibited.</b></p><br/> <p><b>By accessing resources linked on this page ("Session Resources"), you agree that 1. Resources are Sample Files per our <a href="https://www.adobe.com/legal/terms.html">Terms of Use</a> and 2. you will use Session Resources solely as directed by the applicable speaker.</b></p>';
@@ -65,6 +67,36 @@ describe('sessions-guide/utils/rich-text', () => {
     it('sanitizes even when there are no links to rewrite', () => {
       const out = sanitizedRichText('<p>Legal.</p><script>1;</script>');
       expect(out).to.not.include('script');
+    });
+  });
+
+  describe('descriptionHtml', () => {
+    it('returns null for plain text so callers render it as text', () => {
+      expect(descriptionHtml('Intro\nKey takeaways')).to.equal(null);
+      expect(descriptionHtml('')).to.equal(null);
+    });
+
+    it('returns sanitized markup for an HTML description', () => {
+      const out = descriptionHtml('<p>Intro</p><ul><li>One</li></ul><script>1;</script><a href="javascript:alert(1)">x</a>');
+      expect(out).to.include('<p>Intro</p>');
+      expect(out).to.include('<li>One</li>');
+      expect(out).to.not.include('script');
+      expect(out).to.not.include('javascript:');
+    });
+  });
+
+  describe('sessionDescriptionText', () => {
+    it('prefers the precomputed descriptionText', () => {
+      expect(sessionDescriptionText({ description: '<p>A</p>', descriptionText: 'cached' })).to.equal('cached');
+    });
+
+    it('flattens an HTML description when descriptionText is missing', () => {
+      expect(sessionDescriptionText({ description: '<p>A</p><p>B</p>' })).to.equal('A\nB');
+    });
+
+    it('is empty for a missing session or description', () => {
+      expect(sessionDescriptionText(null)).to.equal('');
+      expect(sessionDescriptionText({})).to.equal('');
     });
   });
 });

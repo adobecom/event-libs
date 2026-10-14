@@ -16,6 +16,7 @@ export function showAuthToast({ eventConfig, actionLabel, postEventActionLabel =
     variant: 'informative',
     ctaLabel: post ? 'Sign in' : 'Register/Sign in',
     ctaHref: eventConfig.registerUrl || '/register',
+    ctaDaaLl: post ? 'Toast-Sign-In' : 'Toast-Register-Sign-In',
     // Caps at one toast per gated action; actionLabel is already the natural per-action key.
     key: actionLabel,
   });

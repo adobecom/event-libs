@@ -6,13 +6,12 @@ import {
 
 const CONFIG = {
   PRELOAD_DOMAINS: [
-    'www.youtube-nocookie.com',
     'www.youtube.com',
     'www.google.com',
     'googleads.g.doubleclick.net',
     'static.doubleclick.net',
   ],
-  YOUTUBE_EMBED_BASE: 'https://www.youtube-nocookie.com/embed',
+  YOUTUBE_EMBED_BASE: 'https://www.youtube.com/embed',
   YOUTUBE_CHAT_BASE: 'https://www.youtube.com/live_chat',
   THUMBNAIL_BASE: 'https://i.ytimg.com/vi',
   PLAYER_OPTIONS: {
@@ -179,7 +178,7 @@ export class YouTubeChat {
   createVideoIframe(src) {
     return createTag('iframe', {
       class: 'youtube-video',
-      id: createYouTubePlayerId(),
+      id: createYouTubePlayerId(this.videoId),
       src,
       title: this.getVideoTitle(),
       loading: 'lazy',

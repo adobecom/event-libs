@@ -8,6 +8,7 @@ import {
   scheduled, favorited, pendingActions, liveStreamActiveIds, requestWatchSameSession,
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
+import { withDaaLlSuffix } from '../utils/analytics.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
@@ -44,6 +45,7 @@ export function computeProgressPct(session, nowMs) {
 
 export function LiveCard({
   session, variant = 'live', onCardClick, onWatchSamePage, showDurationBadge = false, forceLive = false,
+  daaLlSuffix,
 }) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig } = state;
@@ -186,7 +188,7 @@ export function LiveCard({
               onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
               aria-label=${titleAriaLabel}
               daa-ll="Session-Card-Open"
-            >${session.title}</button>`;
+            ><span class="sg-live-card__title-text">${session.title}</span></button>`;
 
   // Current layout: horizontal, divider-separated, used everywhere except the new mobile 'live' case below.
   const metaBlock = html`
@@ -248,7 +250,7 @@ export function LiveCard({
             aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
             aria-pressed=${String(isFavorited)}
             disabled=${isPending}
-            daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
+            daa-ll=${withDaaLlSuffix(isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites', daaLlSuffix)}
             type="button"
           >${isFavorited
     ? html`<${IconHeartFilled} size=${16} />`

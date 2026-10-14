@@ -641,28 +641,35 @@
 
 /* ── CTA Button ──────────────────────────────────────────── */
 
+/* Figma "FAB / Arrow=Yes" (node 7676:247711): 243×52 pill, calendar icon left, decorative
+   arrow circle right. The arrow is part of the single open-guide CTA, not a separate control. */
 .sg-cta-btn {
   position: fixed;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px 38px;
+  gap: 0;
+  height: 52px;
+  padding: 0 9px 0 27px;
   background: rgb(255 255 255 / 80%);
-  backdrop-filter: blur(2px);
+
+  /* Approximates Figma's GLASS effect (refraction/dispersion have no CSS equivalent). */
+  backdrop-filter: blur(12px) saturate(1.4);
   border: 1px solid #e9e9e9;
-  border-radius: 25px;
+  border-radius: 100px;
   font-family: var(--body-font-family);
-  font-weight: var(--s2a-font-weight-adobe-clean-extrabold);
-  font-size: 18px;
-  letter-spacing: -0.54px;
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-size: 16px;
+  letter-spacing: -0.48px;
   line-height: 0.98;
   color: #000;
   cursor: pointer;
   white-space: nowrap;
   box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 60%),
     0 0 2px rgb(0 0 0 / 12%),
     0 2px 6px rgb(0 0 0 / 4%),
     0 4px 12px rgb(0 0 0 / 8%);
@@ -670,6 +677,36 @@
 
   /* The delay rides out the player's brief collapse when a session switch remounts it. */
   transition: opacity 200ms ease 100ms, visibility 0s 100ms;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .sg-cta-btn {
+    background: rgb(255 255 255 / 92%);
+  }
+}
+
+.sg-cta-btn > svg {
+  flex-shrink: 0;
+}
+
+/* Figma's fixed 122px text box, so the arrow's position doesn't shift with font metrics. */
+.sg-cta-btn__label {
+  min-width: 122px;
+}
+
+.sg-cta-btn__arrow {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin-left: 32px;
+  background: rgb(0 0 0 / 4%);
+  border: 1px solid rgb(0 0 0 / 8%);
+  border-radius: 100px;
+  color: #292929;
 }
 
 /* Hidden (and out of the tab order) while it would cover a video player's controls;
@@ -1125,9 +1162,14 @@
 
   /* Reserved at 2 lines' height so a 1-line title doesn't leave its card shorter than a 2-line one. */
   min-height: calc(2 * 1.1em);
+}
+
+/* On the span: WebKit ignores line-clamp on buttons (MWPW-209870). */
+.sg-live-card__title-text {
   /* stylelint-disable-next-line value-no-vendor-prefix */
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1481,9 +1523,6 @@
   color: var(--s2a-color-gray-900);
   line-height: 1.25;
   overflow: hidden;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
   margin: 0;
   min-width: 0;
   width: 100%;
@@ -1492,11 +1531,15 @@
 }
 
 /* Figma's small card title is a fixed two lines (40px), so every card in a row is the same height.
-   Below 1280px only: desktop sizes its title separately. */
+   Below 1280px only. On the span: WebKit ignores line-clamp on buttons (MWPW-209870). */
 @media (max-width: 1279px) {
-  .sg-card__title {
+  .sg-card__title-text {
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 }
 
@@ -2747,11 +2790,6 @@
     font-size: var(--s2a-font-size-3xl);
     color: #292929;
     margin-top: 0;
-    /* stylelint-disable-next-line value-no-vendor-prefix */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: #fff; }

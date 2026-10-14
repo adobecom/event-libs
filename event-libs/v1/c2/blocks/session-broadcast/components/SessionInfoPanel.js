@@ -7,6 +7,7 @@ import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { logError } from '../../../../utils/lana-log.js';
 import { CategoryBadge } from '../../sessions-guide/components/CategoryBadge.js';
+import { descriptionHtml } from '../../sessions-guide/utils/rich-text.js';
 import {
   IconHeartFilled, IconHeartOutline, IconShare, IconChevronRight,
 } from '../../sessions-guide/components/icons.js';
@@ -21,6 +22,7 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
 
   if (!session) return null;
 
+  const richDescription = descriptionHtml(session.description);
   const isFavorited = favorited.value.has(session.id);
   const isPending = pendingActions.value.has(session.id);
 
@@ -65,14 +67,14 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
         disabled=${isPending}
         aria-pressed=${String(isFavorited)}
         aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
-        daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
+        daa-ll=${isFavorited ? 'Remove-from-Favorites-Livestream-Details' : 'Add-to-Favorites-Livestream-Details'}
       >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>
       <button
         class="sb-info__icon-btn"
         type="button"
         onclick=${handleShare}
         aria-label=${`Share ${session.title}`}
-        daa-ll="Share"
+        daa-ll="Share-Livestream-Details"
       ><${IconShare} /></button>
     </div>
   `;
@@ -102,7 +104,9 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
       </div>
       ${session.description && html`
         <div class=${'sb-info__desc-wrap' + (expanded ? ' is-expanded' : '')} id="sb-info-desc">
-          <p class="sb-info__desc">${session.description}</p>
+          ${richDescription
+    ? html`<div class="sb-info__desc is-rich-text" dangerouslySetInnerHTML=${{ __html: richDescription }}></div>`
+    : html`<div class="sb-info__desc">${session.description}</div>`}
         </div>
       `}
       ${expanded && html`

@@ -1,4 +1,4 @@
-import { createTag } from '../../../utils/utils.js';
+import { createTag, htmlToPlainText } from '../../../utils/utils.js';
 import {
   favorited,
   scheduled,
@@ -211,8 +211,10 @@ export function buildCard(session) {
   // session.enTitle is attacker-influenced (decoded from a hash payload) - set via .textContent, not html.
   createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
-  if (session.description) {
-    createTag('p', { class: 'sg-card__description' }, '', { parent: body }).textContent = session.description;
+  // Catalog descriptions can be HTML; this one-line preview shows them as plain text (MWPW-210449).
+  const description = htmlToPlainText(session.description);
+  if (description) {
+    createTag('p', { class: 'sg-card__description' }, '', { parent: body }).textContent = description;
   }
 
   const trackCount = additionalTrackCount(session);

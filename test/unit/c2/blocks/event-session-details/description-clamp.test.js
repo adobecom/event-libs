@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import { executeServerCommand, setViewport } from '@web/test-runner-commands';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import { renderDescriptionClamp } from '../../../../../event-libs/v1/c2/blocks/event-session-details/description-clamp.js';
 
@@ -38,8 +39,17 @@ describe('Description "More" Clamp', () => {
     setMetadata('event-details', 'Intro<br>Line two with <strong>bold</strong>');
     const body = renderDescriptionClamp().querySelector('.session-description-text');
     expect(body.classList.contains('is-plain-text')).to.be.false;
+    expect(body.classList.contains('is-rich-text')).to.be.true;
     expect(body.querySelector('br')).to.exist;
     expect(body.querySelector('strong').textContent).to.equal('bold');
+  });
+
+  it('wraps authored paragraphs in a div so they are not nested inside a <p>', () => {
+    setMetadata('event-details', '<p>First.</p><p>Second.</p><ul><li>One</li></ul>');
+    const body = renderDescriptionClamp().querySelector('.session-description-text');
+    expect(body.tagName).to.equal('DIV');
+    expect(body.querySelectorAll(':scope > p').length).to.equal(2);
+    expect(body.querySelectorAll(':scope > ul').length).to.equal(1);
   });
 
   it('starts collapsed and the toggle flips expanded state + label', () => {
@@ -60,5 +70,101 @@ describe('Description "More" Clamp', () => {
     expect(el.classList.contains('is-expanded')).to.be.false;
     expect(toggle.textContent).to.equal('Show more');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Description');
+  });
+
+  describe('responsive clamp (MWPW-210273)', () => {
+    const LONG = Array.from({ length: 60 }, (_, i) => `Sentence number ${i} about creative workflows.`).join(' ');
+
+    // The outer beforeEach resets <head>, so the stylesheet is attached per test. The page is focused
+    // because a background page in a concurrent run never fires the rAF/ResizeObserver this waits on.
+    beforeEach(async () => {
+      await executeServerCommand('focus-test-page');
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/event-libs/v1/c2/blocks/event-session-details/description-clamp.css';
+      await new Promise((resolve, reject) => {
+        link.onload = resolve;
+        link.onerror = () => reject(new Error(`Failed to load ${link.href}`));
+        document.head.append(link);
+      });
+    });
+
+    beforeEach(() => {
+      document.body.innerHTML = '';
+      setMetadata('event-details', LONG);
+    });
+
+    afterEach(async () => {
+      document.body.innerHTML = '';
+      await setViewport({ width: 800, height: 600 });
+    });
+
+    const mount = async () => {
+      const el = renderDescriptionClamp();
+      document.body.append(el);
+      await new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); });
+      return {
+        body: el.querySelector('.session-description-text'),
+        toggle: el.querySelector('.session-description-toggle'),
+      };
+    };
+
+    it('clamps the text and offers the toggle on mobile', async () => {
+      await setViewport({ width: 375, height: 800 });
+      const { body, toggle } = await mount();
+      expect(body.scrollHeight).to.be.greaterThan(body.clientHeight + 1);
+      expect(toggle.hidden).to.be.false;
+      expect(getComputedStyle(toggle).display).to.not.equal('none');
+    });
+
+    it('clamps the text and offers the toggle on tablet', async () => {
+      await setViewport({ width: 800, height: 800 });
+      const { body, toggle } = await mount();
+      expect(body.scrollHeight).to.be.greaterThan(body.clientHeight + 1);
+      expect(toggle.hidden).to.be.false;
+    });
+
+    it('shows the full text with no toggle on desktop', async () => {
+      await setViewport({ width: 1280, height: 800 });
+      const { body, toggle } = await mount();
+      expect(body.scrollHeight).to.be.at.most(body.clientHeight + 1);
+      expect(getComputedStyle(body).overflow).to.equal('visible');
+      expect(getComputedStyle(toggle).display).to.equal('none');
+    });
+
+    it('drops the toggle when a mobile viewport is resized to desktop', async () => {
+      await setViewport({ width: 375, height: 800 });
+      const { body, toggle } = await mount();
+      expect(toggle.hidden).to.be.false;
+      await setViewport({ width: 1280, height: 800 });
+      await new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); });
+      expect(getComputedStyle(toggle).display).to.equal('none');
+      expect(body.scrollHeight).to.be.at.most(body.clientHeight + 1);
+    });
+
+    describe('rich-text spacing (MWPW-210941)', () => {
+      beforeEach(() => {
+        setMetadata('event-details', `<p>${LONG}</p><p>Second paragraph.</p><ul><li>One</li><li>Two</li></ul>`);
+      });
+
+      it('separates paragraphs and lists like the Session Guide overlay', async () => {
+        await setViewport({ width: 1280, height: 800 });
+        const { body } = await mount();
+        const [first, second] = body.querySelectorAll(':scope > p');
+        const list = body.querySelector(':scope > ul');
+        const fontSize = parseFloat(getComputedStyle(body).fontSize);
+        expect(parseFloat(getComputedStyle(first).marginBottom)).to.equal(fontSize * 0.75);
+        expect(parseFloat(getComputedStyle(second).marginBottom)).to.equal(fontSize * 0.75);
+        expect(parseFloat(getComputedStyle(list).marginTop)).to.equal(0);
+        expect(parseFloat(getComputedStyle(list).marginBottom)).to.equal(0);
+      });
+
+      it('still clamps a long rich description on mobile', async () => {
+        await setViewport({ width: 375, height: 800 });
+        const { body, toggle } = await mount();
+        expect(body.scrollHeight).to.be.greaterThan(body.clientHeight + 1);
+        expect(toggle.hidden).to.be.false;
+      });
+    });
   });
 });

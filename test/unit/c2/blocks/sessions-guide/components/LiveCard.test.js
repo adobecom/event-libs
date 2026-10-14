@@ -174,6 +174,14 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now"');
   });
 
+  it('keeps the plain favorite label by default and appends daaLlSuffix when given (MWPW-210975)', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Favorites"');
+    expect(LiveCard({ session: LIVE_SESSION, daaLlSuffix: 'More-Live' }))
+      .to.include('daa-ll="Add-to-Favorites-More-Live"');
+  });
+
   it('labels the watch button "Watch on demand" once the session has gone on demand', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
@@ -212,6 +220,20 @@ describe('LiveCard', () => {
     const html = LiveCard({ session: LIVE_SESSION });
     expect(html).to.include('daa-ll="Session-Card-Open"');
     expect(html).to.include('sg-live-card__title-btn');
+  });
+
+  // MWPW-209870: WebKit ignores line-clamp on buttons, so the clamp sits on an inner span.
+  it('wraps the title text in a span inside the title button', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = {
+      state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
+      dispatch: () => {},
+    };
+    const wrap = document.createElement('div');
+    wrap.innerHTML = buildLiveCard(preact, store)({ session: LIVE_SESSION });
+    const text = wrap.querySelector('button.sg-live-card__title > .sg-live-card__title-text');
+    expect(text.tagName).to.equal('SPAN');
+    expect(text.textContent).to.equal(LIVE_SESSION.title);
   });
 
   // The title's accessible name must match what handleCardClick actually does on the page

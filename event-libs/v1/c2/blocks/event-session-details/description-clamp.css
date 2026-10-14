@@ -26,6 +26,19 @@
   white-space: pre-line;
 }
 
+/* Same paragraph/list spacing as the Session Guide detail overlay (.sg-detail__desc.is-rich-text). */
+.session-description-text.is-rich-text :is(p, ul, ol) {
+  margin: 0 0 0.75em;
+}
+
+.session-description-text.is-rich-text :is(ul, ol) {
+  padding-inline-start: 1.25em;
+}
+
+.session-description-text.is-rich-text > :last-child {
+  margin-bottom: 0;
+}
+
 .session-description.is-expanded .session-description-text {
   display: block;
   overflow: visible;
@@ -58,4 +71,18 @@
 
 .session-description-toggle[aria-expanded="true"] svg {
   transform: rotate(180deg);
+}
+
+/* Desktop shows the full description: no clamp, no toggle (MWPW-210273). Tablet/mobile keep both. */
+@media (min-width: 1024px) {
+  .session-description-text {
+    display: block;
+    overflow: visible;
+    line-clamp: unset;
+    -webkit-line-clamp: unset;
+  }
+
+  .session-description-toggle {
+    display: none;
+  }
 }

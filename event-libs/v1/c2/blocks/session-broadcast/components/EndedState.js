@@ -56,14 +56,14 @@ export function EndedState({ session }) {
           disabled=${isPending}
           aria-pressed=${String(isFavorited)}
           aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
-          daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
+          daa-ll=${isFavorited ? 'Remove-from-Favorites-Session-Complete' : 'Add-to-Favorites-Session-Complete'}
         >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>
         <button
           class="sb-ended__icon-btn"
           type="button"
           onclick=${handleShare}
           aria-label=${`Share ${session.title}`}
-          daa-ll="Share"
+          daa-ll="Share-Session-Complete"
         ><${IconShare} /></button>
       </div>
     </div>

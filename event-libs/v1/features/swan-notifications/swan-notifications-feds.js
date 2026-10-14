@@ -32,7 +32,7 @@ function desiredStage(timingProperties, now) {
 }
 
 // The current clock/catalog is authoritative; cached stages can be ahead after a
-// serverTime reset or a catalog correction. Only forward advances reset read/dismiss.
+// serverTime reset or a catalog correction. Forward advances keep read/dismiss.
 function applyStage(session, swanConfig, now) {
   const timingProperties = calculateSessionTimes(session, swanConfig.upcomingOffsetMinutes);
   if (!Number.isFinite(timingProperties.triggerNotificationTime)

@@ -148,6 +148,31 @@ Template: {dddd}, {LLLL} {dd}, {YYYY} at {timeRange} {timeZone}
 Output: Friday, October 20, 2025 at 13:00 - 14:45 PDT
 ```
 
+## 24-Hour Time and Suffix (per series)
+
+Event times default to the viewer locale's format (12h for en-US). A series can opt in to 24-hour times, with an optional suffix such as "Uhr", by setting two page metadata tags in the series template. This is independent of locale, so en-US pages are unchanged unless the tags are set.
+
+| Metadata | Value | Effect |
+| --- | --- | --- |
+| `time-format` | `24h` | Renders times as `HH:mm` (midnight is `00:xx`). Any other value keeps the default. |
+| `time-suffix` | e.g. `Uhr` | Appended once after a time or time range. Ignored unless `time-format` is `24h`. |
+
+Example (`time-format=24h`, `time-suffix=Uhr`):
+
+```
+{timeRange}                → 13:00 - 14:45 Uhr
+user-event-date-time-range → <date> um 13:00 - 14:45 Uhr (same-day smart range)
+user-end-date-time         → ... 14:45 Uhr
+Agenda item                → 13:00 – 14:45 Uhr
+```
+
+Notes:
+
+- `{timeRange}` already includes the suffix. Remove any hand-typed "Uhr" from `custom-date-time-format` when setting `time-suffix`, otherwise it will appear twice.
+- The suffix goes after the end time of a range, not after the start time. `user-start-date-time` has no suffix.
+- The agenda block also honors these tags (and still supports its `24h` variant class, which sets 24h without a suffix). In 24h mode the agenda skips locale-specific formatters such as fr-FR `13h30`.
+- Covered: marquee/date-time placeholders and the agenda. Not yet covered: C2 blocks (sessions guide, featured/upcoming sessions, session details), which still use en-US 12h.
+
 ## Localization Support
 
 The system automatically adapts to different locales while maintaining the same template structure:
