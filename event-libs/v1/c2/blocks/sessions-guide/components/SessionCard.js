@@ -14,6 +14,7 @@ import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHea
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 import { sessionDescriptionText } from '../utils/rich-text.js';
+import { sessionDaaLh } from '../../../../utils/analytics.js';
 
 export const buildSessionCard = () => SessionCard;
 
@@ -163,8 +164,12 @@ export function SessionCard({
     ? (onCardClick ? 'Session-Card-Open' : 'Session-Card-Navigate')
     : (onDemand ? 'On-Demand-Card-Navigate' : 'Session-Card-Open');
 
+  // The whole card is clickable, so it carries the title's label too; clicks on the card's own
+  // buttons still report their closer label. Callers with onCardClick (Broadcast) track opens themselves.
+  // The actions bar gets an empty label: clicks between its buttons don't open the card, and an
+  // empty closest daa-ll makes Launch skip them instead of reporting the card's label.
   return html`
-    <div class=${cardClass} onclick=${handleClick}
+    <div class=${cardClass} onclick=${handleClick} daa-ll=${onCardClick ? undefined : cardDaaLl} daa-lh=${sessionDaaLh(session)}
       onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
         <button
@@ -183,7 +188,7 @@ export function SessionCard({
           <span class="sg-card__time">${timeLabel}</span>
         </div>
       </div>
-      <div class="sg-card__actions" data-time=${timeLabel} onclick=${(e) => e.stopPropagation()} ontouchend=${handleActionsTouchEnd}>
+      <div class="sg-card__actions" data-time=${timeLabel} daa-ll="" onclick=${(e) => e.stopPropagation()} ontouchend=${handleActionsTouchEnd}>
         ${forceOnDemand && html`<${IconButton}
           variant="solid"
           context="on-light"

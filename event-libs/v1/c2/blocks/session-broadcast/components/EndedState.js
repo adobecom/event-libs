@@ -9,6 +9,7 @@ import { logError } from '../../../../utils/lana-log.js';
 import {
   IconPlay, IconHeartFilled, IconHeartOutline, IconShare,
 } from '../../sessions-guide/components/icons.js';
+import { sessionDaaLh } from '../../../../utils/analytics.js';
 
 // Covers "other sessions live" and "nothing live" with the same markup — Also Live/Up Next
 // below are the fallback actions. Background photo is a CSS background on .sb-app, not here.
@@ -39,7 +40,7 @@ export function EndedState({ session }) {
   }
 
   return html`
-    <div class="sb-ended" role="region" aria-label="Session complete">
+    <div class="sb-ended" role="region" aria-label="Session complete" daa-lh=${sessionDaaLh(session)}>
       <p class="sb-ended__eyebrow">Session complete.</p>
       <h2 class="sb-ended__title">${session.title}</h2>
       <div class="sb-ended__actions">

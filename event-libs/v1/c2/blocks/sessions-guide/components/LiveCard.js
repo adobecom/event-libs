@@ -15,6 +15,7 @@ import { CategoryBadge } from './CategoryBadge.js';
 import { scrollPageToTop } from '../utils/motion.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
+import { sessionDaaLh } from '../../../../utils/analytics.js';
 
 export const buildLiveCard = () => LiveCard;
 
@@ -214,8 +215,10 @@ export function LiveCard({
     </div>
   `;
 
+  // The whole card is clickable, so it carries the title's label too; clicks on the card's own
+  // buttons still report their closer label. Callers with onCardClick (Broadcast) track opens themselves.
   return html`
-    <div class=${cardClass} onclick=${handleCardClick}>
+    <div class=${cardClass} onclick=${handleCardClick} daa-ll=${onCardClick ? undefined : 'Session-Card-Open'} daa-lh=${sessionDaaLh(session)}>
       <div class="sg-live-card__image">
         ${session.thumbnailUrl
     ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" decoding="async" />`

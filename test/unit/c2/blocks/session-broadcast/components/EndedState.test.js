@@ -69,4 +69,9 @@ describe('EndedState', () => {
     const out = EndedState({ session: SESSION });
     expect(out).to.include('daa-ll="Share-Session-Complete"');
   });
+
+  it('names the session on its root as daa-lh code|title (MWPW-211083)', () => {
+    const out = EndedState({ session: { ...SESSION, sessionCode: 'S1' } });
+    expect(out).to.include('daa-lh="S1|Pixel &amp; Product"');
+  });
 });
