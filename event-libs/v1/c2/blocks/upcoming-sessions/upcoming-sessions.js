@@ -12,7 +12,7 @@ import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { logError } from '../../../utils/lana-log.js';
-import { withDaaLlTitle } from '../../../utils/analytics.js';
+import { sessionDaaLh } from '../../../utils/analytics.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
@@ -139,22 +139,18 @@ function syncIconButton(btn, kind, pressed) {
   if (btn.getAttribute('aria-pressed') === String(pressed) && btn.firstElementChild) return;
   btn.setAttribute('aria-label', label);
   btn.setAttribute('aria-pressed', String(pressed));
-  btn.setAttribute('daa-ll', withDaaLlTitle(daaLl, btn.dataset.daaTitle));
+  btn.setAttribute('daa-ll', daaLl);
   const icon = btn.querySelector('.sg-icon-btn__icon')
     || createTag('span', { class: 'sg-icon-btn__icon', 'aria-hidden': 'true' }, '', { parent: btn });
   icon.innerHTML = iconSvg;
 }
 
-function buildIconButton({
-  kind, extraClass, onClick, title,
-}) {
+function buildIconButton({ kind, extraClass, onClick }) {
   const btn = createTag('button', {
     class: ['sg-icon-btn', 'sg-icon-btn--solid', 'sg-icon-btn--on-dark', 'sg-icon-btn--md', extraClass].filter(Boolean).join(' '),
     type: 'button',
   });
   btn.dataset.kind = kind;
-  // Read by syncIconButton, which reapplies the label on every state change.
-  btn.dataset.daaTitle = title || '';
   btn.addEventListener('click', onClick);
   return btn;
 }
@@ -208,8 +204,10 @@ export function buildCard(session) {
     role: 'button',
     tabindex: '0',
     'aria-label': `${session.enTitle}, ${timeRange}`,
-    'daa-ll': withDaaLlTitle('Session-Card-Open', session.enTitle),
+    'daa-ll': 'Session-Card-Open',
   });
+  const daaLh = sessionDaaLh({ sessionCode: session.sessionCode, title: session.enTitle });
+  if (daaLh) card.setAttribute('daa-lh', daaLh);
 
   const body = createTag('div', { class: 'sg-card__body' }, '', { parent: card });
 
@@ -242,7 +240,6 @@ export function buildCard(session) {
     kind: 'schedule',
     extraClass: 'sg-card__btn--schedule',
     onClick: (e) => handleSchedule(e, session, scheduleBtn),
-    title: session.enTitle,
   });
   actions.append(scheduleBtn);
 
@@ -250,7 +247,6 @@ export function buildCard(session) {
     kind: 'favorite',
     extraClass: 'sg-card__btn--favorite',
     onClick: (e) => handleFavorite(e, session, favoriteBtn),
-    title: session.enTitle,
   });
   actions.append(favoriteBtn);
 

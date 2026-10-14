@@ -23,7 +23,7 @@ import {
   PLAYBACK_PHASE,
 } from '../../utils/video-session.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
-import { withDaaLlTitle } from '../../../utils/analytics.js';
+import { sessionDaaLh } from '../../../utils/analytics.js';
 
 const LOG_SCOPE = 'session-video-playlist';
 
@@ -386,7 +386,7 @@ function setFavoriteButtonState(button, item, isFav) {
   button.setAttribute('aria-pressed', String(isFav));
 
   button.setAttribute('aria-label', `${isFav ? 'Unfavorite' : 'Favorite'} ${item.title}`);
-  button.setAttribute('daa-ll', withDaaLlTitle(isFav ? 'playlist-item-unfavorite' : 'playlist-item-favorite', item.title));
+  button.setAttribute('daa-ll', isFav ? 'playlist-item-unfavorite' : 'playlist-item-favorite');
 }
 
 function buildFavoriteButton(item) {
@@ -428,8 +428,10 @@ function buildRow(item, { onSelect, hideProgressBar = false }) {
     role: 'listitem',
     'data-item-id': item.id,
     'data-href': item.href,
-    ...analyticsAttrs(withDaaLlTitle('playlist-item-select', item.title)),
+    ...analyticsAttrs('playlist-item-select'),
   });
+  const daaLh = sessionDaaLh(item);
+  if (daaLh) row.setAttribute('daa-lh', daaLh);
 
   const content = createTag('a', { class: 'session-video-playlist-row-content', href: item.href }, '', { parent: row });
 
@@ -511,6 +513,7 @@ function buildTopicView(el, allRows, {
       {
         id: session.id,
         rfSessionId: session.rfSessionId,
+        sessionCode: session.sessionCode,
         title: session.title,
         thumbnailUrl: session.thumbnailUrl || defaultThumbnail,
 

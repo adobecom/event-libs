@@ -51,13 +51,13 @@ describe('EndedState', () => {
 
   it('shows Add-to-Favorites when not favorited', () => {
     const out = EndedState({ session: SESSION });
-    expect(out).to.include('daa-ll="Add-to-Favorites-Session-Complete--');
+    expect(out).to.include('daa-ll="Add-to-Favorites-Session-Complete"');
   });
 
   it('shows Remove-from-Favorites once favorited', () => {
     favorited.value = new Set(['s-1']);
     const out = EndedState({ session: SESSION });
-    expect(out).to.include('daa-ll="Remove-from-Favorites-Session-Complete--');
+    expect(out).to.include('daa-ll="Remove-from-Favorites-Session-Complete"');
   });
 
   it('never shows an Add-to-Schedule CTA — the session already aired', () => {
@@ -67,6 +67,11 @@ describe('EndedState', () => {
 
   it('shows a Share action alongside Favorite', () => {
     const out = EndedState({ session: SESSION });
-    expect(out).to.include('daa-ll="Share-Session-Complete--');
+    expect(out).to.include('daa-ll="Share-Session-Complete"');
+  });
+
+  it('names the session on its root as daa-lh code|title (MWPW-211083)', () => {
+    const out = EndedState({ session: { ...SESSION, sessionCode: 'S1' } });
+    expect(out).to.include('daa-lh="S1|Pixel &amp; Product"');
   });
 });

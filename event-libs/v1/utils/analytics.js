@@ -1,21 +1,19 @@
 import { logError } from './lana-log.js';
 
-// Milo's decorateDefaultLinkAnalytics (martech/attributes.js) rewrites the daa-ll of any link or
-// button it sees: each `-`-separated part loses punctuation and is cut to 20 characters. The title
-// is pre-processed the same way, so the label is identical whether or not Milo gets to it first.
-const INVALID_CHARACTERS = /[^\u00C0-\u1FFF\u2C00-\uD7FF\w]+/g;
-const MILO_LABEL_PART_LIMIT = 20;
+const toDaaLhPart = (value) => String(value ?? '').replace(/\|/g, '-').replace(/\s+/g, ' ').trim();
 
-const cleanPart = (part) => part.replace(INVALID_CHARACTERS, ' ').trim().replace(/^_+|_+$/g, '').trim();
+// Launch appends the daa-lh of a clicked label's element and its ancestors to the link name as
+// `|`-separated segments, and keeps them verbatim. Pipes inside a value are replaced so they can't
+// add segments. Returns undefined when empty, so Preact omits the attribute.
+export function toDaaLh(...parts) {
+  return parts.map(toDaaLhPart).filter(Boolean).join('|') || undefined;
+}
 
-// Appends what a control acts on, Milo-style (`Session-Card-Open--Photoshop First Look`), so
-// Analytics can tell which session was clicked.
-export function withDaaLlTitle(label, title) {
-  const cleaned = String(title ?? '').split('-').map(cleanPart).filter(Boolean)
-    .join('-')
-    .slice(0, MILO_LABEL_PART_LIMIT)
-    .replace(/[\s_-]+$/, '');
-  return cleaned ? `${label}--${cleaned}` : label;
+// Names the session for every control inside the element that carries it, e.g.
+// `Add-to-Favorites|s2|b1|sessions-guide-|GS2-0|Inspiration Keynote - ASL`. The code comes first:
+// it's unique, so it still identifies the session if Analytics truncates a long title.
+export function sessionDaaLh(session) {
+  return toDaaLh(session?.sessionCode, session?.title);
 }
 
 // Milo's classic sendAnalytics payload; importing its modal.js doubles C2 modals (MWPW-210384).

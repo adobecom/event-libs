@@ -747,12 +747,10 @@ describe('session-video-playlist', () => {
         .to.equal('Favorite Session A');
     });
 
-    it('names the session in the row and favorite analytics labels', () => {
+    it('names the session on each row as daa-lh (MWPW-211083)', () => {
       const row = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
-      expect(row.getAttribute('daa-ll')).to.equal('playlist-item-select--Session A');
-      expect(row.querySelector('.session-video-playlist-row-favorite').getAttribute('daa-ll'))
-        .to.equal('playlist-item-favorite--Session A');
+      expect(row.getAttribute('daa-lh')).to.include('Session A');
     });
 
     it('gives the play button its own accessible name', () => {

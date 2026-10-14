@@ -6,10 +6,10 @@ import { toggleFavoriteWithFeedback } from '../../../../services/sessions/action
 import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { logError } from '../../../../utils/lana-log.js';
-import { withDaaLlTitle } from '../../../../utils/analytics.js';
 import {
   IconPlay, IconHeartFilled, IconHeartOutline, IconShare,
 } from '../../sessions-guide/components/icons.js';
+import { sessionDaaLh } from '../../../../utils/analytics.js';
 
 // Covers "other sessions live" and "nothing live" with the same markup — Also Live/Up Next
 // below are the fallback actions. Background photo is a CSS background on .sb-app, not here.
@@ -40,12 +40,12 @@ export function EndedState({ session }) {
   }
 
   return html`
-    <div class="sb-ended" role="region" aria-label="Session complete">
+    <div class="sb-ended" role="region" aria-label="Session complete" daa-lh=${sessionDaaLh(session)}>
       <p class="sb-ended__eyebrow">Session complete.</p>
       <h2 class="sb-ended__title">${session.title}</h2>
       <div class="sb-ended__actions">
         ${watchOnDemandHref && html`
-          <a class="sb-ended__watch" href=${watchOnDemandHref} daa-ll=${withDaaLlTitle('Watch-On-Demand', session.title)}>
+          <a class="sb-ended__watch" href=${watchOnDemandHref} daa-ll="Watch-On-Demand">
             <${IconPlay} />
             Watch on demand
           </a>
@@ -57,14 +57,14 @@ export function EndedState({ session }) {
           disabled=${isPending}
           aria-pressed=${String(isFavorited)}
           aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
-          daa-ll=${withDaaLlTitle(isFavorited ? 'Remove-from-Favorites-Session-Complete' : 'Add-to-Favorites-Session-Complete', session.title)}
+          daa-ll=${isFavorited ? 'Remove-from-Favorites-Session-Complete' : 'Add-to-Favorites-Session-Complete'}
         >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>
         <button
           class="sb-ended__icon-btn"
           type="button"
           onclick=${handleShare}
           aria-label=${`Share ${session.title}`}
-          daa-ll=${withDaaLlTitle('Share-Session-Complete', session.title)}
+          daa-ll="Share-Session-Complete"
         ><${IconShare} /></button>
       </div>
     </div>

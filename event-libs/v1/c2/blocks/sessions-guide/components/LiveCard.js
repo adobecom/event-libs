@@ -9,13 +9,13 @@ import {
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { withDaaLlSuffix } from '../utils/analytics.js';
-import { withDaaLlTitle } from '../../../../utils/analytics.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { scrollPageToTop } from '../utils/motion.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
+import { sessionDaaLh } from '../../../../utils/analytics.js';
 
 export const buildLiveCard = () => LiveCard;
 
@@ -140,7 +140,7 @@ export function LiveCard({
         class=${'sg-live-card__btn sg-live-card__btn--schedule-cta' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
         onclick=${handleSchedule}
         disabled=${isPending}
-        daa-ll=${withDaaLlTitle(isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule', session.title)}
+        daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
         type="button"
       >${isScheduled
           ? html`<${IconCalendarCheck} size=${useMobileLayout ? 12 : 20} />Added to schedule`
@@ -152,7 +152,7 @@ export function LiveCard({
     primaryCta = html`<button
       class="sg-live-card__btn sg-live-card__btn--watch"
       onclick=${handleWatch}
-      daa-ll=${withDaaLlTitle(isOnDemand ? 'Watch-On-Demand' : 'Watch-Now', session.title)}
+      daa-ll=${isOnDemand ? 'Watch-On-Demand' : 'Watch-Now'}
       type="button"
     ><${IconPlay} size=${useMobileLayout ? 14 : 20} />${isOnDemand ? 'Watch on demand' : 'Watch now'}</button>`;
   }
@@ -188,7 +188,7 @@ export function LiveCard({
               type="button"
               onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
               aria-label=${titleAriaLabel}
-              daa-ll=${withDaaLlTitle('Session-Card-Open', session.title)}
+              daa-ll="Session-Card-Open"
             ><span class="sg-live-card__title-text">${session.title}</span></button>`;
 
   // Current layout: horizontal, divider-separated, used everywhere except the new mobile 'live' case below.
@@ -218,7 +218,7 @@ export function LiveCard({
   // The whole card is clickable, so it carries the title's label too; clicks on the card's own
   // buttons still report their closer label. Callers with onCardClick (Broadcast) track opens themselves.
   return html`
-    <div class=${cardClass} onclick=${handleCardClick} daa-ll=${onCardClick ? undefined : withDaaLlTitle('Session-Card-Open', session.title)}>
+    <div class=${cardClass} onclick=${handleCardClick} daa-ll=${onCardClick ? undefined : 'Session-Card-Open'} daa-lh=${sessionDaaLh(session)}>
       <div class="sg-live-card__image">
         ${session.thumbnailUrl
     ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" decoding="async" />`
@@ -244,7 +244,7 @@ export function LiveCard({
             aria-label=${isScheduled ? `Remove ${session.title} from schedule` : `Add ${session.title} to schedule`}
             aria-pressed=${String(isScheduled)}
             disabled=${isPending}
-            daa-ll=${withDaaLlTitle(isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule', session.title)}
+            daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
             type="button"
           ></button>`}
           ${favoritingEnabled && html`<button
@@ -253,7 +253,7 @@ export function LiveCard({
             aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
             aria-pressed=${String(isFavorited)}
             disabled=${isPending}
-            daa-ll=${withDaaLlTitle(withDaaLlSuffix(isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites', daaLlSuffix), session.title)}
+            daa-ll=${withDaaLlSuffix(isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites', daaLlSuffix)}
             type="button"
           >${isFavorited
     ? html`<${IconHeartFilled} size=${16} />`

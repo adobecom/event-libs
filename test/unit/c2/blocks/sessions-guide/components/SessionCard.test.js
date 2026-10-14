@@ -177,12 +177,20 @@ describe('SessionCard', () => {
   });
 
   it('keeps the plain favorite label by default and appends daaLlSuffix when given (MWPW-210975)', () => {
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Add-to-Favorites--');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Add-to-Favorites"');
     const store = buildStore(preact);
     store.SessionGuideContext._current = makeCtx();
     const SessionCard = buildSessionCard(preact, store);
     expect(SessionCard({ session: UPCOMING_SESSION, daaLlSuffix: 'Upcoming' }))
-      .to.include('daa-ll="Add-to-Favorites-Upcoming--');
+      .to.include('daa-ll="Add-to-Favorites-Upcoming"');
+  });
+
+  it('names the session on the card as daa-lh code|title (MWPW-211083)', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx();
+    const SessionCard = buildSessionCard(preact, store);
+    expect(SessionCard({ session: { ...UPCOMING_SESSION, sessionCode: 'S100' } }))
+      .to.include('daa-lh="S100|Building with AI"');
   });
 
   it('labels the whole card like its title unless the caller tracks card clicks itself (MWPW-211083)', () => {
@@ -247,7 +255,7 @@ describe('SessionCard', () => {
 
   it('tags the card daa-ll as Session-Card-Navigate on the page surface', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('daa-ll="Session-Card-Navigate--');
+    expect(html).to.include('daa-ll="Session-Card-Navigate"');
   });
 
   // showDescription defaults to false so session-broadcast's Upcoming-card-only hover
@@ -298,17 +306,17 @@ describe('SessionCard', () => {
     store.SessionGuideContext._current = makeCtx();
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: UPCOMING_SESSION, onCardClick: () => {} });
-    expect(html).to.include('daa-ll="Session-Card-Open--');
+    expect(html).to.include('daa-ll="Session-Card-Open"');
   });
 
   it('tags the card daa-ll as Session-Card-Open on the widget surface for a live/upcoming session', () => {
     const html = renderCard(UPCOMING_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
-    expect(html).to.include('daa-ll="Session-Card-Open--');
+    expect(html).to.include('daa-ll="Session-Card-Open"');
   });
 
   it('tags the card daa-ll as On-Demand-Card-Navigate on the widget surface for an on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
-    expect(html).to.include('daa-ll="On-Demand-Card-Navigate--');
+    expect(html).to.include('daa-ll="On-Demand-Card-Navigate"');
   });
 
   // Only the schedule button is asserted here — the favorite IconButton is embedded
@@ -316,9 +324,9 @@ describe('SessionCard', () => {
   // which this test mock's minimal component-tag parser can't resolve (real htm/preact
   // renders it correctly; this is a mock limitation, not a production bug).
   it('tags the schedule button with Add-/Remove- daa-ll labels matching its state', () => {
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Add-to-Schedule--');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Add-to-Schedule"');
     scheduled.value = new Set(['session-1']);
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Remove-from-Schedule--');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Remove-from-Schedule"');
   });
 
   it('tags the previously-aired play button with daa-ll=Watch-Now', () => {
@@ -326,7 +334,7 @@ describe('SessionCard', () => {
     store.SessionGuideContext._current = makeCtx();
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
-    expect(html).to.include('daa-ll="Watch-Now--');
+    expect(html).to.include('daa-ll="Watch-Now"');
   });
 
   it('omits the schedule button when enableScheduling is false', () => {
@@ -353,7 +361,7 @@ describe('SessionCard', () => {
     });
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
-    expect(html).to.include('daa-ll="Watch-Now--');
+    expect(html).to.include('daa-ll="Watch-Now"');
   });
 
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {
