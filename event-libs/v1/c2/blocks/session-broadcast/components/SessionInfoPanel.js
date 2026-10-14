@@ -67,14 +67,14 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
         disabled=${isPending}
         aria-pressed=${String(isFavorited)}
         aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
-        daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
+        daa-ll=${isFavorited ? 'Remove-from-Favorites-Livestream-Details' : 'Add-to-Favorites-Livestream-Details'}
       >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>
       <button
         class="sb-info__icon-btn"
         type="button"
         onclick=${handleShare}
         aria-label=${`Share ${session.title}`}
-        daa-ll="Share"
+        daa-ll="Share-Livestream-Details"
       ><${IconShare} /></button>
     </div>
   `;

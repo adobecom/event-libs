@@ -179,6 +179,16 @@ describe('features/toast', () => {
       expect(cta.tagName).to.equal('A');
       expect(cta.getAttribute('href')).to.equal('/register');
       expect(cta.textContent).to.equal('Register now');
+      expect(cta.hasAttribute('daa-ll')).to.be.false;
+    });
+
+    it('tags the CTA with ctaDaaLl and the close button with Toast-Close for analytics (MWPW-210975)', () => {
+      showToast({
+        message: 'Register', ctaLabel: 'Register now', ctaHref: '/register', ctaDaaLl: 'Toast-Register-Sign-In',
+      });
+      const el = region.querySelector('.sg-toast');
+      expect(el.querySelector('.sg-toast__cta').getAttribute('daa-ll')).to.equal('Toast-Register-Sign-In');
+      expect(el.querySelector('.sg-toast__close').getAttribute('daa-ll')).to.equal('Toast-Close');
     });
 
     it('renders a CTA button and wires ctaAction when ctaHref is absent', () => {

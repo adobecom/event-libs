@@ -18,6 +18,7 @@ export function UpNextCarousel({ sessions, title = 'Upcoming' }) {
         onCardClick=${openSessionDetail}
         showDescription=${true}
         pageByGroup=${true}
+        cardDaaLlSuffix="Upcoming"
       />
     </div>
   `;

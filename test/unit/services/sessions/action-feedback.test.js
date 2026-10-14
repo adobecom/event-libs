@@ -248,6 +248,7 @@ describe('services/sessions/action-feedback', () => {
       expect(toasts.value[0].message).to.equal('Sign in to favorite.');
       expect(toasts.value[0].ctaLabel).to.equal('Sign in');
       expect(toasts.value[0].ctaHref).to.equal('/register');
+      expect(toasts.value[0].ctaDaaLl).to.equal('Toast-Sign-In');
     });
 
     it('uses postEventActionLabel after the event and actionLabel during it', () => {
@@ -260,6 +261,7 @@ describe('services/sessions/action-feedback', () => {
       showAuthToast({ eventConfig, actionLabel: 'download Slides.pdf', postEventActionLabel: 'download resources' });
       expect(toasts.value[0].message).to.equal('Register or sign in to download Slides.pdf.');
       expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
+      expect(toasts.value[0].ctaDaaLl).to.equal('Toast-Register-Sign-In');
     });
   });
 
