@@ -163,8 +163,10 @@ export function SessionCard({
     ? (onCardClick ? 'Session-Card-Open' : 'Session-Card-Navigate')
     : (onDemand ? 'On-Demand-Card-Navigate' : 'Session-Card-Open');
 
+  // The whole card is clickable, so it carries the title's label too; clicks on the card's own
+  // buttons still report their closer label. Callers with onCardClick (Broadcast) track opens themselves.
   return html`
-    <div class=${cardClass} onclick=${handleClick}
+    <div class=${cardClass} onclick=${handleClick} daa-ll=${onCardClick ? undefined : cardDaaLl}
       onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
         <button

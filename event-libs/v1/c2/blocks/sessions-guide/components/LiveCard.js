@@ -214,8 +214,10 @@ export function LiveCard({
     </div>
   `;
 
+  // The whole card is clickable, so it carries the title's label too; clicks on the card's own
+  // buttons still report their closer label. Callers with onCardClick (Broadcast) track opens themselves.
   return html`
-    <div class=${cardClass} onclick=${handleCardClick}>
+    <div class=${cardClass} onclick=${handleCardClick} daa-ll=${onCardClick ? undefined : 'Session-Card-Open'}>
       <div class="sg-live-card__image">
         ${session.thumbnailUrl
     ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" decoding="async" />`

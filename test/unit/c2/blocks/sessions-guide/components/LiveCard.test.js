@@ -210,6 +210,14 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Session-Card-Open"');
   });
 
+  it('labels the whole card like its title unless the caller tracks card clicks itself (MWPW-211083)', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    const count = (markup) => markup.split('daa-ll="Session-Card-Open"').length - 1;
+    expect(count(LiveCard({ session: LIVE_SESSION }))).to.equal(2);
+    expect(count(LiveCard({ session: LIVE_SESSION, onCardClick: () => {} }))).to.equal(1);
+  });
+
   it('renders the title as a navigating button (no onCardClick) on the page surface', () => {
     const store = buildStore(preact);
     store.SessionGuideContext._current = {

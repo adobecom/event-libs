@@ -51,6 +51,14 @@ describe('LiveUpcomingView (recommendedSessions authored)', () => {
     expect(View({})).to.include('sg-carousel-section--recommended');
   });
 
+  it('labels the Recommended arrows and favorites apart from the list below (MWPW-211083)', () => {
+    const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY);
+    const View = buildLiveUpcomingView(preact, store);
+    const out = View({});
+    expect(out).to.include('arrowDaaLl="Recommended"');
+    expect(out).to.include('cardDaaLlSuffix="Recommended"');
+  });
+
   it('hides the recommended carousel when search matches nothing', () => {
     const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY, { searchQuery: 'nonexistent term' });
     const View = buildLiveUpcomingView(preact, store);
