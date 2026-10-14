@@ -980,4 +980,94 @@ describe('session-video-player', () => {
       expect(getVideoProgress('mpc-999')).to.equal(null);
     });
   });
+
+  describe('loading placeholder (MWPW-210476)', () => {
+    beforeEach(() => {
+      BlockMediator.set(DECISION_KEY, null);
+    });
+
+    const isReserved = (el) => el.classList.contains('session-video-loading')
+      && Boolean(el.querySelector('.session-video-player-loader'));
+
+    it('reserves the full-width slot for an on-demand session until the player mounts', async () => {
+      authorSession();
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      await init(fullWidthPlayer);
+      await flush();
+      expect(isReserved(fullWidthPlayer)).to.be.true;
+      expect(fullWidthPlayer.querySelector('iframe')).to.not.exist;
+
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+      await flush();
+      expect(fullWidthPlayer.querySelector('iframe.adobetv')).to.exist;
+      expect(fullWidthPlayer.classList.contains('session-video-loading')).to.be.false;
+      expect(fullWidthPlayer.querySelector('.session-video-player-loader')).to.not.exist;
+    });
+
+    it('never reserves a slot on the playlist-container instance', async () => {
+      authorSession();
+      const { playlistPlayer } = buildPage();
+      await init(playlistPlayer);
+      await flush();
+      expect(playlistPlayer.classList.contains('session-video-loading')).to.be.false;
+      expect(playlistPlayer.querySelector('.session-video-player-loader')).to.not.exist;
+    });
+
+    it('drops the slot when the full-width instance loses the layout decision', async () => {
+      authorSession();
+      const { fullWidthPlayer } = buildPage();
+      await init(fullWidthPlayer);
+      await flush();
+      expect(isReserved(fullWidthPlayer)).to.be.true;
+
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: true });
+      await flush();
+      expect(fullWidthPlayer.classList.contains('session-video-loading')).to.be.false;
+      expect(fullWidthPlayer.querySelector('.session-video-player-loader')).to.not.exist;
+    });
+
+    it('does not reserve a slot before the session starts', async () => {
+      authorSession({
+        times: sessionTimes({
+          startTimeMillis: Date.now() + HOUR_MS,
+          endTimeMillis: Date.now() + (2 * HOUR_MS),
+        }),
+      });
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      await init(fullWidthPlayer);
+      expect(fullWidthPlayer.classList.contains('session-video-loading')).to.be.false;
+    });
+
+    it('does not reserve a slot for a live-stream session inside its scheduled window', async () => {
+      // The live-stream poll never answers here, so no phase (and no player) arrives during the test.
+      sinon.stub(window, 'fetch').returns(new Promise(() => {}));
+      authorSession({
+        times: sessionTimes({ startTimeMillis: Date.now() - HOUR_MS, endTimeMillis: Date.now() + HOUR_MS }),
+        attrs: { mpcId: null, mrStreamId: 'mr-live-1', livestreamed: true },
+      });
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      await init(fullWidthPlayer);
+      expect(fullWidthPlayer.classList.contains('session-video-loading')).to.be.false;
+    });
+
+    it('reserves a slot for a live-stream session after its scheduled end when a recording exists', async () => {
+      sinon.stub(window, 'fetch').returns(new Promise(() => {}));
+      authorSession({ attrs: { mpcId: null, mrStreamId: 'mr-live-1', livestreamed: true } });
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      await init(fullWidthPlayer);
+      expect(isReserved(fullWidthPlayer)).to.be.true;
+    });
+
+    it('stops showing the loader if the layout decision never arrives', async () => {
+      const clock = sinon.useFakeTimers({ now: Date.now(), toFake: ['setTimeout', 'clearTimeout'] });
+      authorSession();
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      await init(fullWidthPlayer);
+      expect(isReserved(fullWidthPlayer)).to.be.true;
+
+      clock.tick(15000);
+      expect(fullWidthPlayer.classList.contains('session-video-loading')).to.be.false;
+      expect(fullWidthPlayer.querySelector('.session-video-player-loader')).to.not.exist;
+    });
+  });
 });

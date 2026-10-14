@@ -243,10 +243,17 @@ either side via `.closest()`, so the explicit marker class replaced it
 entirely.
 
 While waiting, only the full-width instance shows a lightweight loader
-(`.session-video-player-loader`) in its own place, since `session-video-playlist.js`'s own
+(`.session-video-player-loader`) in a reserved 16:9 slot (`.session-video-loading`, with the
+same 8px bottom padding as the embedded player), since `session-video-playlist.js`'s own
 catalog fetch (driving this decision) has been measured at ~3.5s and that
 instance is otherwise the more common winner; the `session-video-playlist`-container
-instance just stays empty until confirmed the winner. The decision flow
+instance just stays empty until confirmed the winner. The slot is only reserved when a video
+is expected to mount on load (`expectsVideoOnLoad()`: the clock-based phase is DVR/on-demand
+and has an embeddable video; a MobileRider-stream session counts as live until its scheduled
+end, so upcoming and live sessions never flash a placeholder that then collapses). It's
+removed when the iframe mounts, when the MobileRider player first takes up space, when the
+instance loses the decision or the phase isn't playable, on errors, and after
+`LOADER_MAX_MS` (15s) at most (MWPW-210476). The decision flow
 itself is **not awaited** by `init()` — Milo decorates sections
 sequentially, so blocking on this would stall every later section on the
 page for up to `DECISION_FALLBACK_MS`.

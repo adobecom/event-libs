@@ -16,9 +16,11 @@ import {
   resolveSessionId,
   ensureStylesheet,
   watchPlaybackPhase,
+  getPlaybackPhase,
   PLAYBACK_PHASE,
   buildSessionFromMetadata,
 } from '../../utils/video-session.js';
+import { getNowMs } from '../../../utils/session-state.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
 import {
   createYouTubePlayerId, buildYouTubeAnalyticsParams, registerYouTubeTracking,
@@ -417,12 +419,14 @@ async function loadMobileRiderPlayer(el, video) {
   if (video.skinId) rider.dataset.extractedSkinId = video.skinId;
   rider.dataset.extractedAutoplay = 'true';
   initMobileRider(rider);
+  removeLoaderWhenSized(el, rider);
   el.dataset.embedded = 'true';
 }
 
 function loadVideoPlayer(el, sessionId, video) {
   if (video.provider === 'mobilerider') {
     loadMobileRiderPlayer(el, video).catch((error) => {
+      removeLoaderPlaceholder(el);
       logError(LOG_SCOPE, 'could not load MobileRider DVR player', error);
     });
     return;
@@ -447,6 +451,7 @@ function loadVideoPlayer(el, sessionId, video) {
     if (iframe.id) registerYouTubeTracking(iframe, LOG_SCOPE);
   } else watchMpcPlayback(sessionId, iframe);
 
+  removeLoaderPlaceholder(el);
   el.dataset.embedded = 'true';
 }
 
@@ -462,6 +467,41 @@ function isWinningInstance(el, hasPlaylist) {
 function hideLosingInstance(el) {
   if (closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
   el.classList.add('session-video-hidden');
+}
+
+// Upper bound on the reserved slot, so a decision or player that never arrives can't leave it spinning.
+const LOADER_MAX_MS = 15000;
+const loaderCleanups = new WeakMap();
+
+function removeLoaderPlaceholder(el) {
+  loaderCleanups.get(el)?.forEach((cleanup) => cleanup());
+  loaderCleanups.delete(el);
+  el.classList.remove('session-video-loading');
+  el.querySelector('.session-video-player-loader')?.remove();
+}
+
+function showLoaderPlaceholder(el) {
+  if (!closestSectionWithStyle(el, VIDEO_CONTAINER_CLASS)) return;
+  if (el.querySelector('.session-video-player-loader')) return;
+  el.classList.add('session-video-loading');
+  createTag('div', { class: 'session-video-player-loader', 'aria-hidden': 'true' }, '', { parent: el });
+  const timer = setTimeout(() => removeLoaderPlaceholder(el), LOADER_MAX_MS);
+  loaderCleanups.set(el, [() => clearTimeout(timer)]);
+}
+
+// MobileRider builds its player after loading a remote script, so `target` is still empty here;
+// keep the slot until the player takes up space, or the body jumps up and back down.
+function removeLoaderWhenSized(el, target) {
+  if (!loaderCleanups.has(el)) return;
+  if (target.offsetHeight > 0) {
+    removeLoaderPlaceholder(el);
+    return;
+  }
+  const observer = new ResizeObserver(() => {
+    if (target.offsetHeight > 0) removeLoaderPlaceholder(el);
+  });
+  observer.observe(target);
+  loaderCleanups.get(el).push(() => observer.disconnect());
 }
 
 function awaitEmbedDecision(el) {
@@ -492,6 +532,20 @@ function resolveVideoForPhase(phase, sessionTimes, session) {
 
 const PLAYABLE_PHASES = [PLAYBACK_PHASE.DVR_BUFFER, PLAYBACK_PHASE.ON_DEMAND];
 
+// Predicts the first phase before the live-stream poll answers, so the slot is only reserved when a
+// video will mount. A MobileRider stream counts as live (no player here) until its scheduled end.
+function expectsVideoOnLoad(session, sessionTimes) {
+  const nowMs = getNowMs();
+  const endMs = Date.parse(session.endTimeUtc);
+  const assumeLive = session.mrStreamId && !(Number.isFinite(endMs) && nowMs >= endMs);
+  const phase = getPlaybackPhase(session, {
+    nowMs,
+    eventStartMs: getEventStartMs(),
+    liveStreamActiveIds: new Set(assumeLive ? [session.mrStreamId] : []),
+  });
+  return PLAYABLE_PHASES.includes(phase) && Boolean(resolveVideoForPhase(phase, sessionTimes, session));
+}
+
 function buildRenderModel(el) {
   const config = readAuthoredConfig(el);
   const sessionId = resolveSessionId(config);
@@ -515,11 +569,15 @@ function loadWhenDecided(el, sessionId, video) {
     try {
       const isWinner = await awaitEmbedDecision(el);
       if (!isWinner) {
+        // Lost the layout decision (video goes to the other container) — drop the reserved loader
+        // so the main instance doesn't keep a spinner above the real player.
+        removeLoaderPlaceholder(el);
         hideLosingInstance(el);
         return;
       }
       loadVideoPlayer(el, sessionId, video);
     } catch (error) {
+      removeLoaderPlaceholder(el);
       logError(LOG_SCOPE, 'could not resolve the video layout decision', error);
     }
   })();
@@ -534,6 +592,10 @@ export default async function init(el) {
     return;
   }
   const { sessionId, session, sessionTimes } = model;
+
+  // Reserve the main slot + show a loader immediately so the body doesn't jump when the video
+  // mounts later (no-op for the playlist-container instance, or when no video is expected).
+  if (expectsVideoOnLoad(session, sessionTimes)) showLoaderPlaceholder(el);
 
   let embeddedPhase = null;
 
@@ -574,6 +636,7 @@ export default async function init(el) {
       }
       return;
     }
+    removeLoaderPlaceholder(el);
 
     // Moved back to a non-playable phase (e.g. poll reports live) — tear down the stale player and
     // re-announce the phase so the playlist (if it had rendered for ON_DEMAND) can hide itself.
