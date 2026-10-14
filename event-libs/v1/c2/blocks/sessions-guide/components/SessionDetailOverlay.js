@@ -13,6 +13,7 @@ import { showToast } from '../../../../features/toast/toast.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
 import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { sanitizedRichText, descriptionHtml } from '../utils/rich-text.js';
+import { withDaaLlTitle } from '../../../../utils/analytics.js';
 import {
   IconHeartFilled, IconHeartOutline, IconLinkOut, IconCalendarCheck, IconCalendarPlus,
 } from './icons.js';
@@ -211,7 +212,7 @@ export function SessionDetailOverlay({ onBack }) {
                           href=${watchHref}
                           onclick=${handleWatch}
                           aria-disabled=${watchHref ? undefined : 'true'}
-                          daa-ll=${onDemand ? 'Watch-On-Demand' : 'Watch-Now'}
+                          daa-ll=${withDaaLlTitle(onDemand ? 'Watch-On-Demand' : 'Watch-Now', session.title)}
                         >
                           <span class="sg-detail__btn-icon sg-detail__btn-icon--play" aria-hidden="true"></span>
                           ${onDemand ? 'Watch on demand' : 'Watch now'}
@@ -223,7 +224,7 @@ export function SessionDetailOverlay({ onBack }) {
                           onclick=${handleSchedule}
                           disabled=${isPending}
                           aria-pressed=${String(isScheduled)}
-                          daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
+                          daa-ll=${withDaaLlTitle(isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule', session.title)}
                           type="button"
                         >
                           ${isScheduled ? html`<${IconCalendarCheck} />` : html`<${IconCalendarPlus} />`}
@@ -240,7 +241,7 @@ export function SessionDetailOverlay({ onBack }) {
                     onclick=${handleFavorite}
                     pressed=${isFavorited}
                     disabled=${isPending}
-                    daaLl=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
+                    daaLl=${withDaaLlTitle(isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites', session.title)}
                   >
                     ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
                   </${IconButton}>`}
@@ -307,7 +308,7 @@ export function SessionDetailOverlay({ onBack }) {
                       ${href && html`<span class="sg-detail__product-linkout" aria-hidden="true"><${IconLinkOut} /></span>`}
                     `;
     return href
-      ? html`<a class="sg-detail__product-card" href=${href} target="_blank" rel="noopener noreferrer" daa-ll="Featured-Product">${inner}</a>`
+      ? html`<a class="sg-detail__product-card" href=${href} target="_blank" rel="noopener noreferrer" daa-ll=${withDaaLlTitle('Featured-Product', p)}>${inner}</a>`
       : html`<div class="sg-detail__product-card">${inner}</div>`;
   })}
                 </div>

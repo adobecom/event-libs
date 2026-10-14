@@ -323,7 +323,7 @@ describe('SessionDetailOverlay', () => {
       // The test stub renders interpolated attribute values unquoted.
       expect(out).to.include('href="https://www.adobe.com/products/photoshop"');
       expect(out).to.include('sg-detail__product-linkout');
-      expect(out).to.include('daa-ll="Featured-Product"');
+      expect(out).to.include('daa-ll="Featured-Product--');
     });
 
     it('renders an unmapped product as a non-link tile with no icon at all', () => {

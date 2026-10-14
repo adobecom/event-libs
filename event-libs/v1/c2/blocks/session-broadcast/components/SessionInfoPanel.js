@@ -12,6 +12,7 @@ import {
   IconHeartFilled, IconHeartOutline, IconShare, IconChevronRight,
 } from '../../sessions-guide/components/icons.js';
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
+import { withDaaLlTitle } from '../../../../utils/analytics.js';
 
 // Collapsed vs. expanded changes which actions/meta show and clamps the description (hidden
 // entirely if favorited, mobile only — .is-favorited in the CSS). "View all details" opens the
@@ -67,14 +68,14 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
         disabled=${isPending}
         aria-pressed=${String(isFavorited)}
         aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
-        daa-ll=${isFavorited ? 'Remove-from-Favorites-Livestream-Details' : 'Add-to-Favorites-Livestream-Details'}
+        daa-ll=${withDaaLlTitle(isFavorited ? 'Remove-from-Favorites-Livestream-Details' : 'Add-to-Favorites-Livestream-Details', session.title)}
       >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>
       <button
         class="sb-info__icon-btn"
         type="button"
         onclick=${handleShare}
         aria-label=${`Share ${session.title}`}
-        daa-ll="Share-Livestream-Details"
+        daa-ll=${withDaaLlTitle('Share-Livestream-Details', session.title)}
       ><${IconShare} /></button>
     </div>
   `;
@@ -114,7 +115,7 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
           class="sb-info__view-all"
           type="button"
           onclick=${handleViewAllDetails}
-          daa-ll="View-All-Details"
+          daa-ll=${withDaaLlTitle('View-All-Details', session.title)}
         >${viewAllDetailsLabel}</button>
       `}
     </div>

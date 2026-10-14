@@ -6,6 +6,7 @@ import { toggleFavoriteWithFeedback } from '../../../../services/sessions/action
 import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { logError } from '../../../../utils/lana-log.js';
+import { withDaaLlTitle } from '../../../../utils/analytics.js';
 import {
   IconPlay, IconHeartFilled, IconHeartOutline, IconShare,
 } from '../../sessions-guide/components/icons.js';
@@ -44,7 +45,7 @@ export function EndedState({ session }) {
       <h2 class="sb-ended__title">${session.title}</h2>
       <div class="sb-ended__actions">
         ${watchOnDemandHref && html`
-          <a class="sb-ended__watch" href=${watchOnDemandHref} daa-ll="Watch-On-Demand">
+          <a class="sb-ended__watch" href=${watchOnDemandHref} daa-ll=${withDaaLlTitle('Watch-On-Demand', session.title)}>
             <${IconPlay} />
             Watch on demand
           </a>
@@ -56,14 +57,14 @@ export function EndedState({ session }) {
           disabled=${isPending}
           aria-pressed=${String(isFavorited)}
           aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
-          daa-ll=${isFavorited ? 'Remove-from-Favorites-Session-Complete' : 'Add-to-Favorites-Session-Complete'}
+          daa-ll=${withDaaLlTitle(isFavorited ? 'Remove-from-Favorites-Session-Complete' : 'Add-to-Favorites-Session-Complete', session.title)}
         >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>
         <button
           class="sb-ended__icon-btn"
           type="button"
           onclick=${handleShare}
           aria-label=${`Share ${session.title}`}
-          daa-ll="Share-Session-Complete"
+          daa-ll=${withDaaLlTitle('Share-Session-Complete', session.title)}
         ><${IconShare} /></button>
       </div>
     </div>

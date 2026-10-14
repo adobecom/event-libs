@@ -725,9 +725,9 @@ describe('upcoming-sessions', () => {
       const scheduleBtn = card.querySelector('.sg-card__btn--schedule');
       const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
       expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('false');
-      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule--Intro to Adobe Expre');
       expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('false');
-      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Add-to-Favorites--Intro to Adobe Expre');
     });
 
     it('tags the schedule and favorite buttons as remove actions when the session is already scheduled/favorited', () => {
@@ -737,14 +737,14 @@ describe('upcoming-sessions', () => {
       const scheduleBtn = card.querySelector('.sg-card__btn--schedule');
       const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
       expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('true');
-      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule--Intro to Adobe Expre');
       expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('true');
-      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites--Intro to Adobe Expre');
     });
 
     it('tags the card itself for open-session-detail tracking', () => {
       const card = buildCard(session());
-      expect(card.getAttribute('daa-ll')).to.equal('Session-Card-Open');
+      expect(card.getAttribute('daa-ll')).to.equal('Session-Card-Open--Intro to Adobe Expre');
     });
   });
 
@@ -770,19 +770,19 @@ describe('upcoming-sessions', () => {
       expect(scheduleBtn.disabled).to.equal(false);
       expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('true');
       expect(scheduleBtn.getAttribute('aria-label')).to.equal('Remove from schedule');
-      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule--Intro to Adobe Expre');
       expect(el.querySelector('[data-session-id="session-2"]').classList.contains('is-scheduled')).to.equal(false);
 
       favorited.value = new Set(['session-1']);
       const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
       expect(card.classList.contains('is-favorited')).to.equal(true);
       expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('true');
-      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites--Intro to Adobe Expre');
 
       scheduled.value = new Set();
       expect(card.classList.contains('is-scheduled')).to.equal(false);
       expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('false');
-      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule--Intro to Adobe Expre');
     });
   });
 

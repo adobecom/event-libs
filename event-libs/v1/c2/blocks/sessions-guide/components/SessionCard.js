@@ -7,6 +7,7 @@ import { isDvrPending } from '../../../../utils/session-state.js';
 import { scheduled, favorited, pendingActions, getEventApiConfig } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { withDaaLlSuffix } from '../utils/analytics.js';
+import { withDaaLlTitle } from '../../../../utils/analytics.js';
 import { setSessionParam, sessionParamValue, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
@@ -159,9 +160,9 @@ export function SessionCard({
   }
 
   // eslint-disable-next-line no-nested-ternary
-  const cardDaaLl = surface === 'page'
+  const cardDaaLl = withDaaLlTitle(surface === 'page'
     ? (onCardClick ? 'Session-Card-Open' : 'Session-Card-Navigate')
-    : (onDemand ? 'On-Demand-Card-Navigate' : 'Session-Card-Open');
+    : (onDemand ? 'On-Demand-Card-Navigate' : 'Session-Card-Open'), session.title);
 
   // The whole card is clickable, so it carries the title's label too; clicks on the card's own
   // buttons still report their closer label. Callers with onCardClick (Broadcast) track opens themselves.
@@ -193,7 +194,7 @@ export function SessionCard({
           extraClass="sg-card__btn--play"
           label=${`Play ${session.title}`}
           onclick=${handlePlay}
-          daaLl=${'Watch-Now'}
+          daaLl=${withDaaLlTitle('Watch-Now', session.title)}
         >
           <${IconPlay} />
         </${IconButton}>`}
@@ -206,7 +207,7 @@ export function SessionCard({
           onclick=${handleSchedule}
           pressed=${isScheduled}
           disabled=${isPending}
-          daaLl=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
+          daaLl=${withDaaLlTitle(isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule', session.title)}
         >
           ${isScheduled ? html`<${IconCalendarCheck} />` : html`<${IconCalendarPlus} />`}
         </${IconButton}>`}
@@ -219,7 +220,7 @@ export function SessionCard({
           onclick=${handleFavorite}
           pressed=${isFavorited}
           disabled=${isPending}
-          daaLl=${withDaaLlSuffix(isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites', daaLlSuffix)}
+          daaLl=${withDaaLlTitle(withDaaLlSuffix(isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites', daaLlSuffix), session.title)}
         >
           ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
         </${IconButton}>`}

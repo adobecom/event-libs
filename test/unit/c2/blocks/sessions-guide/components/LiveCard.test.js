@@ -171,15 +171,15 @@ describe('LiveCard', () => {
   it('tags the watch button with daa-ll=Watch-Now', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now"');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now--');
   });
 
   it('keeps the plain favorite label by default and appends daaLlSuffix when given (MWPW-210975)', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Favorites"');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Favorites--');
     expect(LiveCard({ session: LIVE_SESSION, daaLlSuffix: 'More-Live' }))
-      .to.include('daa-ll="Add-to-Favorites-More-Live"');
+      .to.include('daa-ll="Add-to-Favorites-More-Live--');
   });
 
   it('labels the watch button "Watch on demand" once the session has gone on demand', () => {
@@ -188,7 +188,7 @@ describe('LiveCard', () => {
     const out = LiveCard({ session: ON_DEMAND_SESSION });
     expect(out).to.include('Watch on demand');
     expect(out).to.not.include('Watch now');
-    expect(out).to.include('daa-ll="Watch-On-Demand"');
+    expect(out).to.include('daa-ll="Watch-On-Demand--');
   });
 
   // Session-broadcast's Also Live carousel already vetted these via its own MPC-video-
@@ -201,19 +201,19 @@ describe('LiveCard', () => {
     const out = LiveCard({ session: ON_DEMAND_SESSION, forceLive: true });
     expect(out).to.include('Watch now');
     expect(out).to.not.include('Watch on demand');
-    expect(out).to.include('daa-ll="Watch-Now"');
+    expect(out).to.include('daa-ll="Watch-Now--');
   });
 
   it('tags the card title button with daa-ll=Session-Card-Open on the widget surface', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Session-Card-Open"');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Session-Card-Open--');
   });
 
   it('labels the whole card like its title unless the caller tracks card clicks itself (MWPW-211083)', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    const count = (markup) => markup.split('daa-ll="Session-Card-Open"').length - 1;
+    const count = (markup) => markup.split(`daa-ll="Session-Card-Open--${LIVE_SESSION.title}"`).length - 1;
     expect(count(LiveCard({ session: LIVE_SESSION }))).to.equal(2);
     expect(count(LiveCard({ session: LIVE_SESSION, onCardClick: () => {} }))).to.equal(1);
   });
@@ -226,7 +226,7 @@ describe('LiveCard', () => {
     };
     const LiveCard = buildLiveCard(preact, store);
     const html = LiveCard({ session: LIVE_SESSION });
-    expect(html).to.include('daa-ll="Session-Card-Open"');
+    expect(html).to.include('daa-ll="Session-Card-Open--');
     expect(html).to.include('sg-live-card__title-btn');
   });
 
@@ -301,13 +301,13 @@ describe('LiveCard', () => {
   it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Schedule"');
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Favorites"');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Schedule--');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Favorites--');
     scheduled.value = new Set(['session-keynote']);
     favorited.value = new Set(['session-keynote']);
     const html = LiveCard({ session: LIVE_SESSION });
-    expect(html).to.include('daa-ll="Remove-from-Schedule"');
-    expect(html).to.include('daa-ll="Remove-from-Favorites"');
+    expect(html).to.include('daa-ll="Remove-from-Schedule--');
+    expect(html).to.include('daa-ll="Remove-from-Favorites--');
   });
 
   it('omits the schedule button when enableScheduling is false', () => {
