@@ -712,6 +712,7 @@ export default async function init(el) {
     return {
       id: sessionId,
       rfSessionId: (getMetadata('external-session-id') || '').replace(/^rf-/, ''),
+      sessionCode: getMetadata('session-code') || '',
       title: findSessionHeadingText(el) || getMetadata('og:title') || '',
       thumbnailUrl: getMetadata('og:image') || null,
       duration: 0,

@@ -747,6 +747,10 @@ describe('upcoming-sessions', () => {
       expect(card.getAttribute('daa-ll')).to.equal('Session-Card-Open');
     });
 
+    it('keeps clicks between the action buttons untracked with an empty actions label (MWPW-211083)', () => {
+      expect(buildCard(session()).querySelector('.sg-card__actions').getAttribute('daa-ll')).to.equal('');
+    });
+
     it('names the session on the card as daa-lh code|title (MWPW-211083)', () => {
       expect(buildCard(session()).getAttribute('daa-lh')).to.equal('S-001|Intro to Adobe Express');
     });

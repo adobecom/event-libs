@@ -700,6 +700,7 @@ describe('session-video-playlist', () => {
 
     beforeEach(async () => {
       setMeta('session-id', 'cur');
+      setMeta('session-code', 'OS552');
       setMeta('session-times', sessionTimesMeta());
       setMeta('custom-attributes', playlistAttribute());
       ({ playlist } = buildPage());
@@ -745,6 +746,12 @@ describe('session-video-playlist', () => {
         .find((r) => r.dataset.itemId === 'a');
       expect(row.querySelector('.session-video-playlist-row-favorite').getAttribute('aria-label'))
         .to.equal('Favorite Session A');
+    });
+
+    it('names the current session from page metadata when it is not in the catalog (MWPW-211083)', () => {
+      const row = [...playlist.querySelectorAll('.session-video-playlist-row')]
+        .find((r) => r.dataset.itemId === 'cur');
+      expect(row.getAttribute('daa-lh').startsWith('OS552|')).to.be.true;
     });
 
     it('names the session on each row as daa-lh (MWPW-211083)', () => {

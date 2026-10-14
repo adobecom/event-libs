@@ -233,7 +233,9 @@ export function buildCard(session) {
   if (footerBadge) footerBadgeWrap.append(footerBadge);
   createTag('span', { class: 'sg-card__time' }, timeRange, { parent: footer });
 
-  const actions = createTag('div', { class: 'sg-card__actions', 'data-time': timeRange }, '', { parent: card });
+  // Clicks between the buttons don't open the card, so an empty label keeps Launch from reporting
+  // them as the card's Session-Card-Open; each button still reports its own, closer label.
+  const actions = createTag('div', { class: 'sg-card__actions', 'data-time': timeRange, 'daa-ll': '' }, '', { parent: card });
   actions.addEventListener('click', (e) => e.stopPropagation());
 
   const scheduleBtn = buildIconButton({

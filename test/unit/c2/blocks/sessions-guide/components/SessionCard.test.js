@@ -185,6 +185,10 @@ describe('SessionCard', () => {
       .to.include('daa-ll="Add-to-Favorites-Upcoming"');
   });
 
+  it('keeps clicks between the action buttons untracked with an empty actions label (MWPW-211083)', () => {
+    expect(renderCard(UPCOMING_SESSION)).to.match(/class="sg-card__actions"[^>]*daa-ll=""/);
+  });
+
   it('names the session on the card as daa-lh code|title (MWPW-211083)', () => {
     const store = buildStore(preact);
     store.SessionGuideContext._current = makeCtx();
