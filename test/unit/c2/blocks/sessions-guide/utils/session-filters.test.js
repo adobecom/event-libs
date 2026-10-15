@@ -203,23 +203,23 @@ describe('session-filters/getRecommendedSessions', () => {
   });
 
   it('excludes recommended ids not on the active day', () => {
-    const result = getRecommendedSessions([LIVE, UPCOMING], ['upcoming'], LIVE_DAY, TZ);
-    // UPCOMING is on the same day in most cases, but if days differ it should be excluded
-    // Regardless: result should never exceed 3
-    expect(result.length).to.be.at.most(3);
+    const otherDay = { ...LIVE, id: 'other-day', startTimeUtc: h(-48), endTimeUtc: h(-47) };
+    const result = getRecommendedSessions([LIVE, otherDay], ['other-day', 'live'], LIVE_DAY, TZ);
+    expect(result.map((s) => s.id)).to.deep.equal(['live']);
   });
 
-  it('caps results at 3', () => {
-    const many = [LIVE, UPCOMING, PAST, UPCOMING_2].map((s, i) => ({ ...s, id: `s-${i}` }));
-    const ids = many.map((s) => s.id);
-    const day = getSessionDayKey(many[0], TZ);
-    const result = getRecommendedSessions(many, ids, day, TZ);
-    expect(result.length).to.be.at.most(3);
+  // MWPW-211558: an authored list of 9 for one day rendered only the first 3.
+  it('returns every authored recommendation for the active day, uncapped', () => {
+    const sameDay = Array.from({ length: 9 }, (_, i) => ({ ...LIVE, id: `s-${i}` }));
+    const ids = sameDay.map((s) => s.id).reverse();
+    const result = getRecommendedSessions(sameDay, ids, LIVE_DAY, TZ);
+    expect(result.map((s) => s.id)).to.deep.equal(ids);
   });
 
-  it('falls back to random selection when no recommendedIds provided', () => {
-    const result = getRecommendedSessions([LIVE, UPCOMING, PAST], [], LIVE_DAY, TZ);
-    expect(result.length).to.be.at.most(3);
+  it('caps the unauthored fallback at 3', () => {
+    const sameDay = Array.from({ length: 9 }, (_, i) => ({ ...LIVE, id: `s-${i}` }));
+    expect(getRecommendedSessions(sameDay, [], LIVE_DAY, TZ)).to.have.length(3);
+    expect(getRecommendedSessions(sameDay, undefined, LIVE_DAY, TZ)).to.have.length(3);
   });
 
   it('fallback is deterministic for the same day', () => {
@@ -256,11 +256,11 @@ describe('session-filters/getOnDemandRecommendedSessions', () => {
     expect(result.map((s) => s.id)).to.deep.equal(['live']);
   });
 
-  it('caps results at 3', () => {
-    const many = [LIVE, UPCOMING, PAST, UPCOMING_2];
+  it('returns every authored recommendation, uncapped', () => {
+    const many = Array.from({ length: 15 }, (_, i) => ({ ...PAST, id: `s-${i}` }));
     const ids = many.map((s) => s.id);
     const result = getOnDemandRecommendedSessions(many, ids);
-    expect(result.length).to.equal(3);
+    expect(result.map((s) => s.id)).to.deep.equal(ids);
   });
 
   it('returns an empty array when no recommendedIds are provided', () => {
