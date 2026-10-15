@@ -1,6 +1,7 @@
 import { h, render } from '../../../deps/htm-preact.js';
 import { readBlockConfig, loadStyle } from '../../../utils/utils.js';
 import { BroadcastApp } from './components/BroadcastApp.js';
+import { installPlayerScrollGuard } from '../../utils/player-scroll-guard.js';
 
 // Broadcast renders Session Guide components, but the widget that loads their CSS sits in a later
 // section (Milo loads sections in order), so load it here before the first render.
@@ -201,6 +202,7 @@ export default async function init(el) {
   const config = parseBroadcastConfig(el);
   el.innerHTML = '';
   el.classList.add('session-broadcast');
+  installPlayerScrollGuard();
   await loadSessionsGuideStyles();
   render(h(BroadcastApp, { config }), el);
   observeFillHeight(el);
