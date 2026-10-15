@@ -1,5 +1,5 @@
 import { getEventConfig } from '../../../../utils/utils.js';
-import { logError } from '../../../../utils/lana-log.js';
+import { logError, logWarning } from '../../../../utils/lana-log.js';
 
 const MR_PROD_BASE_URL = 'https://overlay-admin-prod.mobilerider.com';
 const MR_INTEGRATION_BASE_URL = 'https://overlay-admin-integration.mobilerider.com';
@@ -96,12 +96,18 @@ class MobileRiderController {
       const activeIds = new Set(Array.isArray(active) ? active : []);
       ids.forEach((id) => statusMap.set(id, activeIds.has(id)));
     } catch (error) {
-      if (error.status !== 404 || ids.length < 2) return;
+      if (error.status !== 404) return;
+      if (ids.length < 2) {
+        logWarning('mobile-rider-controller', 'unknown media id, marked inactive', { id: ids[0] });
+        return;
+      }
       const unknownId = UNKNOWN_ID_RE.exec(error.message || '')?.[1];
       if (retriesLeft > 0 && ids.includes(unknownId)) {
+        logWarning('mobile-rider-controller', 'unknown media id, marked inactive', { id: unknownId });
         await this.checkChunk(ids.filter((id) => id !== unknownId), statusMap, retriesLeft - 1);
         return;
       }
+      logWarning('mobile-rider-controller', 'checking media ids one by one after a 404', { ids });
       await Promise.all(ids.map(async (id) => {
         statusMap.set(id, await this.isMediaActive(id));
       }));

@@ -125,6 +125,21 @@ describe('timing-framework mobile-rider plugin (MWPW-211386)', () => {
       return ok({ active: chunk.filter((id) => active.includes(id)), inactive: [] });
     });
 
+    let originalLana;
+    let warnings;
+    beforeEach(() => {
+      originalLana = window.lana;
+      warnings = [];
+      window.lana = {
+        log: (message, options) => {
+          if (options?.severity === 'warning') warnings.push(message);
+        },
+      };
+    });
+    afterEach(() => {
+      window.lana = originalLana;
+    });
+
     it('drops one unknown id and still reports the live streams, with one retry', async () => {
       const known = idsOf('u1', 14);
       stubMobileRider(known, known);
@@ -135,6 +150,8 @@ describe('timing-framework mobile-rider plugin (MWPW-211386)', () => {
       expect(requests[1].ids.includes('u1-bad')).to.equal(false);
       expect(known.every((id) => mobileRiderStore.get(id) === true)).to.equal(true);
       expect(mobileRiderStore.get('u1-bad')).to.equal(false);
+      expect(warnings.length).to.equal(1);
+      expect(warnings[0]).to.include('unknown media id').and.to.include('u1-bad');
     });
 
     it('falls back to one request per id after MAX_UNKNOWN_ID_RETRIES unknown ids', async () => {
@@ -150,6 +167,9 @@ describe('timing-framework mobile-rider plugin (MWPW-211386)', () => {
       expect(mobileRiderStore.get(known[0])).to.equal(true);
       expect(mobileRiderStore.get(known[1])).to.equal(false);
       expect(bad.every((id) => mobileRiderStore.get(id) === false)).to.equal(true);
+      expect(warnings.filter((w) => w.includes('unknown media id')).length)
+        .to.equal(MAX_UNKNOWN_ID_RETRIES);
+      expect(warnings.filter((w) => w.includes('one by one')).length).to.equal(1);
     });
 
     it('checks ids one by one when a 404 does not name an id', async () => {
@@ -162,6 +182,8 @@ describe('timing-framework mobile-rider plugin (MWPW-211386)', () => {
 
       expect(requests.length).to.equal(1 + ids.length);
       expect(ids.every((id) => mobileRiderStore.get(id) === true)).to.equal(true);
+      expect(warnings.length).to.equal(1);
+      expect(warnings[0]).to.include('one by one');
     });
 
     it('marks a single unknown id inactive without retrying', async () => {
@@ -169,6 +191,8 @@ describe('timing-framework mobile-rider plugin (MWPW-211386)', () => {
       await init([entry('u4-bad')]);
       expect(requests.length).to.equal(1);
       expect(mobileRiderStore.get('u4-bad')).to.equal(false);
+      expect(warnings.length).to.equal(1);
+      expect(warnings[0]).to.include('unknown media id').and.to.include('u4-bad');
     });
   });
 
