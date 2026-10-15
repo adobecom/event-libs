@@ -7,7 +7,7 @@ const MR_INTEGRATION_BASE_URL = 'https://overlay-admin-integration.mobilerider.c
 
 // Mobile Rider's 404 body: "ID <id> not found in JSON data."
 const UNKNOWN_ID_RE = /^ID (\S+) not found/;
-export const MAX_UNKNOWN_ID_RETRIES = 10;
+export const MAX_UNKNOWN_ID_RETRIES = 3;
 export const UNKNOWN_ID_RECHECK_MS = 5 * 60 * 1000;
 
 // `${env}:${id}` -> when the id was last reported unknown, so each 30s tick doesn't repeat the 404.
@@ -52,7 +52,9 @@ export async function fetchLiveStatus(mrStreamIds, env) {
     const body = res.status === 404 ? await res.json().catch(() => ({})) : {};
     const unknownId = getUnknownMediaId(body?.message);
     if (retries >= MAX_UNKNOWN_ID_RETRIES || !ids.includes(unknownId)) {
-      throw new Error(`Mobile Rider media-status fetch failed: ${res.status}`);
+      // The API's own message is what shows whether its 404 wording changed.
+      const detail = typeof body?.message === 'string' ? `: ${body.message}` : '';
+      throw new Error(`Mobile Rider media-status fetch failed: ${res.status}${detail}`);
     }
     logWarning('mobile-rider-service', 'unknown media id, marked inactive', { id: unknownId });
     unknownIds.set(`${env}:${unknownId}`, Date.now());

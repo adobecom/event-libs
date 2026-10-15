@@ -46,4 +46,29 @@ describe('services/poller', () => {
     await new Promise((r) => setTimeout(r, 200));
     expect(updates.length).to.equal(countAfterStop);
   });
+
+  it('still reports the live streams when one stream id is unknown to Mobile Rider', async () => {
+    const requests = [];
+    window.fetch = async (url) => {
+      const ids = new URL(url).searchParams.get('ids').split(',');
+      requests.push(ids);
+      if (ids.includes('pl-bad')) {
+        return new Response(JSON.stringify({ success: false, message: 'ID pl-bad not found in JSON data.' }), { status: 404 });
+      }
+      return new Response(JSON.stringify({ active: ['pl-live'], inactive: ids.filter((id) => id !== 'pl-live') }));
+    };
+
+    startPolling(
+      [{ mrStreamId: 'pl-live' }, { mrStreamId: 'pl-bad' }, { mrStreamId: 'pl-later' }],
+      'dev',
+      (active, inactive) => updates.push({ active, inactive }),
+      60_000,
+    );
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(requests.length).to.equal(2);
+    expect(updates.length).to.equal(1);
+    expect([...updates[0].active]).to.deep.equal(['pl-live']);
+    expect([...updates[0].inactive].sort()).to.deep.equal(['pl-bad', 'pl-later']);
+  });
 });

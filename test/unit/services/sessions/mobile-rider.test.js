@@ -169,6 +169,17 @@ describe('services/sessions/mobile-rider', () => {
       expect(requests.length).to.equal(MAX_UNKNOWN_ID_RETRIES + 1);
     });
 
+    it('puts the API message in the error so a changed 404 wording is visible', async () => {
+      window.fetch = async () => ({ ok: false, status: 404, json: async () => ({ message: 'Media k1 does not exist' }) });
+      let caught;
+      try {
+        await fetchLiveStatus(['k1', 'k2'], 'prod');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught.message).to.include('404').and.to.include('Media k1 does not exist');
+    });
+
     it('throws on a 404 that does not name an id', async () => {
       window.fetch = async () => ({ ok: false, status: 404, json: async () => ({ message: 'Not found' }) });
       let caught;
