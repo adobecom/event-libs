@@ -268,7 +268,8 @@ class MobileRider {
     // A div (not a p) so authored HTML containing block elements (<p>/<ul>/<li>) nests legally.
     const descriptionEl = createTag('div', { class: 'mobile-rider-info-bar-description', id: panelId }, '', { parent: bar });
     const paintDescription = (session) => {
-      const text = session?.descriptionText || session?.description || cfg['session-description'] || '';
+      // The raw description, not the tag-free `descriptionText`: this bar renders HTML (MWPW-211615).
+      const text = session?.description || cfg['session-description'] || '';
       // Authored HTML keeps its structure; plain text keeps its line breaks via pre-line CSS.
       // Sanitized like the Session Guide/Broadcast descriptions: this HTML comes from ESP or authoring.
       if (HTML_TAG.test(text)) descriptionEl.innerHTML = sanitizedRichText(text);
