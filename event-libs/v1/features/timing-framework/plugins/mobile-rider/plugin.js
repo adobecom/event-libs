@@ -20,28 +20,29 @@ export const mobileRiderStore = {
   },
 };
 
-export default async function init(schedule) {
-  const controller = new MobileRiderController();
-  const mobileRiderSchedules = schedule.filter((entry) => entry.mobileRider);
-
-  // Wait for all async operations to complete before returning store
-  await Promise.all(mobileRiderSchedules.map(async (s) => {
-    // Handle mobileRider as an object with sessionId property
-    if (s.mobileRider && typeof s.mobileRider === 'object' && s.mobileRider.sessionId) {
-      const { sessionId } = s.mobileRider;
-      const isActive = await controller.isMediaActive(sessionId);
-      mobileRiderStore.set(sessionId, isActive);
-    } else if (Array.isArray(s.mobileRider)) {
-      // Backward compatibility for array format
-      await Promise.all(s.mobileRider.map(async (condition) => {
-        if (condition && condition.sessionId) {
-          const { sessionId } = condition;
-          const isActive = await controller.isMediaActive(sessionId);
-          mobileRiderStore.set(sessionId, isActive);
-        }
-      }));
+// Unique MobileRider media ids in a schedule; accepts the object and the legacy array shape.
+export function getScheduleMediaIds(schedule) {
+  const ids = new Set();
+  (schedule || []).forEach((entry) => {
+    const mobileRider = entry?.mobileRider;
+    if (mobileRider && typeof mobileRider === 'object' && mobileRider.sessionId) {
+      ids.add(mobileRider.sessionId);
+    } else if (Array.isArray(mobileRider)) {
+      mobileRider.forEach((condition) => {
+        if (condition?.sessionId) ids.add(condition.sessionId);
+      });
     }
-  }));
+  });
+  return [...ids];
+}
+
+export default async function init(schedule) {
+  const ids = getScheduleMediaIds(schedule);
+  if (!ids.length) return mobileRiderStore;
+
+  // One media-status request for every stream in the schedule, not one per entry (MWPW-211386).
+  const statusMap = await new MobileRiderController().getMediaStatusMap(ids);
+  ids.forEach((id) => mobileRiderStore.set(id, statusMap.get(id) === true));
 
   return mobileRiderStore;
 }
