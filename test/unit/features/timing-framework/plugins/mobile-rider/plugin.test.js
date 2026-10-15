@@ -3,7 +3,7 @@ import init, {
   getScheduleMediaIds, mobileRiderStore,
 } from '../../../../../../event-libs/v1/features/timing-framework/plugins/mobile-rider/plugin.js';
 import MobileRiderController, {
-  MAX_IDS_PER_REQUEST,
+  MAX_IDS_PER_REQUEST, MAX_UNKNOWN_ID_RETRIES,
 } from '../../../../../../event-libs/v1/features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js';
 
 // The store is module-level, so each test uses its own id prefix.
@@ -94,12 +94,13 @@ describe('timing-framework mobile-rider plugin (MWPW-211386)', () => {
       expect(ids.every((id) => mobileRiderStore.get(id) === false)).to.equal(true);
     });
 
-    it('marks every stream inactive on a non-OK response', async () => {
+    it('marks every stream inactive on a non-OK response, without retrying', async () => {
       const ids = idsOf('5xx', 2);
       stubFetch(() => ({ ok: false, status: 503, json: async () => ({ message: 'busy' }) }));
 
       await init(ids.map(entry));
 
+      expect(requests.length).to.equal(1);
       expect(ids.every((id) => mobileRiderStore.get(id) === false)).to.equal(true);
     });
 
@@ -111,6 +112,63 @@ describe('timing-framework mobile-rider plugin (MWPW-211386)', () => {
       stubFetch(() => ok({ active: ['other'], inactive: [] }));
       await init([entry('missing-1')]);
       expect(mobileRiderStore.get('missing-1')).to.equal(false);
+    });
+  });
+
+  describe('unknown ids (MobileRider fails the whole request with a 404)', () => {
+    // Mirrors the real API: the first unknown id fails the request and is named in the message.
+    const stubMobileRider = (known, active) => stubFetch((chunk) => {
+      const unknown = chunk.find((id) => !known.includes(id));
+      if (unknown) {
+        return { ok: false, status: 404, json: async () => ({ success: false, message: `ID ${unknown} not found in JSON data.` }) };
+      }
+      return ok({ active: chunk.filter((id) => active.includes(id)), inactive: [] });
+    });
+
+    it('drops one unknown id and still reports the live streams, with one retry', async () => {
+      const known = idsOf('u1', 14);
+      stubMobileRider(known, known);
+
+      await init([...known.slice(0, 7), 'u1-bad', ...known.slice(7)].map(entry));
+
+      expect(requests.length).to.equal(2);
+      expect(requests[1].ids.includes('u1-bad')).to.equal(false);
+      expect(known.every((id) => mobileRiderStore.get(id) === true)).to.equal(true);
+      expect(mobileRiderStore.get('u1-bad')).to.equal(false);
+    });
+
+    it('falls back to one request per id after MAX_UNKNOWN_ID_RETRIES unknown ids', async () => {
+      const known = idsOf('u2', 3);
+      const bad = idsOf('u2-bad', MAX_UNKNOWN_ID_RETRIES + 1);
+      stubMobileRider(known, [known[0]]);
+
+      await init([...bad, ...known].map(entry));
+
+      const batched = 1 + MAX_UNKNOWN_ID_RETRIES;
+      const remaining = known.length + 1;
+      expect(requests.length).to.equal(batched + remaining);
+      expect(mobileRiderStore.get(known[0])).to.equal(true);
+      expect(mobileRiderStore.get(known[1])).to.equal(false);
+      expect(bad.every((id) => mobileRiderStore.get(id) === false)).to.equal(true);
+    });
+
+    it('checks ids one by one when a 404 does not name an id', async () => {
+      const ids = idsOf('u3', 3);
+      stubFetch((chunk) => (chunk.length > 1
+        ? { ok: false, status: 404, json: async () => ({ message: 'Not found' }) }
+        : ok({ active: chunk, inactive: [] })));
+
+      await init(ids.map(entry));
+
+      expect(requests.length).to.equal(1 + ids.length);
+      expect(ids.every((id) => mobileRiderStore.get(id) === true)).to.equal(true);
+    });
+
+    it('marks a single unknown id inactive without retrying', async () => {
+      stubMobileRider([], []);
+      await init([entry('u4-bad')]);
+      expect(requests.length).to.equal(1);
+      expect(mobileRiderStore.get('u4-bad')).to.equal(false);
     });
   });
 
