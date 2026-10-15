@@ -186,6 +186,14 @@ describe('timing-framework mobile-rider plugin (MWPW-211386)', () => {
       expect(warnings[0]).to.include('one by one');
     });
 
+    it('marks an id inactive without an "unknown id" warning when a lone 404 names no id', async () => {
+      stubFetch(() => ({ ok: false, status: 404, json: async () => null }));
+      await init([entry('u5-lone')]);
+      expect(requests.length).to.equal(1);
+      expect(mobileRiderStore.get('u5-lone')).to.equal(false);
+      expect(warnings.length).to.equal(0);
+    });
+
     it('marks a single unknown id inactive without retrying', async () => {
       stubMobileRider([], []);
       await init([entry('u4-bad')]);

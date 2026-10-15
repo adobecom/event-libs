@@ -50,7 +50,7 @@ export async function fetchLiveStatus(mrStreamIds, env) {
 
     // eslint-disable-next-line no-await-in-loop
     const body = res.status === 404 ? await res.json().catch(() => ({})) : {};
-    const unknownId = getUnknownMediaId(body.message);
+    const unknownId = getUnknownMediaId(body?.message);
     if (retries >= MAX_UNKNOWN_ID_RETRIES || !ids.includes(unknownId)) {
       throw new Error(`Mobile Rider media-status fetch failed: ${res.status}`);
     }

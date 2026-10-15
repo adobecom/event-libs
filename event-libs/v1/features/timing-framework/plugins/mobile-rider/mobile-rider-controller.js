@@ -35,7 +35,7 @@ class MobileRiderController {
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         logError('mobile-rider-controller', 'getMediaStatus error', body);
-        const error = new Error(body.message || 'Failed to get media status');
+        const error = new Error(body?.message || 'Failed to get media status');
         error.status = response.status;
         throw error;
       }
@@ -96,11 +96,13 @@ class MobileRiderController {
       ids.forEach((id) => statusMap.set(id, activeIds.has(id)));
     } catch (error) {
       if (error.status !== 404) return;
+      const unknownId = getUnknownMediaId(error.message);
       if (ids.length < 2) {
-        logWarning('mobile-rider-controller', 'unknown media id, marked inactive', { id: ids[0] });
+        if (unknownId === ids[0]) {
+          logWarning('mobile-rider-controller', 'unknown media id, marked inactive', { id: unknownId });
+        }
         return;
       }
-      const unknownId = getUnknownMediaId(error.message);
       if (retriesLeft > 0 && ids.includes(unknownId)) {
         logWarning('mobile-rider-controller', 'unknown media id, marked inactive', { id: unknownId });
         await this.checkChunk(ids.filter((id) => id !== unknownId), statusMap, retriesLeft - 1);

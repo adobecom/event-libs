@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  fetchLiveStatus, MAX_UNKNOWN_ID_RETRIES,
+  fetchLiveStatus, MAX_UNKNOWN_ID_RETRIES, UNKNOWN_ID_RECHECK_MS,
 } from '../../../../event-libs/v1/services/sessions/mobile-rider.js';
 
 describe('services/sessions/mobile-rider', () => {
@@ -178,6 +178,52 @@ describe('services/sessions/mobile-rider', () => {
         caught = err;
       }
       expect(caught.message).to.include('404');
+    });
+
+    it('throws a plain error on a 404 with a null body', async () => {
+      window.fetch = async () => ({ ok: false, status: 404, json: async () => null });
+      let caught;
+      try {
+        await fetchLiveStatus(['h1', 'h2'], 'prod');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught.message).to.include('404');
+    });
+
+    it('makes no request when every id is a known-unknown id', async () => {
+      stubMobileRider([], []);
+      await fetchLiveStatus(['i-bad'], 'prod');
+      requests.length = 0;
+
+      const result = await fetchLiveStatus(['i-bad'], 'prod');
+
+      expect(requests.length).to.equal(0);
+      expect(result.active.size).to.equal(0);
+      expect([...result.inactive]).to.deep.equal(['i-bad']);
+    });
+
+    it('asks again after UNKNOWN_ID_RECHECK_MS and picks the id up once Mobile Rider knows it', async () => {
+      stubMobileRider(['j1'], ['j1']);
+      await fetchLiveStatus(['j1', 'j-late'], 'prod');
+
+      const realNow = Date.now;
+      Date.now = () => realNow() + UNKNOWN_ID_RECHECK_MS + 1;
+      try {
+        requests.length = 0;
+        stubMobileRider(['j1', 'j-late'], ['j1', 'j-late']);
+        const result = await fetchLiveStatus(['j1', 'j-late'], 'prod');
+
+        expect(requests).to.deep.equal([['j1', 'j-late']]);
+        expect([...result.active].sort()).to.deep.equal(['j-late', 'j1']);
+        expect(result.inactive.size).to.equal(0);
+      } finally {
+        Date.now = realNow;
+      }
+
+      requests.length = 0;
+      await fetchLiveStatus(['j1', 'j-late'], 'prod');
+      expect(requests).to.deep.equal([['j1', 'j-late']]);
     });
 
     it('does not retry other failures', async () => {
