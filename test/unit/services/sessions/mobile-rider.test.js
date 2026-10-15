@@ -28,10 +28,10 @@ describe('services/sessions/mobile-rider', () => {
     expect(lastRequest).to.be.null;
   });
 
-  it('hits the production host for env "prod"', async () => {
+  it('hits the production load-balanced host for env "prod" (MWPW-211385)', async () => {
     stubFetch({ active: [], inactive: [] });
     await fetchLiveStatus(['mr-1'], 'prod');
-    expect(lastRequest).to.equal('https://overlay-admin-prod.mobilerider.com/api/media-status?ids=mr-1');
+    expect(lastRequest).to.equal('https://overlay-admin.mobilerider.com/api/media-status?ids=mr-1');
   });
 
   it('hits the shared dev/QA/stage integration host for any non-prod env', async () => {
@@ -46,7 +46,7 @@ describe('services/sessions/mobile-rider', () => {
   it('joins multiple stream ids with commas', async () => {
     stubFetch({ active: [], inactive: [] });
     await fetchLiveStatus(['mr-1', 'mr-2', 'mr-3'], 'prod');
-    expect(lastRequest).to.equal('https://overlay-admin-prod.mobilerider.com/api/media-status?ids=mr-1,mr-2,mr-3');
+    expect(lastRequest).to.equal('https://overlay-admin.mobilerider.com/api/media-status?ids=mr-1,mr-2,mr-3');
   });
 
   it('converts the response active/inactive arrays into Sets', async () => {

@@ -1,6 +1,6 @@
 // Mobile Rider's batch media-status endpoint — only two environments on their side, not
 // ESP's finer-grained split; `env` is session-store.js's already-collapsed mrEnv.
-const MR_PROD_BASE_URL = 'https://overlay-admin-prod.mobilerider.com';
+const MR_PROD_BASE_URL = 'https://overlay-admin.mobilerider.com';
 const MR_INTEGRATION_BASE_URL = 'https://overlay-admin-integration.mobilerider.com';
 
 function mrBaseUrl(env) {
