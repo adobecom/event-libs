@@ -2,8 +2,8 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { guardPlayerScroll } from '../../../../event-libs/v1/c2/utils/player-scroll-guard.js';
 
-function stubLenis(isScrolling = 'smooth', isLocked = false) {
-  return { isScrolling, isLocked, stop: sinon.spy(), start: sinon.spy() };
+function stubLenis(isScrolling = 'smooth') {
+  return { isScrolling, animatedScroll: 420, scrollTo: sinon.spy() };
 }
 
 function pointer(type, target, init = {}) {
@@ -12,7 +12,9 @@ function pointer(type, target, init = {}) {
   }));
 }
 
+const wheel = () => window.dispatchEvent(new WheelEvent('wheel', { deltaY: 100 }));
 const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
+const IDLE = 170; // just past the guard's 150ms wheel-idle window
 
 describe('player-scroll-guard', () => {
   let player;
@@ -22,8 +24,7 @@ describe('player-scroll-guard', () => {
     document.body.innerHTML = '<div class="player"><div class="inner"></div></div><div class="outside"></div>';
     player = document.querySelector('.player');
     unguard = guardPlayerScroll(player);
-    // Let any wheel timestamp from a previous test age out.
-    await wait(160);
+    await wait(IDLE); // let wheel input from a previous test age out
   });
 
   afterEach(() => {
@@ -32,62 +33,82 @@ describe('player-scroll-guard', () => {
     document.body.innerHTML = '';
   });
 
-  it('ends a smooth glide when the mouse moves over the player', () => {
+  it('ends the glide in place when the mouse moves over the player', () => {
     window.lenis = stubLenis();
     pointer('pointermove', player.querySelector('.inner'));
-    expect(window.lenis.stop.calledOnce).to.be.true;
-    expect(window.lenis.start.calledOnce).to.be.true;
-    expect(window.lenis.stop.calledBefore(window.lenis.start)).to.be.true;
+    expect(window.lenis.scrollTo.calledOnceWith(420, { immediate: true })).to.be.true;
   });
 
-  it('ends a smooth glide on pointerdown, whatever the pointer type', () => {
+  it('also treats pen movement as intent', () => {
+    window.lenis = stubLenis();
+    pointer('pointermove', player, { pointerType: 'pen' });
+    expect(window.lenis.scrollTo.calledOnce).to.be.true;
+  });
+
+  it('defers intent shown during wheel input until the wheel goes quiet', async () => {
+    window.lenis = stubLenis();
+    wheel();
+    pointer('pointermove', player);
+    expect(window.lenis.scrollTo.called).to.be.false;
+    await wait(80);
+    wheel(); // momentum still arriving
+    await wait(100);
+    expect(window.lenis.scrollTo.called).to.be.false;
+    await wait(100);
+    expect(window.lenis.scrollTo.calledOnce).to.be.true;
+  });
+
+  it('drops deferred intent when the pointer leaves the player', async () => {
+    window.lenis = stubLenis();
+    wheel();
+    pointer('pointermove', player);
+    player.dispatchEvent(new PointerEvent('pointerleave'));
+    await wait(IDLE + 20);
+    expect(window.lenis.scrollTo.called).to.be.false;
+  });
+
+  it('ends the glide on pointerdown, whatever the pointer type', () => {
     window.lenis = stubLenis();
     pointer('pointerdown', player, { pointerType: 'touch', movementX: 0, movementY: 0 });
-    expect(window.lenis.stop.calledOnce).to.be.true;
+    expect(window.lenis.scrollTo.calledOnce).to.be.true;
   });
 
   it('ignores pointers outside the player', () => {
     window.lenis = stubLenis();
     pointer('pointermove', document.querySelector('.outside'));
     pointer('pointerdown', document.querySelector('.outside'));
-    expect(window.lenis.stop.called).to.be.false;
+    expect(window.lenis.scrollTo.called).to.be.false;
   });
 
-  it('leaves Lenis alone unless it is smooth-scrolling and unlocked', () => {
+  it('leaves Lenis alone unless it is smooth-scrolling', () => {
     window.lenis = stubLenis(false);
-    pointer('pointerdown', player);
+    pointer('pointermove', player);
     window.lenis.isScrolling = 'native';
     pointer('pointerdown', player);
-    window.lenis = stubLenis('smooth', true);
-    pointer('pointerdown', player);
-    expect(window.lenis.stop.called).to.be.false;
+    expect(window.lenis.scrollTo.called).to.be.false;
   });
 
   it('does nothing without Lenis', () => {
-    expect(() => pointer('pointerdown', player)).not.to.throw();
+    expect(() => {
+      pointer('pointermove', player);
+      pointer('pointerdown', player);
+    }).not.to.throw();
   });
 
-  it('ignores non-mouse moves and moves without movement', () => {
+  it('ignores touch moves and moves without movement', () => {
     window.lenis = stubLenis();
     pointer('pointermove', player, { pointerType: 'touch' });
     pointer('pointermove', player, { movementX: 0, movementY: 0 });
-    expect(window.lenis.stop.called).to.be.false;
+    expect(window.lenis.scrollTo.called).to.be.false;
   });
 
-  it('ignores mouse moves while wheel input is still arriving', async () => {
+  it('stops listening, and cancels deferred intent, after cleanup', async () => {
     window.lenis = stubLenis();
-    window.dispatchEvent(new WheelEvent('wheel', { deltaY: 100 }));
+    wheel();
     pointer('pointermove', player);
-    expect(window.lenis.stop.called).to.be.false;
-    await wait(160);
-    pointer('pointermove', player);
-    expect(window.lenis.stop.calledOnce).to.be.true;
-  });
-
-  it('stops listening after cleanup', () => {
-    window.lenis = stubLenis();
     unguard();
     pointer('pointerdown', player);
-    expect(window.lenis.stop.called).to.be.false;
+    await wait(IDLE + 20);
+    expect(window.lenis.scrollTo.called).to.be.false;
   });
 });
