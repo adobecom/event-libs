@@ -1,5 +1,6 @@
 import { getEventConfig } from '../../../../utils/utils.js';
 import { logError, logWarning } from '../../../../utils/lana-log.js';
+import { getUnknownMediaId } from '../../../../services/sessions/mobile-rider.js';
 
 const MR_PROD_BASE_URL = 'https://overlay-admin-prod.mobilerider.com';
 const MR_INTEGRATION_BASE_URL = 'https://overlay-admin-integration.mobilerider.com';
@@ -9,8 +10,6 @@ const getBaseUrl = () => (getEnv() === 'prod' ? MR_PROD_BASE_URL : MR_INTEGRATIO
 
 // Keeps each media-status URL a safe length; a MAX schedule has far fewer streams than this.
 export const MAX_IDS_PER_REQUEST = 50;
-// MobileRider's 404 body: "ID <id> not found in JSON data."
-const UNKNOWN_ID_RE = /^ID (\S+) not found/;
 export const MAX_UNKNOWN_ID_RETRIES = 3;
 
 /**
@@ -101,7 +100,7 @@ class MobileRiderController {
         logWarning('mobile-rider-controller', 'unknown media id, marked inactive', { id: ids[0] });
         return;
       }
-      const unknownId = UNKNOWN_ID_RE.exec(error.message || '')?.[1];
+      const unknownId = getUnknownMediaId(error.message);
       if (retriesLeft > 0 && ids.includes(unknownId)) {
         logWarning('mobile-rider-controller', 'unknown media id, marked inactive', { id: unknownId });
         await this.checkChunk(ids.filter((id) => id !== unknownId), statusMap, retriesLeft - 1);
