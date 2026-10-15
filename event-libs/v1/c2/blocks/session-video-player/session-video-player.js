@@ -22,7 +22,7 @@ import {
 } from '../../utils/video-session.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
-import { installPlayerScrollGuard } from '../../utils/player-scroll-guard.js';
+import { guardPlayerScroll } from '../../utils/player-scroll-guard.js';
 import {
   createYouTubePlayerId, buildYouTubeAnalyticsParams, registerYouTubeTracking,
 } from '../../utils/youtube-analytics.js';
@@ -586,7 +586,7 @@ function loadWhenDecided(el, sessionId, video) {
 
 export default async function init(el) {
   ensureStylesheet('session-video-player-css', BLOCK_CSS_URL);
-  installPlayerScrollGuard();
+  guardPlayerScroll(el);
 
   const model = buildRenderModel(el);
   if (!model) {

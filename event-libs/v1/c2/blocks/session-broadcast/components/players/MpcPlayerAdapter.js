@@ -1,6 +1,7 @@
 import { html, useEffect, useRef } from '../../../../../deps/htm-preact.js';
 import { LIBS, getEventConfig } from '../../../../../utils/utils.js';
 import { trackBroadcastEvent } from '../../utils/broadcast-analytics.js';
+import { guardPlayerScroll } from '../../../../utils/player-scroll-guard.js';
 
 // adobetv.css never auto-loads since Milo's block-loader never mounted this block — inject
 // once, same pattern as scripts.js's C2 foundation stylesheet.
@@ -33,6 +34,7 @@ export function MpcPlayerAdapter({ session }) {
     if (!container || !session?.mpcId) return undefined;
 
     let cancelled = false;
+    const unguard = guardPlayerScroll(container);
     const onMessage = handlePlaybackMessage(session);
     window.addEventListener('message', onMessage);
 
@@ -52,6 +54,7 @@ export function MpcPlayerAdapter({ session }) {
 
     return () => {
       cancelled = true;
+      unguard();
       window.removeEventListener('message', onMessage);
       container.innerHTML = '';
     };

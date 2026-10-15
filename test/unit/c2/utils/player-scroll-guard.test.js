@@ -1,105 +1,93 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { guardPlayerScroll } from '../../../../event-libs/v1/c2/utils/player-scroll-guard.js';
 
-const MODULE = '../../../../event-libs/v1/c2/utils/player-scroll-guard.js?';
-let counter = 0;
-
-// The module installs its listeners once, so each test imports (and installs) a fresh copy.
-async function freshGuard() {
-  counter += 1;
-  return import(`${MODULE}${counter}`);
-}
-
-function stubLenis(isScrolling = 'smooth') {
-  return { isScrolling, animatedScroll: 420, scrollTo: sinon.spy() };
+function stubLenis(isScrolling = 'smooth', isLocked = false) {
+  return { isScrolling, isLocked, stop: sinon.spy(), start: sinon.spy() };
 }
 
 function pointer(type, target, init = {}) {
-  const event = new PointerEvent(type, {
+  target.dispatchEvent(new PointerEvent(type, {
     bubbles: true, pointerType: 'mouse', movementX: 4, movementY: 2, ...init,
-  });
-  target.dispatchEvent(event);
-  return event;
+  }));
 }
+
+const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
 
 describe('player-scroll-guard', () => {
   let player;
-  let outside;
-  const cleanups = [];
+  let unguard;
 
   beforeEach(async () => {
-    document.head.innerHTML = '';
-    document.body.innerHTML = `
-      <div class="sb-player__mount"><div class="inner"></div></div>
-      <div class="outside"></div>`;
-    player = document.querySelector('.sb-player__mount .inner');
-    outside = document.querySelector('.outside');
-    const { installPlayerScrollGuard } = await freshGuard();
-    const addWindow = sinon.spy(window, 'addEventListener');
-    const addDocument = sinon.spy(document, 'addEventListener');
-    installPlayerScrollGuard();
-    installPlayerScrollGuard();
-    addWindow.getCalls().forEach(({ args }) => cleanups.push(() => window.removeEventListener(...args)));
-    addDocument.getCalls().forEach(({ args }) => cleanups.push(() => document.removeEventListener(...args)));
-    addWindow.restore();
-    addDocument.restore();
+    document.body.innerHTML = '<div class="player"><div class="inner"></div></div><div class="outside"></div>';
+    player = document.querySelector('.player');
+    unguard = guardPlayerScroll(player);
+    // Let any wheel timestamp from a previous test age out.
+    await wait(160);
   });
 
   afterEach(() => {
-    cleanups.splice(0).forEach((fn) => fn());
+    unguard();
     delete window.lenis;
     document.body.innerHTML = '';
   });
 
-  it('installs its listeners only once', () => {
-    expect(cleanups).to.have.length(3);
-  });
-
-  it('halts a smooth glide in place when the pointer moves over a player', () => {
+  it('ends a smooth glide when the mouse moves over the player', () => {
     window.lenis = stubLenis();
-    pointer('pointermove', player);
-    expect(window.lenis.scrollTo.calledOnceWith(420, { immediate: true })).to.be.true;
+    pointer('pointermove', player.querySelector('.inner'));
+    expect(window.lenis.stop.calledOnce).to.be.true;
+    expect(window.lenis.start.calledOnce).to.be.true;
+    expect(window.lenis.stop.calledBefore(window.lenis.start)).to.be.true;
   });
 
-  it('halts a smooth glide on pointerdown over a player', () => {
+  it('ends a smooth glide on pointerdown, whatever the pointer type', () => {
     window.lenis = stubLenis();
-    pointer('pointerdown', player, { movementX: 0, movementY: 0 });
-    expect(window.lenis.scrollTo.calledOnce).to.be.true;
+    pointer('pointerdown', player, { pointerType: 'touch', movementX: 0, movementY: 0 });
+    expect(window.lenis.stop.calledOnce).to.be.true;
   });
 
-  it('ignores pointers outside a player', () => {
+  it('ignores pointers outside the player', () => {
     window.lenis = stubLenis();
-    pointer('pointermove', outside);
-    pointer('pointerdown', outside);
-    expect(window.lenis.scrollTo.called).to.be.false;
+    pointer('pointermove', document.querySelector('.outside'));
+    pointer('pointerdown', document.querySelector('.outside'));
+    expect(window.lenis.stop.called).to.be.false;
   });
 
-  it('does nothing unless Lenis is smooth-scrolling', () => {
+  it('leaves Lenis alone unless it is smooth-scrolling and unlocked', () => {
     window.lenis = stubLenis(false);
-    pointer('pointermove', player);
+    pointer('pointerdown', player);
     window.lenis.isScrolling = 'native';
     pointer('pointerdown', player);
-    expect(window.lenis.scrollTo.called).to.be.false;
+    window.lenis = stubLenis('smooth', true);
+    pointer('pointerdown', player);
+    expect(window.lenis.stop.called).to.be.false;
   });
 
   it('does nothing without Lenis', () => {
-    expect(() => {
-      pointer('pointermove', player);
-      pointer('pointerdown', player);
-    }).not.to.throw();
+    expect(() => pointer('pointerdown', player)).not.to.throw();
   });
 
-  it('ignores pointermove with no movement (scroll-synthesised) or from touch', () => {
+  it('ignores non-mouse moves and moves without movement', () => {
     window.lenis = stubLenis();
-    pointer('pointermove', player, { movementX: 0, movementY: 0 });
     pointer('pointermove', player, { pointerType: 'touch' });
-    expect(window.lenis.scrollTo.called).to.be.false;
+    pointer('pointermove', player, { movementX: 0, movementY: 0 });
+    expect(window.lenis.stop.called).to.be.false;
   });
 
-  it('ignores pointermove right after a wheel event (still mid-scroll)', () => {
+  it('ignores mouse moves while wheel input is still arriving', async () => {
     window.lenis = stubLenis();
     window.dispatchEvent(new WheelEvent('wheel', { deltaY: 100 }));
     pointer('pointermove', player);
-    expect(window.lenis.scrollTo.called).to.be.false;
+    expect(window.lenis.stop.called).to.be.false;
+    await wait(160);
+    pointer('pointermove', player);
+    expect(window.lenis.stop.calledOnce).to.be.true;
+  });
+
+  it('stops listening after cleanup', () => {
+    window.lenis = stubLenis();
+    unguard();
+    pointer('pointerdown', player);
+    expect(window.lenis.stop.called).to.be.false;
   });
 });
