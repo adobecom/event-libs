@@ -353,9 +353,10 @@ lists use the Sessions Guide detail overlay's spacing (`margin: 0 0 0.75em`, lis
 `1.25em`, no margin after the last block; MWPW-210941). The Sessions Guide detail overlay and Session Broadcast info
 panel follow the same split for catalog descriptions: HTML goes through `descriptionHtml()`
 (the vendored sanitizer, links forced to a new tab) and renders as markup (`.is-rich-text`);
-plain text keeps the `pre-line` rule. Text-only surfaces — Guide card previews, search, `.ics`
-files, and the Mobile Rider info bar — use the tag-free `descriptionText` that
-`normalizeSessions()` derives with `htmlToPlainText()`.
+plain text keeps the `pre-line` rule. The Mobile Rider info bar does the same, through
+`sanitizedRichText()` (MWPW-210449, MWPW-211615). Text-only surfaces — Guide card previews,
+search, and `.ics` files — use the tag-free `descriptionText` that `normalizeSessions()`
+derives with `htmlToPlainText()`.
 
 The clamp's **automatic ellipsis is the affordance**. It replaced an earlier
 gradient-fade-to-card: fading otherwise-legible text pushes it under the 4.5:1 contrast

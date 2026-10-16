@@ -1157,6 +1157,27 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(desc.classList.contains('is-plain-text')).to.equal(false);
     });
 
+    // MWPW-211615: normalizeSessions() always adds a tag-free descriptionText; the bar must
+    // still render the HTML description rather than the flattened "- " bullet text.
+    it('renders the HTML description over the tag-free descriptionText', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      sessions.value = [{
+        id: 's-100',
+        rfCode: 'rf-100',
+        description: '<p>In this session, you\'ll:</p><ul><li>Walk away</li></ul>',
+        descriptionText: 'In this session, you\'ll:\n- Walk away',
+      }];
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      expect(desc.querySelector('p')?.textContent).to.equal('In this session, you\'ll:');
+      expect(desc.querySelectorAll('li').length).to.equal(1);
+      expect(desc.textContent.includes('- Walk away')).to.equal(false);
+      expect(desc.classList.contains('is-plain-text')).to.equal(false);
+    });
+
     it('does not render a Favorite button until the session resolves from the store', async () => {
       document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
