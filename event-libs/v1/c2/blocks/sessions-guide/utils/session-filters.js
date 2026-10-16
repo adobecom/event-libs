@@ -128,23 +128,26 @@ export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
   });
 }
 
+// Only the unauthored filler is capped; an authored list shows every match (MWPW-211558).
+const FALLBACK_RECOMMENDED_COUNT = 3;
+
 // Shown in the live carousel when nothing is live; falls back to a deterministic pick of up to 3.
 export function getRecommendedSessions(sessions, recommendedIds, activeDay, userTz) {
   const daySessions = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
 
   if (recommendedIds && recommendedIds.length > 0) {
     const daySessionsById = new Map(daySessions.map((s) => [s.id, s]));
-    return recommendedIds.map((id) => daySessionsById.get(id)).filter(Boolean).slice(0, 3);
+    return recommendedIds.map((id) => daySessionsById.get(id)).filter(Boolean);
   }
 
-  return deterministicShuffle(daySessions, activeDay).slice(0, 3);
+  return deterministicShuffle(daySessions, activeDay).slice(0, FALLBACK_RECOMMENDED_COUNT);
 }
 
 // Same authored ids/order as getRecommendedSessions, but membership only: no day-scoping or shuffle.
 export function getOnDemandRecommendedSessions(sessions, recommendedIds) {
   if (!recommendedIds || recommendedIds.length === 0) return [];
   const sessionsById = new Map(sessions.map((s) => [s.id, s]));
-  return recommendedIds.map((id) => sessionsById.get(id)).filter(Boolean).slice(0, 3);
+  return recommendedIds.map((id) => sessionsById.get(id)).filter(Boolean);
 }
 
 function deterministicShuffle(arr, seed) {

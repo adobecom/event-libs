@@ -6,20 +6,25 @@ import { showConflictModal } from '../../features/conflict-modal/conflict-modal.
 import { getAllowDoubleBooking } from '../../utils/tier-1-event-config.js';
 import { sessions, sessionsStatus } from '../../utils/session-store.js';
 import { logError } from '../../utils/lana-log.js';
+import { trackAnalyticsEvent } from '../../utils/analytics.js';
 
 // Shared toast copy for gated actions, used by both runSessionAction's failures and checkViewAccess.
 // Post-event only sign-in is required (see assertAuthorized), so the copy drops "Register".
 export function showAuthToast({ eventConfig, actionLabel, postEventActionLabel = actionLabel }) {
   const post = isEventOver();
-  showToast({
+  const ctaDaaLl = post ? 'Toast-Sign-In' : 'Toast-Register-Sign-In';
+  const toastActionLabel = post ? postEventActionLabel : actionLabel;
+  const toastId = showToast({
     message: post ? `Sign in to ${postEventActionLabel}.` : `Register or sign in to ${actionLabel}.`,
     variant: 'informative',
     ctaLabel: post ? 'Sign in' : 'Register/Sign in',
     ctaHref: eventConfig.registerUrl || '/register',
-    ctaDaaLl: post ? 'Toast-Sign-In' : 'Toast-Register-Sign-In',
+    ctaDaaLl,
     // Caps at one toast per gated action; actionLabel is already the natural per-action key.
     key: actionLabel,
   });
+  // Analytics wants to know the toast opened, not just the CTA/close clicks (MWPW-211083).
+  if (toastId) trackAnalyticsEvent(`${ctaDaaLl}-Open | ${toastActionLabel}`, 'action-feedback');
 }
 
 // Translates a SessionActionError into a toast or conflict modal — usable by both Preact and vanilla blocks.

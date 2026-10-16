@@ -334,12 +334,30 @@
   text-align: left;
 }
 
-/* Authored HTML descriptions: tidy the first/last block's outer margins so the 2-line clamp and
-   bottom spacing stay consistent with the plain-text variant. */
-.mobile-rider .mobile-rider-info-bar-description > :first-child {
+/* Authored HTML descriptions: same rich-text treatment as the Session Guide detail overlay
+   (.sg-detail__desc.is-rich-text) so the abstract reads identically on both surfaces. Source
+   newlines between tags are not line breaks. */
+.mobile-rider .mobile-rider-info-bar-description.is-rich-text {
+  white-space: normal;
+}
+
+.mobile-rider .mobile-rider-info-bar-description.is-rich-text :is(p, ul, ol) {
+  margin: 0 0 0.75em;
+}
+
+.mobile-rider .mobile-rider-info-bar-description.is-rich-text :is(ul, ol) {
+  padding-inline-start: 1.25em;
+}
+
+.mobile-rider .mobile-rider-info-bar-description.is-rich-text > :first-child {
   margin-top: 0;
 }
 
-.mobile-rider .mobile-rider-info-bar-description > :last-child {
+.mobile-rider .mobile-rider-info-bar-description.is-rich-text > :last-child {
   margin-bottom: 0;
+}
+
+.mobile-rider .mobile-rider-info-bar-description.is-rich-text a {
+  color: inherit;
+  text-decoration: underline;
 }

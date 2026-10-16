@@ -66,6 +66,8 @@ export function LiveUpcomingView() {
             formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
             variant="live"
             resetKey=${activeDay}
+            arrowDaaLl="Live-Sessions"
+            cardDaaLlSuffix="Live-Sessions"
           />
         </div>
       `}
@@ -76,6 +78,8 @@ export function LiveUpcomingView() {
             title="Recommended"
             variant="recommended"
             resetKey=${activeDay}
+            arrowDaaLl="Recommended"
+            cardDaaLlSuffix="Recommended"
           />
         </div>
       `}

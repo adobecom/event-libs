@@ -69,6 +69,14 @@ describe('LiveUpcomingView', () => {
     expect(View({})).to.include('Live sessions');
   });
 
+  it('labels the Live sessions arrows and favorites apart from the list below (MWPW-211083)', () => {
+    const store = makeStore([LIVE_SESSION, { ...LIVE_SESSION, id: 'live-2', title: 'Live Two' }]);
+    const View = buildLiveUpcomingView(preact, store);
+    const out = View({});
+    expect(out).to.include('arrowDaaLl="Live-Sessions"');
+    expect(out).to.include('cardDaaLlSuffix="Live-Sessions"');
+  });
+
   it('hides live section when no live sessions', () => {
     const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY);
     const View = buildLiveUpcomingView(preact, store);

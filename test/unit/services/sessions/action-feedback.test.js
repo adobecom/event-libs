@@ -265,6 +265,40 @@ describe('services/sessions/action-feedback', () => {
     });
   });
 
+  describe('showAuthToast opened call (MWPW-211083)', () => {
+    let tracked;
+    let originalSatellite;
+
+    beforeEach(() => {
+      tracked = [];
+      // eslint-disable-next-line no-underscore-dangle
+      originalSatellite = window._satellite;
+      // eslint-disable-next-line no-underscore-dangle
+      window._satellite = { track: (type, payload) => tracked.push(payload.data.web.webInteraction.name) };
+    });
+
+    afterEach(() => {
+      // eslint-disable-next-line no-underscore-dangle
+      window._satellite = originalSatellite;
+      sessions.value = [];
+      liveStreamActiveIds.value = new Set();
+    });
+
+    it('records the Register/Sign in toast opening once per shown toast', () => {
+      sessions.value = [{ id: 's-2', startTimeUtc: '2099-01-01T00:00:00Z', endTimeUtc: '2099-01-01T01:00:00Z' }];
+      showAuthToast({ eventConfig, actionLabel: 'favorite' });
+      // Still showing, so the repeat is capped and no second toast (or call) happens.
+      showAuthToast({ eventConfig, actionLabel: 'favorite' });
+      expect(tracked).to.deep.equal(['Toast-Register-Sign-In-Open | favorite']);
+    });
+
+    it('uses the Sign in name and the post-event action after the event', () => {
+      sessions.value = [PAST_SESSION];
+      showAuthToast({ eventConfig, actionLabel: 'download Slides.pdf', postEventActionLabel: 'download resources' });
+      expect(tracked).to.deep.equal(['Toast-Sign-In-Open | download resources']);
+    });
+  });
+
   describe('isAuthResolved', () => {
     it('is false while isLoggedIn has not resolved yet (IMS still pending)', () => {
       expect(isAuthResolved({ isLoggedIn: null, isRegistered: undefined })).to.be.false;

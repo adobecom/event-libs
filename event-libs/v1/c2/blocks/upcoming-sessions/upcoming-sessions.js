@@ -12,6 +12,7 @@ import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { logError } from '../../../utils/lana-log.js';
+import { sessionDaaLh } from '../../../utils/analytics.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
@@ -205,6 +206,8 @@ export function buildCard(session) {
     'aria-label': `${session.enTitle}, ${timeRange}`,
     'daa-ll': 'Session-Card-Open',
   });
+  const daaLh = sessionDaaLh({ sessionCode: session.sessionCode, title: session.enTitle });
+  if (daaLh) card.setAttribute('daa-lh', daaLh);
 
   const body = createTag('div', { class: 'sg-card__body' }, '', { parent: card });
 
@@ -230,7 +233,9 @@ export function buildCard(session) {
   if (footerBadge) footerBadgeWrap.append(footerBadge);
   createTag('span', { class: 'sg-card__time' }, timeRange, { parent: footer });
 
-  const actions = createTag('div', { class: 'sg-card__actions', 'data-time': timeRange }, '', { parent: card });
+  // Clicks between the buttons don't open the card, so an empty label keeps Launch from reporting
+  // them as the card's Session-Card-Open; each button still reports its own, closer label.
+  const actions = createTag('div', { class: 'sg-card__actions', 'data-time': timeRange, 'daa-ll': '' }, '', { parent: card });
   actions.addEventListener('click', (e) => e.stopPropagation());
 
   const scheduleBtn = buildIconButton({

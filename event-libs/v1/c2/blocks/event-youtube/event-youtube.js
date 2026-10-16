@@ -1,5 +1,6 @@
 import { createTag, readBlockConfig } from '../../../utils/utils.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
+import { guardPlayerScroll } from '../../utils/player-scroll-guard.js';
 import {
   createYouTubePlayerId, buildYouTubeAnalyticsParams, registerYouTubeTracking,
 } from '../../utils/youtube-analytics.js';
@@ -225,6 +226,7 @@ export class YouTubeChat {
 }
 
 export default async function init(block) {
+  guardPlayerScroll(block);
   const youtubeChat = new YouTubeChat();
   await youtubeChat.init(block);
 }
