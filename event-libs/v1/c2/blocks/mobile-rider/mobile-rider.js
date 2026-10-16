@@ -282,6 +282,7 @@ class MobileRider {
       if (isHtml(text)) descriptionEl.innerHTML = render(text);
       else descriptionEl.textContent = render(text);
       descriptionEl.classList.toggle('is-plain-text', !isHtml(text));
+      descriptionEl.classList.toggle('is-rich-text', isHtml(text));
       descriptionEl.classList.toggle('is-hidden', !text);
     };
     paintDescription(null);
