@@ -61,9 +61,11 @@ only by `session-store.js`/`sessions-guide`) duplicated the same
   result still notifies) and pre-filters `{active, inactive}` down to just
   those ids; omitted, a listener gets every tick's raw, unfiltered result.
 - `startPolling`/`stopPolling` — a thin adapter over that registry, preserving
-  `session-store.js`'s exact existing call shape and its "auto-stop once every
-  one of my ids is inactive" behavior. Zero change required in
-  `session-store.js`.
+  `session-store.js`'s exact existing call shape and its auto-stop behavior. Zero
+  change required in `session-store.js`. The auto-stop now also requires every
+  session's end time to have passed: Mobile Rider reports not-yet-started streams
+  as inactive too, so stopping on "all inactive" alone ended polling after the
+  first pre-event tick and missed streams going live.
 
 Each block's own per-session gating is unchanged — this only replaces *where
 the actual fetch/interval lives*, not each block's business logic for deciding

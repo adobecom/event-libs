@@ -1,6 +1,7 @@
 import { fetchLiveStatus } from './mobile-rider.js';
 import { getEventApiConfig, deriveMrEnv } from '../../utils/session-store.js';
 import { logError } from '../../utils/lana-log.js';
+import { getNowMs } from '../../utils/session-state.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
@@ -139,9 +140,15 @@ export function startPolling(mrSessions, env, onUpdate, intervalMs = DEFAULT_POL
   activeIds = ids;
   activeIntervalMs = intervalMs;
 
+  // Mobile Rider also reports not-yet-started streams as inactive, so all-inactive only means
+  // "over" once every session's end time has passed; stopping earlier misses a stream going live.
+  const allEnded = () => mrSessions
+    .filter((s) => s.mrStreamId)
+    .every((s) => getNowMs() >= Date.parse(s.endTimeUtc));
+
   unsubscribe = subscribe(({ active, inactive }) => {
     onUpdate(new Set(active), new Set(inactive), Date.now());
-    if (ids.every((id) => inactive.includes(id))) stopPolling();
+    if (ids.every((id) => inactive.includes(id)) && allEnded()) stopPolling();
   }, ids);
 
   registerStreamIds(ids, { intervalMs });
