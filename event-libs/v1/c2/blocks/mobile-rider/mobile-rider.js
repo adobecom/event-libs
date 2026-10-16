@@ -1,6 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 import {
-  createTag, getEventConfig, safeUrl, normalizeMultilineText,
+  createTag, getEventConfig, safeUrl, normalizeMultilineText, htmlToPlainText,
 } from '../../../utils/utils.js';
 import {
   sessions, favorited, pendingActions, initSessionState, openSessionGuideDetail, getEventApiConfig,
@@ -268,12 +268,21 @@ class MobileRider {
     // A div (not a p) so authored HTML containing block elements (<p>/<ul>/<li>) nests legally.
     const descriptionEl = createTag('div', { class: 'mobile-rider-info-bar-description', id: panelId }, '', { parent: bar });
     const paintDescription = (session) => {
-      const text = session?.descriptionText || session?.description || cfg['session-description'] || '';
+      // The raw description, not the tag-free `descriptionText`: this bar renders HTML (MWPW-211615).
+      // A truthy value isn't enough: "<p></p>" or "<p>&nbsp;</p>" has nothing to show, so it must
+      // fall through to the authored description instead of painting an empty box.
+      const isHtml = (value) => HTML_TAG.test(value);
+      const render = (value) => (isHtml(value)
+        ? sanitizedRichText(value)
+        : normalizeMultilineText(value));
+      const hasContent = (value) => !!value && !!htmlToPlainText(render(value)).trim();
+      const text = [session?.description, cfg['session-description']].find(hasContent) || '';
       // Authored HTML keeps its structure; plain text keeps its line breaks via pre-line CSS.
       // Sanitized like the Session Guide/Broadcast descriptions: this HTML comes from ESP or authoring.
-      if (HTML_TAG.test(text)) descriptionEl.innerHTML = sanitizedRichText(text);
-      else descriptionEl.textContent = normalizeMultilineText(text);
-      descriptionEl.classList.toggle('is-plain-text', !HTML_TAG.test(text));
+      if (isHtml(text)) descriptionEl.innerHTML = render(text);
+      else descriptionEl.textContent = render(text);
+      descriptionEl.classList.toggle('is-plain-text', !isHtml(text));
+      descriptionEl.classList.toggle('is-rich-text', isHtml(text));
       descriptionEl.classList.toggle('is-hidden', !text);
     };
     paintDescription(null);

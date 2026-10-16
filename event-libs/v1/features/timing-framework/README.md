@@ -185,6 +185,13 @@ Each `runTimer()` tick calls `advancePastInactiveMrSlots()` first, then `shouldT
 
 MR stream status uses BroadcastChannel (`mobile-rider-store`) for real-time updates within the same tab.
 
+On load, the mobile-rider plugin checks every unique MR `sessionId` in the schedule with **one**
+`media-status` request (split into chunks of 50 ids only for very large schedules), instead of one
+request per entry (MWPW-211386). MobileRider fails the whole request with a 404 when any id is
+unknown, so the plugin drops the id named in that 404 and retries (up to 3 times), then falls back
+to one request per id. Any other failure marks its ids inactive (`store: false`), as before. After
+load, status only changes through the player's `streamend` event.
+
 ### Mobile Rider edge cases
 
 #### Overrun

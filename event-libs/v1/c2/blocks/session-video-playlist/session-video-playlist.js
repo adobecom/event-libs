@@ -23,6 +23,7 @@ import {
   PLAYBACK_PHASE,
 } from '../../utils/video-session.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
+import { sessionDaaLh } from '../../../utils/analytics.js';
 
 const LOG_SCOPE = 'session-video-playlist';
 
@@ -429,6 +430,8 @@ function buildRow(item, { onSelect, hideProgressBar = false }) {
     'data-href': item.href,
     ...analyticsAttrs('playlist-item-select'),
   });
+  const daaLh = sessionDaaLh(item);
+  if (daaLh) row.setAttribute('daa-lh', daaLh);
 
   const content = createTag('a', { class: 'session-video-playlist-row-content', href: item.href }, '', { parent: row });
 
@@ -510,6 +513,7 @@ function buildTopicView(el, allRows, {
       {
         id: session.id,
         rfSessionId: session.rfSessionId,
+        sessionCode: session.sessionCode,
         title: session.title,
         thumbnailUrl: session.thumbnailUrl || defaultThumbnail,
 
@@ -708,6 +712,7 @@ export default async function init(el) {
     return {
       id: sessionId,
       rfSessionId: (getMetadata('external-session-id') || '').replace(/^rf-/, ''),
+      sessionCode: getMetadata('session-code') || '',
       title: findSessionHeadingText(el) || getMetadata('og:title') || '',
       thumbnailUrl: getMetadata('og:image') || null,
       duration: 0,

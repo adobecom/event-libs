@@ -53,10 +53,6 @@
   border: none;
 }
 
-.lenis.lenis-smooth .sb-player__mount iframe {
-  pointer-events: auto;
-}
-
 /* !important beats c2-global/event-youtube's 1192px cap; overflow:hidden clips corners. */
 @media (min-width: 768px) {
   .session-broadcast .milo-video,

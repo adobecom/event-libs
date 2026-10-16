@@ -326,6 +326,12 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.include('daa-ll="Featured-Product"');
     });
 
+    it('names the session on the view and the product on its link for analytics (MWPW-211083)', () => {
+      const out = render({ sessionCode: 'GS1', products: ['Photoshop'] });
+      expect(out).to.include('daa-lh="GS1|Day One Keynote"');
+      expect(out).to.include('daa-lh="Photoshop"');
+    });
+
     it('renders an unmapped product as a non-link tile with no icon at all', () => {
       const out = render({ products: ['Some Unmapped Product'] });
       expect(out).to.include('Some Unmapped Product');
