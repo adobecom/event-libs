@@ -8,6 +8,7 @@ import {
 } from '../../../../event-libs/v1/features/swan-notifications/notification-store.js';
 import { resetNotifications } from './mocks/notification-store.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
+import { MAX_EVENT_PAGES } from '../../../../event-libs/v1/utils/constances.js';
 
 // now + offsetMs, as an ISO string — startOffsetMs/endOffsetMs are negative for "in the past".
 function iso(offsetMs) {
@@ -161,7 +162,8 @@ describe('swan-notifications-feds', () => {
       reconcileSwanNotifications(() => [corrected], () => new Set([session.id]));
       const entry = getEntry(session.rfCode);
       expect(entry.endTimeMs).to.equal(Date.parse(corrected.endTimeUtc));
-      expect(entry.actionUrl).to.equal(`${location.origin}/sessions/corrected`);
+      // Still in its reminder window, so the refreshed link is the Session Guide modal deep link.
+      expect(entry.actionUrl).to.equal(`${location.origin}${MAX_EVENT_PAGES.homepage}?session=corrected`);
       expect(entry.updatedAt).to.equal(previous.updatedAt);
       expect(entry.seq).to.equal(previous.seq);
       expect(entry.read).to.equal(true);
