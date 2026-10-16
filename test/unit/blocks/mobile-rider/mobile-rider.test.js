@@ -1155,6 +1155,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(desc.querySelectorAll('[onerror]').length).to.equal(0);
       expect(desc.textContent.includes('<p>')).to.equal(false);
       expect(desc.classList.contains('is-plain-text')).to.equal(false);
+      expect(desc.classList.contains('is-rich-text')).to.equal(true);
     });
 
     // MWPW-211615: normalizeSessions() always adds a tag-free descriptionText; the bar must
@@ -1205,6 +1206,48 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       const desc = el.querySelector('.mobile-rider-info-bar-description');
       expect(desc.classList.contains('is-hidden')).to.equal(true);
       expect(desc.textContent.trim()).to.equal('');
+    });
+
+    // The abstract matches the Session Guide detail overlay's rich-text styling (.sg-detail__desc.is-rich-text).
+    it('styles an HTML description like the Session Guide rich text', async () => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/event-libs/v1/c2/blocks/mobile-rider/mobile-rider.css';
+      document.head.append(link);
+      await new Promise((resolve) => { link.onload = resolve; link.onerror = resolve; });
+
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      sessions.value = [{
+        id: 's-100',
+        rfCode: 'rf-100',
+        description: '<p>One</p>\n\n<p>Two</p>\n\n<ul>\n\t<li>A</li>\n\t<li>B</li>\n</ul>\n',
+      }];
+
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      const fontSize = parseFloat(getComputedStyle(desc).fontSize);
+      const firstP = desc.querySelector('p');
+      const ul = desc.querySelector('ul');
+      expect(desc.classList.contains('is-rich-text')).to.equal(true);
+      expect(getComputedStyle(desc).whiteSpace).to.equal('normal');
+      expect(parseFloat(getComputedStyle(firstP).marginBottom)).to.be.closeTo(fontSize * 0.75, 0.5);
+      expect(parseFloat(getComputedStyle(firstP).marginTop)).to.equal(0);
+      expect(parseFloat(getComputedStyle(ul).paddingInlineStart)).to.be.closeTo(fontSize * 1.25, 0.5);
+      expect(parseFloat(getComputedStyle(ul).marginBottom)).to.equal(0);
+    });
+
+    it('does not mark a plain-text description as rich text', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      sessions.value = [{ id: 's-100', rfCode: 'rf-100', description: 'Line one\nLine two' }];
+
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      expect(desc.classList.contains('is-plain-text')).to.equal(true);
+      expect(desc.classList.contains('is-rich-text')).to.equal(false);
     });
 
     it('does not render a Favorite button until the session resolves from the store', async () => {
