@@ -23,6 +23,7 @@ import { resolveTrackBadge, resolveNamedTrackBadge } from '../utils/session-filt
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 import { scrollPageToTop } from '../utils/motion.js';
 import { logError } from '../../../../utils/lana-log.js';
+import { sessionDaaLh, toDaaLh } from '../../../../utils/analytics.js';
 
 // Collapsed list-pod lengths (Figma products 1325:141847, speakers 1325:141990).
 const COLLAPSED_PRODUCTS = 6;
@@ -307,7 +308,7 @@ export function SessionDetailOverlay({ onBack }) {
                       ${href && html`<span class="sg-detail__product-linkout" aria-hidden="true"><${IconLinkOut} /></span>`}
                     `;
     return href
-      ? html`<a class="sg-detail__product-card" href=${href} target="_blank" rel="noopener noreferrer" daa-ll="Featured-Product">${inner}</a>`
+      ? html`<a class="sg-detail__product-card" href=${href} target="_blank" rel="noopener noreferrer" daa-ll="Featured-Product" daa-lh=${toDaaLh(p)}>${inner}</a>`
       : html`<div class="sg-detail__product-card">${inner}</div>`;
   })}
                 </div>
@@ -359,7 +360,7 @@ export function SessionDetailOverlay({ onBack }) {
         `;
 
   return html`
-    <div class="sg-detail" role="region" aria-label="Session detail">
+    <div class="sg-detail" role="region" aria-label="Session detail" daa-lh=${sessionDaaLh(session)}>
       <div class="sg-detail__body">
         <div class="sg-detail__back-wrap">
           <button ref=${backBtnRef} class="sg-detail__back" onclick=${onBack} type="button" aria-label="Back to sessions list">

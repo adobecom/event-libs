@@ -95,6 +95,11 @@ describe('SessionInfoPanel', () => {
     expect(out).to.include('daa-ll="Share-Livestream-Details"');
   });
 
+  it('names the session on its root as daa-lh code|title (MWPW-211083)', () => {
+    const out = SessionInfoPanel({ session: { ...SESSION, sessionCode: 'S1' } });
+    expect(out).to.include('daa-lh="S1|Pixel &amp; Product"');
+  });
+
   // The caret/expand toggle uses local component state, which the mocked htm-preact's
   // useState setter no-ops (see test/unit/mocks/deps/htm-preact.js) — the expanded branch
   // (track badge, untruncated description, "view all details" CTA) can't be reached

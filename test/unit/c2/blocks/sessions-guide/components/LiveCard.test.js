@@ -210,6 +210,22 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Session-Card-Open"');
   });
 
+  it('names the session on the card as daa-lh code|title, with or without onCardClick (MWPW-211083)', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    const session = { ...LIVE_SESSION, sessionCode: 'GS1' };
+    expect(LiveCard({ session })).to.include('daa-lh="GS1|MAX Keynote"');
+    expect(LiveCard({ session, onCardClick: () => {} })).to.include('daa-lh="GS1|MAX Keynote"');
+  });
+
+  it('labels the whole card like its title unless the caller tracks card clicks itself (MWPW-211083)', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    const count = (markup) => markup.split('daa-ll="Session-Card-Open"').length - 1;
+    expect(count(LiveCard({ session: LIVE_SESSION }))).to.equal(2);
+    expect(count(LiveCard({ session: LIVE_SESSION, onCardClick: () => {} }))).to.equal(1);
+  });
+
   it('renders the title as a navigating button (no onCardClick) on the page surface', () => {
     const store = buildStore(preact);
     store.SessionGuideContext._current = {

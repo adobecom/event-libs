@@ -12,6 +12,7 @@ import {
   IconHeartFilled, IconHeartOutline, IconShare, IconChevronRight,
 } from '../../sessions-guide/components/icons.js';
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
+import { sessionDaaLh } from '../../../../utils/analytics.js';
 
 // Collapsed vs. expanded changes which actions/meta show and clamps the description (hidden
 // entirely if favorited, mobile only — .is-favorited in the CSS). "View all details" opens the
@@ -84,6 +85,7 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
       class=${'sb-info' + (expanded ? ' is-expanded' : '') + (isFavorited ? ' is-favorited' : '')}
       role="region"
       aria-label="Now playing session info"
+      daa-lh=${sessionDaaLh(session)}
     >
       <div class="sb-info__row">
         <h2 class="sb-info__title">${session.title}</h2>

@@ -71,6 +71,16 @@ describe('Carousel', () => {
     expect(html).to.include('key="b"');
   });
 
+  // MWPW-211558: a full authored Recommended list (9 on one MAX day) must all reach the strip.
+  it('renders every session of a long recommended list, with nav arrows', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    const many = Array.from({ length: 9 }, (_, i) => ({ ...SESSION_A, id: `rec-${i}` }));
+    const html = Carousel({ sessions: many, variant: 'recommended', title: 'Recommended' });
+    many.forEach((s) => expect(html).to.include(`key="${s.id}"`));
+    expect(html).to.include('sg-carousel__arrow--next');
+  });
+
   it('renders the cards container', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);

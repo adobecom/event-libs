@@ -185,6 +185,27 @@ describe('SessionCard', () => {
       .to.include('daa-ll="Add-to-Favorites-Upcoming"');
   });
 
+  it('keeps clicks between the action buttons untracked with an empty actions label (MWPW-211083)', () => {
+    expect(renderCard(UPCOMING_SESSION)).to.match(/class="sg-card__actions"[^>]*daa-ll=""/);
+  });
+
+  it('names the session on the card as daa-lh code|title (MWPW-211083)', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx();
+    const SessionCard = buildSessionCard(preact, store);
+    expect(SessionCard({ session: { ...UPCOMING_SESSION, sessionCode: 'S100' } }))
+      .to.include('daa-lh="S100|Building with AI"');
+  });
+
+  it('labels the whole card like its title unless the caller tracks card clicks itself (MWPW-211083)', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx();
+    const SessionCard = buildSessionCard(preact, store);
+    const count = (markup) => markup.split('daa-ll="Session-Card-').length - 1;
+    expect(count(SessionCard({ session: UPCOMING_SESSION }))).to.equal(2);
+    expect(count(SessionCard({ session: UPCOMING_SESSION, onCardClick: () => {} }))).to.equal(1);
+  });
+
   it('shows aria-pressed=true on schedule button when scheduled', () => {
     scheduled.value = new Set(['session-1']);
     const html = renderCard(UPCOMING_SESSION);
