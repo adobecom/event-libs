@@ -186,10 +186,12 @@
   cursor: pointer;
 }
 
+/* Centered on both axes: the ±90deg rotation turns any horizontal offset into a vertical one,
+   which made the caret jump up/down on toggle (MWPW-211812). */
 .sb-info__expand-icon {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   transform: rotate(90deg);
   transition: transform 0.2s ease;
 }
@@ -373,8 +375,9 @@
       "desc desc";
   }
 
+  /* Keeps the base align-items: center — switching to start shifted the title row up 4px
+     next to the taller actions on expand (MWPW-211812). */
   .sb-info.is-expanded {
-    align-items: start;
     grid-template-areas:
       "row actions"
       "meta meta"
@@ -401,8 +404,6 @@
 
   /* Favorite moves after Share (rightmost) — reversed from mobile's DOM/visual order. */
   .sb-info__icon-btn--favorite { order: 1; }
-
-  .sb-info__expand-icon { justify-content: center; }
 
   .sb-info__actions { gap: 5px; }
 
