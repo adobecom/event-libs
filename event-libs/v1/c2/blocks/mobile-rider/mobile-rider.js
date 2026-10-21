@@ -366,14 +366,6 @@ class MobileRider {
         'data-videoid': vid,
       }, '', { parent: this.wrap });
 
-      // createTag('video', {
-      //   id: CONFIG.PLAYER.VIDEO_ID,
-      //   class: CONFIG.PLAYER.VIDEO_CLASS,
-      //   controls: true,
-      //   playsinline: '',
-      //   poster: this.cfg.poster || this.cfg.thumbnail || '',
-      // }, '', { parent: container });
-
       this.#embedRafId = requestAnimationFrame(() => {
         this.#embedRafId = null;
 
@@ -494,7 +486,6 @@ class MobileRider {
         videoid: this.el.dataset.extractedVideoId,
         skinid: this.el.dataset.extractedSkinId || '',
         autoplay: toBool(this.el.dataset.extractedAutoplay || 'true'),
-        poster: this.el.dataset.extractedThumbnail || '',
       };
     }
 
