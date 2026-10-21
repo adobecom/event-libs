@@ -371,7 +371,6 @@ class MobileRider {
         class: CONFIG.PLAYER.VIDEO_CLASS,
         controls: true,
         playsinline: '',
-        poster: this.cfg.poster || this.cfg.thumbnail || '',
       }, '', { parent: container });
 
       this.#embedRafId = requestAnimationFrame(() => {
@@ -494,7 +493,6 @@ class MobileRider {
         videoid: this.el.dataset.extractedVideoId,
         skinid: this.el.dataset.extractedSkinId || '',
         autoplay: toBool(this.el.dataset.extractedAutoplay || 'true'),
-        poster: this.el.dataset.extractedThumbnail || '',
       };
     }
 
