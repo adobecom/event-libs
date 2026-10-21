@@ -781,9 +781,38 @@ export default async function init(el) {
       });
     };
     window.addEventListener('resize', handleResize);
+
+    // The GNAV (Milo feds `header`) mounts asynchronously and dispatches no ready event, so it
+    // may be absent or unsized when the drawer first measures — leaving the expanded title under
+    // the nav (MWPW-213xxx). Re-measure whenever the header appears and whenever it resizes, the
+    // same approach as sessions-hub.js. Poll briefly until the header exists, then observe it.
+    let gnavResizeObserver = null;
+    let gnavWaitTimer = null;
+    const observeGnav = () => {
+      const gnav = document.querySelector('header');
+      if (!gnav) return false;
+      gnavResizeObserver = new ResizeObserver(() => drawer.reflow());
+      gnavResizeObserver.observe(gnav);
+      drawer.reflow();
+      return true;
+    };
+    if (!observeGnav()) {
+      const GNAV_POLL_MS = 250;
+      const GNAV_WAIT_TIMEOUT_MS = 8000;
+      const startedAt = Date.now();
+      gnavWaitTimer = window.setInterval(() => {
+        if (observeGnav() || Date.now() - startedAt >= GNAV_WAIT_TIMEOUT_MS) {
+          window.clearInterval(gnavWaitTimer);
+          gnavWaitTimer = null;
+        }
+      }, GNAV_POLL_MS);
+    }
+
     onElementDetached(el, () => {
       window.removeEventListener('resize', handleResize);
       if (pendingResizeFrame != null) cancelAnimationFrame(pendingResizeFrame);
+      gnavResizeObserver?.disconnect();
+      if (gnavWaitTimer != null) window.clearInterval(gnavWaitTimer);
     });
 
     drawer.setInitial({ expanded: drawer.isDesktop() });
