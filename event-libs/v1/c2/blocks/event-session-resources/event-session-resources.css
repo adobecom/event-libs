@@ -9,6 +9,7 @@
 }
 
 .session-resources-title {
+  max-width: 700px;
   margin: 0;
   color: var(--s2a-color-gray-1000, #000);
   font-size: var(--s2a-font-size-18, 1.125rem);

@@ -137,6 +137,17 @@
   text-wrap: balance;
 }
 
+/* Copy wraps at 700px per design (MWPW-208936); the card itself stays full width. */
+.event-session-details :is(
+  .session-title,
+  .session-description,
+  .session-closed-caption,
+  .session-legal-disclaimer,
+  .session-gdpr-copy
+) {
+  max-width: 700px;
+}
+
 @media (min-width: 1024px) {
   .event-session-details .session-title {
     font-size: var(--s2a-typography-font-size-heading-4);
