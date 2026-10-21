@@ -366,6 +366,13 @@ class MobileRider {
         'data-videoid': vid,
       }, '', { parent: this.wrap });
 
+      createTag('video', {
+        id: CONFIG.PLAYER.VIDEO_ID,
+        class: CONFIG.PLAYER.VIDEO_CLASS,
+        controls: true,
+        playsinline: '',
+      }, '', { parent: container });
+
       this.#embedRafId = requestAnimationFrame(() => {
         this.#embedRafId = null;
 
