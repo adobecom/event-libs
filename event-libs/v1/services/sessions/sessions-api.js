@@ -460,3 +460,70 @@ export async function fetchSessions(eventId) {
   const rawSessions = await fetchEslSessions(eventId);
   return normalizeSessions(rawSessions);
 }
+
+// --- MPC poster image --------------------------------------------------------
+// The playlist card thumbnail should use the video's own MPC poster frame rather than the
+// generic session-card-image authored in RainFocus (MWPW-212106). MPC exposes a schema.org
+// VideoObject via `?format=json-ld`; its `thumbnailUrl` is the poster. Mirrors the cached
+// duration fetch in session-video-player.js so repeated rows share one request per MPC id.
+const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
+const MPC_POSTER_TIMEOUT_MS = 5000;
+const mpcPosterByVideoId = new Map();
+const inflightPosterRequests = new Map();
+
+// The playlist card thumbnail renders at ~96–137px wide (16:9). MPC returns ~12 resolutions of
+// the same poster (…_WxH.jpg); pick the smallest whose width is still >= this target so the card
+// stays crisp on high-DPI screens without downloading a 1920px frame into a 96px slot.
+const MPC_POSTER_TARGET_WIDTH = 300;
+
+function parseMpcPosterWidth(url) {
+  // URLs end …_<width>x<height>.jpg (e.g. ..._220x124.jpg).
+  const match = /_(\d+)x\d+\.[a-z]+(?:\?.*)?$/i.exec(url);
+  return match ? Number(match[1]) : null;
+}
+
+// From MPC's thumbnailUrl (a string or an array of sized variants), choose the best card poster.
+export function pickMpcPosterUrl(thumbnailUrl) {
+  if (typeof thumbnailUrl === 'string') return thumbnailUrl || null;
+  if (!Array.isArray(thumbnailUrl) || thumbnailUrl.length === 0) return null;
+
+  const sized = thumbnailUrl
+    .map((url) => ({ url, width: parseMpcPosterWidth(url) }))
+    .filter((entry) => entry.width != null)
+    .sort((a, b) => a.width - b.width);
+  if (sized.length === 0) return thumbnailUrl[0] || null;
+
+  // Smallest variant at or above the target width; otherwise the largest available.
+  const atOrAboveTarget = sized.find((entry) => entry.width >= MPC_POSTER_TARGET_WIDTH);
+  return (atOrAboveTarget ?? sized[sized.length - 1]).url;
+}
+
+export async function fetchMpcPosterUrl(mpcId) {
+  if (!mpcId) return null;
+  if (mpcPosterByVideoId.has(mpcId)) return mpcPosterByVideoId.get(mpcId);
+  if (inflightPosterRequests.has(mpcId)) return inflightPosterRequests.get(mpcId);
+
+  const request = (async () => {
+    try {
+      const response = await fetch(
+        `${ADOBE_TV_ORIGIN}/v/${mpcId}?format=json-ld`,
+        { signal: AbortSignal.timeout(MPC_POSTER_TIMEOUT_MS) },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      const posterUrl = pickMpcPosterUrl(payload?.jsonLinkedData?.thumbnailUrl);
+      mpcPosterByVideoId.set(mpcId, posterUrl);
+      return posterUrl;
+    } catch (error) {
+      logError('sessions-api', `could not fetch mpc poster for "${mpcId}"`, error);
+      // Cache the miss so a failing id is not retried for every playlist row.
+      mpcPosterByVideoId.set(mpcId, null);
+      return null;
+    } finally {
+      inflightPosterRequests.delete(mpcId);
+    }
+  })();
+
+  inflightPosterRequests.set(mpcId, request);
+  return request;
+}

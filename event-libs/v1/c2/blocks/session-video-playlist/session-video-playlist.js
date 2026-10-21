@@ -4,7 +4,7 @@ import {
   getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { getNowMs } from '../../../utils/session-state.js';
-import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
+import { extractCustomAttributeSlugs, extractCustomAttributeValue, fetchMpcPosterUrl } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { initTierOneEventConfig, getEventStartMs } from '../../../utils/tier-1-event-config.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
@@ -435,9 +435,13 @@ function buildRow(item, { onSelect, hideProgressBar = false }) {
 
   const content = createTag('a', { class: 'session-video-playlist-row-content', href: item.href }, '', { parent: row });
 
-  if (item.thumbnailUrl) {
+  if (item.thumbnailUrl || item.mpcId) {
     const thumbWrap = createTag('div', { class: 'session-video-playlist-row-thumb-wrap' }, '', { parent: content });
-    createTag('img', { class: 'session-video-playlist-row-thumb', src: item.thumbnailUrl, alt: '' }, '', { parent: thumbWrap });
+    const img = createTag('img', { class: 'session-video-playlist-row-thumb', src: item.thumbnailUrl, alt: '' }, '', { parent: thumbWrap });
+    // The MPC poster frame is preferred over the generic RainFocus session-card-image
+    // (MWPW-212106). It is resolved asynchronously and swapped in once available, so the
+    // row renders immediately with the authored thumbnail (or empty) and upgrades in place.
+    if (item.mpcId) img.dataset.mpcId = item.mpcId;
     createTag('span', { class: 'session-video-playlist-row-play-icon' }, THUMB_PLAY_ICON_SVG, { parent: thumbWrap });
   }
 
@@ -500,6 +504,22 @@ export function applyExpandedHeightCap(
   list.style.maxHeight = `${cap}px`;
 }
 
+// Swap each row's generic thumbnail for the video's MPC poster frame once it resolves
+// (MWPW-212106). Non-blocking: a failed or missing poster leaves the authored thumbnail in
+// place. Posters are cached per MPC id in sessions-api, so duplicate ids share one request.
+function enhanceThumbnailsWithMpcPoster(root) {
+  const imgs = root.querySelectorAll('img.session-video-playlist-row-thumb[data-mpc-id]');
+  imgs.forEach((img) => {
+    const { mpcId } = img.dataset;
+    fetchMpcPosterUrl(mpcId)
+      .then((posterUrl) => {
+        // Guard against the row being detached before the poster resolves.
+        if (posterUrl && img.isConnected) img.src = posterUrl;
+      })
+      .catch(() => { /* fetchMpcPosterUrl already logs; keep the authored thumbnail */ });
+  });
+}
+
 function buildTopicView(el, allRows, {
   maxSessions = DEFAULT_MAX_SESSIONS, defaultThumbnail = '', currentSessionId = null,
   hideProgressBar = false,
@@ -516,6 +536,7 @@ function buildTopicView(el, allRows, {
         sessionCode: session.sessionCode,
         title: session.title,
         thumbnailUrl: session.thumbnailUrl || defaultThumbnail,
+        mpcId: session.mpcId,
 
         durationLabel: (() => {
           const watchedLengthSeconds = getVideoProgress(session.id)?.length;
@@ -591,6 +612,8 @@ function buildTopicView(el, allRows, {
     window.removeEventListener('resize', handleResize);
     if (pendingFrame != null) cancelAnimationFrame(pendingFrame);
   });
+
+  enhanceThumbnailsWithMpcPoster(list);
 }
 
 function buildAutoplayToggle(el) {
