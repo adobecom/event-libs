@@ -5,6 +5,7 @@ import { MAX_EVENT_PAGES } from '../../utils/constances.js';
 import { getWatchDestination } from '../../utils/session-state.js';
 import { safeUrl } from '../../utils/utils.js';
 import { buildFederalTrackIconUrl } from '../icons/federal-icons.js';
+import { sessionParamValue } from '../../c2/blocks/sessions-guide/utils/url.js';
 
 // Guards against Number(undefined) === NaN silently turning into a null/dropped
 // trigger time when an author omits the field.
@@ -42,20 +43,26 @@ function resolveSessionUrl(path) {
   }
 }
 
+// Upcoming (reminder) notifications open the session's Session Guide detail modal on the
+// homepage (MWPW-211606), keeping attendees in the homepage journey. Uses the widget's own
+// `?session=<url-slug>` deep link (DrawerShell.js) and its own sessionParamValue, so the slug
+// written here is always one findSessionByParam resolves.
+function buildSessionGuidePath(session) {
+  const homepagePath = getHomepagePath() || MAX_EVENT_PAGES.homepage;
+  const slug = sessionParamValue(session);
+  return slug ? `${homepagePath}?session=${encodeURIComponent(slug)}` : homepagePath;
+}
+
 // Reuses session-state.js's getWatchDestination — the same routing sessions-guide's
 // LiveCard/SessionDetailOverlay and session-routing.js's resolveCardAction use — so a live
 // session goes to the homepage (isLivestreamed) or Broadcast (isOnline) instead of its own
 // session page, matching every other entry point into a live session. getWatchDestination
-// doesn't model 'reminder' at all, so that stage is handled here directly: a session that will
-// livestream on the homepage already points there during its reminder window too (that's
-// where its pre-show/countdown content lives), while every other upcoming session type still
-// links to its own page. Also falls back to sessionPageUrl whenever getWatchDestination has
-// nothing to offer (e.g. a live session that's neither isLivestreamed nor isOnline, like an
+// doesn't model 'reminder' at all, so that stage links to the Session Guide modal instead
+// (see buildSessionGuidePath). Also falls back to sessionPageUrl whenever getWatchDestination
+// has nothing to offer (e.g. a live session that's neither isLivestreamed nor isOnline, like an
 // in-person-only one) rather than leaving the row pointing at the bare origin.
 function resolveActionPath(session, stage) {
-  if (stage === 'reminder') {
-    return session.isLivestreamed ? (getHomepagePath() || MAX_EVENT_PAGES.homepage) : session.sessionPageUrl;
-  }
+  if (stage === 'reminder') return buildSessionGuidePath(session);
   return getWatchDestination(session, stage) || session.sessionPageUrl;
 }
 
@@ -109,14 +116,14 @@ export function buildNotificationEntry(session, stage, swanConfig) {
 // feat/swan-notifications (PR #276) — see docs/swan-unc-dependencies.md for how this shape
 // was confirmed against UNC's own engine source.
 
-// sessionPageUrl is a relative path (e.g. "/sessions/my-session") — resolved against
-// the current page's own origin, since that's the only origin this feature ever runs in.
+// The path is relative (e.g. "/sessions/my-session") — resolved against the current page's
+// own origin, since that's the only origin this feature ever runs in.
 // Gated through safeUrl() first, same as buildNotificationEntry's own resolveSessionUrl
 // above — this value ends up in a UNC campaign rule's defaultAction.url, which UNC's engine
-// can surface as a clickable deep link, so a javascript:/data:/cross-origin sessionPageUrl
+// can surface as a clickable deep link, so a javascript:/data:/cross-origin path
 // must never reach it unsanitized.
-function resolveUncSessionUrl(sessionPageUrl) {
-  const safe = safeUrl(sessionPageUrl);
+function resolveUncSessionUrl(path) {
+  const safe = safeUrl(path);
   if (!safe) return window.location.origin;
   try {
     return new URL(safe, window.location.origin).toString();
@@ -151,6 +158,8 @@ function buildTimelineContent(session, stage, swanConfig) {
     || buildFederalTrackIconUrl(trackIcon?.icon)
     || swanConfig.defaultNotificationIconUrl
     || '';
+  // Reminder opens the Session Guide modal (MWPW-211606); live/on-demand keep the session page.
+  const actionPath = stage === 'reminder' ? buildSessionGuidePath(session) : session.sessionPageUrl;
   return {
     timeline: {
       viewtype: 'eventTimeline',
@@ -162,7 +171,7 @@ function buildTimelineContent(session, stage, swanConfig) {
         goLiveExpireTime: toEpochSecondsString(session.endTimeUtc),
       },
       serviceIconDetails: { serviceIcon },
-      defaultAction: { url: resolveUncSessionUrl(session.sessionPageUrl) },
+      defaultAction: { url: resolveUncSessionUrl(actionPath) },
     },
   };
 }

@@ -3,6 +3,9 @@ import {
   calculateSessionTimes, buildNotificationEntry, STAGE_COPY, buildCampaignId, buildStageCampaignRule,
 } from '../../../../event-libs/v1/features/swan-notifications/swan-payload.js';
 import { MAX_EVENT_PAGES } from '../../../../event-libs/v1/utils/constances.js';
+import { findSessionByParam } from '../../../../event-libs/v1/c2/blocks/sessions-guide/utils/url.js';
+
+const sessionGuideUrl = (slug) => new URL(`${MAX_EVENT_PAGES.homepage}?session=${slug}`, window.location.origin).toString();
 
 describe('swan-payload', () => {
   const session = {
@@ -53,7 +56,7 @@ describe('swan-payload', () => {
       expect(entry.stage).to.equal('reminder');
       expect(entry.startTimeMs).to.equal(Date.parse(session.startTimeUtc));
       expect(entry.endTimeMs).to.equal(Date.parse(session.endTimeUtc));
-      expect(entry.actionUrl).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
+      expect(entry.actionUrl).to.equal(sessionGuideUrl('my-session'));
       // Falls back to swanConfig's default when the session has no thumbnail of its own.
       expect(entry.iconUrl).to.equal(swanConfig.defaultNotificationIconUrl);
     });
@@ -91,7 +94,7 @@ describe('swan-payload', () => {
     });
 
     it('falls back to the page origin when sessionPageUrl is absent', () => {
-      const entry = buildNotificationEntry({ ...session, sessionPageUrl: '' }, 'reminder', swanConfig);
+      const entry = buildNotificationEntry({ ...session, sessionPageUrl: '' }, 'on-demand', swanConfig);
       expect(entry.actionUrl).to.equal(window.location.origin);
     });
 
@@ -107,13 +110,31 @@ describe('swan-payload', () => {
       expect(stages).to.deep.equal(['reminder', 'live', 'on-demand']);
     });
 
-    it('links a reminder for a non-livestreamed session to its own page', () => {
+    it('links a reminder to the session\'s Session Guide modal on the homepage, not its own page', () => {
       const entry = buildNotificationEntry(session, 'reminder', swanConfig);
-      expect(entry.actionUrl).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
+      expect(entry.actionUrl).to.equal(sessionGuideUrl('my-session'));
     });
 
-    it('sends a reminder for a livestreamed-on-homepage session to the homepage already, not its own page', () => {
+    it('links a reminder with a title-code slug that the Session Guide resolves back to the same session', () => {
+      const catalogSession = { ...session, sessionPageUrl: '/max/2026/sessions/the-hook-formula-os634.html' };
+      const entry = buildNotificationEntry(catalogSession, 'reminder', swanConfig);
+      const param = new URL(entry.actionUrl).searchParams.get('session');
+      expect(param).to.equal('the-hook-formula-os634');
+      expect(findSessionByParam([session, catalogSession], param)).to.equal(catalogSession);
+    });
+
+    it('links a reminder for a livestreamed-on-homepage session to the Session Guide modal too', () => {
       const entry = buildNotificationEntry({ ...session, isLivestreamed: true }, 'reminder', swanConfig);
+      expect(entry.actionUrl).to.equal(sessionGuideUrl('my-session'));
+    });
+
+    it('falls back to the session id in a reminder link when sessionPageUrl is absent', () => {
+      const entry = buildNotificationEntry({ ...session, sessionPageUrl: '' }, 'reminder', swanConfig);
+      expect(entry.actionUrl).to.equal(sessionGuideUrl('RF-1'));
+    });
+
+    it('links a reminder to the bare homepage when the session has neither a page URL nor an id', () => {
+      const entry = buildNotificationEntry({ ...session, id: '', sessionPageUrl: '' }, 'reminder', swanConfig);
       expect(entry.actionUrl).to.equal(new URL(MAX_EVENT_PAGES.homepage, window.location.origin).toString());
     });
 
@@ -249,11 +270,19 @@ describe('swan-payload', () => {
       expect(payload.timeline.eventData.goLiveTime).to.equal(String(Math.floor(Date.parse(session.startTimeUtc) / 1000)));
       expect(payload.timeline.eventData.goLiveExpireTime).to.equal(String(Math.floor(Date.parse(session.endTimeUtc) / 1000)));
       expect(payload.timeline.serviceIconDetails.serviceIcon).to.equal(swanConfig.defaultNotificationIconUrl);
-      expect(payload.timeline.defaultAction.url).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
+      expect(payload.timeline.defaultAction.url).to.equal(sessionGuideUrl('my-session'));
 
       const untitled = buildStageCampaignRule({ ...session, title: '' }, 'reminder', swanConfig);
       const { payload: untitledPayload } = untitled.campaignRule.events[0].notification_channels[0].channel_details;
       expect(untitledPayload.timeline.eventData.title).to.equal('Adobe MAX 2026 Session');
+    });
+
+    it('keeps live and on-demand defaultAction links on the session\'s own page', () => {
+      ['live', 'on-demand'].forEach((stage) => {
+        const { campaignRule } = buildStageCampaignRule(session, stage, swanConfig);
+        const { payload } = campaignRule.events[0].notification_channels[0].channel_details;
+        expect(payload.timeline.defaultAction.url).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
+      });
     });
 
     it('varies timeline.content per stage', () => {

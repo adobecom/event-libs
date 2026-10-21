@@ -1155,6 +1155,99 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(desc.querySelectorAll('[onerror]').length).to.equal(0);
       expect(desc.textContent.includes('<p>')).to.equal(false);
       expect(desc.classList.contains('is-plain-text')).to.equal(false);
+      expect(desc.classList.contains('is-rich-text')).to.equal(true);
+    });
+
+    // MWPW-211615: normalizeSessions() always adds a tag-free descriptionText; the bar must
+    // still render the HTML description rather than the flattened "- " bullet text.
+    it('renders the HTML description over the tag-free descriptionText', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      sessions.value = [{
+        id: 's-100',
+        rfCode: 'rf-100',
+        description: '<p>In this session, you\'ll:</p><ul><li>Walk away</li></ul>',
+        descriptionText: 'In this session, you\'ll:\n- Walk away',
+      }];
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      expect(desc.querySelector('p')?.textContent).to.equal('In this session, you\'ll:');
+      expect(desc.querySelectorAll('li').length).to.equal(1);
+      expect(desc.textContent.includes('- Walk away')).to.equal(false);
+      expect(desc.classList.contains('is-plain-text')).to.equal(false);
+    });
+
+    // MWPW-211615 follow-up: a truthy-but-empty HTML description must not blank the bar.
+    it('falls back to the authored description when the HTML description has no visible text', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true', description: 'Authored fallback' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      sessions.value = [{
+        id: 's-100', rfCode: 'rf-100', description: '<p>&nbsp;</p><p><br></p>', descriptionText: '',
+      }];
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      expect(desc.textContent).to.equal('Authored fallback');
+      expect(desc.classList.contains('is-hidden')).to.equal(false);
+    });
+
+    it('hides the description when neither the session nor the authoring has visible text', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      sessions.value = [{
+        id: 's-100', rfCode: 'rf-100', description: '<p></p><script>window.__xss = 1</script>',
+      }];
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      expect(desc.classList.contains('is-hidden')).to.equal(true);
+      expect(desc.textContent.trim()).to.equal('');
+    });
+
+    // The abstract matches the Session Guide detail overlay's rich-text styling (.sg-detail__desc.is-rich-text).
+    it('styles an HTML description like the Session Guide rich text', async () => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/event-libs/v1/c2/blocks/mobile-rider/mobile-rider.css';
+      document.head.append(link);
+      await new Promise((resolve) => { link.onload = resolve; link.onerror = resolve; });
+
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      sessions.value = [{
+        id: 's-100',
+        rfCode: 'rf-100',
+        description: '<p>One</p>\n\n<p>Two</p>\n\n<ul>\n\t<li>A</li>\n\t<li>B</li>\n</ul>\n',
+      }];
+
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      const fontSize = parseFloat(getComputedStyle(desc).fontSize);
+      const firstP = desc.querySelector('p');
+      const ul = desc.querySelector('ul');
+      expect(desc.classList.contains('is-rich-text')).to.equal(true);
+      expect(getComputedStyle(desc).whiteSpace).to.equal('normal');
+      expect(parseFloat(getComputedStyle(firstP).marginBottom)).to.be.closeTo(fontSize * 0.75, 0.5);
+      expect(parseFloat(getComputedStyle(firstP).marginTop)).to.equal(0);
+      expect(parseFloat(getComputedStyle(ul).paddingInlineStart)).to.be.closeTo(fontSize * 1.25, 0.5);
+      expect(parseFloat(getComputedStyle(ul).marginBottom)).to.equal(0);
+    });
+
+    it('does not mark a plain-text description as rich text', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      sessions.value = [{ id: 's-100', rfCode: 'rf-100', description: 'Line one\nLine two' }];
+
+      const desc = el.querySelector('.mobile-rider-info-bar-description');
+      expect(desc.classList.contains('is-plain-text')).to.equal(true);
+      expect(desc.classList.contains('is-rich-text')).to.equal(false);
     });
 
     it('does not render a Favorite button until the session resolves from the store', async () => {

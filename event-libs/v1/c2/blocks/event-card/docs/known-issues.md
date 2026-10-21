@@ -32,6 +32,13 @@ is untouched — it's a separate, still-duplicated concern (TF's schedule-skip
 decision, not live-status polling for session cards) worth a follow-up but
 out of scope here.
 
+**Update (MWPW-211385, Oct 2026):** the prod host in both files is now
+`overlay-admin.mobilerider.com`. MobileRider confirmed it's the multi-AZ load
+balancer in front of the autoscaling pool they load-tested for MAX (160k
+req/min); `overlay-admin-prod` resolves to a single nginx host outside that
+test. The earlier 404 on `overlay-admin` no longer reproduces: both hosts
+return the same `media-status` data. The integration host is unchanged.
+
 ## 2. Two independent MobileRider poll loops, and two separate poller modules — fixed
 
 **Was:** `utils/session-routing.js` and `upcoming-sessions/upcoming-sessions.js`

@@ -2,7 +2,7 @@ import { getEventConfig } from '../../../../utils/utils.js';
 import { logError, logWarning } from '../../../../utils/lana-log.js';
 import { getUnknownMediaId } from '../../../../services/sessions/mobile-rider.js';
 
-const MR_PROD_BASE_URL = 'https://overlay-admin-prod.mobilerider.com';
+const MR_PROD_BASE_URL = 'https://overlay-admin.mobilerider.com';
 const MR_INTEGRATION_BASE_URL = 'https://overlay-admin-integration.mobilerider.com';
 
 const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';

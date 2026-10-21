@@ -99,7 +99,8 @@ Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS user
 **File:** `event-libs/v1/services/sessions/mobile-rider.js`
 
 `fetchLiveStatus(mrStreamIds, env)` calls the real MR batch `media-status` endpoint
-(`overlay-admin-{prod,integration}.mobilerider.com`) — this stub was already replaced; this
+(`overlay-admin.mobilerider.com` for prod, `overlay-admin-integration.mobilerider.com` otherwise;
+prod moved off `overlay-admin-prod` in MWPW-211385) — this stub was already replaced; this
 checklist entry was just never updated to say so. The real blocker to live polling actually
 mattering was §6's `mrStreamId` gap below, not this call — that's now closed too, so the two
 together should switch live polling on end-to-end. Not yet verified against a real live
