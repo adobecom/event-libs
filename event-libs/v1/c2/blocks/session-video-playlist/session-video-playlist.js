@@ -192,6 +192,14 @@ function findPlayerBottom(el) {
   return player ? player.getBoundingClientRect().bottom : null;
 }
 
+// Height of the fixed global nav (GNAV), so the expanded drawer can reserve space for it and
+// its title does not slide under the nav on mobile (MWPW-213xxx). Mirrors sessions-hub.js, which
+// measures `header`. Returns 0 when there is no header (the drawer then uses its own top gap).
+function measureGnavHeight() {
+  const gnav = document.querySelector('header');
+  return gnav?.offsetHeight ?? 0;
+}
+
 class Drawer {
   constructor(el, { titleEl, toggleEl, handleEl, headerEl }) {
     this.el = el;
@@ -218,10 +226,13 @@ class Drawer {
   }
 
   measureCapPx() {
+    // Reserve the real GNAV height (plus a small gap) so the expanded drawer never renders under
+    // the fixed nav; fall back to the constant top gap when the nav is shorter or absent.
+    const gnavTopGap = measureGnavHeight() + DRAWER_GAP_PX;
     return computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
       floor: DRAWER_FLOOR_PX,
       gap: DRAWER_GAP_PX,
-      topGap: DRAWER_TOP_GAP_PX,
+      topGap: Math.max(DRAWER_TOP_GAP_PX, gnavTopGap),
       playerBottom: findPlayerBottom(this.el),
       minExpanded: DRAWER_MIN_EXPANDED_PX,
     });
