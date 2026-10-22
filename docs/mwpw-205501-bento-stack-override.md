@@ -1,6 +1,19 @@
 # Bento stack mobile override (MWPW-205501)
 
-**Status:** implemented — [PR #289](https://github.com/adobecom/event-libs/pull/289).
+**Status:** superseded — removed (2026-09-30). Milo `main` shipped `handleBentoStack()`
+and the full `.section.bento.stack-mobile` CSS in the *default*
+`libs/c2/blocks/section-metadata/` via
+[PR #6836](https://github.com/adobecom/milo/pull/6836) ("Site redesign foundation",
+2026-09-29), meeting the "Opting out later" criteria below. By then the vendored CSS had
+drifted from Milo `main` (`8df6e8305`) and was actively overriding it on opted-in pages —
+most visibly, desktop (≥1280px) `rounded-corners` used `--s2a-border-radius-22` (22px)
+instead of Milo's `--s2a-border-radius-xl` (32px). Removed: the
+`milo-site-redesign-override` feature folder, its tests, and its Stylelint override.
+`initMiloSiteRedesignOverride()` remains in `libs.js` as a deprecated no-op only because
+`da-events/events/scripts/scripts.js` still imports and calls it — delete the export after
+da-events drops that call. Authors should also remove `override-milo-ace1209` from pages
+(it's now ignored); native support requires `foundation: c2`. Originally implemented in
+[PR #289](https://github.com/adobecom/event-libs/pull/289); kept below as a historical record.
 
 **Update (2026-09-04):** Milo merged `site-redesign-foundation` into `main` via
 [PR #6614](https://github.com/adobecom/milo/pull/6614) on 2026-09-02. `libs/features/bento-stack.js`
