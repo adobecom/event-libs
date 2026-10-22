@@ -91,6 +91,17 @@ export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
   return titleTop + Math.min(titleHeight, capHeight);
 }
 
+// Dragging may cover the session title and player on purpose, but never the sticky GNAV:
+// it paints above the drawer (z-index 10 vs 2) and is transparent at the top of the page.
+export function computeDragCapPx(viewportHeight, headerBottom) {
+  return viewportHeight - Math.max(0, headerBottom || 0);
+}
+
+export function measureStickyHeaderBottom(doc = document) {
+  const header = doc.querySelector('header.global-navigation');
+  return header ? Math.max(0, header.getBoundingClientRect().bottom) : 0;
+}
+
 function hasPremiered(session, eventStartMs, nowMs) {
   return getPlaybackPhase(session, {
     nowMs,
@@ -218,17 +229,18 @@ class Drawer {
   }
 
   measureCapPx() {
-    return computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
+    const cap = computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
       floor: DRAWER_FLOOR_PX,
       gap: DRAWER_GAP_PX,
       topGap: DRAWER_TOP_GAP_PX,
       playerBottom: findPlayerBottom(this.el),
       minExpanded: DRAWER_MIN_EXPANDED_PX,
     });
+    return Math.min(cap, this.measureDragCapPx());
   }
 
   measureDragCapPx() {
-    return window.innerHeight;
+    return computeDragCapPx(window.innerHeight, measureStickyHeaderBottom());
   }
 
   #reconcilePlacement() {
@@ -301,6 +313,7 @@ class Drawer {
   #bindDrag() {
     let dragStartY = null;
     let dragStartHeight = null;
+    let dragCap = null;
     let activePointerId = null;
     let captureEl = null;
 
@@ -314,10 +327,9 @@ class Drawer {
     };
     const onPointerMove = (event) => {
       if (dragStartY == null) return;
-      const cap = this.measureDragCapPx();
       const delta = dragStartY - event.clientY;
 
-      pendingHeight = Math.min(Math.max(dragStartHeight + delta, DRAWER_FLOOR_PX), cap);
+      pendingHeight = Math.min(Math.max(dragStartHeight + delta, DRAWER_FLOOR_PX), dragCap);
       if (rafId == null) rafId = requestAnimationFrame(flush);
     };
 
@@ -355,6 +367,7 @@ class Drawer {
       if (surface === this.headerEl && (!this.expanded || interactiveInHeader(event.target))) return;
       dragStartY = event.clientY;
       dragStartHeight = this.el.getBoundingClientRect().height;
+      dragCap = this.measureDragCapPx();
 
       activePointerId = event.pointerId;
       captureEl = surface;
