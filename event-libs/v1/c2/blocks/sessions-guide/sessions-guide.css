@@ -3452,6 +3452,13 @@
   }
 }
 
+/* Per-button backdrop blur causes paint artifacts while native-scroll cards resize. */
+@media (max-width: 1279px) {
+  .sg-full-page .sg-card .sg-icon-btn {
+    backdrop-filter: none;
+  }
+}
+
 /* Large desktop (Figma 8463-87634): even wider content gutter than the 1280px tier's 156px.
    Live card stays 1156px at this size too — no override needed. */
 @media (min-width: 1920px) {
