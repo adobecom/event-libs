@@ -312,13 +312,17 @@ DOM is confirmed.
   smaller — the minimum floor wins in that edge case, over strict
   title/player avoidance.
   - The chevron toggle jumps between two fixed states: fully collapsed
-    (`DRAWER_FLOOR_PX`, 75px) and the cap above.
-  - The handle bar (`.session-video-playlist-handle`) supports real drag-to-resize
-    via Pointer Events (`Drawer`'s own `#bindDrag`) — dragging moves the
-    drawer freely between those same two bounds, snapping to whichever
-    fixed state is closer once released, so the toggle button's own
-    `aria-expanded`/chevron rotation always end up correct regardless of
-    whether the user tapped or dragged.
+    (`DRAWER_FLOOR_PX`, 95px) and the cap above.
+  - The handle bar (`.session-video-playlist-handle`, shown once expanded) and the
+    expanded header support drag-to-resize via Pointer Events (`Drawer`'s own
+    `#bindDrag`). Dragging may deliberately go past the title/player cap above, but
+    stops at the bottom of the sticky GNAV (`header.global-navigation`, see
+    `computeDragCapPx`/`measureStickyHeaderBottom`) — the GNAV paints above the drawer
+    and is transparent at the top of the page, so the playlist title would otherwise
+    slide under it (MWPW-212370). On release, a drawer dragged below the midpoint
+    between the collapsed height and the toggle's cap collapses; otherwise it stays at
+    the dragged height. Either way the toggle's `aria-expanded`/chevron rotation end up
+    correct regardless of whether the user tapped or dragged.
   - An authored `background` row (see Authoring above) only ever applies
     at desktop — set as the `--vp-authored-bg` custom property, not a
     direct inline `background`, specifically so it can't outrank (via
