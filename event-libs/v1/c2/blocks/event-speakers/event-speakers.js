@@ -1,4 +1,5 @@
-import { createTag } from '../../../utils/utils.js';
+import { createTag, getMetadata } from '../../../utils/utils.js';
+import { sortSessionSpeakers } from '../../../utils/session-speakers.js';
 import { getJsonMetadata } from '../../utils/custom-attributes.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
 
@@ -51,7 +52,8 @@ export default async function init(el) {
   el.append(title);
 
   const list = createTag('ul', { class: 'speakers-list' });
-  speakers.forEach((s, i) => {
+  // The metadata arrives in speakerId order; RainFocus order puts the right five above the fold.
+  sortSessionSpeakers(speakers, getMetadata('session-code')).forEach((s, i) => {
     const item = createTag('li', { class: 'speaker' });
     if (i >= VISIBLE_LIMIT) item.classList.add('is-overflow');
     const info = createTag('div', { class: 'speaker-info' });
