@@ -4,6 +4,7 @@ import {
 } from '../../utils/utils.js';
 import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
+import { sortSessionSpeakers } from '../../utils/session-speakers.js';
 
 // Catalog URLs always carry prod's host; on non-prod pages point them at the current origin instead.
 export function sessionPageUrlForEnv(
@@ -371,9 +372,8 @@ export function mapEslPayloadToRawSessions(payload) {
       .sort((a, b) => (a.startTimeMillis ?? 0) - (b.startTimeMillis ?? 0));
     const [firstTime] = times;
 
-    const speakers = (session.speakers || [])
-      .slice()
-      .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+    // Sorted as refs: only they carry speakerType and ordinal, not the speaker details.
+    const speakers = sortSessionSpeakers(session.speakers || [], describeRawSession(session))
       .map((ref) => speakersById.get(ref.speakerId))
       .filter(Boolean)
       .map((sp) => ({
