@@ -22,6 +22,31 @@ function backgroundRow(value) {
   return row;
 }
 
+// GS1 (Opening Keynote) metadata as deployed today: ascending speakerId.
+const GS1 = [
+  ['364ea287-e809-4566-8400-c7e83859c9b2', 'Shantanu', 'Narayen', 'Speaker', 1],
+  ['3d857617-fe36-427d-a27d-b632a4a90f9e', 'Kelly', 'Weldon', 'Presenter', 3],
+  ['57b02520-38f8-44c1-be63-272325b4bf1e', 'Veronica', 'Peitong Chen', 'Presenter', 5],
+  ['695ea5ff-d1c5-4206-a2fd-0c38ca030f7d', 'Elise', 'Swopes', 'Presenter', 2],
+  ['698544f0-44d1-4af4-b894-3ffbca7bc76d', 'Forest', 'Key', 'Presenter', 9],
+  ['731f5245-171d-4569-b07f-f7c22a97ba5f', 'Paul', 'Trani', 'Presenter', 4],
+  ['803dff5b-dd89-477f-b41b-652455417b90', 'Michael', 'Fugoso', 'Presenter', 6],
+  ['812777ae-407a-40cb-9361-3c72ca793e0f', 'Anil', 'Chakravarthy', 'Speaker', 2],
+  ['8b77192a-24f4-4890-866d-71c097e72a31', 'Lucy', 'Street', 'Presenter', 8],
+  ['9f3e7822-48f6-4dd4-931b-ddf26aeaba6b', 'Anna', 'McNaught', 'Presenter', 1],
+  ['bdfa2e45-0c4e-4060-8a51-b2948fdad4e5', 'Deepa', 'Subramaniam', 'Presenter', 10],
+  ['ef1e7f75-813e-4dcc-a8d7-f906758e7c76', 'Dacia', 'Sáenz', 'Presenter', 7],
+].map(([speakerId, firstName, lastName, speakerType, ordinal]) => ({
+  speakerId,
+  firstName,
+  lastName,
+  speakerType,
+  ordinal,
+}));
+
+const renderedNames = (el, selector = '.speaker-name') => [...el.querySelectorAll(selector)]
+  .map((node) => node.textContent);
+
 describe('Speakers', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
@@ -123,5 +148,52 @@ describe('Speakers', () => {
     const el = block();
     await init(el);
     expect(el.style.background).to.equal('');
+  });
+
+  // MWPW-212902: RainFocus lists the Speakers first, then the Co-Presenters ('Presenter'),
+  // each by its own ordinal, so Anil is no longer hidden behind Show more.
+  it('orders GS1 by role, then ordinal, with both Speakers above the fold', async () => {
+    setSpeakers(GS1);
+    const el = block();
+    await init(el);
+    expect(renderedNames(el)).to.deep.equal([
+      'Shantanu Narayen', 'Anil Chakravarthy', 'Anna McNaught', 'Elise Swopes', 'Kelly Weldon',
+      'Paul Trani', 'Veronica Peitong Chen', 'Michael Fugoso', 'Dacia Sáenz', 'Lucy Street',
+      'Forest Key', 'Deepa Subramaniam',
+    ]);
+    expect(renderedNames(el, '.speaker:not(.is-overflow) .speaker-name')).to.deep.equal([
+      'Shantanu Narayen', 'Anil Chakravarthy', 'Anna McNaught', 'Elise Swopes', 'Kelly Weldon',
+    ]);
+    expect(el.querySelector('.speakers-count').textContent).to.equal(' (12)');
+  });
+
+  it('orders S6331 by ordinal within the Speaker role', async () => {
+    setSpeakers([
+      { firstName: 'Nathan', lastName: 'Goldman', speakerType: 'Speaker', ordinal: 2 },
+      { firstName: 'Dan', lastName: 'Kuhlken', speakerType: 'Speaker', ordinal: 1 },
+    ]);
+    const el = block();
+    await init(el);
+    expect(renderedNames(el)).to.deep.equal(['Dan Kuhlken', 'Nathan Goldman']);
+  });
+
+  it('labels the fallback diagnostic with the page session code', async () => {
+    setMetadata('session-code', 'S1234');
+    setSpeakers([
+      { firstName: 'Mo', lastName: 'Derator', speakerType: 'Host', ordinal: 1 },
+      { firstName: 'Ada', lastName: 'Lovelace', speakerType: 'Speaker', ordinal: 1 },
+    ]);
+    const logged = [];
+    const originalLana = window.lana;
+    window.lana = { log: (msg) => logged.push(msg) };
+    const el = block();
+    try {
+      await init(el);
+    } finally {
+      window.lana = originalLana;
+    }
+    expect(renderedNames(el)).to.deep.equal(['Ada Lovelace', 'Mo Derator']);
+    expect(logged).to.have.lengthOf(1);
+    expect(logged[0]).to.include('[session-speakers] S1234: 1 of 2 speaker(s)');
   });
 });
