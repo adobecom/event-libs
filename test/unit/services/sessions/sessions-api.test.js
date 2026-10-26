@@ -328,6 +328,76 @@ describe('services/sessions/sessions-api', () => {
     });
   });
 
+  // MWPW-212902: RF's displayorder restarts at 1 in every role, so ordinal alone can't order a
+  // session with both Speakers and Co-Presenters (ESP speakerType 'Presenter').
+  describe('mapEslPayloadToRawSessions speaker order', () => {
+    // GS1 (Opening Keynote) as ESP returns it today: refs in ascending speakerId order.
+    const GS1 = [
+      ['364ea287-e809-4566-8400-c7e83859c9b2', 'Shantanu Narayen', 'Speaker', 1],
+      ['3d857617-fe36-427d-a27d-b632a4a90f9e', 'Kelly Weldon', 'Presenter', 3],
+      ['57b02520-38f8-44c1-be63-272325b4bf1e', 'Veronica Peitong Chen', 'Presenter', 5],
+      ['695ea5ff-d1c5-4206-a2fd-0c38ca030f7d', 'Elise Swopes', 'Presenter', 2],
+      ['698544f0-44d1-4af4-b894-3ffbca7bc76d', 'Forest Key', 'Presenter', 9],
+      ['731f5245-171d-4569-b07f-f7c22a97ba5f', 'Paul Trani', 'Presenter', 4],
+      ['803dff5b-dd89-477f-b41b-652455417b90', 'Michael Fugoso', 'Presenter', 6],
+      ['812777ae-407a-40cb-9361-3c72ca793e0f', 'Anil Chakravarthy', 'Speaker', 2],
+      ['8b77192a-24f4-4890-866d-71c097e72a31', 'Lucy Street', 'Presenter', 8],
+      ['9f3e7822-48f6-4dd4-931b-ddf26aeaba6b', 'Anna McNaught', 'Presenter', 1],
+      ['bdfa2e45-0c4e-4060-8a51-b2948fdad4e5', 'Deepa Subramaniam', 'Presenter', 10],
+      ['ef1e7f75-813e-4dcc-a8d7-f906758e7c76', 'Dacia Sáenz', 'Presenter', 7],
+    ].map(([speakerId, name, speakerType, ordinal]) => ({ speakerId, name, speakerType, ordinal }));
+
+    // Speaker details carry no role or ordinal; only the session's refs do.
+    const toDetail = ({ speakerId, name }) => ({ speakerId, firstName: name });
+    const toRef = ({ speakerId, speakerType, ordinal }) => ({ speakerId, speakerType, ordinal });
+
+    function mappedNames(rows, sessionCode) {
+      const [session] = mapEslPayloadToRawSessions({
+        speakers: rows.map(toDetail),
+        sessions: [{
+          sessionId: 'gs1',
+          sessionCode,
+          customAttributes: [ONLINE_FORMAT],
+          speakers: rows.map(toRef),
+        }],
+      });
+      return session.speakers.map((sp) => sp.name);
+    }
+
+    it('lists GS1 Speakers first, then Co-Presenters, each by ordinal', () => {
+      expect(mappedNames(GS1, 'GS1')).to.deep.equal([
+        'Shantanu Narayen', 'Anil Chakravarthy', 'Anna McNaught', 'Elise Swopes', 'Kelly Weldon',
+        'Paul Trani', 'Veronica Peitong Chen', 'Michael Fugoso', 'Dacia Sáenz', 'Lucy Street',
+        'Forest Key', 'Deepa Subramaniam',
+      ]);
+    });
+
+    it('orders S6331 by ordinal within the Speaker role', () => {
+      expect(mappedNames([
+        { speakerId: 'nathan', name: 'Nathan Goldman', speakerType: 'Speaker', ordinal: 2 },
+        { speakerId: 'dan', name: 'Dan Kuhlken', speakerType: 'Speaker', ordinal: 1 },
+      ], 'S6331')).to.deep.equal(['Dan Kuhlken', 'Nathan Goldman']);
+    });
+
+    it('names the session in the one diagnostic a fallback logs', () => {
+      const logged = [];
+      const originalLana = window.lana;
+      window.lana = { log: (msg) => logged.push(msg) };
+      let names;
+      try {
+        names = mappedNames([
+          { speakerId: 'moderator', name: 'Mo Derator', speakerType: 'Host', ordinal: 1 },
+          { speakerId: 'speaker', name: 'Ada Lovelace', speakerType: 'Speaker', ordinal: 1 },
+        ], 'S1234');
+      } finally {
+        window.lana = originalLana;
+      }
+      expect(names).to.deep.equal(['Ada Lovelace', 'Mo Derator']);
+      expect(logged).to.have.lengthOf(1);
+      expect(logged[0]).to.include('[session-speakers] S1234 "(untitled)" [gs1]: 1 of 2 speaker(s)');
+    });
+  });
+
   // Full combination table (PM, 2026-08-26) — see docs/sessions-guide-implementation-notes.md.
   // Online and On demand, post event are mutually exclusive: a session is either online
   // (optionally also in-person), or an in-person-only session whose recording lands later.
