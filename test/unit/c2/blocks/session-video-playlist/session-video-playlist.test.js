@@ -4,6 +4,8 @@ import init, {
   getVideoProgress,
   computeProgressPercent,
   computeDrawerCapPx,
+  computeDragCapPx,
+  measureStickyHeaderBottom,
   clampedTitleBottom,
   resolveTopicPlaylist,
   resolveCurrentSessionTopics,
@@ -201,6 +203,44 @@ describe('session-video-playlist', () => {
       // Scrolled down: title's getBoundingClientRect top/bottom go negative, so titleCap
       // would balloon past the viewport — the drawer must stay within viewport - gap.
       expect(computeDrawerCapPx(1000, -300, { gap: 16, topGap: 100 })).to.equal(900);
+    });
+  });
+
+  describe('computeDragCapPx', () => {
+    it('stops the drag at the bottom of the sticky GNAV', () => {
+      expect(computeDragCapPx(560, 80)).to.equal(480);
+    });
+
+    it('allows the full viewport when there is no header or it is scrolled away', () => {
+      expect(computeDragCapPx(560, 0)).to.equal(560);
+      expect(computeDragCapPx(560, -40)).to.equal(560);
+      expect(computeDragCapPx(560, undefined)).to.equal(560);
+    });
+  });
+
+  describe('measureStickyHeaderBottom', () => {
+    let header;
+
+    afterEach(() => header?.remove());
+
+    it('returns 0 when the page has no GNAV', () => {
+      expect(measureStickyHeaderBottom()).to.equal(0);
+    });
+
+    it('returns the bottom edge of the GNAV', () => {
+      header = document.createElement('header');
+      header.className = 'global-navigation';
+      header.style.cssText = 'position: fixed; top: 0; left: 0; height: 80px; width: 100px;';
+      document.body.append(header);
+      expect(measureStickyHeaderBottom()).to.equal(80);
+    });
+
+    it('returns 0 when the GNAV is above the viewport', () => {
+      header = document.createElement('header');
+      header.className = 'global-navigation';
+      header.style.cssText = 'position: fixed; top: -200px; left: 0; height: 80px; width: 100px;';
+      document.body.append(header);
+      expect(measureStickyHeaderBottom()).to.equal(0);
     });
   });
 

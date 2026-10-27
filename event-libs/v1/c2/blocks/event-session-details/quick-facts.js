@@ -7,6 +7,7 @@ const QUICK_FACTS = [
   { label: 'AI Focus', name: 'AI Focus' },
   { label: 'Audience', name: 'Audience' },
   { label: 'Category', name: 'Programming Category' },
+  { label: 'Category', name: 'Category' }, // Authoring has renamed "Programming Category" to "Category"
 ];
 
 export function renderQuickFacts(doc = document) {

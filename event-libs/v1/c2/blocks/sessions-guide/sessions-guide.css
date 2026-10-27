@@ -3266,7 +3266,7 @@
   /* Card hover always darkens to gray-900 (see .is-scheduled/.is-favorited:is(:hover...)
      above); all three buttons become a solid white pill with a black icon so they read
      clearly against it, per Figma (MWPW-207192). The button swaps between the
-     --outlined (unfavorited/unscheduled) and --solid (favorited/scheduled/play)
+     --outlined (unfavorited/unscheduled/play) and --solid (favorited/scheduled)
      icon-button variants, so both are covered here; classes are repeated to outrank
      each variant's own rule below, which would otherwise still win on `color` and
      paint the icon white-on-white. */
@@ -3274,8 +3274,7 @@
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule,
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play,
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite,
-  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule,
-  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play {
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule {
     background: #fff;
     border-color: #fff;
     color: #000;
@@ -3288,8 +3287,7 @@
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule:hover:not(:disabled),
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play:hover:not(:disabled),
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite:hover:not(:disabled),
-  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule:hover:not(:disabled),
-  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play:hover:not(:disabled) {
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule:hover:not(:disabled) {
     background: rgb(255 255 255 / 64%);
     border-color: #fff;
   }
@@ -3298,8 +3296,7 @@
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--schedule:active:not(:disabled),
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light.sg-card__btn--play:active:not(:disabled),
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--favorite:active:not(:disabled),
-  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule:active:not(:disabled),
-  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--play:active:not(:disabled) {
+  .sg-card:is(:hover, :focus-within) .sg-icon-btn--solid.sg-icon-btn--on-light.sg-card__btn--schedule:active:not(:disabled) {
     background: #fff;
     border-color: transparent;
   }
@@ -3452,6 +3449,13 @@
   .sg-full-page .sg-header-title-row,
   .sg-full-page .sg-header-controls {
     padding: 0 var(--s2a-spacing-lg);
+  }
+}
+
+/* Per-button backdrop blur causes paint artifacts while native-scroll cards resize. */
+@media (max-width: 1279px) {
+  .sg-full-page .sg-card .sg-icon-btn {
+    backdrop-filter: none;
   }
 }
 

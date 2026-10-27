@@ -190,7 +190,7 @@ export function SessionCard({
       </div>
       <div class="sg-card__actions" data-time=${timeLabel} daa-ll="" onclick=${(e) => e.stopPropagation()} ontouchend=${handleActionsTouchEnd}>
         ${forceOnDemand && html`<${IconButton}
-          variant="solid"
+          variant="outlined"
           context="on-light"
           size="md"
           extraClass="sg-card__btn--play"
