@@ -4,6 +4,7 @@ import { readFile, setViewport } from '@web/test-runner-commands';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import { sessions } from '../../../../event-libs/v1/utils/session-store.js';
 import init from '../../../../event-libs/v1/c2/blocks/event-marquee/event-marquee.js';
+import { decorateAnchorVideo } from './mocks/libs/utils/decorate.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 
@@ -79,6 +80,77 @@ describe('event-marquee', () => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
     sessions.value = [];
+    decorateAnchorVideo.resetHistory();
+  });
+
+  describe('ambient background video decoration', () => {
+    it('re-decorates controlled videos in each background cell as ambient videos through Milo', async () => {
+      document.body.innerHTML = `
+        <div class="event-marquee">
+          <div>
+            <div><video controls data-video-source="./mobile.mp4" poster="./poster.jpg"></video></div>
+            <div><video controls data-video-source="./desktop.mp4"></video></div>
+          </div>
+          <div>
+            <div><h2>Live now</h2></div>
+            <div><video controls src="./foreground.mp4"></video></div>
+          </div>
+        </div>`;
+      const el = document.querySelector('.event-marquee');
+      const originals = [...el.firstElementChild.querySelectorAll('video')];
+      await init(el);
+
+      expect(decorateAnchorVideo.callCount).to.equal(2);
+      ['./mobile.mp4', './desktop.mp4'].forEach((src, i) => {
+        const { src: decoratedSrc, anchorTag } = decorateAnchorVideo.getCall(i).args[0];
+        expect(decoratedSrc).to.equal(src);
+        expect(anchorTag.hash).to.equal('#autoplay');
+        expect(anchorTag.parentElement).to.equal(el.querySelector('.event-marquee-background').children[i]);
+        expect(originals[i].isConnected).to.be.false;
+      });
+      expect(decorateAnchorVideo.firstCall.args[0].anchorTag.dataset.videoPoster).to.equal('./poster.jpg');
+      expect(el.querySelector('.tablet-only.desktop-only')).to.exist;
+      expect(el.querySelector('.event-marquee-media video').hasAttribute('controls')).to.be.true;
+    });
+
+    [
+      ['the video src', '<video controls src="./background.mp4"></video>'],
+      ['a source element', '<video controls><source src="./background.mp4" type="video/mp4"></video>'],
+    ].forEach(([name, video]) => {
+      it(`resolves an ambient background source from ${name}`, async () => {
+        document.body.innerHTML = `
+          <div class="event-marquee">
+            <div><div>${video}</div></div>
+            <div><div><h2>Live now</h2></div></div>
+          </div>`;
+        await init(document.querySelector('.event-marquee'));
+        expect(decorateAnchorVideo.calledOnce).to.be.true;
+        expect(decorateAnchorVideo.firstCall.args[0].src).to.equal('./background.mp4');
+      });
+    });
+
+    it('preserves existing video holders and logs missing sources without replacing the video', async () => {
+      document.body.innerHTML = `
+        <div class="event-marquee">
+          <div>
+            <div><div class="video-container video-holder"><video controls src="./background.mp4"></video></div></div>
+            <div><video controls></video></div>
+          </div>
+          <div><div><h2>Live now</h2></div></div>
+        </div>`;
+      const el = document.querySelector('.event-marquee');
+      const originals = [...el.querySelectorAll('video')];
+      const warning = sinon.spy(window.lana, 'log');
+      try {
+        await init(el);
+        expect(decorateAnchorVideo.called).to.be.false;
+        expect([...el.querySelectorAll('video')]).to.deep.equal(originals);
+        expect(warning.calledOnce).to.be.true;
+        expect(warning.firstCall.args[0]).to.include('background video has no source');
+      } finally {
+        warning.restore();
+      }
+    });
   });
 
   describe('responsive styles', () => {
