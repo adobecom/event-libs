@@ -97,6 +97,19 @@ export function buildWatchUrl(path, sessionId, nowMs = getNowMs()) {
   return `${base}?${params}${hash}`;
 }
 
+// Forwards a test `?serverTime` to an absolute URL (e.g. an MPC player iframe) as the simulated
+// current time; returns `url` unchanged without one, or when it can't be parsed.
+export function withServerTime(url, nowMs = getNowMs()) {
+  if (!url || !new URLSearchParams(window.location.search).get('serverTime')) return url;
+  try {
+    const target = new URL(url);
+    target.searchParams.set('serverTime', String(nowMs));
+    return target.href;
+  } catch {
+    return url;
+  }
+}
+
 // Root-relative, falls back to MAX's pages for pre-authorable configs. `?watch=<id>` tells the
 // Broadcast page which session to commit to; omitted when session.id is absent (pseudo-sessions).
 export function getWatchDestination(session, sessionState, nowMs = getNowMs()) {

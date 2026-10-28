@@ -20,7 +20,7 @@ import {
   PLAYBACK_PHASE,
   buildSessionFromMetadata,
 } from '../../utils/video-session.js';
-import { getNowMs } from '../../../utils/session-state.js';
+import { getNowMs, withServerTime } from '../../../utils/session-state.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
 import { guardPlayerScroll } from '../../utils/player-scroll-guard.js';
 import {
@@ -118,7 +118,7 @@ function buildMiloVideo(video) {
     return container;
   }
   createTag('iframe', {
-    src: video.url,
+    src: withServerTime(video.url),
     class: 'adobetv',
     webkitallowfullscreen: '',
     mozallowfullscreen: '',
