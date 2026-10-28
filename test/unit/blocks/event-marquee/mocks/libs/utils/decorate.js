@@ -8,6 +8,14 @@ export function decorateButtons(el) {
 export async function decorateBlockBg(block, node, { className = 'background' } = {}) {
   if (node.querySelector('img, video, a[href*=".mp4"]') || node.childElementCount > 1) {
     node.classList.add(className);
+    const viewports = node.childElementCount === 2
+      ? [['mobile-only'], ['tablet-only', 'desktop-only']]
+      : [['mobile-only'], ['tablet-only'], ['desktop-only']];
+    [...node.children].forEach((child, i) => {
+      if (node.childElementCount > 1 && i < viewports.length) {
+        child.classList.add(...viewports[i]);
+      }
+    });
     return;
   }
   block.style.background = node.textContent;

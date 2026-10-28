@@ -81,7 +81,7 @@ describe('event-marquee', () => {
     sessions.value = [];
   });
 
-  describe('responsive heading and body paragraph widths', () => {
+  describe('responsive styles', () => {
     let originalViewport;
 
     before(() => {
@@ -104,6 +104,26 @@ describe('event-marquee', () => {
 
     afterEach(async () => {
       await setViewport(originalViewport);
+    });
+
+    [1, 2, 3].forEach((imageCount) => {
+      it(`shows only the matching background with ${imageCount} authored image cells when resizing`, async () => {
+        document.body.innerHTML = body;
+        const el = document.querySelector('.event-marquee');
+        const backgroundRow = el.firstElementChild;
+        backgroundRow.innerHTML = Array.from({ length: imageCount }, (_, i) => `
+          <div><picture><img src="./background.jpg" alt="Background ${i}"></picture></div>
+        `).join('');
+        await init(el);
+        const background = el.querySelector('.event-marquee-background');
+        for (const width of [375, 767, 768, 1279, 1280, 1440, 375]) {
+          await setViewport({ width, height: 900 });
+          const visible = [...background.children].filter((child) => getComputedStyle(child).display !== 'none');
+          const expectedIndex = width < 768 ? 0 : Math.min(imageCount - 1, width < 1280 ? 1 : 2);
+          expect(visible, `visible backgrounds at ${width}px`).to.have.lengthOf(1);
+          expect(visible[0]).to.equal(background.children[expectedIndex]);
+        }
+      });
     });
 
     [
