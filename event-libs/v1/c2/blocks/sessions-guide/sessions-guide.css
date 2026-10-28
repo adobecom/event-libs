@@ -476,6 +476,14 @@
   right: var(--s2a-spacing-xs);
 }
 
+/* Mobile: same spot as the drawer's own close button, so it doesn't jump when Filters opens (MWPW-211989). */
+@media (max-width: 767px) {
+  .sg-filter-panel__close {
+    top: 16px;
+    right: 16px;
+  }
+}
+
 /* ── Filter & Search Controls ────────────────────────────── */
 
 .sg-filter-wrap {
