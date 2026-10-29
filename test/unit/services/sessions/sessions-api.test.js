@@ -6,7 +6,7 @@ import {
   ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, getProductAttributeId, sessionPageUrlForEnv, parseDvrDelayHours,
   getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes, getSessionDescription,
-  reportDroppedSessions, fetchSessions,
+  reportDroppedSessions, fetchSessions, SESSION_CATALOG_TIMEOUT_MS, SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 import { setEventServiceEnvOverride } from '../../../../event-libs/v1/utils/utils.js';
 
@@ -1424,6 +1424,99 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     await fetchSessions('event-1');
     const [url] = fetchStub.firstCall.args;
     expect(url).to.equal('https://events-platform-prod-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
+  });
+
+  it('times out a stalled catalog request so it fails and can be retried (MWPW-213410)', async () => {
+    setEventServiceEnvOverride('prod');
+    const fetchStub = stubEmptyCatalog();
+    await fetchSessions('event-1');
+    const [, options] = fetchStub.firstCall.args;
+    expect(options.signal).to.be.instanceOf(AbortSignal);
+    expect(options.signal.aborted).to.equal(false);
+    expect(options.method).to.equal('GET');
+    expect(options.headers.get('x-api-key')).to.equal('acom_event_service');
+  });
+
+  it('still loads where AbortSignal.timeout is unsupported (Safari < 16)', async () => {
+    setEventServiceEnvOverride('prod');
+    sandbox.stub(AbortSignal, 'timeout').value(undefined);
+    const fetchStub = stubEmptyCatalog();
+    expect(await fetchSessions('event-1')).to.deep.equal([]);
+    expect(fetchStub.calledOnce).to.equal(true);
+  });
+
+  it('aborts the request once SESSION_CATALOG_TIMEOUT_MS passes without a response', async () => {
+    setEventServiceEnvOverride('prod');
+    const clock = sandbox.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let signal;
+    let fetchCalled;
+    const fetchStarted = new Promise((resolve) => { fetchCalled = resolve; });
+    sandbox.stub(window, 'fetch').callsFake((url, opts) => {
+      signal = opts.signal;
+      fetchCalled();
+      return new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      });
+    });
+    const pending = fetchSessions('event-1').catch((e) => e);
+    await fetchStarted;
+    clock.tick(SESSION_CATALOG_TIMEOUT_MS - 1);
+    expect(signal.aborted).to.equal(false);
+    clock.tick(1);
+    expect(signal.aborted).to.equal(true);
+    expect((await pending).name).to.equal('AbortError');
+  });
+
+  it('clears the timeout once the catalog has loaded', async () => {
+    setEventServiceEnvOverride('prod');
+    const clock = sandbox.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const fetchStub = stubEmptyCatalog();
+    await fetchSessions('event-1');
+    const [, options] = fetchStub.firstCall.args;
+    clock.tick(SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS * 2);
+    expect(options.signal.aborted).to.equal(false);
+  });
+
+  function stubSlowDownload(downloadMs) {
+    let signal;
+    let jsonCalled;
+    const downloadStarted = new Promise((resolve) => { jsonCalled = resolve; });
+    sandbox.stub(window, 'fetch').callsFake(async (url, opts) => {
+      signal = opts.signal;
+      return {
+        ok: true,
+        json: () => new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+          setTimeout(() => resolve({ sessions: [], sessionTimes: [], speakers: [], locations: [] }), downloadMs);
+          jsonCalled();
+        }),
+      };
+    });
+    return { downloadStarted, getSignal: () => signal };
+  }
+
+  it('lets a slow download run past SESSION_CATALOG_TIMEOUT_MS once the response has started', async () => {
+    setEventServiceEnvOverride('prod');
+    const clock = sandbox.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { downloadStarted, getSignal } = stubSlowDownload(SESSION_CATALOG_TIMEOUT_MS + 5000);
+    const pending = fetchSessions('event-1');
+    await downloadStarted;
+    clock.tick(SESSION_CATALOG_TIMEOUT_MS + 5000);
+    expect(await pending).to.deep.equal([]);
+    expect(getSignal().aborted).to.equal(false);
+  });
+
+  it('aborts a download that takes longer than SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS', async () => {
+    setEventServiceEnvOverride('prod');
+    const clock = sandbox.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { downloadStarted, getSignal } = stubSlowDownload(SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS * 2);
+    const pending = fetchSessions('event-1').catch((e) => e);
+    await downloadStarted;
+    clock.tick(SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS - 1);
+    expect(getSignal().aborted).to.equal(false);
+    clock.tick(1);
+    expect(getSignal().aborted).to.equal(true);
+    expect((await pending).name).to.equal('AbortError');
   });
 
   it('fetches from the stage CDN domain on stage', async () => {

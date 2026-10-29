@@ -177,8 +177,13 @@ function maybeLoadMyData() {
   loadMyData();
 }
 
-async function loadSessions() {
-  sessionsStatus.value = 'loading';
+// Delays before each retry of a failed catalog load (MWPW-213410). Status stays 'loading' until
+// one succeeds or they run out, so blocks keep their spinner instead of flashing an error. With
+// the 10s request timeout (sessions-api.js), the worst case reaches 'error' in about 37s.
+export const SESSIONS_RETRY_DELAYS_MS = [2000, 5000];
+
+async function loadSessions(attempt = 0) {
+  if (attempt === 0) sessionsStatus.value = 'loading';
   try {
     const fetched = await fetchSessions(eventApiConfig.eventId);
     // Batched so components reading both `sessions` and `sessionsStatus` re-render once.
@@ -199,7 +204,13 @@ async function loadSessions() {
     );
     maybeLoadMyData();
   } catch (err) {
-    logError('session-store,sessions', `sessions fetch failed for event ${eventApiConfig.eventId} on ${getEventServiceEnv()?.name}`, err);
+    const context = `sessions fetch failed for event ${eventApiConfig.eventId} on ${getEventServiceEnv()?.name} (attempt ${attempt + 1})`;
+    if (attempt < SESSIONS_RETRY_DELAYS_MS.length) {
+      logWarning('session-store,sessions', `${context}, retrying`, err);
+      setTimeout(() => loadSessions(attempt + 1), SESSIONS_RETRY_DELAYS_MS[attempt]);
+      return;
+    }
+    logError('session-store,sessions', context, err);
     sessionsStatus.value = 'error';
   }
 }
