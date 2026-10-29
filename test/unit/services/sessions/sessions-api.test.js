@@ -6,7 +6,7 @@ import {
   ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, getProductAttributeId, sessionPageUrlForEnv, parseDvrDelayHours,
   getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes, getSessionDescription,
-  reportDroppedSessions, fetchSessions,
+  reportDroppedSessions, fetchSessions, SESSION_CATALOG_TIMEOUT_MS,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 import { setEventServiceEnvOverride } from '../../../../event-libs/v1/utils/utils.js';
 
@@ -1435,6 +1435,46 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(options.signal.aborted).to.equal(false);
     expect(options.method).to.equal('GET');
     expect(options.headers.get('x-api-key')).to.equal('acom_event_service');
+  });
+
+  it('still loads where AbortSignal.timeout is unsupported (Safari < 16)', async () => {
+    setEventServiceEnvOverride('prod');
+    sandbox.stub(AbortSignal, 'timeout').value(undefined);
+    const fetchStub = stubEmptyCatalog();
+    expect(await fetchSessions('event-1')).to.deep.equal([]);
+    expect(fetchStub.calledOnce).to.equal(true);
+  });
+
+  it('aborts the request once SESSION_CATALOG_TIMEOUT_MS passes without a response', async () => {
+    setEventServiceEnvOverride('prod');
+    const clock = sandbox.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let signal;
+    let fetchCalled;
+    const fetchStarted = new Promise((resolve) => { fetchCalled = resolve; });
+    sandbox.stub(window, 'fetch').callsFake((url, opts) => {
+      signal = opts.signal;
+      fetchCalled();
+      return new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      });
+    });
+    const pending = fetchSessions('event-1').catch((e) => e);
+    await fetchStarted;
+    clock.tick(SESSION_CATALOG_TIMEOUT_MS - 1);
+    expect(signal.aborted).to.equal(false);
+    clock.tick(1);
+    expect(signal.aborted).to.equal(true);
+    expect((await pending).name).to.equal('AbortError');
+  });
+
+  it('clears the timeout once the catalog has loaded', async () => {
+    setEventServiceEnvOverride('prod');
+    const clock = sandbox.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const fetchStub = stubEmptyCatalog();
+    await fetchSessions('event-1');
+    const [, options] = fetchStub.firstCall.args;
+    clock.tick(SESSION_CATALOG_TIMEOUT_MS * 2);
+    expect(options.signal.aborted).to.equal(false);
   });
 
   it('fetches from the stage CDN domain on stage', async () => {

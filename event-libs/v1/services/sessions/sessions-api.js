@@ -445,22 +445,30 @@ export const SESSION_CATALOG_TIMEOUT_MS = 10000;
 // Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost.
 async function fetchEslSessions(eventId) {
   const options = await constructRequestOptions('GET', null, false, true);
-  let res;
+  // AbortController + setTimeout, not AbortSignal.timeout(): that's Safari 16+, and calling it on
+  // older browsers would throw and fail every attempt. The timer also covers reading the body.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SESSION_CATALOG_TIMEOUT_MS);
   try {
-    res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, {
-      ...options,
-      signal: AbortSignal.timeout(SESSION_CATALOG_TIMEOUT_MS),
-    });
-  } catch (err) {
-    logError('sessions-api', `network error fetching session catalog for event ${eventId}`, err);
-    throw err;
+    let res;
+    try {
+      res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, {
+        ...options,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      logError('sessions-api', `network error fetching session catalog for event ${eventId}`, err);
+      throw err;
+    }
+    if (!res.ok) {
+      logError('sessions-api', `session catalog fetch failed for event ${eventId}`, res);
+      throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
+    }
+    const payload = await res.json();
+    return mapEslPayloadToRawSessions(payload);
+  } finally {
+    clearTimeout(timer);
   }
-  if (!res.ok) {
-    logError('sessions-api', `session catalog fetch failed for event ${eventId}`, res);
-    throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
-  }
-  const payload = await res.json();
-  return mapEslPayloadToRawSessions(payload);
 }
 
 export async function fetchSessions(eventId) {
