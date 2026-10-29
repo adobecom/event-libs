@@ -102,7 +102,7 @@ function attachUpcomingSessionsWrapper(el) {
 
 export default async function init(el) {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
-  const [{ decorateButtons, decorateBlockBg }, config] = await Promise.all([
+  const [{ decorateButtons, decorateBlockBg, decorateAnchorVideo }, config] = await Promise.all([
     import(`${miloLibs}/utils/decorate.js`),
     getSectionConfig(el, miloLibs),
   ]);
@@ -128,9 +128,22 @@ export default async function init(el) {
     el._eventMarqueeCountdownStop = countdown.stop;
   }
 
-  // Reuses Milo's own background decoration (responsive per-viewport variants, focal
-  // point, solid-color fallback) — zero new code, same as MPC/YT/MR/ambient video.
   if (backgroundRow) {
+    // Milo defaults plain MP4 links to native controls outside its own marquee blocks.
+    backgroundRow.querySelectorAll('video[controls]').forEach((video) => {
+      if (video.closest('.video-holder')) return;
+      const src = video.dataset.videoSource || video.getAttribute('src')
+        || video.querySelector('source')?.getAttribute('src');
+      if (!src) {
+        logWarning('event-marquee', 'background video has no source');
+        return;
+      }
+      const anchorTag = createTag('a', { href: src });
+      anchorTag.hash = '#autoplay';
+      if (video.hasAttribute('poster')) anchorTag.dataset.videoPoster = video.getAttribute('poster');
+      video.replaceWith(anchorTag);
+      decorateAnchorVideo({ src, anchorTag });
+    });
     await decorateBlockBg(el, backgroundRow, {
       useHandleFocalpoint: true,
       className: 'event-marquee-background',
