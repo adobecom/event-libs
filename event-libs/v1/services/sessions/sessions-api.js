@@ -438,12 +438,19 @@ export function mapEslPayloadToRawSessions(payload) {
   return mapped;
 }
 
+// A stalled catalog request would otherwise leave the store in 'loading' with nothing to retry (MWPW-213410).
+// ~280 KB gzipped, so 10s covers slow mobile connections while keeping the retries under ~40s total.
+export const SESSION_CATALOG_TIMEOUT_MS = 10000;
+
 // Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost.
 async function fetchEslSessions(eventId) {
   const options = await constructRequestOptions('GET', null, false, true);
   let res;
   try {
-    res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, options);
+    res = await fetch(`${sessionCatalogHost(getEventServiceEnv().name)}/v1/events/${eventId}/session-catalog`, {
+      ...options,
+      signal: AbortSignal.timeout(SESSION_CATALOG_TIMEOUT_MS),
+    });
   } catch (err) {
     logError('sessions-api', `network error fetching session catalog for event ${eventId}`, err);
     throw err;

@@ -1426,6 +1426,17 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.equal('https://events-platform-prod-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
   });
 
+  it('times out a stalled catalog request so it fails and can be retried (MWPW-213410)', async () => {
+    setEventServiceEnvOverride('prod');
+    const fetchStub = stubEmptyCatalog();
+    await fetchSessions('event-1');
+    const [, options] = fetchStub.firstCall.args;
+    expect(options.signal).to.be.instanceOf(AbortSignal);
+    expect(options.signal.aborted).to.equal(false);
+    expect(options.method).to.equal('GET');
+    expect(options.headers.get('x-api-key')).to.equal('acom_event_service');
+  });
+
   it('fetches from the stage CDN domain on stage', async () => {
     setEventServiceEnvOverride('stage');
     const fetchStub = stubEmptyCatalog();
