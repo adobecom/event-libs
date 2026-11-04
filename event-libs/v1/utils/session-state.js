@@ -20,6 +20,10 @@ export function getNowMs() {
   return SERVER_TIME_ORIGIN + (Date.now() - PAGE_LOAD_MS);
 }
 
+export function shouldAvoidStreamEnd() {
+  return new URLSearchParams(window.location.search).get('avoidStreamEndFlag') === 'true';
+}
+
 const HOUR_MS = 3_600_000;
 
 // Unlock = sessionEnd + DVR delay, falling back to the event start when there is no session end.
