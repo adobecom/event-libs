@@ -1,5 +1,6 @@
 import { logWarning, logError } from '../../../../utils/lana-log.js';
 import { sessionDescriptionText } from './rich-text.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -82,7 +83,7 @@ export function generateICS(sessions) {
     if (s.sessionPageUrl) descParts.push(`Session page: ${s.sessionPageUrl}`);
 
     lines.push('BEGIN:VEVENT');
-    lines.push(foldLine(`UID:${s.id || crypto.randomUUID()}@sessions.adobe.com`));
+    lines.push(foldLine(`UID:${getSessionKey(s) || crypto.randomUUID()}@sessions.adobe.com`));
     lines.push(foldLine(`DTSTAMP:${dtstamp}`));
     lines.push(foldLine(`DTSTART:${dtstart}`));
     lines.push(foldLine(`DTEND:${dtend}`));

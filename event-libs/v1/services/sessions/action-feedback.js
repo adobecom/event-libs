@@ -7,6 +7,7 @@ import { getAllowDoubleBooking } from '../../utils/tier-1-event-config.js';
 import { sessions, sessionsStatus } from '../../utils/session-store.js';
 import { logError } from '../../utils/lana-log.js';
 import { trackAnalyticsEvent } from '../../utils/analytics.js';
+import { getSessionKey } from '../../utils/session-state.js';
 
 // Shared toast copy for gated actions, used by both runSessionAction's failures and checkViewAccess.
 // Post-event only sign-in is required (see assertAuthorized), so the copy drops "Register".
@@ -45,7 +46,7 @@ export async function runSessionAction(actionFn, {
         existing: conflict,
         incoming,
         onConfirm: async (keep) => {
-          if (keep.id === incoming.id) {
+          if (getSessionKey(keep) === getSessionKey(incoming)) {
             await resolveScheduleConflict(conflict, incoming);
             showToast({ message: 'Schedule updated', variant: 'positive' });
           }

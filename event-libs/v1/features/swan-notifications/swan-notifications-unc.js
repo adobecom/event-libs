@@ -10,7 +10,7 @@ import { getSwanConfig } from './swan-config.js';
 import { calculateSessionTimes, buildStageCampaignRule } from './swan-payload.js';
 import { registerReminderRule, deleteReminderRule } from './unc-client.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
-import { getNowMs } from '../../utils/session-state.js';
+import { getNowMs, getSessionKey } from '../../utils/session-state.js';
 
 // Per-rfCode: which single stage's rule is currently registered/active, and its campaignId
 // (needed to delete it once superseded). v2 because the shape changed from the previous
@@ -131,7 +131,7 @@ export async function reconcileSwanNotifications(getSessions, getScheduled) {
   try {
     const swanConfig = getSwanConfig();
     const now = getNowMs();
-    const sessionsById = new Map(getSessions().map((s) => [s.id, s]));
+    const sessionsById = new Map(getSessions().map((s) => [getSessionKey(s), s]));
     const scheduledSessions = [...getScheduled()]
       .map((id) => sessionsById.get(id))
       // A scheduled session absent from the catalog (e.g. filtered out by a published

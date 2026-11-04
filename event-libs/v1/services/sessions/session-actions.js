@@ -2,7 +2,7 @@ import {
   auth, sessions, scheduled, pendingActions, liveStreamActiveIds, toggleSchedule, toggleFavorite,
   getEventApiConfig,
 } from '../../utils/session-store.js';
-import { isPostEvent, getNowMs } from '../../utils/session-state.js';
+import { isPostEvent, getNowMs, getSessionKey } from '../../utils/session-state.js';
 import { RfAccessError } from './rainfocus.js';
 
 // Discriminated failure reason, kept UI-agnostic — callers decide their own toast/modal.
@@ -24,7 +24,8 @@ export function hasTimeConflict(a, b) {
 
 function findScheduleConflict(incoming, allSessions, scheduledIds) {
   return allSessions.find(
-    (s) => s.id !== incoming.id && scheduledIds.has(s.id) && hasTimeConflict(s, incoming),
+    (s) => getSessionKey(s) !== getSessionKey(incoming)
+      && scheduledIds.has(getSessionKey(s)) && hasTimeConflict(s, incoming),
   ) || null;
 }
 
@@ -44,9 +45,9 @@ export function assertAuthorized() {
 
 export async function toggleScheduleAction(session, { showConflictModal = false } = {}) {
   assertAuthorized();
-  if (pendingActions.value.has(session.id)) return;
+  if (pendingActions.value.has(getSessionKey(session)) || pendingActions.value.has(session.id)) return;
 
-  const isScheduled = scheduled.value.has(session.id);
+  const isScheduled = scheduled.value.has(getSessionKey(session));
   if (!isScheduled && showConflictModal) {
     const conflict = findScheduleConflict(session, sessions.value, scheduled.value);
     if (conflict) throw new SessionActionError('conflict', { conflict, incoming: session });

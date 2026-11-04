@@ -80,6 +80,29 @@ describe('BroadcastBody', () => {
     expect(out).to.include('aria-busy="false"');
   });
 
+  it('restores a persisted base-session selection to the live repeat rather than an expired card', () => {
+    sessionsStatus.value = 'ready';
+    const shared = { id: 'repeat', youTubeId: 'repeat-video', isOnline: true };
+    sessions.value = [
+      {
+        ...shared,
+        sessionTimeId: '81638256-b490-489c-8d72-b4d7b00ab29f',
+        startTimeUtc: new Date(Date.now() - 3 * HOUR).toISOString(),
+        endTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
+      },
+      {
+        ...shared,
+        sessionTimeId: 'e00d6647-034d-48b1-a77f-06d24415b474',
+        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
+        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
+      },
+    ];
+    history.replaceState({ session: 'repeat' }, '', window.location.pathname);
+    const out = BroadcastBody({ config: CONFIG });
+    expect(out).to.include('class="sb-live"');
+    expect(out).to.not.include('sb-ended');
+  });
+
   describe('live player background', () => {
     beforeEach(() => {
       sessionsStatus.value = 'ready';

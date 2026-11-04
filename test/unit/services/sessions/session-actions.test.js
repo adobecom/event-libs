@@ -25,6 +25,27 @@ describe('services/sessions/session-actions', () => {
         .with.property('reason', 'auth-required');
     });
 
+    it('detects an overlapping scheduled sibling time as a conflict, not the same card', async () => {
+      auth.value = { isLoggedIn: true, isRegistered: true };
+      const first = {
+        id: 's-1', sessionId: 's-1', sessionTimeId: 'first-time',
+        startTimeUtc: '2099-01-01T10:00:00Z', endTimeUtc: '2099-01-01T11:00:00Z',
+      };
+      const second = {
+        ...first, sessionTimeId: 'second-time', startTimeUtc: '2099-01-01T10:30:00Z',
+      };
+      sessions.value = [first, second];
+      scheduled.value = new Set([first.sessionTimeId]);
+      try {
+        await toggleScheduleAction(second, { showConflictModal: true });
+        expect.fail('Expected a time conflict');
+      } catch (error) {
+        expect(error.reason).to.equal('conflict');
+        expect(error.meta.conflict).to.equal(first);
+        expect(error.meta.incoming).to.equal(second);
+      }
+    });
+
     it('throws registration-required when logged in but not registered, pre/during event', () => {
       auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
       sessions.value = [

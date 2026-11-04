@@ -1,4 +1,4 @@
-import { deriveSessionState, getNowMs } from '../../utils/session-state.js';
+import { deriveSessionState, getNowMs, getSessionKey } from '../../utils/session-state.js';
 
 // Detects session-state transitions (upcoming/live/on-demand) driven purely by time
 // passing, not by a signal write — the gap being that liveStreamActiveIds only changes
@@ -17,8 +17,9 @@ function computeAndMaybeNotify(getSessions, getLiveStreamActiveIds, onChange, ge
   let changed = false;
   sessionsList.forEach((s) => {
     const state = deriveSessionState(s, liveIds, now);
-    if (_lastStates.get(s.id) !== state) changed = true;
-    _lastStates.set(s.id, state);
+    const key = getSessionKey(s);
+    if (_lastStates.get(key) !== state) changed = true;
+    _lastStates.set(key, state);
   });
   if (changed) onChange();
   // Unlike onChange, fires on every tick regardless of whether the coarse

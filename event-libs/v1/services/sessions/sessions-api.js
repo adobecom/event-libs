@@ -42,6 +42,9 @@ function normalizeSession(s) {
   const description = normalizeMultilineText(s.description);
   return {
     id: s.id || '',
+    sessionId: s.sessionId || s.id || '',
+    sessionTimeId: s.sessionTimeId || '',
+    sessionTimes: s.sessionTimes || [],
     // What an author searches RainFocus by; not to be confused with rfCode/rfSessionId.
     sessionCode: s.sessionCode || '',
     rfCode: s.rfCode || '',
@@ -365,12 +368,11 @@ export function mapEslPayloadToRawSessions(payload) {
     candidates.push({ session, formatFlags });
   });
 
-  const mapped = candidates.map(({ session, formatFlags }) => {
+  const mapped = candidates.flatMap(({ session, formatFlags }) => {
     // Real rows can have no sessionTime yet; time.js is guarded for the '' that follows.
     const times = (timesBySessionId.get(session.sessionId) || [])
       .slice()
       .sort((a, b) => (a.startTimeMillis ?? 0) - (b.startTimeMillis ?? 0));
-    const [firstTime] = times;
 
     // Sorted as refs: only they carry speakerType and ordinal, not the speaker details.
     const speakers = sortSessionSpeakers(session.speakers || [], describeRawSession(session))
@@ -387,16 +389,14 @@ export function mapEslPayloadToRawSessions(payload) {
     const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
     const { values: customAttributeValues, labels: customAttributeLabels } = buildCustomAttributeMaps(session);
 
-    return {
+    const shared = {
       id: session.sessionId,
+      sessionId: session.sessionId,
+      sessionTimes: times,
       sessionCode: session.sessionCode || '',
-      // Per-time-slot id, used for scheduling. Favoriting uses rfSessionId.
-      rfCode: stripRfPrefix(firstTime?.externalSessionTimeId),
       rfSessionId: stripRfPrefix(session.externalSessionId),
       title: session.localizations?.['en-US']?.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || '',
-      startTimeUtc: firstTime ? new Date(firstTime.startTimeMillis).toISOString() : '',
-      endTimeUtc: firstTime ? new Date(firstTime.endTimeMillis).toISOString() : '',
       duration: session.sessionLengthInMinutes || 0,
       primaryTrack: extractCustomAttributeValue(session, PRIMARY_TRACK_ATTRIBUTE_NAMES),
       trackOverride: extractCustomAttributeValue(session, 'Override Primary Event Site Track'),
@@ -432,6 +432,16 @@ export function mapEslPayloadToRawSessions(payload) {
       customAttributeValues,
       customAttributeLabels,
     };
+    return (times.length ? times : [null]).map((time) => {
+      const rfCode = stripRfPrefix(time?.externalSessionTimeId);
+      return {
+        ...shared,
+        sessionTimeId: time?.sessionTimeId || '',
+        rfCode,
+        startTimeUtc: time ? new Date(time.startTimeMillis).toISOString() : '',
+        endTimeUtc: time ? new Date(time.endTimeMillis).toISOString() : '',
+      };
+    });
   });
 
   reportDroppedSessions(dropped);

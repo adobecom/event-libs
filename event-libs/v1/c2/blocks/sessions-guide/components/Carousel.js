@@ -1,5 +1,6 @@
 import { html, useState, useRef, useEffect } from '../../../../deps/htm-preact.js';
 import { LiveCard } from './LiveCard.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 import {
   handOffArrowFocus, lastFullyVisible, maxPageOffset, measureCards, previousPageStart,
   scrollEdges, scrollToAdjacent, watchScrollEdges, widthTransitionRunning,
@@ -168,7 +169,7 @@ export function Carousel({
           <div class="sg-carousel__cards" ref=${stripRef} style=${'transform:translateX(-' + translateX + 'px)'}>
             ${sessions.map((s, i) => html`<div
               class="sg-carousel__card-wrap"
-              key=${s.id}
+              key=${getSessionKey(s)}
               inert=${paged && (i < clampedOffset || i > lastVisible) ? true : undefined}
             ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} showDurationBadge=${showDurationBadge} showDescription=${showDescription} forceLive=${forceLive} daaLlSuffix=${cardDaaLlSuffix} /></div>`)}
           </div>

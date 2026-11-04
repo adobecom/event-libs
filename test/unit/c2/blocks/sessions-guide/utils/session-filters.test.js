@@ -183,6 +183,16 @@ describe('session-filters/excludeOnDemandFormat', () => {
 });
 
 describe('session-filters/getRecommendedSessions', () => {
+  it('retains both time entries for a recommended session without changing their shared id', () => {
+    const first = { ...LIVE, sessionTimeId: 'first-time' };
+    const second = { ...first, sessionTimeId: 'second-time' };
+    const entries = [first, second];
+    expect(getRecommendedSessions(entries, [LIVE.id], LIVE_DAY, TZ)).to.deep.equal(entries);
+    expect(getOnDemandRecommendedSessions(entries, [LIVE.id])).to.deep.equal(entries);
+    expect(getRecommendedSessions(entries, [second.sessionTimeId], LIVE_DAY, TZ))
+      .to.deep.equal([second]);
+  });
+
   it('returns sessions matching recommendedIds for the active day', () => {
     const result = getRecommendedSessions([LIVE, UPCOMING, PAST], ['live', 'past'], LIVE_DAY, TZ);
     expect(result.map((s) => s.id)).to.include('live');

@@ -22,6 +22,17 @@ export function getNowMs() {
 
 const HOUR_MS = 3_600_000;
 
+export function getSessionKey(session) {
+  return session?.sessionTimeId || session?.id;
+}
+
+export function hasMultipleSessionTimes(session) {
+  const windows = new Set((session?.sessionTimes || [])
+    .filter((time) => Number.isFinite(time.startTimeMillis) && Number.isFinite(time.endTimeMillis))
+    .map((time) => `${time.startTimeMillis}:${time.endTimeMillis}`));
+  return windows.size > 1;
+}
+
 // Unlock = sessionEnd + DVR delay, falling back to the event start when there is no session end.
 export function dvrAvailableAtMs(session, eventStartMs) {
   if (session?.dvrDelayHours == null) return null;
@@ -39,7 +50,7 @@ export function isDvrPending(session, nowMs, eventStartMs) {
   return availableAt !== null && nowMs < availableAt;
 }
 
-// MR poll results for mrStreamId sessions, pure time-window for the rest. Computed fresh, never stored.
+// Single-slot MR sessions use polling; repeated slots and non-MR use their own time window.
 export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
   // Never airing, so neither the clock nor an active MR stream applies.
   if (session.hasOnDemandFormat) return 'on-demand';
@@ -47,7 +58,7 @@ export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
   const start = Date.parse(session.startTimeUtc);
   const end = Date.parse(session.endTimeUtc);
 
-  if (session.mrStreamId) {
+  if (session.mrStreamId && !hasMultipleSessionTimes(session)) {
     // Inactive in the poll = on-demand regardless of time.
     if (!liveStreamActiveIds.has(session.mrStreamId)) {
       return nowMs < start ? 'upcoming' : 'on-demand';
@@ -63,6 +74,9 @@ export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
 // Only MR sessions past their start time and active in the MR API.
 export function isInLiveNow(session, liveStreamActiveIds, nowMs) {
   if (!session.mrStreamId) return false;
+  if (hasMultipleSessionTimes(session)) {
+    return deriveSessionState(session, liveStreamActiveIds, nowMs) === 'live';
+  }
   const start = Date.parse(session.startTimeUtc);
   return nowMs >= start && liveStreamActiveIds.has(session.mrStreamId);
 }
@@ -107,7 +121,7 @@ export function getWatchDestination(session, sessionState, nowMs = getNowMs()) {
   }
   if (session.isOnline) {
     const path = getBroadcastPath() || MAX_EVENT_PAGES.broadcast;
-    return buildWatchUrl(path, session.id, nowMs);
+    return buildWatchUrl(path, session.sessionId || session.id, nowMs);
   }
   return '';
 }

@@ -744,6 +744,37 @@ describe('session-state-view', () => {
       expect(primaryCtaSlot.querySelector('.session-schedule')).to.be.null;
     });
 
+    it('cycles a multi-time livestream CTA through every window without waiting for a poll', () => {
+      const now = Date.now();
+      const clock = sinon.useFakeTimers({ now, toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      setMetadata('session-id', 'sid');
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'Format', values: [{ value: 'online', label: 'Online' }] },
+        { name: 'Mobilerider Video ID (Livestream)', values: [{ value: 'stream' }] },
+      ]));
+      const times = [1000, 4000, 7000].map((offset) => ({
+        startTimeMillis: now + offset, endTimeMillis: now + offset + 1000,
+      }));
+      setMetadata('session-times', JSON.stringify([times[2], times[0], times[1]]));
+      const { statusSlot, primaryCtaSlot } = slots();
+      const stop = mountSessionState({ statusSlot, primaryCtaSlot });
+      try {
+        expect(primaryCtaSlot.querySelector('.session-schedule')).to.exist;
+        times.forEach(({ startTimeMillis, endTimeMillis }) => {
+          clock.tick(startTimeMillis + 501 - Date.now());
+          expect(statusSlot.textContent).to.equal('Live');
+          expect(primaryCtaSlot.querySelector('.session-watch-now')).to.exist;
+          clock.tick(endTimeMillis + 501 - Date.now());
+          expect(statusSlot.textContent).to.equal('On-demand');
+          expect(primaryCtaSlot.querySelector('.session-watch-now')).not.to.exist;
+        });
+        expect(primaryCtaSlot.children.length).to.equal(0);
+      } finally {
+        stop();
+        clock.restore();
+      }
+    });
+
     // Watch now is swapped in after Milo's analytics pass has already run, so it is the one
     // CTA that never gets auto-tagged — it has to carry daa-ll from construction.
     it('tags Watch now for analytics', async () => {

@@ -136,8 +136,9 @@ export function getRecommendedSessions(sessions, recommendedIds, activeDay, user
   const daySessions = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
 
   if (recommendedIds && recommendedIds.length > 0) {
-    const daySessionsById = new Map(daySessions.map((s) => [s.id, s]));
-    return recommendedIds.map((id) => daySessionsById.get(id)).filter(Boolean);
+    return recommendedIds.flatMap((id) => daySessions.filter(
+      (s) => s.id === id || s.sessionTimeId === id,
+    ));
   }
 
   return deterministicShuffle(daySessions, activeDay).slice(0, FALLBACK_RECOMMENDED_COUNT);
@@ -146,8 +147,9 @@ export function getRecommendedSessions(sessions, recommendedIds, activeDay, user
 // Same authored ids/order as getRecommendedSessions, but membership only: no day-scoping or shuffle.
 export function getOnDemandRecommendedSessions(sessions, recommendedIds) {
   if (!recommendedIds || recommendedIds.length === 0) return [];
-  const sessionsById = new Map(sessions.map((s) => [s.id, s]));
-  return recommendedIds.map((id) => sessionsById.get(id)).filter(Boolean);
+  return recommendedIds.flatMap((id) => sessions.filter(
+    (s) => s.id === id || s.sessionTimeId === id,
+  ));
 }
 
 function deterministicShuffle(arr, seed) {

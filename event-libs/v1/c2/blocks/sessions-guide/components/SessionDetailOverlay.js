@@ -10,7 +10,7 @@ import {
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../../features/toast/toast.js';
-import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
+import { deriveSessionState, getSessionKey, getWatchDestination } from '../../../../utils/session-state.js';
 import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { sanitizedRichText, descriptionHtml } from '../utils/rich-text.js';
 import {
@@ -69,7 +69,7 @@ export function SessionDetailOverlay({ onBack }) {
     };
   }, []);
 
-  const session = sessions.value.find((s) => s.id === activeSessionId);
+  const session = sessions.value.find((s) => getSessionKey(s) === activeSessionId);
   if (!session) return null;
   const richDescription = descriptionHtml(session.description);
 
@@ -78,9 +78,10 @@ export function SessionDetailOverlay({ onBack }) {
   sessionStateVersion.value;
   const nowMs = getNowMs();
   const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
-  const isScheduled = scheduled.value.has(session.id);
+  const sessionKey = getSessionKey(session);
+  const isScheduled = scheduled.value.has(sessionKey);
   const isFavorited = favorited.value.has(session.id);
-  const isPending = pendingActions.value.has(session.id);
+  const isPending = pendingActions.value.has(session.id) || pendingActions.value.has(sessionKey);
   const schedulingEnabled = isBehaviorEnabled(guideConfig, 'enableScheduling');
   const favoritingEnabled = isBehaviorEnabled(guideConfig, 'enableFavoriting');
   const watchNowEnabled = isBehaviorEnabled(guideConfig, 'enableWatchNowCtas');
@@ -99,7 +100,7 @@ export function SessionDetailOverlay({ onBack }) {
     // reloading the page out from under the player.
     if (isLive && isSamePage(destination)) {
       e.preventDefault();
-      requestWatchSameSession(session.id);
+      requestWatchSameSession(sessionKey);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
       scrollPageToTop();

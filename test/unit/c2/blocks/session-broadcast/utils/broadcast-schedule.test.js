@@ -7,6 +7,7 @@ import {
   getSessionBucket,
   parseVideoDurationMs,
   isSessionLiveNow,
+  resolveLiveSessionRequest,
   resolveBucketSchedule,
 } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-schedule.js';
 
@@ -59,6 +60,46 @@ function ytSession(id, startOffsetMin, endOffsetMin, overrides = {}) {
 describe('broadcast-schedule', () => {
   const nowMs = NOW;
   const liveStreamActiveIds = new Set();
+
+  describe('resolveLiveSessionRequest', () => {
+    const shared = { sessionPageUrl: '/sessions/repeat-title' };
+    const past = ytSession('repeat', -120, -60, { ...shared, sessionTimeId: 'past-time' });
+    const live = ytSession('repeat', -10, 10, { ...shared, sessionTimeId: 'live-time' });
+    const upcoming = ytSession('repeat', 30, 60, { ...shared, sessionTimeId: 'upcoming-time' });
+    const cards = [past, live, upcoming];
+
+    it('resolves a base watch/same-page request to its active time, not the earliest card', () => {
+      expect(resolveLiveSessionRequest(cards, 'repeat', liveStreamActiveIds, nowMs)).to.equal(live);
+      expect(resolveLiveSessionRequest(cards, 'repeat-title', liveStreamActiveIds, nowMs)).to.equal(live);
+    });
+
+    it('preserves explicit slot requests rather than replacing expired/future slots with a live sibling', () => {
+      expect(resolveLiveSessionRequest(cards, live.sessionTimeId, liveStreamActiveIds, nowMs)).to.equal(live);
+      expect(resolveLiveSessionRequest(cards, past.sessionTimeId, liveStreamActiveIds, nowMs)).to.be.null;
+      expect(resolveLiveSessionRequest(cards, upcoming.sessionTimeId, liveStreamActiveIds, nowMs)).to.be.null;
+    });
+
+    it('rejects unknown requests and base requests with no active time', () => {
+      expect(resolveLiveSessionRequest(cards, 'missing', liveStreamActiveIds, nowMs)).to.be.null;
+      expect(resolveLiveSessionRequest(cards, '', liveStreamActiveIds, nowMs)).to.be.null;
+      expect(resolveLiveSessionRequest([past, upcoming], 'repeat', liveStreamActiveIds, nowMs)).to.be.null;
+    });
+
+    it('uses broadcast MPC video-duration liveness when choosing the repeat', () => {
+      const endedVideo = mpcSession('repeat', -40, 30, { ...shared, sessionTimeId: 'ended-time' });
+      const liveVideo = mpcSession('repeat', -10, 30, { ...shared, sessionTimeId: 'playing-time' });
+      expect(resolveLiveSessionRequest(
+        [endedVideo, liveVideo], 'repeat', liveStreamActiveIds, nowMs,
+      )).to.equal(liveVideo);
+    });
+
+    it('commits persisted base IDs to the live card, retaining slot IDs in the schedule result', () => {
+      const result = getBroadcastSchedule(cards, liveStreamActiveIds, nowMs, { activeSessionId: 'repeat' });
+      expect(result.activeSession).to.equal(live);
+      expect(result.alsoLive).to.deep.equal([]);
+      expect(result.upNext).to.deep.equal([upcoming]);
+    });
+  });
 
   describe('getSessionBucket', () => {
     it('is "mpc" when mpcId is set', () => {

@@ -130,8 +130,29 @@ export function findEmbeddableVideos(sessionTimes) {
     .filter((video) => EMBEDDABLE_PROVIDERS.includes(video?.provider));
 }
 
-// True once the first session-times entry's end has passed; missing/invalid end is treated as ended.
+export function normalizeSessionTimes(sessionTimes, lengthMinutes = 0) {
+  const lengthMs = (Number(lengthMinutes) || 0) * 60_000;
+  return (Array.isArray(sessionTimes) ? sessionTimes : [])
+    .filter((entry) => entry?.startTimeMillis && Number.isFinite(Number(entry.startTimeMillis)))
+    .map((entry) => {
+      const start = Number(entry.startTimeMillis);
+      return {
+        start,
+        end: Number(entry.endTimeMillis) || start + lengthMs,
+        timezone: entry.timezone || undefined,
+      };
+    })
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+    .filter((slot, index, slots) => index === 0
+      || slot.start !== slots[index - 1].start || slot.end !== slots[index - 1].end);
+}
+
 export function currentSessionHasEnded(sessionTimes, nowMs) {
+  const slots = normalizeSessionTimes(sessionTimes);
+  if (slots.length > 1) {
+    return slots.some(({ end }) => nowMs > end)
+      && !slots.some(({ start, end }) => nowMs >= start && nowMs <= end);
+  }
   const firstEntry = (sessionTimes || [])[0];
   if (!firstEntry || !Number.isFinite(firstEntry.endTimeMillis)) return true;
   return nowMs >= firstEntry.endTimeMillis;
@@ -232,6 +253,22 @@ export function getPlaybackPhase(session, {
   nowMs, eventStartMs = null, liveStreamActiveIds = null,
 } = {}) {
   const playbackCase = classifySessionPlayback(session);
+  const slots = session?.timeSlots || [];
+  if (slots.length > 1 && playbackCase && playbackCase !== PLAYBACK_CASE.IPOD) {
+    if (nowMs < slots[0].start) return PLAYBACK_PHASE.PRE_EVENT;
+    if (slots.some(({ start, end }) => nowMs >= start && nowMs <= end)) {
+      return PLAYBACK_PHASE.WATCH_LIVE;
+    }
+    const previous = slots.slice().reverse().find(({ end }) => nowMs > end);
+    if (playbackCase === PLAYBACK_CASE.LIVE && previous) {
+      return livePhase({
+        ...session,
+        startTimeUtc: new Date(previous.start).toISOString(),
+        endTimeUtc: new Date(previous.end).toISOString(),
+      }, nowMs, eventStartMs, new Set());
+    }
+    return PLAYBACK_PHASE.ON_DEMAND;
+  }
   if (playbackCase === PLAYBACK_CASE.IPOD) return ipodPhase(session, nowMs, eventStartMs);
   if (playbackCase === PLAYBACK_CASE.SIMULIVE) return simulivePhase(session, nowMs);
   if (playbackCase === PLAYBACK_CASE.LIVE) {
@@ -241,10 +278,14 @@ export function getPlaybackPhase(session, {
 }
 
 export function buildSessionFromMetadata(sessionTimes) {
-  const firstEntry = (sessionTimes || [])[0] || null;
+  const timeSlots = normalizeSessionTimes(sessionTimes, getMetadata('session-length-in-minutes'));
+  const firstEntry = timeSlots.length ? {
+    startTimeMillis: timeSlots[0].start, endTimeMillis: timeSlots[0].end,
+  } : (sessionTimes || [])[0] || null;
   const formatValues = getAttrValues('Format').map((v) => v.label || v.value);
 
   return {
+    timeSlots,
     startTimeUtc: firstEntry?.startTimeMillis ? new Date(firstEntry.startTimeMillis).toISOString() : '',
     endTimeUtc: firstEntry?.endTimeMillis ? new Date(firstEntry.endTimeMillis).toISOString() : '',
     hasOnDemandFormat: hasOnDemandFormat(formatValues),
@@ -261,6 +302,18 @@ export function buildSessionFromMetadata(sessionTimes) {
 
 export function nextPhaseBoundaryMs(session, { nowMs, eventStartMs = null } = {}) {
   const candidates = [];
+  const slots = session.timeSlots || [];
+  if (slots.length > 1 && classifySessionPlayback(session) !== PLAYBACK_CASE.IPOD) {
+    slots.forEach(({ start, end }) => {
+      candidates.push(start, end);
+      const unlockMs = dvrAvailableAtMs({
+        ...session, endTimeUtc: new Date(end).toISOString(),
+      }, eventStartMs);
+      if (unlockMs != null) candidates.push(unlockMs);
+    });
+    const future = candidates.filter((ms) => ms > nowMs);
+    return future.length ? Math.min(...future) : null;
+  }
   const start = Date.parse(session.startTimeUtc) || null;
   const end = Date.parse(session.endTimeUtc) || null;
   if (start != null) {
@@ -288,6 +341,8 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   let firstEmitTimerId = null;
   let emitted = false;
   let stopped = false;
+  // A shared stream can remain active between replays; multi-time pages follow their windows.
+  const usesPoll = session.mrStreamId && !(session.timeSlots?.length > 1);
 
   const emitIfChanged = () => {
     if (stopped) return;
@@ -313,7 +368,7 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
   };
 
   let unsubscribePoll = () => {};
-  if (session.mrStreamId) {
+  if (usesPoll) {
     unsubscribePoll = subscribeToPoller(({ active }) => {
       liveStreamActiveIds = new Set(active);
       emitIfChanged();
@@ -332,7 +387,7 @@ export function watchPlaybackPhase(session, onChange, { eventStartMs } = {}) {
     stopped = true;
     if (timerId != null) { clearTimeout(timerId); timerId = null; }
     if (firstEmitTimerId != null) { clearTimeout(firstEmitTimerId); firstEmitTimerId = null; }
-    if (session.mrStreamId) {
+    if (usesPoll) {
       unsubscribePoll();
       unregisterStreamIds([session.mrStreamId]);
     }

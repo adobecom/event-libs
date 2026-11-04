@@ -21,6 +21,7 @@ import {
   ensureStylesheet,
   getPlaybackPhase,
   PLAYBACK_PHASE,
+  normalizeSessionTimes,
 } from '../../utils/video-session.js';
 import { logError, logWarning } from '../../../utils/lana-log.js';
 import { sessionDaaLh } from '../../../utils/analytics.js';
@@ -136,10 +137,23 @@ export function resolveTopicPlaylist(
 
   const topicSet = new Set(topics);
   const nowMs = getNowMs();
-  const rows = allSessions.filter((s) => s.id !== currentSessionId
-    && hasVideoSource(s)
-    && (s.playlistAssignment || []).some((t) => topicSet.has(t))
-    && hasPremiered(s, eventStartMs, nowMs));
+  const bySession = new Map();
+  allSessions.forEach((s) => {
+    const id = s.sessionId || s.id;
+    if (!bySession.has(id)) bySession.set(id, []);
+    bySession.get(id).push(s);
+  });
+  const rows = [];
+  bySession.forEach((entries, id) => {
+    const [s] = entries;
+    const timeSlots = normalizeSessionTimes(entries.map((entry) => ({
+      startTimeMillis: Date.parse(entry.startTimeUtc),
+      endTimeMillis: Date.parse(entry.endTimeUtc),
+    })));
+    if (id !== currentSessionId && hasVideoSource(s)
+      && (s.playlistAssignment || []).some((t) => topicSet.has(t))
+      && hasPremiered({ ...s, timeSlots }, eventStartMs, nowMs)) rows.push(s);
+  });
 
   return rows.length >= minSessions ? rows.slice().sort(compareByStartTime) : [];
 }
@@ -439,7 +453,8 @@ function buildRow(item, { onSelect, hideProgressBar = false }) {
   const row = createTag('div', {
     class: 'session-video-playlist-row',
     role: 'listitem',
-    'data-item-id': item.id,
+    'data-item-id': item.sessionId || item.id,
+    'data-favorite-id': item.id,
     'data-href': item.href,
     ...analyticsAttrs('playlist-item-select'),
   });
@@ -461,7 +476,7 @@ function buildRow(item, { onSelect, hideProgressBar = false }) {
     const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
     const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
     const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
-    fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
+    fill.style.width = `${computeProgressPercent(getVideoProgress(item.sessionId || item.id))}%`;
     createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
   }
 
@@ -525,13 +540,14 @@ function buildTopicView(el, allRows, {
     const row = buildRow(
       {
         id: session.id,
+        sessionId: session.sessionId || session.id,
         rfSessionId: session.rfSessionId,
         sessionCode: session.sessionCode,
         title: session.title,
         thumbnailUrl: session.thumbnailUrl || defaultThumbnail,
 
         durationLabel: (() => {
-          const watchedLengthSeconds = getVideoProgress(session.id)?.length;
+          const watchedLengthSeconds = getVideoProgress(session.sessionId || session.id)?.length;
           if (watchedLengthSeconds) return formatDuration(Math.round(watchedLengthSeconds / 60));
           return formatDuration(
             parseVideoDurationMinutes(session.videoDuration) ?? session.duration,
@@ -557,7 +573,7 @@ function buildTopicView(el, allRows, {
       favoriteButtons.forEach((button) => {
         const row = button.closest('.session-video-playlist-row');
         const title = row.querySelector('.session-video-playlist-row-title')?.textContent || '';
-        setFavoriteButtonState(button, { id: row.dataset.itemId, title }, favorited.value.has(row.dataset.itemId));
+        setFavoriteButtonState(button, { title }, favorited.value.has(row.dataset.favoriteId));
       });
     });
   }
@@ -679,6 +695,7 @@ function listenForPlayerEvents(el, sessionId) {
     if (event.detail.sessionId !== sessionId) return;
     if (event.detail.state !== 'ended') return;
     if (!getShouldAutoPlay()) return;
+    if (!el.classList.contains('is-rendered')) return;
 
     const nextRow = [...el.querySelectorAll('.session-video-playlist-row[data-href]')]
       .find((row) => row.dataset.itemId !== sessionId);
@@ -738,7 +755,7 @@ export default async function init(el) {
   function buildHeader(displayRows) {
     const header = createTag('div', { class: 'session-video-playlist-top' }, '', { parent: el });
 
-    const nextSession = displayRows.find((row) => row.id !== sessionId);
+    const nextSession = displayRows.find((row) => (row.sessionId || row.id) !== sessionId);
     const upNext = createTag('div', { class: 'session-video-playlist-up-next' }, '', { parent: header });
     createTag('span', { class: 'session-video-playlist-up-next-label' }, 'Up next', { parent: upNext });
     createTag('span', { class: 'session-video-playlist-up-next-title' }, nextSession?.title || '', { parent: upNext });
@@ -759,8 +776,9 @@ export default async function init(el) {
     return { header, toggle };
   }
 
+  let drawer;
   function setUpDrawer({ header, toggle, handle }) {
-    const drawer = new Drawer(el, {
+    drawer = new Drawer(el, {
       titleEl: findSessionHeading(el),
       toggleEl: toggle,
       handleEl: handle,
@@ -798,9 +816,10 @@ export default async function init(el) {
       removeBlock(el);
       return;
     }
-    announceVideoDecision(true);
+    announceVideoDecision(currentPhase === PLAYBACK_PHASE.ON_DEMAND);
 
-    const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
+    const current = sessionList.find((s) => (s.sessionId || s.id) === sessionId)
+      || synthesizeCurrentSession();
     const displayRows = [current, ...rows.slice().sort(compareByStartTime)];
 
     el.replaceChildren();
@@ -812,7 +831,7 @@ export default async function init(el) {
     el.querySelector('.session-video-playlist-list')?.setAttribute('id', LIST_ID);
     setUpDrawer({ header, toggle, handle });
 
-    el.classList.add('is-rendered');
+    el.classList.toggle('is-rendered', currentPhase === PLAYBACK_PHASE.ON_DEMAND);
 
     el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
   };
@@ -853,12 +872,15 @@ export default async function init(el) {
   const isOnDemandPhase = (phase) => phase === PLAYBACK_PHASE.ON_DEMAND;
 
   let started = false;
+  let currentPhase;
   const startFor = (phase) => {
     if (!el.isConnected) return;
+    currentPhase = phase;
     if (started) {
-      // Already rendered for ON_DEMAND. If the phase later reverts to a non-on-demand state (e.g.
-      // the poll flips back to live), remove the now-stale playlist so it doesn't linger.
-      if (!isOnDemandPhase(phase)) removeBlock(el);
+      const visible = isOnDemandPhase(phase) && Boolean(drawer);
+      el.classList.toggle('is-rendered', visible);
+      announceVideoDecision(visible);
+      if (visible) drawer.reflow();
       return;
     }
     if (!isOnDemandPhase(phase)) {

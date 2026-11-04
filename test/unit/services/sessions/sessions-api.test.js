@@ -9,6 +9,7 @@ import {
   reportDroppedSessions, fetchSessions,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 import { setEventServiceEnvOverride } from '../../../../event-libs/v1/utils/utils.js';
+import { getSessionKey, hasMultipleSessionTimes } from '../../../../event-libs/v1/utils/session-state.js';
 
 function customAttr(name, values) {
   return { name, values };
@@ -26,6 +27,66 @@ function textValue(value) {
 const ONLINE_FORMAT = customAttr('Format', [selectValue('Online')]);
 
 describe('services/sessions/sessions-api', () => {
+  describe('actual catalog repeated-time contract', () => {
+    const inPersonId = '789fc3dc-5c0b-46ee-b5d0-715af5cb817d';
+    const onlineId = 'fcf1e46c-7923-4a78-8b3c-5f53bf24f91d';
+    const sessionTimes = [
+      {
+        sessionId: inPersonId, sessionTimeId: '81638256-b490-489c-8d72-b4d7b00ab29f',
+        externalSessionTimeId: 'rf-1782322153382001JAWf', startTimeMillis: 1794402900000,
+        endTimeMillis: 1794405600000, timezone: 'America/Los_Angeles',
+      },
+      {
+        sessionId: inPersonId, sessionTimeId: 'e00d6647-034d-48b1-a77f-06d24415b474',
+        externalSessionTimeId: 'rf-1789079868540001cVvW', startTimeMillis: 1794497400000,
+        endTimeMillis: 1794500100000, timezone: 'America/Los_Angeles',
+      },
+      {
+        sessionId: onlineId, sessionTimeId: '1065118f-7dfd-4432-a443-178b8a95853d',
+        externalSessionTimeId: 'rf-1788366651021001Ct7q', startTimeMillis: 1794420000000,
+        endTimeMillis: 1794420900000, timezone: 'America/Los_Angeles',
+      },
+      {
+        sessionId: onlineId, sessionTimeId: 'd5816aa4-e689-41f1-a7dc-ec18e0b8762f',
+        externalSessionTimeId: 'rf-1783367806768001b5DT', startTimeMillis: 1794420000000,
+        endTimeMillis: 1794420900000, timezone: 'America/Los_Angeles',
+      },
+    ];
+    const rows = normalizeSessions(mapEslPayloadToRawSessions({
+      sessions: [
+        {
+          sessionId: inPersonId, sessionCode: 'S6231', url: '/sessions/s6231',
+          customAttributes: [
+            customAttr('Format', [selectValue('In-Person'), selectValue('On demand, post event')]),
+          ],
+        },
+        { sessionId: onlineId, sessionCode: 'OS231', url: '/sessions/os231', customAttributes: [ONLINE_FORMAT] },
+      ],
+      sessionTimes,
+    }));
+
+    it('retains the actual shared S6231 session ID and distinct actual time IDs without making it online', () => {
+      const cards = rows.filter((s) => s.id === inPersonId);
+      expect(cards).to.have.lengthOf(2);
+      expect(cards.map(getSessionKey)).to.deep.equal(sessionTimes.slice(0, 2).map((t) => t.sessionTimeId));
+      expect(cards.map((s) => s.rfCode)).to.deep.equal(['1782322153382001JAWf', '1789079868540001cVvW']);
+      expect(cards.every((s) => s.inPerson && !s.isOnline && s.hasOnDemandFormat)).to.be.true;
+      expect(cards.every(hasMultipleSessionTimes)).to.be.true;
+      expect(cards[0].sessionPageUrl).to.equal(cards[1].sessionPageUrl);
+      expect(cards[0].sessionTimes).to.equal(cards[1].sessionTimes);
+      expect(cards[0].sessionTimes[0]).to.equal(sessionTimes[0]);
+    });
+
+    it('keeps both actual OS231 time rows without inventing a replay for their identical window', () => {
+      const cards = rows.filter((s) => s.id === onlineId);
+      expect(cards).to.have.lengthOf(2);
+      expect(cards.map(getSessionKey)).to.deep.equal(sessionTimes.slice(2).map((t) => t.sessionTimeId));
+      expect(cards.every((s) => s.isOnline && !hasMultipleSessionTimes(s))).to.be.true;
+      expect(cards[0].startTimeUtc).to.equal(cards[1].startTimeUtc);
+      expect(cards[0].endTimeUtc).to.equal(cards[1].endTimeUtc);
+    });
+  });
+
   describe('mapEslPayloadToRawSessions', () => {
     const payload = {
       speakers: [
@@ -40,8 +101,8 @@ describe('services/sessions/sessions-api', () => {
         },
       ],
       sessionTimes: [
-        { sessionId: 's-1', startTimeMillis: 2000, endTimeMillis: 3000, externalSessionTimeId: 'rf-later' },
-        { sessionId: 's-1', startTimeMillis: 1000, endTimeMillis: 1500, externalSessionTimeId: 'rf-earlier' },
+        { sessionId: 's-1', sessionTimeId: 'later-time', startTimeMillis: 2000, endTimeMillis: 3000, externalSessionTimeId: 'rf-later' },
+        { sessionId: 's-1', sessionTimeId: 'earlier-time', startTimeMillis: 1000, endTimeMillis: 1500, externalSessionTimeId: 'rf-earlier' },
       ],
       sessions: [
         {
@@ -84,7 +145,65 @@ describe('services/sessions/sessions-api', () => {
       ],
     };
 
-    const [full, bare] = mapEslPayloadToRawSessions(payload);
+    const [full, later, bare] = mapEslPayloadToRawSessions(payload);
+
+    it('emits independently addressable cards per time sharing the session identity and page', () => {
+      expect(mapEslPayloadToRawSessions(payload)).to.have.lengthOf(3);
+      expect(full.id).to.equal('s-1');
+      expect(later.id).to.equal('s-1');
+      expect(full.sessionTimeId).to.equal('earlier-time');
+      expect(later.sessionTimeId).to.equal('later-time');
+      expect(full.sessionTimes).to.equal(later.sessionTimes);
+      expect(full.sessionTimes[0]).to.equal(payload.sessionTimes[1]);
+      expect(full.sessionId).to.equal('s-1');
+      expect(later.sessionId).to.equal(full.sessionId);
+      expect(later.sessionPageUrl).to.equal(full.sessionPageUrl);
+      expect(later.rfSessionId).to.equal(full.rfSessionId);
+      expect(later.rfCode).to.equal('later');
+      expect(later.startTimeUtc).to.equal(new Date(2000).toISOString());
+      expect(later.endTimeUtc).to.equal(new Date(3000).toISOString());
+      const normalized = normalizeSessions([full, later]);
+      expect(normalized.map((s) => s.sessionId)).to.deep.equal(['s-1', 's-1']);
+      expect(normalized.map((s) => s.id)).to.deep.equal(['s-1', 's-1']);
+      expect(normalized.map((s) => s.sessionTimeId)).to.deep.equal(['earlier-time', 'later-time']);
+      expect(normalized[0].sessionTimes).to.equal(full.sessionTimes);
+    });
+
+    it('preserves the legacy card id for single-time and untimed sessions', () => {
+      const [single, untimed] = mapEslPayloadToRawSessions({
+        ...payload, sessionTimes: [payload.sessionTimes[0]],
+      });
+      expect(single.id).to.equal('s-1');
+      expect(single.sessionId).to.equal('s-1');
+      expect(single.rfCode).to.equal('later');
+      expect(untimed.id).to.equal('s-2');
+    });
+
+    it('uses catalog time IDs for stable card identity independent of payload order', () => {
+      const sessionTimes = payload.sessionTimes.map((time, index) => ({
+        ...time, sessionTimeId: `time-${index}`,
+      }));
+      const forward = mapEslPayloadToRawSessions({ ...payload, sessionTimes });
+      const reverse = mapEslPayloadToRawSessions({ ...payload, sessionTimes: [...sessionTimes].reverse() });
+      expect(forward.map((s) => s.id)).to.deep.equal(['s-1', 's-1', 's-2']);
+      expect(reverse.map((s) => s.id)).to.deep.equal(forward.map((s) => s.id));
+      expect(forward.map((s) => s.sessionTimeId)).to.deep.equal(['time-1', 'time-0', '']);
+      expect(reverse.map((s) => s.sessionTimeId)).to.deep.equal(forward.map((s) => s.sessionTimeId));
+      expect(forward[0].rfCode).to.equal('earlier');
+    });
+
+    it('never synthesizes IDs when time IDs are missing, even with an RF time ID', () => {
+      const sessionTimes = payload.sessionTimes.map((time) => ({ ...time, sessionTimeId: undefined }));
+      const rows = normalizeSessions(mapEslPayloadToRawSessions({ ...payload, sessionTimes }));
+      expect(rows.map((s) => s.id)).to.deep.equal(['s-1', 's-1', 's-2']);
+      expect(rows.map((s) => s.sessionTimeId)).to.deep.equal(['', '', '']);
+      const [single] = normalizeSessions(mapEslPayloadToRawSessions({
+        ...payload, sessionTimes: [sessionTimes[0]],
+      }));
+      expect(single.id).to.equal('s-1');
+      expect(single.sessionTimeId).to.equal('');
+      expect(single.rfCode).to.equal('later');
+    });
 
     it('extracts title/description from en-US localizations', () => {
       expect(full.title).to.equal('Full Stack Session');

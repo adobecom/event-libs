@@ -42,6 +42,26 @@ describe('services/sessions/session-state-ticker', () => {
     expect(changeCount).to.equal(1);
   });
 
+  it('tracks repeated time rows independently despite their shared session ID', async () => {
+    const rows = [
+      { id: 'repeat', sessionTimeId: 'past-time', startTimeUtc: '2026-11-10T16:00:00Z', endTimeUtc: '2026-11-10T17:00:00Z' },
+      { id: 'repeat', sessionTimeId: 'next-time', startTimeUtc: '2026-11-10T18:00:00Z', endTimeUtc: '2026-11-10T19:00:00Z' },
+    ];
+    let changeCount = 0;
+    let now = Date.parse('2026-11-10T17:30:00Z');
+    startSessionStateTicker(
+      () => rows, () => new Set(), () => { changeCount += 1; },
+      { intervalMs: 20, getNow: () => now },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 70));
+    expect(changeCount).to.equal(1);
+    now = Date.parse('2026-11-10T18:30:00Z');
+    await new Promise((resolve) => setTimeout(resolve, 70));
+    expect(changeCount).to.equal(2);
+    await new Promise((resolve) => setTimeout(resolve, 70));
+    expect(changeCount).to.equal(2);
+  });
+
   it('notifies again when a session transitions from upcoming to live', async () => {
     let changeCount = 0;
     const session = { id: 's-1', startTimeUtc: '2026-11-10T18:00:00Z', endTimeUtc: '2026-11-10T19:00:00Z' };

@@ -217,6 +217,21 @@ describe('SessionCard', () => {
     expect(html).to.include('aria-pressed="false"');
   });
 
+  it('schedules only the selected time while sharing the favorite across both cards', () => {
+    const first = { ...UPCOMING_SESSION, sessionTimeId: '81638256-b490-489c-8d72-b4d7b00ab29f' };
+    const second = { ...first, sessionTimeId: 'e00d6647-034d-48b1-a77f-06d24415b474' };
+    scheduled.value = new Set([second.sessionTimeId]);
+    favorited.value = new Set([first.id]);
+    const pressed = (s) => {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = renderCard(s);
+      return [...wrapper.querySelectorAll('button[aria-pressed]')]
+        .map((button) => button.getAttribute('aria-pressed'));
+    };
+    expect(pressed(first)).to.deep.equal(['false', 'true']);
+    expect(pressed(second)).to.deep.equal(['true', 'true']);
+  });
+
   it('dispatches SCHEDULE_ADD when schedule button clicked and registered', () => {
     const dispatched = [];
     const store = buildStore(preact);

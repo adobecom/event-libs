@@ -18,13 +18,8 @@ export function renderFavorite() {
     registerUrl: getEventApiConfig()?.registerUrl || '/register',
   };
 
-  let session = sessions.value.find((s) => s.id === sessionId) || { id: sessionId };
-  if (!session.rfSessionId) {
-    const unsubscribe = sessions.subscribe((list) => {
-      const found = list.find((s) => s.id === sessionId);
-      if (found) { session = found; unsubscribe(); }
-    });
-  }
+  const selectSession = () => sessions.value.find((s) => (s.sessionId || s.id) === sessionId)
+    || { id: sessionId };
 
   const btn = createTag('button', {
     type: 'button',
@@ -34,19 +29,20 @@ export function renderFavorite() {
   });
 
   const paint = () => {
-    const isFavorited = favorited.value.has(sessionId);
+    const isFavorited = favorited.value.has(selectSession().id);
     btn.innerHTML = isFavorited ? ICON_HEART_FILLED : ICON_HEART_OUTLINE;
     btn.setAttribute('aria-pressed', String(isFavorited));
     btn.setAttribute('daa-ll', isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites');
     btn.classList.toggle('is-favorited', isFavorited);
   };
-  paint();
   favorited.subscribe(paint);
+  sessions.subscribe(paint);
 
   btn.addEventListener('click', () => {
+    const session = selectSession();
     toggleFavoriteWithFeedback(session, {
       eventConfig,
-      isFavorited: favorited.value.has(sessionId),
+      isFavorited: favorited.value.has(session.id),
     });
   });
 

@@ -160,6 +160,25 @@ describe('swan-notifications-unc', () => {
   });
 
   describe('reconcileSwanNotifications', () => {
+    it('registers independent rules for scheduled time IDs sharing a session ID', async () => {
+      const first = {
+        ...makeSession('RF-first', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN }),
+        id: 'shared-session', sessionTimeId: 'first-time',
+      };
+      const second = {
+        ...makeSession('RF-second', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN }),
+        id: 'shared-session', sessionTimeId: 'second-time',
+      };
+      await reconcileSwanNotifications(() => [first, second], () => new Set(['first-time', 'second-time']));
+      const state = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY));
+      expect(state[first.rfCode].stage).to.equal('live');
+      expect(state[second.rfCode].stage).to.equal('reminder');
+      await reconcileSwanNotifications(() => [first, second], () => new Set(['second-time']));
+      const next = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY));
+      expect(next[first.rfCode]).to.equal(undefined);
+      expect(next[second.rfCode].stage).to.equal('reminder');
+    });
+
     it('advances a session from reminder to live in the correct order: register new, then delete the previous stage', async () => {
       const reminderSession = makeSession('RF-progress', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
       await notifySessionScheduled(reminderSession);

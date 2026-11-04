@@ -11,6 +11,7 @@ import {
   sessionsForDay, excludeOnDemandFormat, hasActiveSearchOrFilters,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 export const buildLiveUpcomingView = () => LiveUpcomingView;
 
@@ -44,9 +45,9 @@ export function LiveUpcomingView() {
   // Once nothing is upcoming; live sessions (MR streams stay on until ops stops them) stay in the Live carousel.
   const previouslyAiredSlots = timeSlots.length === 0
     ? (() => {
-      const liveIds = new Set(live.map((s) => s.id));
+      const liveIds = new Set(live.map(getSessionKey));
       const previouslyAiredRaw = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz))
-        .filter((s) => !liveIds.has(s.id));
+        .filter((s) => !liveIds.has(getSessionKey(s)));
       return groupByStartTime(filterSessions(previouslyAiredRaw, activeFilters, searchQuery));
     })()
     : [];

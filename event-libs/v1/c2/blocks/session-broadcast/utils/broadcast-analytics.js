@@ -1,5 +1,6 @@
 import { openSessionGuideDetail } from '../../../../utils/session-store.js';
 import { trackAnalyticsEvent } from '../../../../utils/analytics.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 export function trackBroadcastEvent(name) {
   trackAnalyticsEvent(name, 'session-broadcast');
@@ -7,7 +8,7 @@ export function trackBroadcastEvent(name) {
 
 // Shared by both carousels' onCardClick.
 export function openSessionDetail(session) {
-  openSessionGuideDetail(session.id);
+  openSessionGuideDetail(getSessionKey(session));
   trackBroadcastEvent(`Broadcast-Session-Detail-Open | ${session.id}`);
 }
 

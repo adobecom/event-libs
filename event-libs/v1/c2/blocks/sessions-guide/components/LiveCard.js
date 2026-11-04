@@ -3,7 +3,7 @@ import { useSessionGuide } from '../store/index.js';
 import {
   formatShortTime, formatTimezoneAbbr, formatDuration, getNowMs,
 } from '../utils/time.js';
-import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
+import { deriveSessionState, getSessionKey, getWatchDestination } from '../../../../utils/session-state.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds, requestWatchSameSession,
 } from '../../../../utils/session-store.js';
@@ -54,9 +54,10 @@ export function LiveCard({
   const isMobile = useIsMobile(guideConfig.liveCardMobileMaxWidth ?? DEFAULT_MOBILE_MAX_WIDTH);
   const useMobileLayout = isMobile;
 
-  const isScheduled = scheduled.value.has(session.id);
+  const sessionKey = getSessionKey(session);
+  const isScheduled = scheduled.value.has(sessionKey);
   const isFavorited = favorited.value.has(session.id);
-  const isPending = pendingActions.value.has(session.id);
+  const isPending = pendingActions.value.has(session.id) || pendingActions.value.has(sessionKey);
   const schedulingEnabled = isBehaviorEnabled(guideConfig, 'enableScheduling');
   const favoritingEnabled = isBehaviorEnabled(guideConfig, 'enableFavoriting');
   const watchNowEnabled = isBehaviorEnabled(guideConfig, 'enableWatchNowCtas');
@@ -124,7 +125,7 @@ export function LiveCard({
     if (sessionState === 'live' && isSamePage(destination)) {
       if (onWatchSamePage) { onWatchSamePage(session); return; }
       // No-op on pages with nothing subscribed to this request (e.g. the homepage).
-      requestWatchSameSession(session.id);
+      requestWatchSameSession(sessionKey);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
       scrollPageToTop();
@@ -161,7 +162,7 @@ export function LiveCard({
   function handleCardClick(e) {
     if (sessionState === 'on-demand') { handleWatch(e); return; }
     if (surface === 'widget') {
-      dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
+      dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: sessionKey });
       history.pushState({}, '', setSessionParam(sessionParamValue(session)));
       return;
     }

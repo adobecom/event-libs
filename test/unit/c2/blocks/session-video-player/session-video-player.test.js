@@ -180,6 +180,101 @@ describe('session-video-player', () => {
     else delete window._satellite;
   });
 
+  describe('multi-time playback', () => {
+    it('hides the marquee during every airing and restores it between windows without a reload', async () => {
+      const now = Date.now();
+      const clock = sinon.useFakeTimers({ now, toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      const oldDecision = BlockMediator.get(DECISION_KEY);
+      const oldPlayable = BlockMediator.get('videoPlayable');
+      const times = [1000, 4000, 7000].map((offset) => ({
+        startTimeMillis: now + offset,
+        endTimeMillis: now + offset + 1000,
+        videos: [{ provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/3458940`, kind: 'onDemand' }],
+      }));
+      authorSession({ times: JSON.stringify([times[2], times[0], times[1]]) });
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      try {
+        await init(fullWidthPlayer);
+        expect(fullWidthPlayer.querySelector('iframe')).not.to.exist;
+
+        for (const { startTimeMillis, endTimeMillis } of times) {
+          clock.tick(startTimeMillis + 501 - Date.now());
+          expect(fullWidthPlayer.querySelector('iframe')).not.to.exist;
+
+          clock.tick(endTimeMillis + 501 - Date.now());
+          await Promise.resolve();
+          expect(fullWidthPlayer.querySelector('iframe')).to.exist;
+        }
+      } finally {
+        document.body.innerHTML = '';
+        await Promise.resolve();
+        clock.restore();
+        BlockMediator.set(DECISION_KEY, oldDecision);
+        BlockMediator.set('videoPlayable', oldPlayable);
+      }
+    });
+
+    it('does not embed a stale on-demand player when a layout decision arrives during a replay', async () => {
+      const now = Date.now();
+      const clock = sinon.useFakeTimers({ now, toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      const oldDecision = BlockMediator.get(DECISION_KEY);
+      const oldPlayable = BlockMediator.get('videoPlayable');
+      authorSession({ times: JSON.stringify([
+        { startTimeMillis: now - 5000, endTimeMillis: now - 3000 },
+        { startTimeMillis: now + 1000, endTimeMillis: now + 2000 },
+      ]) });
+      BlockMediator.set(DECISION_KEY, null);
+      const { fullWidthPlayer } = buildPage({ withPlaylistContainer: false });
+      try {
+        await init(fullWidthPlayer);
+        clock.tick(1501);
+        BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+        await Promise.resolve();
+        expect(fullWidthPlayer.querySelector('iframe')).not.to.exist;
+        clock.tick(1000);
+        await Promise.resolve();
+        expect(fullWidthPlayer.querySelector('iframe')).to.exist;
+      } finally {
+        document.body.innerHTML = '';
+        await Promise.resolve();
+        clock.restore();
+        BlockMediator.set(DECISION_KEY, oldDecision);
+        BlockMediator.set('videoPlayable', oldPlayable);
+      }
+    });
+
+    it('moves the recording when a late playlist decision changes the winning container', async () => {
+      const oldDecision = BlockMediator.get(DECISION_KEY);
+      const oldPlayable = BlockMediator.get('videoPlayable');
+      authorSession();
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+      const { fullWidthPlayer, playlistPlayer } = buildPage();
+      try {
+        await init(fullWidthPlayer);
+        await init(playlistPlayer);
+        await flush();
+        expect(fullWidthPlayer.querySelector('iframe')).to.exist;
+        expect(playlistPlayer.querySelector('iframe')).not.to.exist;
+
+        BlockMediator.set(DECISION_KEY, { hasPlaylist: true });
+        await flush();
+        expect(fullWidthPlayer.querySelector('iframe')).not.to.exist;
+        expect(playlistPlayer.querySelector('iframe')).to.exist;
+
+        BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+        await flush();
+        expect(fullWidthPlayer.querySelector('iframe')).to.exist;
+        expect(playlistPlayer.querySelector('iframe')).not.to.exist;
+      } finally {
+        document.body.innerHTML = '';
+        await flush();
+        BlockMediator.set(DECISION_KEY, oldDecision);
+        BlockMediator.set('videoPlayable', oldPlayable);
+      }
+    });
+  });
+
   describe('progress persistence', () => {
     it('returns null for a session with no saved progress', () => {
       expect(getVideoProgress('s-1')).to.equal(null);

@@ -412,8 +412,9 @@ function removeMobileRiderPlayer(el) {
   rider.remove();
 }
 
-async function loadMobileRiderPlayer(el, video) {
+async function loadMobileRiderPlayer(el, video, isCurrent) {
   const { default: initMobileRider } = await import('../mobile-rider/mobile-rider.js');
+  if (!el.isConnected || !isCurrent()) return;
   el.querySelector('.milo-video')?.remove();
   const rider = createTag('div', { class: 'mobile-rider' }, '', { parent: el });
   rider.dataset.extractedVideoId = video.videoId;
@@ -424,9 +425,9 @@ async function loadMobileRiderPlayer(el, video) {
   el.dataset.embedded = 'true';
 }
 
-function loadVideoPlayer(el, sessionId, video) {
+function loadVideoPlayer(el, sessionId, video, isCurrent) {
   if (video.provider === 'mobilerider') {
-    loadMobileRiderPlayer(el, video).catch((error) => {
+    loadMobileRiderPlayer(el, video, isCurrent).catch((error) => {
       removeLoaderPlaceholder(el);
       logError(LOG_SCOPE, 'could not load MobileRider DVR player', error);
     });
@@ -563,12 +564,13 @@ function buildRenderModel(el) {
   return { sessionId, sessionTimes, session };
 }
 
-function loadWhenDecided(el, sessionId, video) {
+function loadWhenDecided(el, sessionId, video, isCurrent) {
   preconnectVideoProvider(video.provider);
 
   (async () => {
     try {
       const isWinner = await awaitEmbedDecision(el);
+      if (!el.isConnected || !isCurrent()) return;
       if (!isWinner) {
         // Lost the layout decision (video goes to the other container) — drop the reserved loader
         // so the main instance doesn't keep a spinner above the real player.
@@ -576,7 +578,7 @@ function loadWhenDecided(el, sessionId, video) {
         hideLosingInstance(el);
         return;
       }
-      loadVideoPlayer(el, sessionId, video);
+      loadVideoPlayer(el, sessionId, video, isCurrent);
     } catch (error) {
       removeLoaderPlaceholder(el);
       logError(LOG_SCOPE, 'could not resolve the video layout decision', error);
@@ -600,12 +602,17 @@ export default async function init(el) {
   if (expectsVideoOnLoad(session, sessionTimes)) showLoaderPlaceholder(el);
 
   let embeddedPhase = null;
+  let activeVideo = null;
+  let phaseRevision = 0;
 
   const onPhase = (phase) => {
     if (!el.isConnected) return;
+    const revision = ++phaseRevision;
+    const isCurrent = () => revision === phaseRevision;
     const video = PLAYABLE_PHASES.includes(phase)
       ? resolveVideoForPhase(phase, sessionTimes, session)
       : null;
+    activeVideo = video;
 
     if (video && phase === embeddedPhase) {
       return;
@@ -618,7 +625,7 @@ export default async function init(el) {
       if (isFirstEmbed) {
         BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
         window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId, phase } }));
-        loadWhenDecided(el, sessionId, video);
+        loadWhenDecided(el, sessionId, video, isCurrent);
       } else {
         if (previousPhase !== phase) {
           BlockMediator.set(VIDEO_PLAYABLE_KEY, { sessionId, phase });
@@ -628,7 +635,7 @@ export default async function init(el) {
         if (nowWinning) {
           el.classList.remove('session-video-hidden');
           preconnectVideoProvider(video.provider);
-          loadVideoPlayer(el, sessionId, video);
+          loadVideoPlayer(el, sessionId, video, isCurrent);
         } else {
           removeMobileRiderPlayer(el);
           el.querySelector('.milo-video')?.remove();
@@ -658,6 +665,30 @@ export default async function init(el) {
     }
   };
 
+  let lastHasPlaylist = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY)?.hasPlaylist;
+  const unsubscribeLayout = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
+    const previous = lastHasPlaylist;
+    lastHasPlaylist = newValue?.hasPlaylist;
+    if (previous == null || lastHasPlaylist == null || previous === lastHasPlaylist
+      || !activeVideo || !el.isConnected) return;
+    const revision = ++phaseRevision;
+    if (isWinningInstance(el, lastHasPlaylist)) {
+      el.classList.remove('session-video-hidden');
+      if (!el.dataset.embedded) {
+        preconnectVideoProvider(activeVideo.provider);
+        loadVideoPlayer(el, sessionId, activeVideo, () => revision === phaseRevision);
+      }
+    } else {
+      removeLoaderPlaceholder(el);
+      removeMobileRiderPlayer(el);
+      el.querySelector('.milo-video')?.remove();
+      delete el.dataset.embedded;
+      hideLosingInstance(el);
+    }
+  });
   const stopWatching = watchPlaybackPhase(session, onPhase, { eventStartMs: getEventStartMs() });
-  onElementDetached(el, stopWatching);
+  onElementDetached(el, () => {
+    stopWatching();
+    unsubscribeLayout();
+  });
 }

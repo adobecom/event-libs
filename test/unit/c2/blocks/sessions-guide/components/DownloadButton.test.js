@@ -65,6 +65,32 @@ describe('DownloadButton', () => {
   });
 
   describe('downloadSchedule', () => {
+    it('exports selected times of one session with distinct calendar UIDs and one page URL', async () => {
+      const first = session({
+        sessionTimeId: '81638256-b490-489c-8d72-b4d7b00ab29f',
+        sessionPageUrl: 'https://www.adobe.com/max/2026/sessions/shared',
+      });
+      const second = {
+        ...first,
+        sessionTimeId: 'e00d6647-034d-48b1-a77f-06d24415b474',
+        startTimeUtc: '2026-10-29T17:00:00.000Z',
+        endTimeUtc: '2026-10-29T18:00:00.000Z',
+      };
+      downloadSchedule([first, second], new Set([second.sessionTimeId]));
+      let content = (await downloads[0].text()).replace(/\r\n /g, '');
+      expect(content).to.include(`UID:${second.sessionTimeId}@sessions.adobe.com`);
+      expect(content).to.not.include(first.sessionTimeId);
+      expect(content).to.include('DTSTART:20261029T170000Z');
+      downloadSchedule([first, second], new Set([first.sessionTimeId, second.sessionTimeId]));
+      content = (await downloads[1].text()).replace(/\r\n /g, '');
+      const events = content.split('BEGIN:VEVENT\r\n').slice(1);
+      expect(events).to.have.lengthOf(2);
+      [first, second].forEach((entry, index) => {
+        expect(events[index]).to.include(`UID:${entry.sessionTimeId}@sessions.adobe.com`);
+        expect(events[index]).to.include(`URL:${first.sessionPageUrl}`);
+      });
+    });
+
     it('downloads only the sessions whose id is in the scheduled set', () => {
       const list = [session({ id: 'a' }), session({ id: 'b' }), session({ id: 'c' })];
       downloadSchedule(list, new Set(['a', 'c']));

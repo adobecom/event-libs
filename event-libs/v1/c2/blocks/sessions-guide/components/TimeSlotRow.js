@@ -6,6 +6,7 @@ import {
 import { formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 import { SessionCard } from './SessionCard.js';
 import { useCarouselRow } from '../utils/use-carousel-row.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 export const buildTimeSlotRow = () => TimeSlotRow;
 
@@ -19,7 +20,7 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   // Encodes scheduled/favorited state of every card in this row.
   // Changes value whenever a card gains or loses a state that widens it,
   // so useLayoutEffect re-measures with the actual post-layout card widths.
-  const cardStateKey = sessions?.map((s) => (scheduled.has(s.id) ? 1 : 0) + (favorited.has(s.id) ? 2 : 0)).join('') || '';
+  const cardStateKey = sessions?.map((s) => (scheduled.has(getSessionKey(s)) ? 1 : 0) + (favorited.has(s.id) ? 2 : 0)).join('') || '';
 
   const {
     dismissingIds, allDismissing, offset, tx, lastVisible, stripRef, viewportRef, rowRef,
@@ -49,8 +50,8 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
         <div class="sg-time-row__viewport" ref=${viewportRef}>
           <div class="sg-time-row__cards" ref=${stripRef} style=${'transform:translateX(-' + tx + 'px)'}>
             ${sessions.map((s, i) => html`<div
-              class=${'sg-time-row__card-wrap' + (dismissingIds.has(s.id) ? ' sg-time-row__card-wrap--collapsing' : '')}
-              key=${s.id}
+              class=${'sg-time-row__card-wrap' + (dismissingIds.has(getSessionKey(s)) ? ' sg-time-row__card-wrap--collapsing' : '')}
+              key=${getSessionKey(s)}
               inert=${i < offset || i > lastVisible ? true : undefined}
             ><${SessionCard} session=${s} forceOnDemand=${forceOnDemand} showDescription=${true} /></div>`)}
           </div>

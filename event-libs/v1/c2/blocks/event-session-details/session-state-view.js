@@ -12,6 +12,7 @@ import {
   buildSessionFromMetadata,
   parseJsonMetadata,
   PLAYBACK_PHASE,
+  normalizeSessionTimes,
 } from '../../utils/video-session.js';
 import { renderSchedule } from './schedule.js';
 
@@ -28,15 +29,7 @@ export function getAllSessionTimes(doc = document) {
     logError('session-details', 'invalid session-times JSON', e);
     return [];
   }
-  const lengthMs = (Number(getMetadata('session-length-in-minutes', doc)) || 0) * 60000;
-  return (Array.isArray(entries) ? entries : [])
-    .filter((entry) => entry?.startTimeMillis)
-    .map((entry) => {
-      const start = Number(entry.startTimeMillis);
-      const end = Number(entry.endTimeMillis) || (start + lengthMs) || start;
-      return { start, end, timezone: entry.timezone || undefined };
-    })
-    .sort((a, b) => a.start - b.start);
+  return normalizeSessionTimes(entries, getMetadata('session-length-in-minutes', doc));
 }
 
 export function getSessionTimes(doc = document) {
@@ -260,12 +253,15 @@ export function mountSessionState({
     return stop;
   }
 
+  let timer = null;
   const evaluate = () => {
     const now = getNowMs();
     apply(getState(now, slots), now);
     const boundary = nextBoundary(now, slots);
-    if (boundary !== null) setTimeout(evaluate, Math.min((boundary - now) + 500, MAX_TIMEOUT));
+    if (boundary !== null) {
+      timer = setTimeout(evaluate, Math.min((boundary - now) + 500, MAX_TIMEOUT));
+    }
   };
   evaluate();
-  return undefined;
+  return () => { if (timer != null) clearTimeout(timer); };
 }
