@@ -1468,7 +1468,6 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     const error = await pending;
     expect(error.name).to.equal('TimeoutError');
     expect(error.message).to.include('request (no response) timed out after 10s for event event-1');
-    // A stall is logged as a timeout, not as a network error.
     expect(lanaLogStub.calledOnce).to.equal(true);
     expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] session catalog request (no response) timed out after 10s');
     expect(lanaLogStub.firstCall.args[0]).to.not.include('network error');
@@ -1584,7 +1583,6 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.include('wcms-events-service-platform-deploy-ethos105-stage-9a5fdc.stage.cloud.adobe.io');
   });
 
-  // Warnings, not errors: session-store retries these and logs the single error once retries run out.
   describe('fetchEslSessions failures are reported to lana as warnings', () => {
     let lanaLogStub;
 

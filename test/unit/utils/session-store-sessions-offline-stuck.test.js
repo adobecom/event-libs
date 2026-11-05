@@ -2,12 +2,12 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 
-// session-store.js keeps module-level state, so each file needs its own instance.
+// Fresh module instance per file: session-store.js keeps module-level state.
 const {
   initSessionState, sessionsStatus, SESSIONS_RETRY_DELAYS_MS, SESSIONS_OFFLINE_RETRY_MS,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
-// Real-time wait (setInterval isn't faked): the fetch path awaits a real dynamic import.
+// Real-time wait: the fetch path awaits a real dynamic import, which fake timers don't advance.
 function flush(ms = 150) {
   return new Promise((resolve) => {
     const id = setInterval(() => { clearInterval(id); resolve(); }, ms);
@@ -21,8 +21,6 @@ async function waitFor(predicate) {
   }
 }
 
-// navigator.onLine stuck at false and the 'online' event never fires (e.g. a browser that
-// misreports, or a long outage): the fallback timer must still let the store settle.
 describe('session-store: session-catalog load with navigator.onLine stuck offline (MWPW-213410)', () => {
   let clock;
   let originalFetch;

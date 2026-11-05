@@ -438,20 +438,15 @@ export function mapEslPayloadToRawSessions(payload) {
   return mapped;
 }
 
-// A stalled catalog request would otherwise leave the store in 'loading' with nothing to retry (MWPW-213410).
-// The response must start within SESSION_CATALOG_TIMEOUT_MS (a stall), then the ~220 KB gzipped body
-// gets SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS: slow 3G needs ~2s to respond but ~11s in total.
+// Response must start within 10s (a stall); the ~220 KB body then gets 20s (slow 3G takes ~11s).
 export const SESSION_CATALOG_TIMEOUT_MS = 10000;
 export const SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS = 20000;
 
-// Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost. Failures are logged as warnings
-// with the request details; session-store retries them and logs the single error once retries run out.
+// Failures log warnings; session-store retries and logs the final error.
 async function fetchEslSessions(eventId) {
   const options = await constructRequestOptions('GET', null, false, true);
-  // AbortController + setTimeout, not AbortSignal.timeout(): that's Safari 16+, and calling it on
-  // older browsers would throw and fail every attempt.
+  // Not AbortSignal.timeout(): it's Safari 16+ and throws on older browsers.
   const controller = new AbortController();
-  // Set when one of our timers aborts, so a stall isn't logged as a network error.
   let timeoutMessage = null;
   const startTimer = (ms, what) => setTimeout(() => {
     timeoutMessage = `session catalog ${what} timed out after ${ms / 1000}s for event ${eventId}`;

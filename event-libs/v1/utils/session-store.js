@@ -177,13 +177,9 @@ function maybeLoadMyData() {
   loadMyData();
 }
 
-// Delays before each retry of a failed catalog load (MWPW-213410). Status stays 'loading' until
-// one succeeds or they run out, so blocks keep their spinner instead of flashing an error. With
-// the 10s request timeout (sessions-api.js), the worst case reaches 'error' in about 37s.
+// Status stays 'loading' until a retry succeeds or they run out (worst case ~37s with the 10s timeout).
 export const SESSIONS_RETRY_DELAYS_MS = [2000, 5000];
-// While offline the store waits for the 'online' event (which repeats the same attempt) or this
-// long (which counts as the next attempt), whichever comes first. The fallback keeps a stuck
-// navigator.onLine from leaving the store loading forever: still offline after ~1 min is an error.
+// Offline: retry on 'online' (same attempt) or after this delay (next attempt), whichever is first.
 export const SESSIONS_OFFLINE_RETRY_MS = 30000;
 
 async function loadSessions(attempt = 0) {
@@ -210,8 +206,7 @@ async function loadSessions(attempt = 0) {
   } catch (err) {
     const context = `sessions fetch failed for event ${eventApiConfig.eventId} on ${getEventServiceEnv()?.name} (attempt ${attempt + 1})`;
     if (navigator.onLine === false && attempt < SESSIONS_RETRY_DELAYS_MS.length) {
-      // Offline (laptop waking, Wi-Fi switch): every request fails instantly, so retrying on the
-      // short delays would use up all attempts in ~7s. Wait for the network instead.
+      // Offline requests fail instantly; the short delays would use up every attempt in ~7s.
       logWarning('session-store,sessions', `${context}, offline; retrying when back online`, err);
       let fallbackTimer;
       let onOnline;

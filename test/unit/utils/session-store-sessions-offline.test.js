@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 
-// session-store.js keeps module-level state, so each file needs its own instance.
+// Fresh module instance per file: session-store.js keeps module-level state.
 const {
   initSessionState, sessions, sessionsStatus, SESSIONS_RETRY_DELAYS_MS, SESSIONS_OFFLINE_RETRY_MS,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
@@ -18,7 +18,7 @@ const CATALOG = {
   speakers: [],
 };
 
-// Real-time wait (setInterval isn't faked): the fetch path awaits a real dynamic import.
+// Real-time wait: the fetch path awaits a real dynamic import, which fake timers don't advance.
 function flush(ms = 150) {
   return new Promise((resolve) => {
     const id = setInterval(() => { clearInterval(id); resolve(); }, ms);
@@ -50,7 +50,7 @@ describe('session-store: session-catalog load while offline (MWPW-213410)', () =
     window.fetch = async (url) => {
       if (!String(url).includes('/event-offline/session-catalog')) return { ok: true, status: 200, json: async () => ({}) };
       catalogCalls += 1;
-      // 1: offline. 2: back online but the network isn't ready yet. 3: succeeds.
+      // Call 1 fails offline, call 2 fails right after reconnecting, call 3 succeeds.
       if (catalogCalls < 3) throw new TypeError('Load failed');
       return { ok: true, status: 200, json: async () => CATALOG };
     };

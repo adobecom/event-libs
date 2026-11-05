@@ -2,8 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 
-// session-store.js keeps module-level state, so each file needs its own instance; see
-// session-store-sessions-fetch-failed.test.js for the path where every retry fails.
+// Fresh module instance per file: session-store.js keeps module-level state.
 const {
   initSessionState, sessions, sessionsStatus, SESSIONS_RETRY_DELAYS_MS,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
@@ -19,7 +18,7 @@ const CATALOG = {
   speakers: [],
 };
 
-// Real-time wait (setInterval isn't faked): the fetch path awaits a real dynamic import.
+// Real-time wait: the fetch path awaits a real dynamic import, which fake timers don't advance.
 function flush(ms = 150) {
   return new Promise((resolve) => {
     const id = setInterval(() => { clearInterval(id); resolve(); }, ms);

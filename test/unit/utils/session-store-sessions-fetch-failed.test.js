@@ -2,21 +2,18 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 
-// session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
-// @web/test-runner does not reliably reset between test files sharing a worker session —
-// cache-bust the import so this file gets its own fresh instance regardless.
+// Fresh module instance per file: session-store.js keeps module-level state.
 const {
   initSessionState, sessionsStatus, SESSIONS_RETRY_DELAYS_MS,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
-// Real-time wait (setInterval isn't faked): the fetch path awaits a real dynamic import.
+// Real-time wait: the fetch path awaits a real dynamic import, which fake timers don't advance.
 function flush(ms = 150) {
   return new Promise((resolve) => {
     const id = setInterval(() => { clearInterval(id); resolve(); }, ms);
   });
 }
 
-// Every attempt fails, so the store only settles to 'error' after the last retry (MWPW-213410).
 async function runUntilSessionsError(clock) {
   for (let i = 0; i < 40 && sessionsStatus.value !== 'error'; i += 1) {
     // eslint-disable-next-line no-await-in-loop
@@ -68,8 +65,6 @@ describe('session-store: session-catalog fetch failure reports to lana, not cons
   });
 
   it('reports the final failure to lana as an error with the eventId and env for triage', () => {
-    // sessions-api.js logs each raw fetch failure as a warning; session-store.js adds eventId/env
-    // context: warnings while it can still retry, one error once the retries run out.
     const storeCalls = lanaLogStub.getCalls().filter((call) => call.args[1]?.tags === 'session-store,sessions');
     expect(storeCalls).to.have.lengthOf(1 + SESSIONS_RETRY_DELAYS_MS.length);
     storeCalls.slice(0, -1).forEach((call) => expect(call.args[1].severity).to.equal('warning'));
@@ -82,7 +77,6 @@ describe('session-store: session-catalog fetch failure reports to lana, not cons
   });
 
   it('sends exactly one error-level lana log, from session-store, once retries run out', () => {
-    // sessions-api.js logs each attempt's raw failure as a warning; only the store reports the error.
     const catalogCalls = lanaLogStub.getCalls().filter((call) => call.args[0]?.includes('event-99'));
     const errors = catalogCalls.filter((call) => call.args[1].severity === 'error');
     expect(errors).to.have.lengthOf(1);
