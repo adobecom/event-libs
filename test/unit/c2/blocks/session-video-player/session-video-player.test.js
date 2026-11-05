@@ -527,6 +527,22 @@ describe('session-video-player', () => {
       expect(iframe.getAttribute('loading')).to.equal('lazy');
     });
 
+    it('forwards the page serverTime to the adobetv iframe as the simulated now', async () => {
+      const originalUrl = window.location.href;
+      history.replaceState(null, '', `${window.location.pathname}?serverTime=1794339000000`);
+      try {
+        setMeta('session-times', sessionTimes());
+        setCustomAttributes();
+        const el = await embedFullWidth();
+
+        const src = new URL(getIframeSrc(el.querySelector('iframe.adobetv')));
+        expect(`${src.origin}${src.pathname}`).to.equal(`${ADOBE_TV_ORIGIN}/v/3458940`);
+        expect(src.searchParams.get('serverTime')).to.match(/^\d+$/);
+      } finally {
+        history.replaceState(null, '', originalUrl);
+      }
+    });
+
     it('wraps the iframe in a .milo-video container and loads milo iframe css', async () => {
       setMeta('session-times', sessionTimes());
       setCustomAttributes();
