@@ -3,17 +3,18 @@ import { sessions, scheduled } from '../../../../utils/session-store.js';
 import { downloadICS } from '../utils/ics.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { IconDownload } from './icons.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 // Exported for testability: the test-time htm-preact mock drops function props, so clicks can't be simulated.
 export function downloadSchedule(sessionList, scheduledIds) {
-  const scheduledSessions = sessionList.filter((s) => scheduledIds.has(s.id));
+  const scheduledSessions = sessionList.filter((s) => scheduledIds.has(getSessionKey(s)));
   if (!downloadICS(scheduledSessions)) {
     showToast({ message: 'Something went wrong downloading your schedule. Please try again.', variant: 'negative' });
   }
 }
 
 export function DownloadButton() {
-  const isEmpty = !sessions.value.some((s) => scheduled.value.has(s.id));
+  const isEmpty = !sessions.value.some((s) => scheduled.value.has(getSessionKey(s)));
 
   // No `title` attribute: it would pop a second, native tooltip on top of this custom one.
   return html`

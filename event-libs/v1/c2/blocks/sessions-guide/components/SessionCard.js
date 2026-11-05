@@ -3,7 +3,7 @@ import { useSessionGuide } from '../store/index.js';
 import {
   isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs,
 } from '../utils/time.js';
-import { isDvrPending } from '../../../../utils/session-state.js';
+import { getSessionKey, isDvrPending } from '../../../../utils/session-state.js';
 import { scheduled, favorited, pendingActions, getEventApiConfig } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { withDaaLlSuffix } from '../utils/analytics.js';
@@ -27,9 +27,10 @@ export function SessionCard({
   const dismissingIds = state.dismissingIds || new Set();
   const { userTz, surface } = guideConfig;
 
-  const isScheduled = scheduled.value.has(session.id);
+  const sessionKey = getSessionKey(session);
+  const isScheduled = scheduled.value.has(sessionKey);
   const isFavorited = favorited.value.has(session.id);
-  const isPending = pendingActions.value.has(session.id);
+  const isPending = pendingActions.value.has(session.id) || pendingActions.value.has(sessionKey);
   const schedulingEnabled = isBehaviorEnabled(guideConfig, 'enableScheduling');
   const favoritingEnabled = isBehaviorEnabled(guideConfig, 'enableFavoriting');
   const [hoverAnim, setHoverAnim] = useState(null);
@@ -64,7 +65,7 @@ export function SessionCard({
     isPending ? 'is-pending' : '',
     hoverAnim === 'fav' ? 'sg-card--anim-fav' : '',
     hoverAnim === 'sched' ? 'sg-card--anim-sched' : '',
-    dismissingIds.has(session.id) ? 'sg-card--collapsing' : '',
+    dismissingIds.has(sessionKey) ? 'sg-card--collapsing' : '',
   ].filter(Boolean).join(' ');
 
   function onMouseEnter() {
@@ -86,11 +87,11 @@ export function SessionCard({
         // eslint-disable-next-line no-unused-expressions
         cardWrap.offsetHeight; // force reflow so transition starts from current width, not none
       }
-      dispatch({ type: 'ADD_DISMISSING_ID', id: session.id });
+      dispatch({ type: 'ADD_DISMISSING_ID', id: sessionKey });
       await new Promise((r) => setTimeout(r, 450));
     }
     await actionFn();
-    if (willDismiss) dispatch({ type: 'REMOVE_DISMISSING_ID', id: session.id });
+    if (willDismiss) dispatch({ type: 'REMOVE_DISMISSING_ID', id: sessionKey });
   }
 
   async function handleSchedule(e) {
@@ -155,7 +156,7 @@ export function SessionCard({
       if (dest) window.location.href = dest;
       return;
     }
-    dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
+    dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: sessionKey });
     history.pushState({}, '', setSessionParam(sessionParamValue(session)));
   }
 

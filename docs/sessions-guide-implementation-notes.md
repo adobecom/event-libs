@@ -105,6 +105,34 @@ Two distinct RainFocus ids, easy to mix up:
 | `rfCode` | `sessionTimes[].externalSessionTimeId` (per time slot) | scheduling — `addSession` / `removeSession` |
 | `rfSessionId` | `sessions[].externalSessionId` (session level) | favoriting — `toggleSessionInterest` |
 
+Catalog sessions produce one guide entry per time, sorted by start time. Upcoming
+and Live show one card per airing; On-demand keeps one card per session, represented
+by its earliest eligible airing. This also applies to My Sessions (scheduled airings
+only) and My Favorites (all airings of a favorited session), within their existing
+day filters. No new visual treatment is added to distinguish premiere cards.
+Every card's `id`
+remains the actual catalog session ID (`sessionId` is an alias), with the same page URL and
+content. `sessionTimeId` is only the actual catalog time ID, or `''` when absent; it is never
+synthesized from RF IDs or array position. `sessionTimes` shares the raw catalog time rows
+for that session. `getSessionKey(session)` returns `sessionTimeId || id`, or `undefined` for
+an empty selection. Use this key for scheduling, pending schedule actions, time-state maps,
+notifications, and selecting a particular time. Favorites and pending favorite actions use
+the actual shared session `id`. RF mutations still use `rfCode` for scheduling and
+`rfSessionId` for favorites, not either local key.
+
+`hasMultipleSessionTimes(session)` detects distinct start/end windows, not merely distinct
+time IDs. The actual S6231 sample has two different windows but remains in-person/on-demand,
+not an online replay. OS231 has two actual time IDs with identical windows, so it remains
+one airing window. Format flags are not inferred from time multiplicity.
+
+On session pages, the schedule button targets a scheduled upcoming time, otherwise
+the next upcoming time, then an ongoing time. It does not target an expired repeat.
+MR cards with distinct airing windows use their own windows, not shared stream poll status;
+single-window MR sessions retain polling. Watch actions target the base session on the broadcast page.
+Broadcast entry links, same-page watch requests, and persisted base selections resolve to
+the currently live repeat. Explicit time IDs remain exact: an expired or upcoming card
+request is not silently replaced by another time of the same session.
+
 ### Format value folding
 
 Format values are compared on a folded form (lowercased, non-alphanumerics stripped) because

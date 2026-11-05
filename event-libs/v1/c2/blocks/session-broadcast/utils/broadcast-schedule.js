@@ -1,4 +1,5 @@
-import { deriveSessionState, isBroadcastEligible } from '../../../../utils/session-state.js';
+import { deriveSessionState, getSessionKey, isBroadcastEligible } from '../../../../utils/session-state.js';
+import { findSessionByParam } from '../../sessions-guide/utils/url.js';
 
 export const UP_NEXT_CAP = 15;
 
@@ -41,6 +42,17 @@ export function isSessionLiveNow(session, liveStreamActiveIds, nowMs) {
   return nowMs >= startMs && nowMs < sessionEndsAtMs(session);
 }
 
+// Exact card requests never silently switch to a sibling; base IDs/slugs choose a live repeat.
+export function resolveLiveSessionRequest(sessionList, param, liveStreamActiveIds, nowMs) {
+  if (!param) return null;
+  const exact = sessionList.find((s) => getSessionKey(s) === param);
+  if (exact) return isSessionLiveNow(exact, liveStreamActiveIds, nowMs) ? exact : null;
+  return findSessionByParam(
+    sessionList.filter((s) => isSessionLiveNow(s, liveStreamActiveIds, nowMs)),
+    param,
+  );
+}
+
 function isUpcoming(session, liveStreamActiveIds, nowMs) {
   return isBroadcastEligible(session)
     && hasPlayableVideoSource(session)
@@ -55,7 +67,7 @@ function byStartTimeAsc(a, b) {
 export function getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap = UP_NEXT_CAP } = {}) {
   return sessionList
     .filter((s) => isUpcoming(s, liveStreamActiveIds, nowMs))
-    .sort((a, b) => byStartTimeAsc(a, b) || a.id.localeCompare(b.id))
+    .sort((a, b) => byStartTimeAsc(a, b) || getSessionKey(a).localeCompare(getSessionKey(b)))
     .slice(0, cap);
 }
 
@@ -134,7 +146,10 @@ export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
   const ytSessions = eligible.filter((s) => getSessionBucket(s) === 'youtube');
 
   // Keyed on mpcId/youTubeId so a cancelled session still resolves to its own bucket.
-  const committedRaw = activeSessionId ? validSessions.find((s) => s.id === activeSessionId) : null;
+  const committedRaw = activeSessionId
+    ? validSessions.find((s) => getSessionKey(s) === activeSessionId)
+      || resolveLiveSessionRequest(validSessions, activeSessionId, liveStreamActiveIds, nowMs)
+    : null;
   const committedBucket = committedRaw ? getSessionBucket(committedRaw) : null;
 
   let result = { activeSession: null, pendingCandidates: null, endedSession: null };
@@ -166,11 +181,14 @@ export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
 
   const allLive = eligible.filter((s) => isSessionLiveNow(s, liveStreamActiveIds, nowMs));
   // Excludes activeSession/pendingCandidates so a session doesn't briefly render in both places.
-  const pendingIds = new Set((result.pendingCandidates || []).map((s) => s.id));
+  const pendingIds = new Set((result.pendingCandidates || []).map(getSessionKey));
   return {
     activeSession: result.activeSession,
     pendingCandidates: result.pendingCandidates,
-    alsoLive: allLive.filter((s) => s.id !== result.activeSession?.id && !pendingIds.has(s.id)),
+    alsoLive: allLive.filter(
+      (s) => getSessionKey(s) !== getSessionKey(result.activeSession)
+        && !pendingIds.has(getSessionKey(s)),
+    ),
     upNext,
     endedSession: result.endedSession,
   };

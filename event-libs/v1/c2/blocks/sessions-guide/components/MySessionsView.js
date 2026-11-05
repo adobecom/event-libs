@@ -16,7 +16,7 @@ import {
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 import { useIsPostEvent } from '../utils/use-post-event.js';
-import { deriveSessionState } from '../../../../utils/session-state.js';
+import { deriveSessionState, getSessionKey } from '../../../../utils/session-state.js';
 
 export const buildMySessionsView = () => MySessionsView;
 
@@ -48,7 +48,7 @@ export function MySessionsView() {
   // every render, not just once auth resolves — a conditional hook count corrupts Preact's
   // hook state across renders.
   const { live, timeSlots, filteredOnDemand } = useMemo(() => {
-    const scheduledSessions = sessions.filter((s) => scheduled.has(s.id));
+    const scheduledSessions = sessions.filter((s) => scheduled.has(getSessionKey(s)));
     const dayScheduled = sessionsForDay(scheduledSessions, activeDay, userTz);
 
     const liveNow = liveSessions(scheduledSessions, liveStreamActiveIds, activeDay, userTz, nowMs)

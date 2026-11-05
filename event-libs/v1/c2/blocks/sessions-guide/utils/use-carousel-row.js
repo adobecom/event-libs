@@ -3,6 +3,7 @@ import {
 } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { handOffArrowFocus, scrollToAdjacent, watchScrollEdges, widthTransitionRunning } from './carousel-nav.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 // Must match the breakpoint sessions-guide.css uses to switch into the desktop transform-carousel.
 const DESKTOP_CAROUSEL_QUERY = '(min-width: 1280px)';
@@ -24,7 +25,7 @@ function useIsDesktopCarousel() {
 export function useCarouselRow(sessions, cardStateKey) {
   const { state } = useSessionGuide();
   const dismissingIds = state.dismissingIds || new Set();
-  const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;
+  const allDismissing = sessions?.every((s) => dismissingIds.has(getSessionKey(s))) || false;
   const isDesktopCarousel = useIsDesktopCarousel();
 
   const [offset, setOffset] = useState(0);

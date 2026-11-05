@@ -20,6 +20,7 @@ import { isSafariMobile } from '../utils/browser.js';
 import { usePlayerOverlap } from '../utils/use-player-overlap.js';
 import { logWarning } from '../../../../utils/lana-log.js';
 import { containToasts } from '../../../../features/toast/toast.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
@@ -40,11 +41,11 @@ const getDefaultView = (isRegistered) => (isRegistered ? 'my-sessions' : 'live-u
 // Kept out of the effect below so it's directly unit-testable.
 export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessionsValue, authValue }) {
   if (!request || sessionsStatusValue !== 'ready') return null;
-  const found = sessionsValue.find((s) => s.id === request.sessionId);
+  const found = findSessionByParam(sessionsValue, request.sessionId);
   if (!found) return { found: false, sessionId: request.sessionId };
   return {
     found: true,
-    sessionId: found.id,
+    sessionId: getSessionKey(found),
     sessionParam: sessionParamValue(found),
     defaultView: getDefaultView(authValue.isRegistered),
   };
@@ -185,7 +186,7 @@ export function DrawerShell() {
     const sessionParam = new URLSearchParams(window.location.search).get('session');
     if (!sessionParam) return;
     const found = findSessionByParam(sessions.value, sessionParam);
-    if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
+    if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: getSessionKey(found) });
     // Bounded: URLSearchParams decodes %0A, which would forge a second log line.
     else logWarning('sessions-guide', `?session=${encodeURIComponent(sessionParam).slice(0, 100)} matched no session`);
   }, [sessionsStatus.value]);
@@ -218,9 +219,10 @@ export function DrawerShell() {
         const sessionParam = params.get('session');
         const lastDash = sessionParam.lastIndexOf('-');
         const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
-        const found = sessionsRef.current.find((s) => s.rfCode === rfCode || s.id === sessionParam);
+        const found = findSessionByParam(sessionsRef.current, sessionParam)
+          || sessionsRef.current.find((s) => s.rfCode === rfCode);
         dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: getDefaultView(auth.value.isRegistered) });
-        dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found ? found.id : null });
+        dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found ? getSessionKey(found) : null });
       } else if (params.has('sessions')) {
         dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: getDefaultView(auth.value.isRegistered) });
         dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });

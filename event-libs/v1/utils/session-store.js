@@ -15,6 +15,7 @@ import {
 import { getSwanMode } from '../features/swan-notifications/swan-config.js';
 import { mountNotificationWidget } from '../features/swan-notifications/notification-widget.js';
 import { logError, logWarning } from './lana-log.js';
+import { getSessionKey } from './session-state.js';
 
 // Preact reads `.value` directly; non-Preact code uses `.subscribe()`/`.peek()`.
 export const sessions = signal([]);
@@ -133,9 +134,9 @@ async function resolveRegistrationAndAuth() {
 }
 
 // RF's own objects, not bare ids: schedule keys on sessionTimeID, favorites on sessionID.
-function mapToSessionIds(entries, idField, matchField) {
-  const idByRf = new Map(sessions.value.map((s) => [s[matchField], s.id]));
-  return (entries || []).map((entry) => idByRf.get(entry[idField])).filter(Boolean);
+function mapToSessionIds(entries, idField, matchField, key = (session) => session.id) {
+  const rfIds = new Set((entries || []).map((entry) => entry[idField]).filter(Boolean));
+  return sessions.value.filter((s) => rfIds.has(s[matchField])).map(key);
 }
 
 // isRegistered here is a weaker fallback than resolveRegistrationAndAuth()'s — see realRegistrationKnown.
@@ -143,7 +144,7 @@ async function loadMyData() {
   try {
     const data = await fetchMyData(rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     batch(() => {
-      scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode'));
+      scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode', getSessionKey));
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
       if (!realRegistrationKnown) {
         auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
@@ -282,8 +283,10 @@ function setPending(id, isPending) {
 }
 
 export async function toggleSchedule(session) {
-  const isScheduled = scheduled.value.has(session.id);
-  setPending(session.id, true);
+  const key = getSessionKey(session);
+  if (pendingActions.value.has(key) || pendingActions.value.has(session.id)) return;
+  const isScheduled = scheduled.value.has(key);
+  setPending(key, true);
   try {
     if (isScheduled) {
       await removeSession(session.rfCode, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
@@ -291,14 +294,14 @@ export async function toggleSchedule(session) {
       await addSession(session.rfCode, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     }
   } catch (err) {
-    setPending(session.id, false);
+    setPending(key, false);
     throw err;
   }
   // Batched so components reading both `scheduled` and `pendingActions` re-render once.
   batch(() => {
-    if (isScheduled) removeFromSet(scheduled, session.id);
-    else addToSet(scheduled, session.id);
-    setPending(session.id, false);
+    if (isScheduled) removeFromSet(scheduled, key);
+    else addToSet(scheduled, key);
+    setPending(key, false);
   });
   // Fire-and-forget — a SWAN failure must never roll back the RF mutation.
   if (isScheduled) notifySessionUnscheduled(session);
@@ -306,6 +309,7 @@ export async function toggleSchedule(session) {
 }
 
 export async function toggleFavorite(session) {
+  if (pendingActions.value.has(session.id)) return;
   const isFavorited = favorited.value.has(session.id);
   setPending(session.id, true);
   try {

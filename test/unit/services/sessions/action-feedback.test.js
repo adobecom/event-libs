@@ -113,6 +113,17 @@ describe('services/sessions/action-feedback', () => {
     expect(toasts.value).to.have.lengthOf(0);
   });
 
+  it('keeps the existing time without swapping when conflicting times share the same session ID', async () => {
+    const existing = { id: 'shared-session', sessionTimeId: 'existing-time' };
+    const incoming = { id: 'shared-session', sessionTimeId: 'incoming-time' };
+    await runSessionAction(
+      () => Promise.reject(new SessionActionError('conflict', { conflict: existing, incoming })),
+      { eventConfig, actionLabel: 'add to schedule' },
+    );
+    await conflict.value.onConfirm(existing);
+    expect(toasts.value).to.have.lengthOf(0);
+  });
+
   it('shows a generic error toast and logs on any other failure', async () => {
     const actionFn = () => Promise.reject(new SessionActionError('network', { cause: new Error('boom') }));
     await runSessionAction(actionFn, { eventConfig, actionLabel: 'add to schedule' });

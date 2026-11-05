@@ -57,6 +57,16 @@ describe('resolveSessionGuideRequest', () => {
     const result = resolveSessionGuideRequest({ sessionId: 'session-1' }, context);
     expect(result.defaultView).to.equal('my-sessions');
   });
+
+  it('accepts a session-level request and retains exact card requests for repeated sessions', () => {
+    const first = { ...SESSION, sessionTimeId: '81638256-b490-489c-8d72-b4d7b00ab29f' };
+    const second = { ...first, sessionTimeId: 'e00d6647-034d-48b1-a77f-06d24415b474' };
+    const context = makeContext({ sessionsValue: [first, second] });
+    expect(resolveSessionGuideRequest({ sessionId: 'session-1' }, context).sessionId).to.equal(first.sessionTimeId);
+    const result = resolveSessionGuideRequest({ sessionId: second.sessionTimeId }, context);
+    expect(result.sessionId).to.equal(second.sessionTimeId);
+    expect(result.sessionParam).to.equal(second.sessionTimeId);
+  });
 });
 
 // The drawer and its backdrop must opt out of Milo's Lenis smooth-scroll, which is loaded

@@ -2,6 +2,7 @@ import { html } from '../../../../deps/htm-preact.js';
 import { favorited as favoritedSignal } from '../../../../utils/session-store.js';
 import { SessionCard } from './SessionCard.js';
 import { useCarouselRow } from '../utils/use-carousel-row.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 export const buildTrackRow = () => TrackRow;
 
@@ -31,8 +32,8 @@ export function TrackRow({ track, sessions }) {
         <div class="sg-time-row__viewport" ref=${viewportRef}>
           <div class="sg-time-row__cards" ref=${stripRef} style=${'transform:translateX(-' + tx + 'px)'}>
             ${sessions.map((s, i) => html`<div
-              class=${'sg-time-row__card-wrap' + (dismissingIds.has(s.id) ? ' sg-time-row__card-wrap--collapsing' : '')}
-              key=${s.id}
+              class=${'sg-time-row__card-wrap' + (dismissingIds.has(getSessionKey(s)) ? ' sg-time-row__card-wrap--collapsing' : '')}
+              key=${getSessionKey(s)}
               inert=${i < offset || i > lastVisible ? true : undefined}
             ><${SessionCard} session=${s} forceOnDemand=${true} showDescription=${true} /></div>`)}
           </div>

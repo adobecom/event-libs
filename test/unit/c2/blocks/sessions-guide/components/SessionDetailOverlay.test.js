@@ -101,6 +101,17 @@ describe('SessionDetailOverlay', () => {
     expect(SessionDetailOverlay({ onBack: () => {} })).to.equal(null);
   });
 
+  it('opens the selected time instead of the first entry sharing its session id', () => {
+    const first = makeSession({ sessionTimeId: 'first-time', title: 'First airing' });
+    const second = { ...first, sessionTimeId: 'second-time', title: 'Selected airing' };
+    setState(first);
+    sessions.value = [first, second];
+    SessionGuideContext._current.state.activeSessionId = second.sessionTimeId;
+    const out = SessionDetailOverlay({ onBack: () => {} });
+    expect(out).to.include('Selected airing');
+    expect(out).to.not.include('First airing');
+  });
+
   it('renders the title, the track badge and the meta divider between badge and time', () => {
     const out = render();
     expect(out).to.include('Day One Keynote');

@@ -40,6 +40,11 @@ describe('getWatchDestination — authored event pages', () => {
     expect(getWatchDestination(session({ isOnline: true }), 'live')).to.equal('/summit/broadcast?watch=s1');
   });
 
+  it('routes a repeated time card to the base session on the broadcast page', () => {
+    const repeated = session({ id: 's1', sessionId: 's1', sessionTimeId: 'second-time', isOnline: true });
+    expect(getWatchDestination(repeated, 'live')).to.equal('/summit/broadcast?watch=s1');
+  });
+
   it('prefers the homepage path when a session is both livestreamed and online', () => {
     const both = session({ isLivestreamed: true, isOnline: true });
     expect(getWatchDestination(both, 'live')).to.equal('/summit');

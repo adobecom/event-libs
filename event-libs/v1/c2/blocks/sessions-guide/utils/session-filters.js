@@ -121,11 +121,19 @@ export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userT
 
 // dvrDelayHours isn't read here — a session goes On Demand as soon as its state resolves there.
 export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
-  return sessions.filter((s) => {
+  const eligible = sessions.filter((s) => {
     if (s.hasOnDemandFormat) return true;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
   });
+  const bySession = new Map();
+  eligible.forEach((s) => {
+    const first = bySession.get(s.id);
+    if (!first || Date.parse(s.startTimeUtc) < Date.parse(first.startTimeUtc)) {
+      bySession.set(s.id, s);
+    }
+  });
+  return [...bySession.values()];
 }
 
 // Only the unauthored filler is capped; an authored list shows every match (MWPW-211558).
@@ -136,8 +144,9 @@ export function getRecommendedSessions(sessions, recommendedIds, activeDay, user
   const daySessions = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
 
   if (recommendedIds && recommendedIds.length > 0) {
-    const daySessionsById = new Map(daySessions.map((s) => [s.id, s]));
-    return recommendedIds.map((id) => daySessionsById.get(id)).filter(Boolean);
+    return recommendedIds.flatMap((id) => daySessions.filter(
+      (s) => s.id === id || s.sessionTimeId === id,
+    ));
   }
 
   return deterministicShuffle(daySessions, activeDay).slice(0, FALLBACK_RECOMMENDED_COUNT);
@@ -146,8 +155,9 @@ export function getRecommendedSessions(sessions, recommendedIds, activeDay, user
 // Same authored ids/order as getRecommendedSessions, but membership only: no day-scoping or shuffle.
 export function getOnDemandRecommendedSessions(sessions, recommendedIds) {
   if (!recommendedIds || recommendedIds.length === 0) return [];
-  const sessionsById = new Map(sessions.map((s) => [s.id, s]));
-  return recommendedIds.map((id) => sessionsById.get(id)).filter(Boolean);
+  return recommendedIds.flatMap((id) => sessions.filter(
+    (s) => s.id === id || s.sessionTimeId === id,
+  ));
 }
 
 function deterministicShuffle(arr, seed) {

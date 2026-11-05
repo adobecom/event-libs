@@ -13,6 +13,7 @@ import {
 } from '../../sessions-guide/components/icons.js';
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
 import { sessionDaaLh } from '../../../../utils/analytics.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
 // Collapsed vs. expanded changes which actions/meta show and clamps the description (hidden
 // entirely if favorited, mobile only — .is-favorited in the CSS). "View all details" opens the
@@ -47,7 +48,7 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
   }
 
   function handleViewAllDetails() {
-    openSessionGuideDetail(session.id);
+    openSessionGuideDetail(getSessionKey(session));
     trackBroadcastEvent(`Broadcast-Session-Detail-Open | ${session.id}`);
   }
 

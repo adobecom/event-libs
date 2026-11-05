@@ -106,6 +106,16 @@ describe('sessions-guide/utils/url', () => {
       expect(findSessionByParam(all, withUrl.id)).to.equal(withUrl);
     });
 
+    it('round-trips an exact time card even when siblings share a page slug', () => {
+      const first = { ...withUrl, sessionTimeId: '81638256-b490-489c-8d72-b4d7b00ab29f' };
+      const second = { ...first, sessionTimeId: 'e00d6647-034d-48b1-a77f-06d24415b474' };
+      const cards = [first, second];
+      expect(sessionParamValue(second)).to.equal(second.sessionTimeId);
+      expect(findSessionByParam(cards, sessionParamValue(second))).to.equal(second);
+      expect(findSessionByParam(cards, withUrl.id)).to.equal(first);
+      expect(findSessionByParam(cards, sessionUrlSlug(withUrl.sessionPageUrl))).to.equal(first);
+    });
+
     it('does not match a url-less session against a partial param', () => {
       expect(findSessionByParam(all, 'ac4af2fbdc00')).to.be.null;
       expect(findSessionByParam(all, '')).to.be.null;

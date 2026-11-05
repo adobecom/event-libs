@@ -2,6 +2,7 @@ import { html, useEffect, useRef } from '../../../../../deps/htm-preact.js';
 import { LIBS, getEventConfig } from '../../../../../utils/utils.js';
 import { trackBroadcastEvent } from '../../utils/broadcast-analytics.js';
 import { guardPlayerScroll } from '../../../../utils/player-scroll-guard.js';
+import { getSessionKey } from '../../../../../utils/session-state.js';
 
 // adobetv.css never auto-loads since Milo's block-loader never mounted this block — inject
 // once, same pattern as scripts.js's C2 foundation stylesheet.
@@ -58,7 +59,7 @@ export function MpcPlayerAdapter({ session }) {
       window.removeEventListener('message', onMessage);
       container.innerHTML = '';
     };
-  }, [session?.id]);
+  }, [getSessionKey(session)]);
 
   return html`<div class="sb-player__mount" ref=${containerRef}></div>`;
 }

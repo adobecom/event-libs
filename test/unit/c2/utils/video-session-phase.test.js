@@ -5,6 +5,9 @@ import {
   nextPhaseBoundaryMs,
   PLAYBACK_CASE,
   PLAYBACK_PHASE,
+  buildSessionFromMetadata,
+  normalizeSessionTimes,
+  currentSessionHasEnded,
 } from '../../../../event-libs/v1/c2/utils/video-session.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -26,6 +29,22 @@ const session = (overrides = {}) => ({
 
 const phase = (s, { eventStartMs = EVENT_START, liveIds = new Set() } = {}) => getPlaybackPhase(s, {
   nowMs: NOW, eventStartMs, liveStreamActiveIds: liveIds,
+});
+
+describe('catalog time-window normalization', () => {
+  it('does not treat distinct time IDs with identical windows as separate replays', () => {
+    const shared = { startTimeMillis: NOW, endTimeMillis: NOW + HOUR };
+    const slots = normalizeSessionTimes([
+      { ...shared, sessionTimeId: '1065118f-7dfd-4432-a443-178b8a95853d' },
+      { ...shared, sessionTimeId: 'd5816aa4-e689-41f1-a7dc-ec18e0b8762f' },
+    ]);
+    expect(slots).to.have.lengthOf(1);
+    expect(phase(session({
+      mrStreamId: 'stream', timeSlots: slots,
+      startTimeUtc: new Date(NOW).toISOString(),
+      endTimeUtc: new Date(NOW + HOUR).toISOString(),
+    }), { liveIds: new Set(['stream']) })).to.equal(PLAYBACK_PHASE.WATCH_LIVE);
+  });
 });
 
 describe('classifySessionPlayback — identity + DVR gate, not Format', () => {
@@ -124,6 +143,52 @@ describe('nextPhaseBoundaryMs — the clock boundaries the shared watcher schedu
     const s = session({
       startTimeUtc: new Date(NOW + HOUR).toISOString(),
       endTimeUtc: new Date(NOW + 2 * HOUR).toISOString(),
+    });
+
+    describe('multi-time session playback', () => {
+      const slots = [
+        { start: NOW, end: NOW + HOUR },
+        { start: NOW + 3 * HOUR, end: NOW + 4 * HOUR },
+        { start: NOW + 6 * HOUR, end: NOW + 7 * HOUR },
+      ];
+      const times = slots.map(({ start, end }) => ({ startTimeMillis: start, endTimeMillis: end }));
+
+      it('sorts metadata and retains every window, including per-slot duration fallbacks', () => {
+        const unsorted = [times[2], times[0], { startTimeMillis: slots[1].start }];
+        expect(normalizeSessionTimes(unsorted, 60)).to.deep.equal(
+          slots.map((slot) => ({ ...slot, timezone: undefined })),
+        );
+        const built = buildSessionFromMetadata([times[2], times[0], times[1]]);
+        expect(built.startTimeUtc).to.equal(new Date(NOW).toISOString());
+        expect(built.timeSlots).to.have.length(3);
+      });
+
+      [session({ mpcId: '123' }), session({ mrStreamId: 'mr-1' })].forEach((base) => {
+        it(`cycles every window for ${base.mrStreamId ? 'livestream' : 'MPC'} sessions`, () => {
+          const s = { ...base, timeSlots: slots };
+          const at = (nowMs) => getPlaybackPhase(s, {
+            nowMs, liveStreamActiveIds: new Set(['mr-1']),
+          });
+          expect(at(NOW - 1)).to.equal(PLAYBACK_PHASE.PRE_EVENT);
+          slots.forEach(({ start, end }) => {
+            expect(at(start)).to.equal(PLAYBACK_PHASE.WATCH_LIVE);
+            expect(at(end)).to.equal(PLAYBACK_PHASE.WATCH_LIVE);
+            expect(at(end + 1)).to.equal(PLAYBACK_PHASE.ON_DEMAND);
+          });
+          expect(at(NOW + 2 * HOUR)).to.equal(PLAYBACK_PHASE.ON_DEMAND);
+          expect(nextPhaseBoundaryMs(s, { nowMs: NOW + 2 * HOUR })).to.equal(slots[1].start);
+          expect(nextPhaseBoundaryMs(s, { nowMs: slots[1].start })).to.equal(slots[1].end);
+          expect(nextPhaseBoundaryMs(s, { nowMs: slots[2].end + 1 })).to.equal(null);
+        });
+      });
+
+      it('treats a recording as available between windows but not during another airing', () => {
+        const unsorted = [times[2], times[0], times[1]];
+        expect(currentSessionHasEnded(unsorted, NOW - 1)).to.be.false;
+        expect(currentSessionHasEnded(unsorted, NOW + 2 * HOUR)).to.be.true;
+        expect(currentSessionHasEnded(unsorted, NOW + 3 * HOUR)).to.be.false;
+        expect(currentSessionHasEnded(unsorted, NOW + 8 * HOUR)).to.be.true;
+      });
     });
     // start (+1h) and the simulive pre-roll (start − 5min) are both future; pre-roll is nearest.
     const preRoll = (NOW + HOUR) - (5 * 60 * 1000);

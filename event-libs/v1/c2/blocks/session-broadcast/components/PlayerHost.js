@@ -1,18 +1,18 @@
 import { html } from '../../../../deps/htm-preact.js';
 import { YouTubePlayerAdapter } from './players/YouTubePlayerAdapter.js';
 import { MpcPlayerAdapter } from './players/MpcPlayerAdapter.js';
+import { getSessionKey } from '../../../../utils/session-state.js';
 
-// One adapter at a time, picked by which video-source field is set. key=${session.id} forces
-// a full remount on every switch, even within the same player type.
+// The airing key remounts the player when switching between times of the same session.
 export function PlayerHost({ session }) {
   if (!session) return null;
 
   if (session.youTubeId) {
-    return html`<${YouTubePlayerAdapter} session=${session} key=${session.id} />`;
+    return html`<${YouTubePlayerAdapter} session=${session} key=${getSessionKey(session)} />`;
   }
 
   if (session.mpcId) {
-    return html`<${MpcPlayerAdapter} session=${session} key=${session.id} />`;
+    return html`<${MpcPlayerAdapter} session=${session} key=${getSessionKey(session)} />`;
   }
 
   // MobileRider (future ticket) lands here.

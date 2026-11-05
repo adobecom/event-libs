@@ -106,6 +106,25 @@ describe('swan-notifications-feds', () => {
   });
 
   describe('reconcileSwanNotifications', () => {
+    it('reconciles scheduled actual time IDs without collapsing shared session IDs', () => {
+      const first = {
+        ...makeSession('RF-first', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN }),
+        id: 'shared-session', sessionTimeId: 'first-time',
+      };
+      const second = {
+        ...makeSession('RF-second', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN }),
+        id: 'shared-session', sessionTimeId: 'second-time',
+      };
+      reconcileSwanNotifications(() => [first, second], () => new Set(['first-time', 'second-time']));
+      expect(getEntry(first.rfCode).stage).to.equal('live');
+      expect(getEntry(second.rfCode).stage).to.equal('reminder');
+      reconcileSwanNotifications(
+        () => [first, second], () => new Set(['second-time']), () => true, { refreshSchedule: true },
+      );
+      expect(getEntry(first.rfCode)).to.equal(undefined);
+      expect(getEntry(second.rfCode).stage).to.equal('reminder');
+    });
+
     it('uses the exact reminder, start and end boundaries', () => {
       const now = Date.now();
       const clock = sinon.stub(Date, 'now').returns(now);

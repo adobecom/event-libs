@@ -6,7 +6,8 @@ import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 // @web/test-runner does not reliably reset between test files sharing a worker session —
 // cache-bust the import so this file gets its own fresh instance regardless.
 const {
-  initSessionState, getEventApiConfig, sessionsStatus, scheduled, favorited, auth,
+  initSessionState, getEventApiConfig, sessions, sessionsStatus, scheduled, favorited, auth,
+  pendingActions, toggleFavorite, toggleSchedule,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 const ONLINE_FORMAT = {
@@ -29,6 +30,8 @@ describe('session-store: myData maps RF ids to our session ids', () => {
   let originalFetch;
   let jwtRequestUrl;
   let myDataRequestUrl;
+  const mutations = [];
+  let rejectMutation = false;
 
   before(async () => {
     originalFetch = window.fetch;
@@ -55,15 +58,26 @@ describe('session-store: myData maps RF ids to our session ids', () => {
             ],
             sessionTimes: [
               {
-                sessionId: 's-001', externalSessionTimeId: 'rf-S001TIME', startTimeMillis: 1000, endTimeMillis: 2000,
+                sessionId: 's-001', sessionTimeId: 's-first', externalSessionTimeId: 'rf-S001TIME', startTimeMillis: 1000, endTimeMillis: 2000,
               },
               {
-                sessionId: 'k-001', externalSessionTimeId: 'rf-K001TIME', startTimeMillis: 1000, endTimeMillis: 2000,
+                sessionId: 's-001', sessionTimeId: 's-later', externalSessionTimeId: 'rf-S001LATER', startTimeMillis: 3000, endTimeMillis: 4000,
+              },
+              {
+                sessionId: 'k-001', sessionTimeId: 'k-first', externalSessionTimeId: 'rf-K001TIME', startTimeMillis: 1000, endTimeMillis: 2000,
+              },
+              {
+                sessionId: 'k-001', sessionTimeId: 'k-later', externalSessionTimeId: 'rf-K001LATER', startTimeMillis: 3000, endTimeMillis: 4000,
               },
             ],
             speakers: [],
           }),
         };
+      }
+      if (['addSession', 'removeSession', 'toggleSessionInterest'].some((endpoint) => url.includes(endpoint))) {
+        mutations.push(url);
+        if (rejectMutation) throw new Error('mutation failed');
+        return { ok: true, json: async () => ({ responseCode: '0' }) };
       }
       myDataRequestUrl = url;
       return {
@@ -103,11 +117,55 @@ describe('session-store: myData maps RF ids to our session ids', () => {
 
   it('resolves the real RF response into eventApiConfig-backed scheduled/favorited ids', () => {
     expect(getEventApiConfig().apiUrl).to.equal('https://mock.example/api');
-    expect(scheduled.value).to.deep.equal(new Set(['s-001']));
+    expect(scheduled.value).to.deep.equal(new Set(['s-first']));
     expect(favorited.value).to.deep.equal(new Set(['k-001']));
   });
 
   it('derives isRegistered from a populated loggedInUser', () => {
     expect(auth.value.isRegistered).to.be.true;
+  });
+
+  it('toggles all cards of a favorite together while sending the session-level RF id', async () => {
+    const cards = sessions.value.filter((s) => s.sessionId === 'k-001');
+    const operation = toggleFavorite(cards[1]);
+    expect(cards.every((s) => pendingActions.value.has(s.id))).to.be.true;
+    await toggleFavorite(cards[0]);
+    await operation;
+    expect(mutations).to.have.lengthOf(1);
+    const url = new URL(mutations[0]);
+    expect(url.searchParams.get('sessionId')).to.equal('K001SESS');
+    expect(url.searchParams.has('sessionTimeId')).to.be.false;
+    expect(cards.some((s) => favorited.value.has(s.id))).to.be.false;
+    expect(pendingActions.value.size).to.equal(0);
+    await toggleFavorite(cards[0]);
+    expect(cards.every((s) => favorited.value.has(s.id))).to.be.true;
+    expect(favorited.value).to.deep.equal(new Set(['k-001']));
+  });
+
+  it('leaves favorites unchanged and clears all pending cards when a mutation fails', async () => {
+    const before = new Set(favorited.value);
+    rejectMutation = true;
+    try {
+      await toggleFavorite(sessions.value.find((s) => s.sessionId === 'k-001'));
+      expect.fail('Expected a failed mutation');
+    } catch (error) {
+      expect(error.message).to.equal('mutation failed');
+    } finally {
+      rejectMutation = false;
+    }
+    expect(favorited.value).to.deep.equal(before);
+    expect(pendingActions.value.size).to.equal(0);
+  });
+
+  it('adds and removes only the chosen slot without changing the sibling schedule', async () => {
+    const later = sessions.value.find((s) => s.rfCode === 'S001LATER');
+    const operation = toggleSchedule(later);
+    expect(pendingActions.value.has(later.sessionTimeId)).to.be.true;
+    expect(pendingActions.value.has(later.id)).to.be.false;
+    await operation;
+    expect(scheduled.value).to.deep.equal(new Set(['s-first', later.sessionTimeId]));
+    expect(new URL(mutations[mutations.length - 1]).searchParams.get('sessionTimeId')).to.equal('S001LATER');
+    await toggleSchedule(later);
+    expect(scheduled.value).to.deep.equal(new Set(['s-first']));
   });
 });

@@ -284,6 +284,30 @@ describe('session-video-playlist', () => {
       expect(rows).to.deep.equal([]);
     });
 
+    it('counts unique session pages and excludes repeats of the current session', () => {
+      const list = [
+        catalogSession({ id: 'cur', sessionTimeId: 'current-time' }),
+        catalogSession({ id: 'other', sessionTimeId: 'first-time' }),
+        catalogSession({ id: 'other', sessionTimeId: 'second-time' }),
+      ];
+      expect(resolveTopicPlaylist('cur', topics, list, 2)).to.deep.equal([]);
+      expect(resolveTopicPlaylist('cur', topics, list, 1).map((s) => s.id))
+        .to.deep.equal(['other']);
+    });
+
+    it('does not recommend an on-demand page while another airing of it is live', () => {
+      const list = [
+        catalogSession({ id: 'other', sessionTimeId: 'past-time' }),
+        catalogSession({
+          id: 'other',
+          sessionTimeId: 'live-time',
+          startTimeUtc: new Date(Date.now() - 60_000).toISOString(),
+          endTimeUtc: new Date(Date.now() + HOUR_MS).toISOString(),
+        }),
+      ];
+      expect(resolveTopicPlaylist('cur', topics, list, 1)).to.deep.equal([]);
+    });
+
     it('excludes sessions with no video source', () => {
       const rows = resolveTopicPlaylist('cur', topics, [catalogSession({ mpcId: '', youTubeId: '', mrDvrVideoId: '' })], 1);
       expect(rows).to.deep.equal([]);
@@ -558,7 +582,7 @@ describe('session-video-playlist', () => {
       expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
     });
 
-    it('removes itself if the phase reverts from ON_DEMAND back to a non-on-demand phase', async () => {
+    it('hides during another live window and restores the same playlist afterward', async () => {
       const { playlist } = buildPage();
       setMeta('session-id', 'cur');
       setMeta('session-times', sessionTimesMeta({ endTimeMillis: Date.now() - HOUR_MS }));
@@ -575,11 +599,44 @@ describe('session-video-playlist', () => {
       await flush();
       expect(playlist.querySelector('.session-video-playlist-list')).to.exist;
       expect(playlist.isConnected).to.be.true;
+      const list = playlist.querySelector('.session-video-playlist-list');
 
-      // Poll flips the session back to live → playlist must not linger.
+      for (let replay = 0; replay < 2; replay += 1) {
+        firePlayable('cur', PLAYBACK_PHASE.WATCH_LIVE);
+        await flush();
+        expect(playlist.isConnected).to.be.true;
+        expect(playlist.classList.contains('is-rendered')).to.be.false;
+        expect(BlockMediator.get('videoLayoutDecision').hasPlaylist).to.be.false;
+
+        firePlayable('cur', PLAYBACK_PHASE.ON_DEMAND);
+        await flush();
+        expect(playlist.classList.contains('is-rendered')).to.be.true;
+        expect(playlist.querySelector('.session-video-playlist-list')).to.equal(list);
+        expect(BlockMediator.get('videoLayoutDecision').hasPlaylist).to.be.true;
+      }
+    });
+
+    it('keeps a late catalog response hidden until the page returns to on-demand', async () => {
+      const { playlist } = buildPage();
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta());
+      setMeta('custom-attributes', playlistAttribute());
+      addConfigRow(playlist, 'minimum-sessions', '1');
+      sessionsStatus.value = 'loading';
+      await init(playlist);
+      firePlayable('cur', PLAYBACK_PHASE.ON_DEMAND);
       firePlayable('cur', PLAYBACK_PHASE.WATCH_LIVE);
+      sessions.value = [catalogSession({ id: 'other', sessionTimeId: 'first-time' })];
       await flush();
-      expect(playlist.isConnected).to.be.false;
+      expect(playlist.classList.contains('is-rendered')).to.be.false;
+      expect(BlockMediator.get('videoLayoutDecision').hasPlaylist).to.be.false;
+
+      firePlayable();
+      await flush();
+      expect(playlist.classList.contains('is-rendered')).to.be.true;
+      const row = playlist.querySelector('[data-item-id="other"]');
+      expect(row).to.exist;
+      expect(row.dataset.favoriteId).to.equal('other');
     });
 
     it('removes the block when the catalog is already ready but empty', async () => {

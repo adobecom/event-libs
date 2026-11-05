@@ -5,17 +5,16 @@ import {
   sessions, sessionsStatus, liveStreamActiveIds, sessionStateVersion, initSessionState,
   getEventApiConfig, watchSameSessionRequest,
 } from '../../../../utils/session-store.js';
-import { getNowMs, isPostEvent } from '../../../../utils/session-state.js';
+import { getNowMs, getSessionKey, isPostEvent } from '../../../../utils/session-state.js';
 import { getSessionGuidePath } from '../../../../utils/tier-1-event-config.js';
 import { MAX_EVENT_PAGES } from '../../../../utils/constances.js';
 import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { SessionGuideProvider } from '../../sessions-guide/store/index.js';
 import { detectUserTimezone } from '../../sessions-guide/utils/time.js';
-import { findSessionByParam } from '../../sessions-guide/utils/url.js';
 import { scrollPageToTop } from '../../sessions-guide/utils/motion.js';
 import { LoadingState, sessionsStatusMessage } from '../../sessions-guide/components/LoadingState.js';
-import { getBroadcastSchedule, isSessionLiveNow } from '../utils/broadcast-schedule.js';
+import { getBroadcastSchedule, resolveLiveSessionRequest } from '../utils/broadcast-schedule.js';
 import {
   readWatchParam, stripWatchParam, pushSessionState, getHistorySessionId,
   persistActiveSession, getPersistedSessionId, clearPersistedSession,
@@ -75,22 +74,22 @@ export function BroadcastBody({ config }) {
     const watchId = readWatchParam();
     if (!watchId) return;
     const nowMs = getNowMs();
-    const requested = findSessionByParam(sessions.value, watchId);
-    const isLive = requested && isSessionLiveNow(requested, liveStreamActiveIds.value, nowMs);
+    const requested = resolveLiveSessionRequest(sessions.value, watchId, liveStreamActiveIds.value, nowMs);
+    const isLive = !!requested;
     if (isLive) {
-      setManualSessionId(requested.id);
+      setManualSessionId(getSessionKey(requested));
     } else {
       showToast({ message: 'That session has ended — showing what’s live now.', variant: 'informative' });
       setManualSessionId(null);
       // Clears persisted storage too, so a refresh right after a dead link can't resurrect it.
       clearPersistedSession();
     }
-    stripWatchParam(isLive ? requested.id : null);
+    stripWatchParam(isLive ? getSessionKey(requested) : null);
   }, [sessionsStatus.value]);
 
   function handleSwitchSession(session) {
-    pushSessionState(session.id);
-    setManualSessionId(session.id);
+    pushSessionState(getSessionKey(session));
+    setManualSessionId(getSessionKey(session));
     trackBroadcastEvent(`Broadcast-Session-Switch | ${session.id}`);
     scheduleSwitchScroll();
   }
@@ -98,8 +97,10 @@ export function BroadcastBody({ config }) {
   // Session Guide's widget has no prop path in - watchSameSessionRequest is the only channel.
   useEffect(() => watchSameSessionRequest.subscribe((request) => {
     if (!request) return;
-    const requested = sessions.value.find((s) => s.id === request.sessionId);
-    if (requested && isSessionLiveNow(requested, liveStreamActiveIds.value, getNowMs())) {
+    const requested = resolveLiveSessionRequest(
+      sessions.value, request.sessionId, liveStreamActiveIds.value, getNowMs(),
+    );
+    if (requested) {
       handleSwitchSession(requested);
     }
   }), []);
@@ -129,20 +130,21 @@ export function BroadcastBody({ config }) {
     if (!entryResolved) return;
     if (schedule.pendingCandidates?.length) {
       const picked = schedule.pendingCandidates[Math.floor(Math.random() * schedule.pendingCandidates.length)];
-      setManualSessionId(picked.id);
+      setManualSessionId(getSessionKey(picked));
       return;
     }
-    if (schedule.activeSession && schedule.activeSession.id !== manualSessionId) {
-      setManualSessionId(schedule.activeSession.id);
+    if (schedule.activeSession && getSessionKey(schedule.activeSession) !== manualSessionId) {
+      setManualSessionId(getSessionKey(schedule.activeSession));
       return;
     }
     // Locks in the synthesized endedSession so the next-group walk-forward can take over.
-    if (schedule.endedSession && schedule.endedSession.id !== manualSessionId) {
-      setManualSessionId(schedule.endedSession.id);
+    if (schedule.endedSession && getSessionKey(schedule.endedSession) !== manualSessionId) {
+      setManualSessionId(getSessionKey(schedule.endedSession));
     }
   }, [
     entryResolved, manualSessionId,
-    schedule.activeSession?.id, schedule.pendingCandidates?.length, schedule.endedSession?.id,
+    getSessionKey(schedule.activeSession), schedule.pendingCandidates?.length,
+    getSessionKey(schedule.endedSession),
   ]);
 
   // Redirects once nothing is live/also-live/upcoming — the whole event has aired, not just today.

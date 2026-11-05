@@ -13,7 +13,7 @@ import {
   batchNotifications, allowNotification, wasNotificationRemoved,
   correctEntry,
 } from './notification-store.js';
-import { getNowMs } from '../../utils/session-state.js';
+import { getNowMs, getSessionKey } from '../../utils/session-state.js';
 import { logError, logWarning } from '../../utils/lana-log.js';
 
 const STAGE_RANK = { reminder: 1, live: 2, 'on-demand': 3 };
@@ -105,7 +105,7 @@ export function reconcileSwanNotifications(getSessions, getScheduled, isSchedule
   try {
     const swanConfig = getSwanConfig();
     const now = getNowMs();
-    const sessionsById = new Map(getSessions().map((s) => [s.id, s]));
+    const sessionsById = new Map(getSessions().map((s) => [getSessionKey(s), s]));
     const scheduledSessions = [...getScheduled()]
       .map((id) => sessionsById.get(id))
       // A scheduled session absent from the catalog (e.g. filtered out by a published

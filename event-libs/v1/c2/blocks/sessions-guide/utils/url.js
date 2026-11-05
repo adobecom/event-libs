@@ -1,3 +1,5 @@
+import { getSessionKey } from '../../../../utils/session-state.js';
+
 // Toggles the widget's own `sessions` / `session` params, preserving any others.
 // safeUrl is generic and shared with session-routing.js, so it lives in shared utils.
 export { safeUrl } from '../../../../utils/utils.js';
@@ -43,14 +45,15 @@ export function sessionUrlSlug(url) {
 
 // Falls back to the session id, which is also what openSessionGuideDetail() writes.
 export function sessionParamValue(session) {
+  if (session.sessionTimeId) return session.sessionTimeId;
   return sessionUrlSlug(session.sessionPageUrl) || session.id || '';
 }
 
 // Matched whole against either form: both carry dashes, so splitting would truncate them.
 export function findSessionByParam(sessionList, param) {
   if (!param) return null;
-  return sessionList.find(
-    (s) => sessionUrlSlug(s.sessionPageUrl) === param || s.id === param,
+  return sessionList.find((s) => getSessionKey(s) === param) || sessionList.find(
+    (s) => sessionUrlSlug(s.sessionPageUrl) === param || s.id === param || s.sessionId === param,
   ) || null;
 }
 
