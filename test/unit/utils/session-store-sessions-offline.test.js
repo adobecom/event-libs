@@ -4,7 +4,7 @@ import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 
 // session-store.js keeps module-level state, so each file needs its own instance.
 const {
-  initSessionState, sessions, sessionsStatus, SESSIONS_RETRY_DELAYS_MS,
+  initSessionState, sessions, sessionsStatus, SESSIONS_RETRY_DELAYS_MS, SESSIONS_OFFLINE_RETRY_MS,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 const CATALOG = {
@@ -71,7 +71,7 @@ describe('session-store: session-catalog load while offline (MWPW-213410)', () =
   });
 
   it('does not use up retries while the browser is offline', async () => {
-    clock.tick(Math.max(...SESSIONS_RETRY_DELAYS_MS) * 10);
+    clock.tick(SESSIONS_OFFLINE_RETRY_MS - 1);
     await flush();
     expect(catalogCalls).to.equal(1);
     expect(sessionsStatus.value).to.equal('loading');
@@ -88,6 +88,12 @@ describe('session-store: session-catalog load while offline (MWPW-213410)', () =
     await waitFor(() => sessionsStatus.value === 'ready');
     expect(catalogCalls).to.equal(3);
     expect(sessions.value.map((s) => s.id)).to.deep.equal(['s-1']);
+  });
+
+  it('cancels the offline fallback once the online event has fired', async () => {
+    clock.tick(SESSIONS_OFFLINE_RETRY_MS * 2);
+    await flush();
+    expect(catalogCalls).to.equal(3);
   });
 
   it('never reports error, and logs the offline wait without counting it as an attempt', () => {

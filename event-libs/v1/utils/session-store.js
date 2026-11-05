@@ -180,8 +180,11 @@ function maybeLoadMyData() {
 // Delays before each retry of a failed catalog load (MWPW-213410). Status stays 'loading' until
 // one succeeds or they run out, so blocks keep their spinner instead of flashing an error. With
 // the 10s request timeout (sessions-api.js), the worst case reaches 'error' in about 37s.
-// Failures while the browser is offline don't count: the store waits for the 'online' event.
 export const SESSIONS_RETRY_DELAYS_MS = [2000, 5000];
+// While offline the store waits for the 'online' event (which repeats the same attempt) or this
+// long (which counts as the next attempt), whichever comes first. The fallback keeps a stuck
+// navigator.onLine from leaving the store loading forever: still offline after ~1 min is an error.
+export const SESSIONS_OFFLINE_RETRY_MS = 30000;
 
 async function loadSessions(attempt = 0) {
   if (attempt === 0) sessionsStatus.value = 'loading';
@@ -206,11 +209,20 @@ async function loadSessions(attempt = 0) {
     maybeLoadMyData();
   } catch (err) {
     const context = `sessions fetch failed for event ${eventApiConfig.eventId} on ${getEventServiceEnv()?.name} (attempt ${attempt + 1})`;
-    if (navigator.onLine === false) {
+    if (navigator.onLine === false && attempt < SESSIONS_RETRY_DELAYS_MS.length) {
       // Offline (laptop waking, Wi-Fi switch): every request fails instantly, so retrying on the
-      // timer would use up all attempts in ~7s. Wait for the network and repeat the same attempt.
+      // short delays would use up all attempts in ~7s. Wait for the network instead.
       logWarning('session-store,sessions', `${context}, offline; retrying when back online`, err);
-      window.addEventListener('online', () => loadSessions(attempt), { once: true });
+      let fallbackTimer;
+      let onOnline;
+      const retry = (nextAttempt) => {
+        window.removeEventListener('online', onOnline);
+        clearTimeout(fallbackTimer);
+        loadSessions(nextAttempt);
+      };
+      onOnline = () => retry(attempt);
+      window.addEventListener('online', onOnline, { once: true });
+      fallbackTimer = setTimeout(() => retry(attempt + 1), SESSIONS_OFFLINE_RETRY_MS);
       return;
     }
     if (attempt < SESSIONS_RETRY_DELAYS_MS.length) {
