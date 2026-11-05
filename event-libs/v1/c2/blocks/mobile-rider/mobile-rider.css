@@ -288,11 +288,21 @@
   object-fit: revert;
 }
 
+/* Our placeholder until MR replaces it; stays hidden if MR fails to load. */
+.mobile-rider-container > video:not(.vjs-tech) {
+  display: none;
+}
+
 .marquee .asset .mobile-rider img,
 .marquee .asset .mobile-rider video {
   max-width: none !important;
   min-height: auto !important;
   max-height: none !important;
+}
+
+/* Milo's classic marquee sets video { height: auto }, which beats video.js's height: 100%. */
+.marquee .asset .mobile-rider video {
+  height: 100%;
 }
 
 @media (min-width: 1024px) {
