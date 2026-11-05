@@ -1,6 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
+import sinon from 'sinon';
 import init from '../../../../event-libs/v1/c2/blocks/event-card/event-card.js';
+import { resolveCardAction } from '../../../../event-libs/v1/utils/session-routing.js';
 
 describe('event-card', () => {
   beforeEach(() => {
@@ -154,5 +156,54 @@ describe('event-card', () => {
     const img = el.querySelector('.card-media picture img');
     expect(img).to.exist;
     expect(img.src).to.equal('https://example.com/media/session.jpg');
+  });
+
+  it('updates MR card CTAs and routing at scheduled boundaries when avoiding stream end', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
+    const el = document.querySelector('.event-card');
+    const now = Date.parse('2026-11-11T19:00:00.000Z');
+    const originalPath = window.location.pathname + window.location.search;
+    const clock = sinon.useFakeTimers({ now, toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    const fetchStub = sinon.stub(window, 'fetch').resolves({
+      ok: true,
+      json: async () => ({ active: [], inactive: ['mr-1'] }),
+    });
+
+    try {
+      window.history.replaceState(null, '', '?avoidStreamEndFlag=true');
+      Object.assign(el.dataset, {
+        sessionId: 'sess-1',
+        mrStreamId: 'mr-1',
+        sessionUrl: 'https://adobe.com/sessions/s1',
+        watchDestination: 'homepage',
+        homepageAnchorId: 'video',
+        startTimeUtc: new Date(now + 1000).toISOString(),
+        endTimeUtc: new Date(now + 2000).toISOString(),
+      });
+      Object.assign(el.querySelector('a').dataset, {
+        ctaPrior: 'Learn more',
+        ctaDuring: 'Watch now',
+        ctaAfter: 'Watch on demand',
+      });
+      await init(el);
+
+      const cta = el.querySelector('.card-cta');
+      expect(cta.textContent).to.equal('Learn more');
+
+      await clock.tickAsync(1000);
+      expect(cta.textContent).to.equal('Watch now');
+      expect(resolveCardAction(el.dataset)).to.deep.equal({ type: 'scroll', anchorId: 'video' });
+
+      await clock.tickAsync(1001);
+      expect(cta.textContent).to.equal('Watch on demand');
+      expect(cta.href).to.equal(el.dataset.sessionUrl);
+      expect(resolveCardAction(el.dataset))
+        .to.deep.equal({ type: 'navigate', url: el.dataset.sessionUrl });
+      expect(fetchStub.called).to.be.false;
+    } finally {
+      clock.restore();
+      fetchStub.restore();
+      window.history.replaceState(null, '', originalPath);
+    }
   });
 });

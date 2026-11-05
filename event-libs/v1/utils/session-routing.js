@@ -1,5 +1,7 @@
 import { LIBS, safeUrl } from './utils.js';
-import { buildWatchUrl, deriveSessionState, getNowMs, getWatchDestination } from './session-state.js';
+import {
+  buildWatchUrl, deriveSessionState, getNowMs, getWatchDestination, shouldAvoidStreamEnd,
+} from './session-state.js';
 import { openSessionGuideDetail } from './session-store.js';
 import { getHomepagePath, getBroadcastPath } from './tier-1-event-config.js';
 import { MAX_EVENT_PAGES } from './constances.js';
@@ -49,7 +51,11 @@ export function getLiveStreamActiveIds() {
 export function resolveCardAction(dataset, nowMs = getNowMs(), activeStreamIds = liveStreamActiveIds) {
   const { sessionId, sessionUrl, mrStreamId } = dataset;
   const state = deriveSessionState(
-    { startTimeUtc: dataset.startTimeUtc, endTimeUtc: dataset.endTimeUtc, mrStreamId },
+    {
+      startTimeUtc: dataset.startTimeUtc,
+      endTimeUtc: dataset.endTimeUtc,
+      mrStreamId: shouldAvoidStreamEnd() ? undefined : mrStreamId,
+    },
     activeStreamIds,
     nowMs,
   );
@@ -89,7 +95,7 @@ async function runAction(action) {
 export default function attachSessionRouting(el) {
   if (!el.dataset.sessionId) return;
 
-  if (el.dataset.mrStreamId) startMobileRiderPolling();
+  if (el.dataset.mrStreamId && !shouldAvoidStreamEnd()) startMobileRiderPolling();
 
   el.setAttribute('role', 'link');
   el.tabIndex = 0;
