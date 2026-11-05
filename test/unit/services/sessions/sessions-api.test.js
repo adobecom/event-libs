@@ -1448,6 +1448,7 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
   it('aborts the request once SESSION_CATALOG_TIMEOUT_MS passes without a response', async () => {
     setEventServiceEnvOverride('prod');
     const clock = sandbox.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const lanaLogStub = sandbox.stub(window.lana, 'log');
     let signal;
     let fetchCalled;
     const fetchStarted = new Promise((resolve) => { fetchCalled = resolve; });
@@ -1464,7 +1465,14 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(signal.aborted).to.equal(false);
     clock.tick(1);
     expect(signal.aborted).to.equal(true);
-    expect((await pending).name).to.equal('AbortError');
+    const error = await pending;
+    expect(error.name).to.equal('TimeoutError');
+    expect(error.message).to.include('request (no response) timed out after 10s for event event-1');
+    // A stall is logged as a timeout, not as a network error.
+    expect(lanaLogStub.calledOnce).to.equal(true);
+    expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] session catalog request (no response) timed out after 10s');
+    expect(lanaLogStub.firstCall.args[0]).to.not.include('network error');
+    expect(lanaLogStub.firstCall.args[1]).to.include({ tags: 'sessions-api', severity: 'warning' });
   });
 
   it('clears the timeout once the catalog has loaded', async () => {
@@ -1509,6 +1517,7 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
   it('aborts a download that takes longer than SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS', async () => {
     setEventServiceEnvOverride('prod');
     const clock = sandbox.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const lanaLogStub = sandbox.stub(window.lana, 'log');
     const { downloadStarted, getSignal } = stubSlowDownload(SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS * 2);
     const pending = fetchSessions('event-1').catch((e) => e);
     await downloadStarted;
@@ -1516,7 +1525,22 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(getSignal().aborted).to.equal(false);
     clock.tick(1);
     expect(getSignal().aborted).to.equal(true);
-    expect((await pending).name).to.equal('AbortError');
+    const error = await pending;
+    expect(error.name).to.equal('TimeoutError');
+    expect(error.message).to.include('download timed out after 20s for event event-1');
+    expect(lanaLogStub.calledOnce).to.equal(true);
+    expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] session catalog download timed out after 20s');
+    expect(lanaLogStub.firstCall.args[1]).to.include({ tags: 'sessions-api', severity: 'warning' });
+  });
+
+  it('still reports a real network error as one, not as a timeout', async () => {
+    setEventServiceEnvOverride('prod');
+    const lanaLogStub = sandbox.stub(window.lana, 'log');
+    sandbox.stub(window, 'fetch').rejects(new TypeError('Load failed'));
+    const error = await fetchSessions('event-1').catch((e) => e);
+    expect(error.name).to.equal('TypeError');
+    expect(lanaLogStub.firstCall.args[0]).to.include('network error fetching session catalog');
+    expect(lanaLogStub.firstCall.args[0]).to.not.include('timed out');
   });
 
   it('fetches from the stage CDN domain on stage', async () => {

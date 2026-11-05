@@ -180,6 +180,7 @@ function maybeLoadMyData() {
 // Delays before each retry of a failed catalog load (MWPW-213410). Status stays 'loading' until
 // one succeeds or they run out, so blocks keep their spinner instead of flashing an error. With
 // the 10s request timeout (sessions-api.js), the worst case reaches 'error' in about 37s.
+// Failures while the browser is offline don't count: the store waits for the 'online' event.
 export const SESSIONS_RETRY_DELAYS_MS = [2000, 5000];
 
 async function loadSessions(attempt = 0) {
@@ -205,6 +206,13 @@ async function loadSessions(attempt = 0) {
     maybeLoadMyData();
   } catch (err) {
     const context = `sessions fetch failed for event ${eventApiConfig.eventId} on ${getEventServiceEnv()?.name} (attempt ${attempt + 1})`;
+    if (navigator.onLine === false) {
+      // Offline (laptop waking, Wi-Fi switch): every request fails instantly, so retrying on the
+      // timer would use up all attempts in ~7s. Wait for the network and repeat the same attempt.
+      logWarning('session-store,sessions', `${context}, offline; retrying when back online`, err);
+      window.addEventListener('online', () => loadSessions(attempt), { once: true });
+      return;
+    }
     if (attempt < SESSIONS_RETRY_DELAYS_MS.length) {
       logWarning('session-store,sessions', `${context}, retrying`, err);
       setTimeout(() => loadSessions(attempt + 1), SESSIONS_RETRY_DELAYS_MS[attempt]);
