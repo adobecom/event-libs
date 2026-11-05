@@ -6,6 +6,8 @@ import init, {
   computeDrawerCapPx,
   computeDragCapPx,
   measureStickyHeaderBottom,
+  findSessionTitle,
+  findRenderedPlayer,
   clampedTitleBottom,
   resolveTopicPlaylist,
   resolveCurrentSessionTopics,
@@ -195,6 +197,15 @@ describe('session-video-playlist', () => {
       expect(computeDrawerCapPx(1000, 200, { gap: 0, playerBottom: 400 })).to.equal(600);
     });
 
+    it('still avoids the player when the title is unmeasured (MWPW-212790)', () => {
+      expect(computeDrawerCapPx(1180, null, {
+        floor: 95, gap: 16, topGap: 100, playerBottom: 472, minExpanded: 150,
+      })).to.equal(692);
+      expect(computeDrawerCapPx(600, null, {
+        floor: 95, gap: 16, playerBottom: 500, minExpanded: 150,
+      })).to.equal(150);
+    });
+
     it('respects minExpanded even when both constraints would squeeze smaller', () => {
       expect(computeDrawerCapPx(1000, 980, { gap: 16, minExpanded: 150 })).to.equal(150);
     });
@@ -241,6 +252,54 @@ describe('session-video-playlist', () => {
       header.style.cssText = 'position: fixed; top: -200px; left: 0; height: 80px; width: 100px;';
       document.body.append(header);
       expect(measureStickyHeaderBottom()).to.equal(0);
+    });
+  });
+
+  // MWPW-212790: the drawer measures these each time, inside the playlist's original section.
+  describe('findSessionTitle / findRenderedPlayer', () => {
+    let section;
+
+    beforeEach(() => {
+      section = document.createElement('div');
+      section.className = 'section';
+      document.body.append(section);
+    });
+    afterEach(() => section.remove());
+
+    it('returns null without a section or a rendered heading', () => {
+      expect(findSessionTitle(null)).to.equal(null);
+      expect(findRenderedPlayer(null)).to.equal(null);
+      section.innerHTML = '<h2 style="display: none">Session resources</h2>';
+      expect(findSessionTitle(section)).to.equal(null);
+    });
+
+    it('skips a hidden heading that comes first in the section', () => {
+      section.innerHTML = `
+        <h2 class="hidden" style="display: none">Session resources</h2>
+        <h2 class="featured">Featured products</h2>`;
+      expect(findSessionTitle(section)).to.equal(section.querySelector('.featured'));
+    });
+
+    it('prefers the session <h1> once it has rendered, even after other headings', () => {
+      section.innerHTML = `
+        <h2 class="hidden" style="display: none">Session resources</h2>
+        <h2>Featured products</h2>`;
+      const title = document.createElement('h1');
+      title.textContent = 'Session title';
+      section.prepend(title);
+      expect(findSessionTitle(section)).to.equal(title);
+    });
+
+    it('skips an empty placeholder player and returns the rendered one', () => {
+      section.innerHTML = `
+        <div class="session-video-player placeholder"><div></div></div>
+        <div class="session-video-player real" style="height: 200px"></div>`;
+      expect(findRenderedPlayer(section)).to.equal(section.querySelector('.real'));
+    });
+
+    it('returns null when no player has rendered yet', () => {
+      section.innerHTML = '<div class="session-video-player"></div>';
+      expect(findRenderedPlayer(section)).to.equal(null);
     });
   });
 

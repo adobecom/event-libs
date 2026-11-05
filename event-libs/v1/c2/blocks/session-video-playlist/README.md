@@ -306,11 +306,18 @@ DOM is confirmed.
   is capped by whichever is more restrictive of two constraints (never
   fully covers the session title's first 2 lines; never covers the video
   player either, wherever its own bottom edge is, since it may live in a
-  sibling fragment — see `findPlayerBottom`), but never shrinks below
+  sibling fragment), but never shrinks below
   `DRAWER_MIN_EXPANDED_PX` (150px, roughly one row) even on a very short
   viewport where both of those constraints would otherwise squeeze it
   smaller — the minimum floor wins in that edge case, over strict
   title/player avoidance.
+  - The title and player are looked up every time the cap is measured, inside the
+    playlist's original `.section` (the drawer itself is moved to `<body>` below
+    1024px), and only rendered elements count (`findSessionTitle`, which prefers the
+    `<h1>`, and `findRenderedPlayer`). The session details block can add its `<h1>`
+    after the playlist renders, and the section also holds viewport-hidden headings
+    and an empty placeholder player. Resolving the title once at build time could
+    measure a hidden heading and open the drawer over the whole player (MWPW-212790).
   - The chevron toggle jumps between two fixed states: fully collapsed
     (`DRAWER_FLOOR_PX`, 95px) and the cap above.
   - The handle bar (`.session-video-playlist-handle`, shown once expanded) and the
