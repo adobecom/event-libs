@@ -7,7 +7,8 @@
 One RainFocus (RF) session maps to one EMC/ESP session and one DA session page,
 even when it has multiple scheduled times. The frontend switches that page's
 experience as each airing starts and ends. Session Guide presents a card for
-each time, with all cards linking to the same session page.
+each time in Upcoming and Live, with all cards linking to the same session page.
+On-demand shows one card per session, not one per airing.
 
 Previously, AEM could generate a separate page for each replay time. The RF-to-DA
 flow requires a one-to-one session mapping to support delta syncs, so separate
@@ -47,6 +48,17 @@ The catalog produces one entry for each actual session-time row, sorted by start
 time. Entries share session content, identity, and page URL, but retain their own
 scheduled times. Rendering, detail selection, and dismissal distinguish these
 entries instead of collapsing them because they have the same session ID.
+
+Upcoming and Live keep every eligible airing and use the premiere time already
+shown on the card to distinguish them; no new visual treatment is introduced.
+On-demand keeps only the earliest eligible airing per session. After the first
+airing becomes on-demand, a later airing still moves through Upcoming and Live
+but does not add a duplicate recording card when it ends.
+
+The same rule applies to personal views: My Sessions includes only the airings
+the attendee scheduled, while My Favorites includes all airings of a favorited
+session. Their on-demand lists also show at most one eligible card per session,
+within the existing day and membership filters.
 
 ### Independent scheduling and calendar entries
 
@@ -129,3 +141,6 @@ For preview validation, use a playable session with two distinct airing windows:
    either card and verify both reflect the favorite.
 5. Schedule both times and verify the calendar contains two events linking to the
    same page. Open each time's detail link and verify the selected time is retained.
+6. After both airings end, verify only one on-demand card per session in Session
+   Guide, My Sessions, and My Favorites. Verify an upcoming or live replay remains
+   visible in its own time slot while the earlier recording is listed on-demand.

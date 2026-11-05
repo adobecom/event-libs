@@ -47,6 +47,17 @@ function makeStore(sessionList, extraState = {}) {
 }
 
 describe('OnDemandView', () => {
+  it('renders only one card for multiple ended airings linking to the same page', () => {
+    const first = { ...PAST_DESIGN, sessionTimeId: 'first-time' };
+    const second = {
+      ...first, sessionTimeId: 'second-time', startTimeUtc: h(-2), endTimeUtc: h(-1),
+    };
+    const View = buildOnDemandView(preact, makeStore([first, second]));
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = View({});
+    expect(wrapper.querySelectorAll('.sg-time-row__card-wrap')).to.have.lengthOf(1);
+  });
+
   it('renders the on-demand view container', () => {
     const store = makeStore([]);
     const View = buildOnDemandView(preact, store);

@@ -150,6 +150,45 @@ describe('session-filters/upcomingSessions', () => {
 });
 
 describe('session-filters/onDemandSessions', () => {
+  const first = { ...PAST, sessionTimeId: 'first-time' };
+  const second = {
+    ...first,
+    sessionTimeId: 'second-time',
+    startTimeUtc: new Date(NOW + 3_600_000).toISOString(),
+    endTimeUtc: new Date(NOW + 7_200_000).toISOString(),
+  };
+
+  it('keeps one recording while the next airing moves through upcoming, live, and ended', () => {
+    const entries = [first, second];
+    expect(onDemandSessions(entries, new Set(), NOW)).to.deep.equal([first]);
+    expect(upcomingSessions(entries, new Set(), getSessionDayKey(second, TZ), TZ, NOW))
+      .to.deep.equal([second]);
+
+    const duringSecond = Date.parse(second.startTimeUtc) + 60_000;
+    expect(onDemandSessions(entries, new Set(), duringSecond)).to.deep.equal([first]);
+    expect(liveSessions(entries, new Set(), getSessionDayKey(second, TZ), TZ, duringSecond))
+      .to.deep.equal([second]);
+
+    const afterSecond = Date.parse(second.endTimeUtc) + 60_000;
+    expect(onDemandSessions([second, first], new Set(), afterSecond)).to.deep.equal([first]);
+  });
+
+  it('collapses repeated on-demand-format rows but not different sessions sharing a title', () => {
+    const firstIpod = { ...first, hasOnDemandFormat: true };
+    const secondIpod = { ...second, hasOnDemandFormat: true };
+    const separateSession = { ...firstIpod, id: 'another-session' };
+    expect(onDemandSessions([secondIpod, firstIpod, separateSession], new Set(), NOW))
+      .to.deep.equal([firstIpod, separateSession]);
+  });
+
+  it('uses the eligible airing in a scoped list without introducing an unscheduled sibling', () => {
+    const afterSecond = Date.parse(second.endTimeUtc) + 60_000;
+    expect(onDemandSessions([second], new Set(), afterSecond)).to.deep.equal([second]);
+    expect(getOnDemandRecommendedSessions(
+      onDemandSessions([first, second], new Set(), afterSecond), [first.id],
+    )).to.deep.equal([first]);
+  });
+
   it('returns sessions that have ended', () => {
     const result = onDemandSessions([LIVE, UPCOMING, PAST], new Set(), NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['past']);
@@ -188,7 +227,6 @@ describe('session-filters/getRecommendedSessions', () => {
     const second = { ...first, sessionTimeId: 'second-time' };
     const entries = [first, second];
     expect(getRecommendedSessions(entries, [LIVE.id], LIVE_DAY, TZ)).to.deep.equal(entries);
-    expect(getOnDemandRecommendedSessions(entries, [LIVE.id])).to.deep.equal(entries);
     expect(getRecommendedSessions(entries, [second.sessionTimeId], LIVE_DAY, TZ))
       .to.deep.equal([second]);
   });

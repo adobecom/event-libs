@@ -105,7 +105,12 @@ Two distinct RainFocus ids, easy to mix up:
 | `rfCode` | `sessionTimes[].externalSessionTimeId` (per time slot) | scheduling — `addSession` / `removeSession` |
 | `rfSessionId` | `sessions[].externalSessionId` (session level) | favoriting — `toggleSessionInterest` |
 
-Catalog sessions produce one guide card per time, sorted by start time. Every card's `id`
+Catalog sessions produce one guide entry per time, sorted by start time. Upcoming
+and Live show one card per airing; On-demand keeps one card per session, represented
+by its earliest eligible airing. This also applies to My Sessions (scheduled airings
+only) and My Favorites (all airings of a favorited session), within their existing
+day filters. No new visual treatment is added to distinguish premiere cards.
+Every card's `id`
 remains the actual catalog session ID (`sessionId` is an alias), with the same page URL and
 content. `sessionTimeId` is only the actual catalog time ID, or `''` when absent; it is never
 synthesized from RF IDs or array position. `sessionTimes` shares the raw catalog time rows

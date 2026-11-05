@@ -121,11 +121,19 @@ export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userT
 
 // dvrDelayHours isn't read here — a session goes On Demand as soon as its state resolves there.
 export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
-  return sessions.filter((s) => {
+  const eligible = sessions.filter((s) => {
     if (s.hasOnDemandFormat) return true;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
   });
+  const bySession = new Map();
+  eligible.forEach((s) => {
+    const first = bySession.get(s.id);
+    if (!first || Date.parse(s.startTimeUtc) < Date.parse(first.startTimeUtc)) {
+      bySession.set(s.id, s);
+    }
+  });
+  return [...bySession.values()];
 }
 
 // Only the unauthored filler is capped; an authored list shows every match (MWPW-211558).
