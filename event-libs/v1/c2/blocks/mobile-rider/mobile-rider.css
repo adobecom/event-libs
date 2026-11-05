@@ -18,13 +18,6 @@
   overflow: hidden;
 }
 
-.mobile-rider .mobile-rider-container .mr-poster {
-  position: absolute;
-  inset: 0;
-  object-fit: cover;
-  display: block;
-}
-
 .mobile-rider > :not(.mobile-rider-player) {
   display: none;
 }
@@ -277,12 +270,22 @@
   padding-bottom: 56.25%;
 }
 
-.mobile-rider .mobile-rider-container video {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+/* The player renders into the page, so Milo's global heading and video styles reach MR's markup.
+   Undo them at low specificity (:where) so MR's own skin styles everything inside the player. */
+.mobile-rider-container :where(h1, h2, h3, h4, h5, h6) {
+  margin: revert;
+  font-family: revert;
+  font-size: revert;
+  font-weight: revert;
+  line-height: revert;
+  letter-spacing: revert;
+  scroll-margin-top: revert;
+}
+
+.mobile-rider-container :where(video) {
+  max-width: revert;
+  height: revert;
+  object-fit: revert;
 }
 
 .marquee .asset .mobile-rider img,
@@ -290,10 +293,6 @@
   max-width: none !important;
   min-height: auto !important;
   max-height: none !important;
-}
-
-.mobile-rider h2#title_container {
-  line-height: 1;
 }
 
 @media (min-width: 1024px) {
@@ -310,21 +309,6 @@
   .mobile-rider-player:has(.mobile-rider-info-bar) .mobile-rider-container {
     border-radius: var(--s2a-border-radius-16, 16px) var(--s2a-border-radius-16, 16px) 0 0;
   }
-}
-
-.mobile-rider :is(h1, h2, h3, h4, h5, h6):not(.mobile-rider-info-bar-title, .overlays-wrapper *) {
-  font-size: revert;
-  font-weight: revert;
-  font-family: revert;
-  line-height: revert;
-  letter-spacing: revert;
-  margin: revert;
-  scroll-margin-top: revert;
-}
-
-.mobile-rider .overlays-wrapper :is(h1, h2, h3, h4, h5, h6) {
-  letter-spacing: normal;
-  line-height: normal;
 }
 
 .standalone-link.label {
