@@ -68,8 +68,8 @@ describe('session-store: session-catalog fetch failure reports to lana, not cons
   });
 
   it('reports the final failure to lana as an error with the eventId and env for triage', () => {
-    // sessions-api.js logs each raw fetch failure; session-store.js adds eventId/env context:
-    // warnings while it can still retry, one error once the retries run out.
+    // sessions-api.js logs each raw fetch failure as a warning; session-store.js adds eventId/env
+    // context: warnings while it can still retry, one error once the retries run out.
     const storeCalls = lanaLogStub.getCalls().filter((call) => call.args[1]?.tags === 'session-store,sessions');
     expect(storeCalls).to.have.lengthOf(1 + SESSIONS_RETRY_DELAYS_MS.length);
     storeCalls.slice(0, -1).forEach((call) => expect(call.args[1].severity).to.equal('warning'));
@@ -79,6 +79,17 @@ describe('session-store: session-catalog fetch failure reports to lana, not cons
     expect(message).to.include('network error');
     expect(message).to.include(`(attempt ${1 + SESSIONS_RETRY_DELAYS_MS.length})`);
     expect(options).to.include({ tags: 'session-store,sessions', severity: 'error' });
+  });
+
+  it('sends exactly one error-level lana log, from session-store, once retries run out', () => {
+    // sessions-api.js logs each attempt's raw failure as a warning; only the store reports the error.
+    const catalogCalls = lanaLogStub.getCalls().filter((call) => call.args[0]?.includes('event-99'));
+    const errors = catalogCalls.filter((call) => call.args[1].severity === 'error');
+    expect(errors).to.have.lengthOf(1);
+    expect(errors[0].args[1].tags).to.equal('session-store,sessions');
+    const apiCalls = catalogCalls.filter((call) => call.args[1].tags === 'sessions-api');
+    expect(apiCalls).to.have.lengthOf(1 + SESSIONS_RETRY_DELAYS_MS.length);
+    apiCalls.forEach((call) => expect(call.args[1].severity).to.equal('warning'));
   });
 
   it('settles sessionsStatus to error', () => {

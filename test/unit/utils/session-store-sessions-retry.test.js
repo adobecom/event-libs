@@ -105,4 +105,13 @@ describe('session-store: session-catalog retry (MWPW-213410)', () => {
     expect(storeCalls[0].args[0]).to.include('event-retry').and.include('(attempt 1), retrying');
     expect(storeCalls[1].args[0]).to.include('(attempt 2), retrying');
   });
+
+  it('sends no error-level lana log at all when a retry succeeds', () => {
+    const catalogCalls = lanaLogStub.getCalls().filter((call) => call.args[0]?.includes('event-retry'));
+    expect(catalogCalls).to.have.lengthOf(4);
+    catalogCalls.forEach((call) => expect(call.args[1].severity).to.equal('warning'));
+    const apiCalls = catalogCalls.filter((call) => call.args[1].tags === 'sessions-api');
+    expect(apiCalls).to.have.lengthOf(2);
+    apiCalls.forEach((call) => expect(call.args[0]).to.include('network error fetching session catalog'));
+  });
 });

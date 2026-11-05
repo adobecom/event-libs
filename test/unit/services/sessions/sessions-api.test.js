@@ -1560,7 +1560,8 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
     expect(url).to.include('wcms-events-service-platform-deploy-ethos105-stage-9a5fdc.stage.cloud.adobe.io');
   });
 
-  describe('fetchEslSessions failures are reported to lana', () => {
+  // Warnings, not errors: session-store retries these and logs the single error once retries run out.
+  describe('fetchEslSessions failures are reported to lana as warnings', () => {
     let lanaLogStub;
 
     beforeEach(() => {
@@ -1581,6 +1582,7 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
       expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api]');
       expect(lanaLogStub.firstCall.args[0]).to.include('event-1');
       expect(lanaLogStub.firstCall.args[0]).to.include('503');
+      expect(lanaLogStub.firstCall.args[1]).to.include({ tags: 'sessions-api', severity: 'warning' });
     });
 
     it('logs a network error before rethrowing', async () => {
@@ -1595,6 +1597,7 @@ describe('fetchSessions CDN routing (MWPW-206486)', () => {
       expect(lanaLogStub.calledOnce).to.equal(true);
       expect(lanaLogStub.firstCall.args[0]).to.include('[sessions-api] network error fetching session catalog for event event-1');
       expect(lanaLogStub.firstCall.args[0]).to.include('offline');
+      expect(lanaLogStub.firstCall.args[1]).to.include({ tags: 'sessions-api', severity: 'warning' });
     });
   });
 });

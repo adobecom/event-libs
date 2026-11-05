@@ -3,7 +3,7 @@ import {
   getEventServiceEnv, getEventConfig, normalizeMultilineText, htmlToPlainText,
 } from '../../utils/utils.js';
 import { ADOBE_PROD_HOST, sessionCatalogHost } from '../../utils/constances.js';
-import { logError, logWarning } from '../../utils/lana-log.js';
+import { logWarning } from '../../utils/lana-log.js';
 import { sortSessionSpeakers } from '../../utils/session-speakers.js';
 
 // Catalog URLs always carry prod's host; on non-prod pages point them at the current origin instead.
@@ -444,7 +444,8 @@ export function mapEslPayloadToRawSessions(payload) {
 export const SESSION_CATALOG_TIMEOUT_MS = 10000;
 export const SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS = 20000;
 
-// Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost.
+// Public endpoint (skipAuth), CDN-fronted via sessionCatalogHost. Failures are logged as warnings
+// with the request details; session-store retries them and logs the single error once retries run out.
 async function fetchEslSessions(eventId) {
   const options = await constructRequestOptions('GET', null, false, true);
   // AbortController + setTimeout, not AbortSignal.timeout(): that's Safari 16+, and calling it on
@@ -459,13 +460,13 @@ async function fetchEslSessions(eventId) {
         signal: controller.signal,
       });
     } catch (err) {
-      logError('sessions-api', `network error fetching session catalog for event ${eventId}`, err);
+      logWarning('sessions-api', `network error fetching session catalog for event ${eventId}`, err);
       throw err;
     }
     clearTimeout(timer);
     timer = setTimeout(() => controller.abort(), SESSION_CATALOG_DOWNLOAD_TIMEOUT_MS);
     if (!res.ok) {
-      logError('sessions-api', `session catalog fetch failed for event ${eventId}`, res);
+      logWarning('sessions-api', `session catalog fetch failed for event ${eventId}`, res);
       throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
     }
     const payload = await res.json();
