@@ -1830,3 +1830,63 @@ describe('stripTags', () => {
     expect(stripTags('<a href="x"><img onerror="y">text</a>')).to.equal('text');
   });
 });
+
+// MWPW-210982: consent markup is built from DOM nodes and text, never re-parsed HTML strings.
+describe('loadConsent', () => {
+  let loadConsent;
+  let sandbox;
+  const CN_FRAGMENT = '<div><ul><li>I agree to the <a href="https://www.adobe.com/cn/privacy/policy.html">Privacy Policy</a>.</li><li>Second <strong>consent</strong>.</li></ul></div>';
+
+  before(async () => {
+    ({ loadConsent } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js'));
+    // The consent fragment goes through Milo's real fragment loader, which needs a Milo config.
+    const { getEventConfig } = await import('../../../../event-libs/v1/utils/utils.js');
+    const { setConfig } = await import(`${getEventConfig().miloConfig.miloLibs}/utils/utils.js`);
+    setConfig({ codeRoot: '/event-libs', contentRoot: '/event-libs', miloLibs: getEventConfig().miloConfig.miloLibs });
+  });
+
+  beforeEach(() => {
+    sandbox = sinon.createSandbox();
+    window.lana = { log: () => {} };
+  });
+
+  afterEach(() => {
+    sandbox.restore();
+    delete window.lana;
+  });
+
+  function buildConsentForm() {
+    const form = document.createElement('form');
+    form.innerHTML = '<div class="terms-and-conditions-wrapper"><p>old</p></div><div class="events-form-submit-wrapper"><button>Submit</button></div>';
+    return form;
+  }
+
+  it('does not load a consent fragment from another origin', async () => {
+    const form = buildConsentForm();
+    const fetchStub = sandbox.stub(window, 'fetch');
+    const lanaStub = sandbox.stub(window.lana, 'log');
+    await loadConsent(form, { path: 'https://evil.example/fragment', countryCode: 'US' });
+    expect(fetchStub.called).to.equal(false);
+    expect(form.querySelector('.terms-and-conditions-wrapper').innerHTML).to.equal('<p>old</p>');
+    expect(form.querySelector('button').disabled).to.equal(false);
+    expect(lanaStub.firstCall.args[0]).to.include('not on the event-libs origin');
+  });
+
+  it('builds the China consent checkboxes from the fragment nodes, keeping their links', async () => {
+    const form = buildConsentForm();
+    sandbox.stub(window, 'fetch').callsFake(async (url) => {
+      if (String(url).includes('/consents/fragments/ch1b')) {
+        return new Response(CN_FRAGMENT, { status: 200, headers: { 'content-type': 'text/html' } });
+      }
+      return new Response('', { status: 404 });
+    });
+    await loadConsent(form, { path: '/event-libs/assets/consents/fragments/ch1b', countryCode: 'CN' });
+    const labels = [...form.querySelectorAll('.check-item-label')];
+    expect(labels).to.have.lengthOf(2);
+    expect(labels[0].textContent).to.equal('I agree to the Privacy Policy.');
+    expect(labels[0].querySelector('a')?.getAttribute('href')).to.equal('https://www.adobe.com/cn/privacy/policy.html');
+    expect(labels[1].querySelector('strong')?.textContent).to.equal('consent');
+    expect(form.querySelector('.terms-and-conditions-wrapper ul')).to.equal(null);
+    expect(form.querySelector('button').disabled).to.equal(true);
+  });
+});
