@@ -119,17 +119,43 @@ describe('Featured Products', () => {
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Products');
   });
 
-  it('omits the count at the visible limit and shows it just above', async () => {
+  it('omits the count at the mobile limit (4) and shows it just above', async () => {
     let el = block();
-    setProducts(Array.from({ length: 6 }, (_, i) => `Product ${i}`));
+    setProducts(Array.from({ length: 4 }, (_, i) => `Product ${i}`));
     await init(el);
     expect(el.querySelector('.featured-products-title').textContent).to.equal('Featured products');
     expect(el.querySelector('.featured-products-count')).to.be.null;
+    expect(el.querySelector('.featured-products-toggle')).to.be.null;
 
     el = block();
     setProducts(Array.from({ length: 7 }, (_, i) => `Product ${i}`));
     await init(el);
-    expect(el.querySelector('.featured-products-count').textContent).to.equal(' (7)');
+    const count = el.querySelector('.featured-products-count');
+    expect(count.textContent).to.equal(' (7)');
+    expect(count.classList.contains('is-mobile-only')).to.be.false;
+  });
+
+  it('truncates to 4 on mobile and 6 on desktop', async () => {
+    setProducts(Array.from({ length: 10 }, (_, i) => `Product ${i}`));
+    const el = block();
+    await init(el);
+    const items = [...el.querySelectorAll('.featured-product')];
+    expect(items.slice(0, 4).every((li) => li.className === 'featured-product')).to.be.true;
+    expect(items.slice(4, 6).every((li) => li.classList.contains('is-overflow-mobile'))).to.be.true;
+    expect(items.slice(6).every((li) => li.classList.contains('is-overflow'))).to.be.true;
+    expect(el.querySelector('.featured-products-toggle').classList.contains('is-mobile-only')).to.be.false;
+  });
+
+  it('shows the count and toggle on mobile only when products are within the desktop limit', async () => {
+    setProducts(Array.from({ length: 6 }, (_, i) => `Product ${i}`));
+    const el = block();
+    await init(el);
+    expect(el.querySelectorAll('.featured-product.is-overflow')).to.have.lengthOf(0);
+    expect(el.querySelectorAll('.featured-product.is-overflow-mobile')).to.have.lengthOf(2);
+    const count = el.querySelector('.featured-products-count');
+    expect(count.textContent).to.equal(' (6)');
+    expect(count.classList.contains('is-mobile-only')).to.be.true;
+    expect(el.querySelector('.featured-products-toggle').classList.contains('is-mobile-only')).to.be.true;
   });
 
   it('removes the block entirely when there are no products', async () => {
