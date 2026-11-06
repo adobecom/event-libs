@@ -71,4 +71,51 @@ describe('services/poller', () => {
     expect([...updates[0].active]).to.deep.equal(['pl-live']);
     expect([...updates[0].inactive].sort()).to.deep.equal(['pl-bad', 'pl-later']);
   });
+
+  describe('when every stream is inactive', () => {
+    const HOUR_MS = 3_600_000;
+    const iso = (offsetMs) => new Date(Date.now() + offsetMs).toISOString();
+    let live;
+
+    beforeEach(() => {
+      live = new Set();
+      window.fetch = async (url) => {
+        const ids = new URL(url).searchParams.get('ids').split(',');
+        return new Response(JSON.stringify({
+          active: ids.filter((id) => live.has(id)),
+          inactive: ids.filter((id) => !live.has(id)),
+        }));
+      };
+    });
+
+    it('keeps polling before the sessions end, so a stream going live is picked up', async () => {
+      const mrSessions = [
+        { mrStreamId: 'up-keynote', startTimeUtc: iso(HOUR_MS), endTimeUtc: iso(2 * HOUR_MS) },
+      ];
+      startPolling(mrSessions, 'dev', (active) => updates.push(active), 40);
+      await new Promise((r) => setTimeout(r, 60));
+      expect(updates.length).to.be.at.least(1);
+      expect(updates[0].size).to.equal(0);
+
+      live.add('up-keynote');
+      await new Promise((r) => setTimeout(r, 120));
+      expect(updates.some((active) => active.has('up-keynote'))).to.be.true;
+    });
+
+    it('keeps polling when a session has no parseable end time', async () => {
+      startPolling([{ mrStreamId: 'no-end' }], 'dev', () => updates.push(1), 40);
+      await new Promise((r) => setTimeout(r, 150));
+      expect(updates.length).to.be.at.least(2);
+    });
+
+    it('stops polling once every session has ended', async () => {
+      const mrSessions = [
+        { mrStreamId: 'done-1', startTimeUtc: iso(-3 * HOUR_MS), endTimeUtc: iso(-2 * HOUR_MS) },
+        { mrStreamId: 'done-2', startTimeUtc: iso(-2 * HOUR_MS), endTimeUtc: iso(-HOUR_MS) },
+      ];
+      startPolling(mrSessions, 'dev', () => updates.push(1), 40);
+      await new Promise((r) => setTimeout(r, 150));
+      expect(updates.length).to.equal(1);
+    });
+  });
 });
