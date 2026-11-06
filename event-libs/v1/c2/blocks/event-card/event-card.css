@@ -93,8 +93,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-
-  /* 16px side inset (Figma) keeps long titles off the neighboring card. */
   padding: 24px 16px 0;
 }
 
