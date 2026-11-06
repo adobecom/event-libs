@@ -34,6 +34,24 @@ describe('event-card', () => {
     expect(el.querySelector('.card-cta').textContent).to.equal('Learn more');
   });
 
+  it('insets the title, description and CTA 16px from both card edges', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
+    const el = document.querySelector('.event-card');
+    await init(el);
+    const link = document.head.querySelector('link[href$="/event-card.css"]');
+    if (!link.sheet) await new Promise((resolve) => { link.addEventListener('load', resolve, { once: true }); });
+    el.querySelector('.card-title').textContent = 'A very long featured session title that wraps across several lines';
+
+    const card = el.getBoundingClientRect();
+    ['.card-title', '.card-description', '.card-cta'].forEach((selector) => {
+      const box = el.querySelector(selector).getBoundingClientRect();
+      expect(Math.round(box.left - card.left), `${selector} left inset`).to.equal(16);
+      expect(card.right - box.right, `${selector} right inset`).to.be.at.least(16);
+    });
+    const title = el.querySelector('.card-title').getBoundingClientRect();
+    expect(Math.round(card.right - title.right)).to.equal(16);
+  });
+
   it('renders a body-layout card for media-wide too', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/media-wide.html' });
     const el = document.querySelector('.event-card');
