@@ -47,6 +47,29 @@
   display: flex;
 }
 
+.featured-products-count.is-mobile-only,
+.featured-products-toggle.is-mobile-only {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .featured-product.is-overflow-mobile {
+    display: none;
+  }
+
+  .event-featured-products.is-expanded .featured-product.is-overflow-mobile {
+    display: flex;
+  }
+
+  .featured-products-count.is-mobile-only {
+    display: inline;
+  }
+
+  .featured-products-toggle.is-mobile-only {
+    display: inline-flex;
+  }
+}
+
 .featured-product-tile {
   position: relative;
   display: flex;
