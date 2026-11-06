@@ -1872,7 +1872,7 @@ describe('loadConsent', () => {
     expect(lanaStub.firstCall.args[0]).to.include('not on the event-libs origin');
   });
 
-  it('builds the China consent checkboxes from the fragment nodes, keeping their links', async () => {
+  it('moves the China consent nodes into the checkbox labels, keeping their links', async () => {
     const form = buildConsentForm();
     sandbox.stub(window, 'fetch').callsFake(async (url) => {
       if (String(url).includes('/consents/fragments/ch1b')) {
@@ -1880,11 +1880,22 @@ describe('loadConsent', () => {
       }
       return new Response('', { status: 404 });
     });
+    // Keep a reference to the fragment's link once it's in the DOM, to check the label holds that same node.
+    const wrapper = form.querySelector('.terms-and-conditions-wrapper');
+    let fragmentLink = null;
+    const observer = new MutationObserver(() => {
+      fragmentLink ??= wrapper.querySelector('li a');
+    });
+    observer.observe(wrapper, { childList: true, subtree: true });
     await loadConsent(form, { path: '/event-libs/assets/consents/fragments/ch1b', countryCode: 'CN' });
+    observer.disconnect();
     const labels = [...form.querySelectorAll('.check-item-label')];
     expect(labels).to.have.lengthOf(2);
     expect(labels[0].textContent).to.equal('I agree to the Privacy Policy.');
     expect(labels[0].querySelector('a')?.getAttribute('href')).to.equal('https://www.adobe.com/cn/privacy/policy.html');
+    // Moved, not re-parsed: the label holds the fragment's own <a> element.
+    expect(fragmentLink).to.not.equal(null);
+    expect(labels[0].querySelector('a')).to.equal(fragmentLink);
     expect(labels[1].querySelector('strong')?.textContent).to.equal('consent');
     expect(form.querySelector('.terms-and-conditions-wrapper ul')).to.equal(null);
     expect(form.querySelector('button').disabled).to.equal(true);
