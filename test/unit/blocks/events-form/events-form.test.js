@@ -894,10 +894,12 @@ describe('Events Form', () => {
   describe('submitForm RSVP token submit routing', () => {
     let sandbox;
     let submitForm;
+    let isEventFullError;
 
     before(async () => {
       const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
       submitForm = module.submitForm;
+      isEventFullError = module.isEventFullError;
     });
 
     beforeEach(() => {
@@ -922,14 +924,23 @@ describe('Events Form', () => {
       return form;
     }
 
-    it('registers a guest via the normal attendee flow, sending both the guest IMS token and the rsvp-token header', async () => {
+    const isWrite = (call) => call.args[1]?.method === 'POST';
+
+    function stubSubmitFlow() {
+      return sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('campaign-map.json')) return Promise.resolve({ ok: false, status: 404 });
+        if (typeof url === 'string' && url.includes('/attendees')) {
+          return Promise.resolve({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true, status: 201 });
+        }
+        return Promise.resolve({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      });
+    }
+
+    it('registers a guest with ONE write request, sending both the guest IMS token and the rsvp-token header', async () => {
       const originalAdobeIMS = window.adobeIMS;
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
-      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+      const fetchStub = stubSubmitFlow();
 
       const result = await submitForm({ form: buildForm(), sanitizeList: [] });
       window.adobeIMS = originalAdobeIMS;
@@ -938,56 +949,42 @@ describe('Events Form', () => {
       expect(result.data).to.have.property('registrationStatus', 'registered');
       const urls = fetchStub.getCalls().map((call) => call.args[0]);
       expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
-      expect(urls[1]).to.include('/v1/attendees');
-      expect(urls[2]).to.include('/v1/events/test-event-id/attendees/att-1');
-      const createOptions = fetchStub.getCall(1).args[1];
-      const addToEventOptions = fetchStub.getCall(2).args[1];
-      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
-      expect(createOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
-      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
-      expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
+      const writes = fetchStub.getCalls().filter(isWrite);
+      expect(writes).to.have.length(1);
+      expect(writes[0].args[0]).to.include('/v1/events/test-event-id/attendees/');
+      expect(urls.some((url) => /\/v1\/attendees/.test(url))).to.be.false;
+      const { headers } = writes[0].args[1];
+      expect(headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(headers.get('Authorization')).to.equal('Bearer fake-token');
     });
 
     it('still forwards a real signed-in session\'s IMS token when the rsvp link is opened while signed in — Cluster Gateway requires one either way', async () => {
       const originalAdobeIMS = window.adobeIMS;
       window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
-      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+      const fetchStub = stubSubmitFlow();
 
       await submitForm({ form: buildForm(), sanitizeList: [] });
       window.adobeIMS = originalAdobeIMS;
 
-      const createOptions = fetchStub.getCall(1).args[1];
-      const addToEventOptions = fetchStub.getCall(2).args[1];
-      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
-      expect(createOptions.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
-      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
-      expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
+      const { headers } = fetchStub.getCalls().find(isWrite).args[1];
+      expect(headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(headers.get('Authorization')).to.equal('Bearer assistants-own-token');
     });
 
-    it('forwards a routed campaign in the body of the add-to-event call — same body schema as the normal attendee flow', async () => {
+    it('forwards a routed campaign in the body of the single request', async () => {
       resetCampaignMapCache();
       window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
-      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
-        if (typeof url === 'string' && url.includes('campaign-map.json')) {
-          return Promise.resolve({ ok: false, status: 404 });
-        }
-        if (typeof url === 'string' && url.includes('/v1/attendees') && !url.includes('/events/')) {
-          return Promise.resolve({ json: () => ({ attendeeId: 'att-1' }), ok: true });
-        }
-        return Promise.resolve({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
-      });
+      const fetchStub = stubSubmitFlow();
 
       try {
         await submitForm({ form: buildForm(), sanitizeList: [] });
 
-        const addToEventCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/attendees/att-1'));
-        expect(addToEventCall.args[0]).to.not.include('campaignId');
-        const body = JSON.parse(addToEventCall.args[1].body);
+        const writes = fetchStub.getCalls().filter(isWrite);
+        expect(writes).to.have.length(1);
+        expect(writes[0].args[0]).to.not.include('campaignId');
+        const body = JSON.parse(writes[0].args[1].body);
         expect(body).to.have.property('campaignId', 'camp-1');
         expect(body.firstName).to.equal('Guest');
       } finally {
@@ -996,21 +993,55 @@ describe('Events Form', () => {
       }
     });
 
-    it('registers a non-guest via IMS auth with no rsvp-token header', async () => {
+    it('registers a non-guest via IMS auth with ONE write request and no rsvp-token header', async () => {
       BlockMediator.set('imsProfile', { account_type: 'type1' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => ({ message: 'Not found' }), ok: false, status: 404 });
-      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-2' }), ok: true });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+      const fetchStub = stubSubmitFlow();
 
       const result = await submitForm({ form: buildForm(), sanitizeList: [] });
 
       expect(result.ok).to.be.true;
       const urls = fetchStub.getCalls().map((call) => call.args[0]);
       expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
-      const createOptions = fetchStub.getCall(2).args[1];
-      expect(createOptions.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
+      const writes = fetchStub.getCalls().filter(isWrite);
+      expect(writes).to.have.length(1);
+      expect(writes[0].args[1].headers.has('x-adobe-esp-rsvp-token')).to.be.false;
+      const body = JSON.parse(writes[0].args[1].body);
+      expect(body).to.include({ firstName: 'Guest', lastName: 'User', email: 'guest@test.com', registrationStatus: 'registered' });
+    });
+
+    it('sends waitlisted registrationStatus in the single request when the event is full', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'type1' });
+      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('/attendees')) {
+          return Promise.resolve({ json: () => ({ registrationStatus: 'waitlisted' }), ok: true, status: 201 });
+        }
+        return Promise.resolve({ json: () => ({ eventId: 'test-event-id', isFull: true }), ok: true });
+      });
+
+      const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+
+      expect(result.data.registrationStatus).to.equal('waitlisted');
+      const writes = fetchStub.getCalls().filter(isWrite);
+      expect(writes).to.have.length(1);
+      expect(JSON.parse(writes[0].args[1].body).registrationStatus).to.equal('waitlisted');
+    });
+
+    it('surfaces a structured validation failure (never an event-full result) from the single request', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'type1' });
+      const body = { code: 'RsvpValidationError', message: 'invalid', fieldErrors: [{ field: 'email', code: 'FieldInvalidFormat', message: 'bad' }] };
+      sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('/attendees')) {
+          return Promise.resolve({ text: () => JSON.stringify(body), ok: false, status: 400 });
+        }
+        return Promise.resolve({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      });
+
+      const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+
+      expect(result.ok).to.be.false;
+      expect(result.code).to.equal('RsvpValidationError');
+      expect(result.fieldErrors[0].field).to.equal('email');
+      expect(isEventFullError(result.status, result.error)).to.be.false;
     });
   });
 
@@ -1263,6 +1294,152 @@ describe('Events Form', () => {
       const errorEl = form.querySelector('.error');
       expect(errorEl).to.not.be.null;
       expect(errorEl.textContent).to.equal('rsvp-error-msg');
+    });
+
+    describe('structured error codes', () => {
+      const message = async (status, error, eventResp = { json: () => ({ allowWaitlisting: false }), ok: true }) => {
+        stubFetchByUrl(eventResp);
+        const form = document.createElement('form');
+        await buildErrorMsg(form, status, error);
+        return form.querySelector('.error')?.textContent;
+      };
+
+      it('RsvpValidationError shows the invalid-submission message, never an event-full one', async () => {
+        const text = await message(400, { code: 'RsvpValidationError', message: 'Event is full', fieldErrors: [{ field: 'email', code: 'FieldInvalidFormat' }] });
+        expect(text).to.equal('There was a problem with the information you submitted. Please check your entries and try again.');
+        expect(text).to.not.include('full');
+      });
+
+      it('EventFull uses the event-full keys (waitlist-aware)', async () => {
+        expect(await message(400, { code: 'EventFull', message: 'x' })).to.equal('event-full-no-waitlist-error-msg');
+        expect(await message(400, { code: 'EventFull', message: 'x' }, { json: () => ({ allowWaitlisting: true }), ok: true })).to.equal('event-full-error-msg');
+      });
+
+      it('CampaignFull uses the campaign-full keys', async () => {
+        expect(await message(409, { code: 'CampaignFull', message: 'x' })).to.equal('campaign-full-no-waitlist-error-msg');
+      });
+
+      it('AttendeeAlreadyRegistered shows the already-registered message for guests without a token', async () => {
+        expect(await message(409, { code: 'AttendeeAlreadyRegistered', message: 'x' })).to.equal('This email is already registered for this event.');
+      });
+
+      it('InvalidAttendeeToken shows the token-invalid message', async () => {
+        expect(await message(400, { code: 'InvalidAttendeeToken', message: 'x' })).to.equal('This registration link is no longer valid. It may have already been used or expired.');
+      });
+
+      it('InviteOnlyEvent and CampaignNotFound show the invitation-only message', async () => {
+        const expected = 'Registration is only available through a valid invitation link.';
+        expect(await message(403, { code: 'InviteOnlyEvent', message: 'x' })).to.equal(expected);
+        expect(await message(404, { code: 'CampaignNotFound', message: 'x' })).to.equal(expected);
+      });
+
+      it('WaitlistingNotAllowed shows the no-waitlist full message', async () => {
+        expect(await message(403, { code: 'WaitlistingNotAllowed', message: 'x' })).to.equal('event-full-no-waitlist-error-msg');
+      });
+
+      it('other known codes fall back to the general failure message', async () => {
+        const codes = [['EventNotFull', 400], ['EventNotFound', 404], ['NonexistentAttendee', 404], ['InvalidExternalIdMapping', 400]];
+        for (const [code, status] of codes) {
+          // eslint-disable-next-line no-await-in-loop
+          expect(await message(status, { code, message: 'x' })).to.equal('rsvp-error-msg');
+        }
+      });
+    });
+  });
+
+  describe('isEventFullError', () => {
+    let isEventFullError;
+
+    before(async () => {
+      ({ isEventFullError } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js'));
+    });
+
+    it('is true only for the EventFull code, or the legacy plain-text 400 body', () => {
+      expect(isEventFullError(400, { code: 'EventFull' })).to.be.true;
+      expect(isEventFullError(400, 'Event is full')).to.be.true;
+      expect(isEventFullError(400, { message: 'Event is full' })).to.be.true;
+    });
+
+    it('is false for validation failures even if the message says "Event is full"', () => {
+      expect(isEventFullError(400, { code: 'RsvpValidationError', message: 'Event is full' })).to.be.false;
+      expect(isEventFullError(409, { code: 'AttendeeAlreadyRegistered' })).to.be.false;
+      expect(isEventFullError(400, 'Custom field x is required')).to.be.false;
+      expect(isEventFullError('Network Error', 'Event is full')).to.be.false;
+    });
+  });
+
+  describe('showFieldErrors', () => {
+    let showFieldErrors;
+    let clearFieldErrors;
+    let form;
+
+    before(async () => {
+      ({ showFieldErrors, clearFieldErrors } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js'));
+    });
+
+    beforeEach(() => {
+      form = document.createElement('form');
+      form.innerHTML = `
+        <div class="field-wrapper" data-field-id="companyName"><label for="companyName">Company</label><input id="companyName" type="text"></div>
+        <div class="field-wrapper" data-field-id="industry"><select id="industry"><option value="">-</option></select></div>
+        <div class="field-wrapper" data-field-id="interests" data-type="checkbox-group">
+          <input type="checkbox" name="interests" id="interests-a" value="a">
+        </div>`;
+      document.body.append(form);
+    });
+
+    afterEach(() => form.remove());
+
+    it('shows a field-level message next to each matching control and wires aria attributes', async () => {
+      const unmatched = await showFieldErrors(form, [
+        { field: 'companyName', code: 'FieldRequired', message: 'ignored server text' },
+        { field: 'industry', code: 'FieldInvalidOption' },
+        { field: 'interests', code: 'FieldInvalidType' },
+      ]);
+
+      expect(unmatched).to.deep.equal([]);
+      const messages = form.querySelectorAll('.field-error');
+      expect(messages).to.have.length(3);
+      const input = form.querySelector('#companyName');
+      expect(input.getAttribute('aria-invalid')).to.equal('true');
+      const described = form.querySelector(`#${input.getAttribute('aria-describedby')}`);
+      expect(described.textContent).to.equal('This field is required.');
+      expect(described.getAttribute('role')).to.equal('alert');
+      expect(form.querySelector('[data-field-id="industry"] .field-error').textContent).to.equal('Please choose a valid option.');
+    });
+
+    it('returns fields that have no matching control so the caller can show a general message', async () => {
+      const unmatched = await showFieldErrors(form, [{ field: 'notOnForm', code: 'FieldUnknown' }, { field: 'companyName', code: 'FieldTooLong' }]);
+
+      expect(unmatched).to.deep.equal(['notOnForm']);
+      expect(form.querySelectorAll('.field-error')).to.have.length(1);
+    });
+
+    it('falls back to the invalid-submission copy for an unrecognized code', async () => {
+      await showFieldErrors(form, [{ field: 'companyName', code: 'SomethingNew' }]);
+
+      expect(form.querySelector('.field-error').textContent).to.equal('There was a problem with the information you submitted. Please check your entries and try again.');
+    });
+
+    it('clears the message and aria state when the user edits the field', async () => {
+      await showFieldErrors(form, [{ field: 'companyName', code: 'FieldRequired' }]);
+      const input = form.querySelector('#companyName');
+
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+
+      expect(form.querySelector('.field-error')).to.be.null;
+      expect(input.hasAttribute('aria-invalid')).to.be.false;
+    });
+
+    it('replaces earlier messages on re-validation and clearFieldErrors removes everything', async () => {
+      await showFieldErrors(form, [{ field: 'companyName', code: 'FieldRequired' }]);
+      await showFieldErrors(form, [{ field: 'industry', code: 'FieldInvalidOption' }]);
+      expect(form.querySelectorAll('.field-error')).to.have.length(1);
+      expect(form.querySelector('#companyName').hasAttribute('aria-invalid')).to.be.false;
+
+      clearFieldErrors(form);
+      expect(form.querySelectorAll('.field-error')).to.have.length(0);
+      expect(form.querySelector('[aria-invalid]')).to.be.null;
     });
   });
 
