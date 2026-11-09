@@ -150,3 +150,23 @@ export function getUnrecognizedAttendeeFields(attendeeData) {
   }, {});
 }
 
+/**
+ * Builds the flat payload for the atomic RSVP submit: every submitted form field
+ * (base profile, event, and custom) in one object. Which fields belong to the base
+ * profile vs. the event registration is decided server-side, so no routing happens here.
+ * Empty values and prototype-chain keys are dropped; boolean event fields are coerced.
+ * @param {Object} attendeeData - Raw form payload.
+ * @param {string} registrationStatus - 'registered' | 'waitlisted'.
+ * @returns {Object}
+ */
+export function getRsvpPayload(attendeeData, registrationStatus) {
+  return Object.entries({ ...attendeeData, registrationStatus }).reduce((acc, [key, value]) => {
+    if (UNSAFE_KEYS.has(key)) return acc;
+    const nextValue = EVENT_ATTENDEE_DATA_FILTER[key]?.type === 'boolean'
+      ? coerceBoolean(key, value)
+      : value;
+    if (isValidAttribute(nextValue)) acc[key] = nextValue;
+    return acc;
+  }, {});
+}
+
