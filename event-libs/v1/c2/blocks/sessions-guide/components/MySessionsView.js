@@ -2,7 +2,7 @@ import { html, useMemo, useEffect } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, scheduled as scheduledSignal,
-  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
+  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion, getEventApiConfig,
 } from '../../../../utils/session-store.js';
 import { checkViewAccess, isAuthResolved } from '../../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
@@ -138,7 +138,9 @@ export function MySessionsView() {
         `}
         ${effectiveTab === 'on-demand' && html`
           <div class="sg-my-sessions__on-demand">
-            ${groupByTrack(filteredOnDemand, state.guideConfig?.swimlaneOrder).map(([track, trackSessions, label]) => html`
+            ${groupByTrack(filteredOnDemand, state.guideConfig?.swimlaneOrder, {
+    nowMs, eventStartMs: getEventApiConfig()?.eventStartMs,
+  }).map(([track, trackSessions, label]) => html`
               <${TrackRow} key=${track} track=${label} sessions=${trackSessions} />
             `)}
           </div>
