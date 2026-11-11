@@ -1,5 +1,5 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
-import { deriveSessionState, isInLiveNow } from '../../../../utils/session-state.js';
+import { deriveSessionState, isInLiveNow, isDvrPending } from '../../../../utils/session-state.js';
 import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../../utils/tier-1-event-config.js';
 import { sessionDescriptionText } from './rich-text.js';
 
@@ -72,8 +72,37 @@ export function resolveTrackBadge(session) {
   };
 }
 
+const compare = (a, b) => {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+};
+
+// A session with no time yet sorts after every timed one.
+const startMs = (session) => {
+  const ms = Date.parse(session.startTimeUtc);
+  return Number.isNaN(ms) ? Infinity : ms;
+};
+
+// In-person on-demand and "AVAILABLE SOON" cards go last (MWPW-215102); isDvrPending is the
+// same check behind SessionCard's label. Each group runs earliest start first. A keynote and
+// its ASL version share a start time, so the session code (GS1 before GS1-0) breaks the tie.
+export function sortTrackSessions(sessions, { nowMs, eventStartMs } = {}) {
+  return sessions
+    .map((session) => ({
+      session,
+      last: Boolean(session.hasOnDemandFormat) || isDvrPending(session, nowMs, eventStartMs),
+      start: startMs(session),
+    }))
+    .sort((a, b) => compare(a.last, b.last)
+      || compare(a.start, b.start)
+      || (a.session.sessionCode || '').localeCompare(b.session.sessionCode || '', 'en', { numeric: true })
+      || compare(String(a.session.id), String(b.session.id)))
+    .map(({ session }) => session);
+}
+
 // Unlisted lanes in swimlaneOrder stay enabled under their raw name, appended last.
-export function groupByTrack(sessions, swimlaneOrder) {
+// `timing` ({ nowMs, eventStartMs }) feeds sortTrackSessions' "available soon" check.
+export function groupByTrack(sessions, swimlaneOrder, timing) {
   const map = new Map();
   for (const s of sessions) {
     resolveSwimlanes(s).forEach((track) => {
@@ -85,7 +114,11 @@ export function groupByTrack(sessions, swimlaneOrder) {
   const configByTrack = new Map((swimlaneOrder || []).map((entry) => [entry.track, entry]));
   const entries = [...map.entries()]
     .filter(([track]) => configByTrack.get(track)?.enabled !== false)
-    .map(([track, trackSessions]) => [track, trackSessions, configByTrack.get(track)?.displayName || track]);
+    .map(([track, trackSessions]) => [
+      track,
+      sortTrackSessions(trackSessions, timing),
+      configByTrack.get(track)?.displayName || track,
+    ]);
 
   if (!swimlaneOrder || swimlaneOrder.length === 0) return entries;
   const orderIndex = new Map(swimlaneOrder.map((entry, i) => [entry.track, i]));

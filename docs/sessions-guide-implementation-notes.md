@@ -72,6 +72,13 @@ heading and track rows (MWPW-208777). The heading stays above the empty or no-re
 state when Recommended is absent or hidden. This is DOM order, not a CSS reorder,
 so visual and reading order agree on both page and drawer surfaces.
 
+Within each track row, cards run by start time, earliest first (MWPW-215102,
+`sortTrackSessions`). In-person on-demand sessions (`hasOnDemandFormat`) and cards still
+showing AVAILABLE SOON (`isDvrPending`, the same check as the card label) come after the
+rest, in the same order among themselves. A keynote and its ASL version share a start
+time, so the session code breaks ties (`GS1` before `GS1-0`). Every on-demand track row
+uses this order: On Demand, My Sessions and My Favorites.
+
 ## sessions-api.js
 
 ### sessionPageUrlForEnv
