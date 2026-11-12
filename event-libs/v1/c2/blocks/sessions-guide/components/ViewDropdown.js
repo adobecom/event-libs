@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useRef } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
+import { checkViewAccess, getPersonalViewAccess } from '../../../../services/sessions/action-feedback.js';
 import { isOutsideClick } from '../utils/outside-click.js';
 import { useIsPostEvent } from '../utils/use-post-event.js';
 import { IconCheckmark } from './icons.js';
@@ -14,8 +14,9 @@ const VIEWS = [
 
 // Post-event there is nothing live or upcoming left, and the store bounces the view straight
 // back to On demand, so offering it is a dead option.
-export function visibleViews(isPost) {
-  return isPost ? VIEWS.filter((v) => v.value !== 'live-upcoming') : VIEWS;
+export function visibleViews(isPost, hidePersonalViews = false) {
+  if (!isPost) return VIEWS;
+  return VIEWS.filter((v) => v.value !== 'live-upcoming' && (!hidePersonalViews || v.value === 'on-demand'));
 }
 
 export const buildViewDropdown = () => ViewDropdown;
@@ -33,7 +34,7 @@ export function ViewDropdown() {
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
 
-  const views = visibleViews(useIsPostEvent());
+  const views = visibleViews(useIsPostEvent(), getPersonalViewAccess() === 'missing');
   // activeView can briefly still be live-upcoming post-event, before the store transitions
   // it — fall back to the first offered option rather than naming the hidden one.
   const activeLabel = views.find((v) => v.value === state.activeView)?.label || views[0]?.label;
@@ -53,7 +54,7 @@ export function ViewDropdown() {
   useEffect(() => {
     if (!open) return;
     menuRef.current?.children[selectedIndex]?.focus();
-  }, [open]);
+  }, [open, selectedIndex, views.length]);
 
   function selectView(value) {
     dispatch({ type: 'SET_VIEW', view: resolveViewSelection(value, { eventConfig: state.guideConfig }) });

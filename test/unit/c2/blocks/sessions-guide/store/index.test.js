@@ -146,6 +146,35 @@ describe('store/reducer', () => {
     expect(next.searchQuery).to.equal('typography');
   });
 
+  ['my-sessions', 'my-favorites'].forEach((view) => {
+    it(`ignores a queued post-event transition after the URL selects ${view}`, () => {
+      const filters = { track: new Set(['design']) };
+      let requested = reducer(baseState, { type: 'SET_VIEW', view });
+      requested = reducer(requested, { type: 'SET_SEARCH', query: 'typography' });
+      requested = reducer(requested, { type: 'SET_FILTERS', filters });
+      const next = reducer(requested, {
+        type: 'SET_VIEW', view: 'on-demand', expectedView: 'live-upcoming',
+      });
+      expect(next.activeView).to.equal(view);
+      expect(next.searchQuery).to.equal('typography');
+      expect(next.activeFilters).to.equal(filters);
+      expect(sessionStorage.getItem('sg:last-view')).to.equal(view);
+    });
+  });
+
+  it('still transitions Live & upcoming to On demand with the existing view-change reset', () => {
+    const filtered = {
+      ...baseState, activeFilters: { track: new Set(['design']) }, searchQuery: 'typography',
+    };
+    const next = reducer(filtered, {
+      type: 'SET_VIEW', view: 'on-demand', expectedView: 'live-upcoming',
+    });
+    expect(next.activeView).to.equal('on-demand');
+    expect(next.activeFilters).to.deep.equal({});
+    expect(next.searchQuery).to.equal('');
+    expect(sessionStorage.getItem('sg:last-view')).to.equal('on-demand');
+  });
+
   it('SET_DAY changes activeDay', () => {
     const next = reducer(baseState, { type: 'SET_DAY', day: '2026-10-29' });
     expect(next.activeDay).to.equal('2026-10-29');
