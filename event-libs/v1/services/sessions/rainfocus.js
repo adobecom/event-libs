@@ -66,6 +66,13 @@ export class RfAccessError extends Error {
   }
 }
 
+export class RfAuthRequiredError extends Error {
+  constructor(message = 'RainFocus authentication required') {
+    super(message);
+    this.name = 'RfAuthRequiredError';
+  }
+}
+
 // Only write calls carry a responseCode (0/15 = success); reads never do.
 function handleWriteResponse(data) {
   const responseCode = data?.responseCode;
@@ -136,6 +143,9 @@ export async function toggleSessionInterest(sessionTimeId, sessionId, rfAuthToke
   const data = await rawFetch(rfApiUrl, ENDPOINTS.TOGGLE_FAVORITES, {
     rfApiProfileId, rfAuthToken, sessionTimeId, sessionId, rfWidgetId: RF_WIDGET_ID,
   });
+  if (!rfAuthToken && data?.responseCode === '103') {
+    throw new RfAuthRequiredError(data.responseMessage);
+  }
   return handleWriteResponse(data);
 }
 
