@@ -121,6 +121,21 @@ describe('services/sessions/action-feedback', () => {
     expect(loggedMessages[0]).to.include('add to schedule failed');
   });
 
+  it('shows an informative toast without a registration CTA for missing RF auth', async () => {
+    let blocked = false;
+    await runSessionAction(() => Promise.reject(new SessionActionError('rf-auth-required')), {
+      eventConfig,
+      actionLabel: 'favorite',
+      onBlocked: () => { blocked = true; },
+    });
+    expect(toasts.value).to.have.lengthOf(1);
+    expect(toasts.value[0].message).to.equal('Favoriting is only available to registered attendees.');
+    expect(toasts.value[0].variant).to.equal('informative');
+    expect(toasts.value[0].ctaLabel).to.be.null;
+    expect(blocked).to.be.true;
+    expect(loggedMessages).to.have.lengthOf(0);
+  });
+
   // No tier-1-event-config metadata authored anywhere in this file, so
   // getAllowDoubleBooking() defaults to false — mirrors a page that hasn't set the
   // flag, where a genuine time conflict must still block scheduling.
