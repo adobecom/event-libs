@@ -2,6 +2,7 @@ import { html } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal, sessionStateVersion,
+  getEventApiConfig,
 } from '../../../../utils/session-store.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
@@ -28,7 +29,9 @@ export function OnDemandView() {
   // Recommended is a curated highlight reel, not a filtered result set — ignores active filters/search.
   const recommended = getOnDemandRecommendedSessions(onDemandRaw, state.guideConfig?.recommendedSessions);
   const available = filterSessions(onDemandRaw, activeFilters, searchQuery);
-  const byTrack = groupByTrack(available, state.guideConfig?.swimlaneOrder);
+  const byTrack = groupByTrack(available, state.guideConfig?.swimlaneOrder, {
+    nowMs, eventStartMs: getEventApiConfig()?.eventStartMs,
+  });
   const noResults = byTrack.length === 0 && hasActiveSearchOrFilters(activeFilters, searchQuery);
 
   return html`
