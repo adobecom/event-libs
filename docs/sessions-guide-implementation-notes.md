@@ -79,6 +79,14 @@ rest, in the same order among themselves. A keynote and its ASL version share a 
 time, so the session code breaks ties (`GS1` before `GS1-0`). Every on-demand track row
 uses this order: On Demand, My Sessions and My Favorites.
 
+## Post-event favorite authentication (MWPW-212845)
+
+Signed-in visitors can favorite after the event without completing registration when they have an
+RF token. As a temporary fallback, a favorite write rejected with RF response code `103` and no
+token shows the blue informative toast: "Favoriting is only available to registered attendees."
+The frontend registration boolean is not used for this fallback because it can be forced.
+Pre-event gating and unrelated failures keep their existing behavior.
+
 ## sessions-api.js
 
 ### sessionPageUrlForEnv
