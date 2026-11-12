@@ -39,6 +39,9 @@ export async function runSessionAction(actionFn, {
       showAuthToast({ eventConfig, actionLabel });
       // Blurs the triggering button so a hover-styled card doesn't look stuck via :focus-within.
       onBlocked?.();
+    } else if (err.reason === 'rf-auth-required') {
+      showToast({ message: 'Favoriting is only available to registered attendees.', variant: 'informative' });
+      onBlocked?.();
     } else if (err.reason === 'conflict') {
       const { conflict, incoming } = err.meta;
       showConflictModal({

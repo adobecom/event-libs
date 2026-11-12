@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import {
   fetchAuthToken, fetchMyData, fetchScheduled, fetchFavorited,
   addSession, removeSession, dropAndSwapSession, toggleSessionInterest, fetchAttendeeAccess,
-  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID, RF_PROFILE_IDS, RfAccessError,
+  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID, RF_PROFILE_IDS, RfAccessError, RfAuthRequiredError,
 } from '../../../../event-libs/v1/services/sessions/rainfocus.js';
 
 describe('services/sessions/rainfocus', () => {
@@ -167,6 +167,31 @@ describe('services/sessions/rainfocus', () => {
       expect(url.searchParams.get('rfAuthToken')).to.equal('auth-token');
       expect(url.searchParams.get('rfApiProfileId')).to.equal('profile-1');
       expect(url.searchParams.has('sessionTimeId')).to.be.false;
+    });
+
+    [null, undefined, ''].forEach((token) => {
+      it(`identifies the missing-auth rejection when the favorite token is ${String(token)}`, async () => {
+        stubFetch({ responseCode: '103', responseMessage: 'Required parameter missing: attendeeId or authenticated session' });
+        let error;
+        try {
+          await toggleSessionInterest('', 'sess-3', token, 'profile-1', 'https://example.com/rf/');
+        } catch (err) {
+          error = err;
+        }
+        expect(error).to.be.an.instanceOf(RfAuthRequiredError);
+      });
+    });
+
+    it('does not classify a parameter rejection as missing auth when a favorite token is present', async () => {
+      stubFetch({ responseCode: '103', responseMessage: 'Required parameter missing: sessionId' });
+      let error;
+      try {
+        await toggleSessionInterest('', '', 'auth-token', 'profile-1', 'https://example.com/rf/');
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error').and.not.an.instanceOf(RfAuthRequiredError);
+      expect(error.message).to.include('responseCode: 103');
     });
 
     it('rejects on a schedule-conflict responseCode', async () => {
