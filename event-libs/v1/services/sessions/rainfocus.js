@@ -18,8 +18,7 @@ export const RF_PROFILE_IDS = {
 // Current/upcoming event — update when the next MAX supersedes it.
 export const DEFAULT_RF_PROFILE_ID = RF_PROFILE_IDS.max26;
 
-// Same for every event so far; per-event widget ids retired.
-export const RF_WIDGET_ID = 'RCitHYXguvb7I6o4Ps9T5weDqIK9xRYb';
+export const RF_WIDGET_ID = 'iot1q1elrXqtAcu5vRDqoZLpoMeHWDfe';
 
 const ENDPOINTS = {
   AUTH: 'jwt',
@@ -135,7 +134,7 @@ export async function dropAndSwapSession(sessionTimeId, dropSessionItems, rfAuth
 
 export async function toggleSessionInterest(sessionTimeId, sessionId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.TOGGLE_FAVORITES, {
-    rfApiProfileId, rfAuthToken, sessionTimeId, sessionId,
+    rfApiProfileId, rfAuthToken, sessionTimeId, sessionId, rfWidgetId: RF_WIDGET_ID,
   });
   return handleWriteResponse(data);
 }
