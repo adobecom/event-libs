@@ -23,6 +23,7 @@ export const liveStreamActiveIds = signal(new Set());
 export const favorited = signal(new Set());
 export const scheduled = signal(new Set());
 export const auth = signal({ isLoggedIn: null, isRegistered: undefined, userFirstName: null });
+export const rfAuthStatus = signal('loading'); // UI only: loading | ready | missing | error
 export const pendingActions = signal(new Set());
 // Re-render dependency only.
 export const sessionStateVersion = signal(0);
@@ -73,11 +74,20 @@ function defaultRfApiUrlForEnv() {
 async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
+  rfAuthStatus.value = 'loading';
   try {
     const data = await fetchAuthToken(clientId, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     rfAuthToken = data?.rfAuthToken ?? data?.token ?? data?.jwt ?? data?.authToken ?? null;
-    if (!rfAuthToken) logWarning('session-store,rf-auth-token', 'jwt exchange returned no recognizable token field');
+    if (rfAuthToken) {
+      rfAuthStatus.value = 'ready';
+    } else {
+      // RF 104 means no identity is linked yet, not a failed credential lookup.
+      const lookupFailed = data?.responseCode && !['0', '104'].includes(String(data.responseCode));
+      rfAuthStatus.value = lookupFailed ? 'error' : 'missing';
+      logWarning('session-store,rf-auth-token', 'jwt exchange returned no recognizable token field');
+    }
   } catch (err) {
+    rfAuthStatus.value = 'error';
     logError('session-store,rf-auth-token', 'jwt exchange failed', err);
   }
   rfAuthTokenSettled = true;
@@ -108,6 +118,7 @@ function syncAuth() {
   } else {
     // Not logged in (or no userId) is itself a final answer, not "still don't know."
     rfAuthTokenSettled = true;
+    if (!rfAuthToken && !rfAuthTokenStarted) rfAuthStatus.value = 'missing';
     maybeLoadMyData();
   }
 }
@@ -122,6 +133,7 @@ async function resolveRegistrationAndAuth() {
     if (authToken) {
       rfAuthToken = authToken;
       rfAuthTokenSettled = true;
+      rfAuthStatus.value = 'ready';
       maybeLoadMyData();
       return;
     }

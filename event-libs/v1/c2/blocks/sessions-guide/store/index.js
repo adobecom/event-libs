@@ -59,6 +59,8 @@ export function reducer(state, action) {
     }
 
     case 'SET_VIEW': {
+      // Recheck queued auto-transitions against the latest state, not the effect's stale view.
+      if (action.expectedView && state.activeView !== action.expectedView) return state;
       try { sessionStorage.setItem(SS_LAST_VIEW, action.view); } catch { /* unavailable */ }
       // A real view change resets filters/search (scoped to "what was I looking at"); re-selecting doesn't.
       if (action.view === state.activeView) return { ...state, activeView: action.view };
@@ -130,7 +132,7 @@ export function SessionGuideProvider({ guideConfig, children }) {
       if (sessionsStatus.value !== 'ready' || !sessions.value.length) return;
       const eventEndMs = getEventApiConfig()?.eventEndMs;
       if (isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs)) {
-        dispatch({ type: 'SET_VIEW', view: 'on-demand' });
+        dispatch({ type: 'SET_VIEW', view: 'on-demand', expectedView: 'live-upcoming' });
       }
     }
     checkAutoTransition();

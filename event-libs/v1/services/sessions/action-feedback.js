@@ -1,10 +1,13 @@
 import {
   resolveScheduleConflict, toggleScheduleAction, toggleFavoriteAction, assertAuthorized, isEventOver,
+  SessionActionError,
 } from './session-actions.js';
 import { showToast } from '../../features/toast/toast.js';
 import { showConflictModal } from '../../features/conflict-modal/conflict-modal.js';
 import { getAllowDoubleBooking } from '../../utils/tier-1-event-config.js';
-import { sessions, sessionsStatus } from '../../utils/session-store.js';
+import {
+  auth, rfAuthStatus, sessions, sessionsStatus,
+} from '../../utils/session-store.js';
 import { logError } from '../../utils/lana-log.js';
 import { trackAnalyticsEvent } from '../../utils/analytics.js';
 
@@ -38,6 +41,9 @@ export async function runSessionAction(actionFn, {
     if (err.reason === 'auth-required' || err.reason === 'registration-required') {
       showAuthToast({ eventConfig, actionLabel });
       // Blurs the triggering button so a hover-styled card doesn't look stuck via :focus-within.
+      onBlocked?.();
+    } else if (err.reason === 'rf-auth-required') {
+      showToast({ message: 'Favoriting is only available to registered attendees.', variant: 'informative' });
       onBlocked?.();
     } else if (err.reason === 'conflict') {
       const { conflict, incoming } = err.meta;
@@ -107,15 +113,27 @@ export function isAuthResolved({ isLoggedIn, isRegistered }) {
   return isLoggedIn === false || (isLoggedIn === true && isRegistered !== undefined);
 }
 
-// Returns the fallback view when blocked (toast already shown), or null when accessible.
+export function getPersonalViewAccess() {
+  if (!isAuthResolved(auth.value)) return 'loading';
+  try {
+    assertAuthorized();
+  } catch (err) {
+    if (!(err instanceof SessionActionError)) throw err;
+    return 'blocked';
+  }
+  if (!isEventOver()) return 'allowed';
+  return rfAuthStatus.value === 'ready' ? 'allowed' : rfAuthStatus.value;
+}
+
+// Auth gates show their existing toast; confirmed missing RF credentials only redirect.
 export function checkViewAccess(view, { eventConfig }) {
   const label = GATED_VIEW_LABELS[view];
   if (!label) return null;
-  try {
-    assertAuthorized();
-    return null;
-  } catch {
+  const access = getPersonalViewAccess();
+  if (access === 'blocked') {
     showAuthToast({ eventConfig, actionLabel: `view ${label}` });
     return fallbackViewForUnauthorized();
   }
+  if (access === 'missing') return fallbackViewForUnauthorized();
+  return null;
 }

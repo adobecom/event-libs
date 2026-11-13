@@ -3,6 +3,7 @@ import {
   sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge, resolveSwimlanes,
   liveSessions, upcomingSessions, onDemandSessions, getRecommendedSessions,
   getOnDemandRecommendedSessions, getFilterValue, filterSessions, excludeOnDemandFormat,
+  sortTrackSessions,
 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/session-filters.js';
 import { getSessionDayKey } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/time.js';
 
@@ -106,6 +107,94 @@ describe('session-filters/groupByTrack', () => {
     const groups = groupByTrack([LIVE]);
     expect(groups[0][0]).to.equal('Design');
     expect(groups[0][1]).to.deep.equal([LIVE]);
+  });
+});
+
+describe('session-filters/sortTrackSessions (MWPW-215102)', () => {
+  const KS = 'Keynotes & Sneaks';
+  const at = (iso) => `2026-11-${iso}:00.000Z`;
+  const card = (sessionCode, start, extra = {}) => ({
+    id: sessionCode, sessionCode, primaryTrack: KS, startTimeUtc: start, endTimeUtc: start, ...extra,
+  });
+  const NOW_MS = Date.parse(at('12T00:00'));
+  const ids = (list) => list.map((s) => s.id);
+
+  // Real K&S row, in the catalog order it rendered in before this fix.
+  const KS_ROW = [
+    card('GS1', at('10T14:00'), { mrStreamId: 'gs1' }),
+    card('GS1-3', at('10T14:15')),
+    card('GS2-0', at('11T15:00'), { mrStreamId: 'gs2-0', dvrDelayHours: 772 }),
+    card('GS1-2', at('10T14:10')),
+    card('GS1-0', at('10T14:00'), { mrStreamId: 'gs1-0', dvrDelayHours: 772 }),
+    card('GS1-1', at('10T14:05')),
+    card('GS2', at('11T15:00'), { mrStreamId: 'gs2' }),
+  ];
+
+  it('orders the K&S row: Opening Keynote, Opening ASL, chapters, Inspiration Keynote, Inspiration ASL', () => {
+    expect(ids(sortTrackSessions(KS_ROW, { nowMs: NOW_MS }))).to.deep.equal(
+      ['GS1', 'GS1-0', 'GS1-1', 'GS1-2', 'GS1-3', 'GS2', 'GS2-0'],
+    );
+  });
+
+  it('gives the same order whatever order the cards arrive in', () => {
+    const expected = ids(sortTrackSessions(KS_ROW, { nowMs: NOW_MS }));
+    expect(ids(sortTrackSessions([...KS_ROW].reverse(), { nowMs: NOW_MS }))).to.deep.equal(expected);
+    expect(ids(sortTrackSessions(KS_ROW.slice(3), { nowMs: NOW_MS })))
+      .to.deep.equal(expected.filter((id) => KS_ROW.slice(3).some((s) => s.id === id)));
+  });
+
+  it('compares session codes numerically when start times tie', () => {
+    const row = [card('GS1-10', at('10T14:00')), card('GS1-9', at('10T14:00'))];
+    expect(ids(sortTrackSessions(row))).to.deep.equal(['GS1-9', 'GS1-10']);
+  });
+
+  it('puts in-person on-demand sessions after the timed ones, earliest first among themselves', () => {
+    const row = [
+      card('S6232', at('10T18:30'), { hasOnDemandFormat: true }),
+      card('OS700', at('11T16:00')),
+      card('S6230', at('10T17:00'), { hasOnDemandFormat: true }),
+      card('OS701', at('10T16:00')),
+    ];
+    expect(ids(sortTrackSessions(row, { nowMs: NOW_MS }))).to.deep.equal(['OS701', 'OS700', 'S6230', 'S6232']);
+  });
+
+  it('keeps in-person on-demand sessions last even once their recording is available', () => {
+    const row = [card('S6709', at('10T10:00'), { hasOnDemandFormat: true }), card('OS700', at('11T16:00'))];
+    expect(ids(sortTrackSessions(row, { nowMs: NOW_MS }))).to.deep.equal(['OS700', 'S6709']);
+  });
+
+  it('puts "available soon" sessions last until their DVR delay has passed', () => {
+    const row = [card('OS710', at('10T10:00'), { dvrDelayHours: 48 }), card('OS700', at('11T16:00'))];
+    expect(ids(sortTrackSessions(row, { nowMs: NOW_MS }))).to.deep.equal(['OS700', 'OS710']);
+    const later = Date.parse(at('13T00:00'));
+    expect(ids(sortTrackSessions(row, { nowMs: later }))).to.deep.equal(['OS710', 'OS700']);
+  });
+
+  it('never treats an MR session as "available soon", matching the card label', () => {
+    const row = [card('GS2-0', at('11T15:00'), { mrStreamId: 'x', dvrDelayHours: 772 }), card('GS3', at('11T22:30'))];
+    expect(ids(sortTrackSessions(row, { nowMs: NOW_MS }))).to.deep.equal(['GS2-0', 'GS3']);
+  });
+
+  it('sorts a session with no start time after the timed ones in its group', () => {
+    const row = [card('TBD', ''), card('OS700', at('11T16:00'))];
+    expect(ids(sortTrackSessions(row))).to.deep.equal(['OS700', 'TBD']);
+  });
+
+  it('does not mutate the input', () => {
+    const row = [...KS_ROW];
+    sortTrackSessions(row, { nowMs: NOW_MS });
+    expect(ids(row)).to.deep.equal(ids(KS_ROW));
+  });
+
+  it('is applied to every lane by groupByTrack', () => {
+    const video = [
+      card('OS702', at('11T16:00'), { primaryTrack: 'Video' }),
+      card('S6609', at('10T17:15'), { primaryTrack: 'Video', hasOnDemandFormat: true }),
+      card('OS701', at('10T16:00'), { primaryTrack: 'Video' }),
+    ];
+    const lanes = Object.fromEntries(groupByTrack([...KS_ROW, ...video], [], { nowMs: NOW_MS }));
+    expect(ids(lanes[KS])).to.deep.equal(['GS1', 'GS1-0', 'GS1-1', 'GS1-2', 'GS1-3', 'GS2', 'GS2-0']);
+    expect(ids(lanes.Video)).to.deep.equal(['OS701', 'OS702', 'S6609']);
   });
 });
 

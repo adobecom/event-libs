@@ -3,13 +3,13 @@ import {
   getEventApiConfig,
 } from '../../utils/session-store.js';
 import { isPostEvent, getNowMs } from '../../utils/session-state.js';
-import { RfAccessError } from './rainfocus.js';
+import { RfAccessError, RfAuthRequiredError } from './rainfocus.js';
 
 // Discriminated failure reason, kept UI-agnostic — callers decide their own toast/modal.
 export class SessionActionError extends Error {
   constructor(reason, meta = {}) {
     super(reason);
-    this.reason = reason; // 'auth-required' | 'registration-required' | 'conflict' | 'network'
+    this.reason = reason; // 'auth-required' | 'registration-required' | 'rf-auth-required' | 'conflict' | 'network'
     this.meta = meta;
   }
 }
@@ -68,6 +68,9 @@ export async function toggleFavoriteAction(session) {
   try {
     await toggleFavorite(session);
   } catch (err) {
+    if (err instanceof RfAuthRequiredError && isEventOver()) {
+      throw new SessionActionError('rf-auth-required');
+    }
     throw new SessionActionError('network', { cause: err });
   }
 }

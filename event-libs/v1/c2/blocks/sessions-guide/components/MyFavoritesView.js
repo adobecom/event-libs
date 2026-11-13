@@ -2,9 +2,9 @@ import { html, useMemo, useEffect } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, favorited as favoritedSignal,
-  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
+  liveStreamActiveIds as liveStreamActiveIdsSignal, sessionStateVersion, getEventApiConfig,
 } from '../../../../utils/session-store.js';
-import { checkViewAccess, isAuthResolved } from '../../../../services/sessions/action-feedback.js';
+import { checkViewAccess, getPersonalViewAccess } from '../../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
@@ -35,14 +35,12 @@ export function MyFavoritesView() {
   const nowMs = getNowMs();
   const isPost = useIsPostEvent();
 
-  // Logged-out/unregistered visitors get bounced to a fallback view with a toast, re-checked on every auth change.
-  const { isLoggedIn, isRegistered } = auth.value;
-  const authResolved = isAuthResolved(auth.value);
+  const access = getPersonalViewAccess();
   useEffect(() => {
-    if (!authResolved) return;
+    if (access === 'loading') return;
     const fallback = checkViewAccess('my-favorites', { eventConfig: state.guideConfig });
     if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
-  }, [authResolved, isLoggedIn, isRegistered]);
+  }, [access, isPost]);
 
   // Computed unconditionally (even while loading/unauthorized) so every hook below runs on
   // every render, not just once auth resolves — a conditional hook count corrupts Preact's
@@ -69,13 +67,16 @@ export function MyFavoritesView() {
   }, [sessions, favorited, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
 
   // Avoids a blank view in the gap between the catalog resolving and registration resolving.
-  if (!authResolved) {
+  if (access === 'loading') {
     return html`
       <div class="sg-sr-only" role="status" aria-live="polite">Loading your favorited sessions…</div>
       ${html`<${LoadingState} />`}
     `;
   }
-  if (!isLoggedIn || isRegistered !== true) return null;
+  if (access === 'blocked' || access === 'missing') return null;
+  if (access === 'error') {
+    return html`<div class="sg-error" role="alert">Unable to load your favorites. Please refresh and try again.</div>`;
+  }
 
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;
@@ -138,7 +139,9 @@ export function MyFavoritesView() {
         `}
         ${effectiveTab === 'on-demand' && html`
           <div class="sg-my-favorites__on-demand">
-            ${groupByTrack(filteredOnDemand, state.guideConfig?.swimlaneOrder).map(([track, trackSessions, label]) => html`
+            ${groupByTrack(filteredOnDemand, state.guideConfig?.swimlaneOrder, {
+    nowMs, eventStartMs: getEventApiConfig()?.eventStartMs,
+  }).map(([track, trackSessions, label]) => html`
               <${TrackRow} key=${track} track=${label} sessions=${trackSessions} />
             `)}
           </div>
