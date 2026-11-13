@@ -79,6 +79,13 @@ rest, in the same order among themselves. A keynote and its ASL version share a 
 time, so the session code breaks ties (`GS1` before `GS1-0`). Every on-demand track row
 uses this order: On Demand, My Sessions and My Favorites.
 
+## Filtered carousel row position (MWPW-215192)
+
+Track/time-slot rows reset to the first card when search, filters or the active day changes.
+Desktop offsets are clamped when results shrink, and measurements/observers follow session IDs
+even when a replacement list has the same count. Saved-state changes alone preserve position.
+Below 1280px, rows scroll natively and no cards inherit desktop off-screen `inert` state.
+
 ## Scheduled on-demand row interaction (MWPW-215139)
 
 At desktop widths, a row-hover/focus rule turns resting scheduled, non-favorited on-demand cards
