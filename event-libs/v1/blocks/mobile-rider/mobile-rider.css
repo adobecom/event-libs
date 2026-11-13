@@ -12,13 +12,6 @@
 
 .mobile-rider .mobile-rider-container { position: relative; }
 
-.mobile-rider .mobile-rider-container .mr-poster {
-  position: absolute;
-  inset: 0;
-  object-fit: cover;
-  display: block;
-}
-
 .mobile-rider > :not(.mobile-rider-player) {
   display: none;
 }
@@ -33,20 +26,36 @@
   padding-bottom: 56.25%;
 }
 
-.mobile-rider .mobile-rider-container video {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+/* The player renders into the page, so Milo's global heading and video styles reach MR's markup.
+   Undo them at low specificity (:where) so MR's own skin styles everything inside the player. */
+.mobile-rider-container :where(h1, h2, h3, h4, h5, h6) {
+  margin: revert;
+  font-family: revert;
+  font-size: revert;
+  font-weight: revert;
+  line-height: revert;
+  letter-spacing: revert;
+  scroll-margin-top: revert;
 }
 
-.mobile-rider h2#title_container {
-  line-height: 1;
+.mobile-rider-container :where(video) {
+  max-width: revert;
+  height: revert;
+  object-fit: revert;
+}
+
+/* Our placeholder until MR replaces it; stays hidden if MR fails to load. */
+.mobile-rider-container > video:not(.vjs-tech) {
+  display: none;
 }
 
 .marquee .asset .mobile-rider img,
 .marquee .asset .mobile-rider video {
   max-width: none !important;
   min-height: auto !important;
+}
+
+/* Milo's classic marquee sets video { height: auto }, which beats video.js's height: 100%. */
+.marquee .asset .mobile-rider video {
+  height: 100%;
 }

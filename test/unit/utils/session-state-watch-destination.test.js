@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { getWatchDestination } from '../../../event-libs/v1/utils/session-state.js';
+import { getWatchDestination, withServerTime } from '../../../event-libs/v1/utils/session-state.js';
 import { initTierOneEventConfig } from '../../../event-libs/v1/utils/tier-1-event-config.js';
 
 // tier-1-event-config.js is a module-level singleton, so the unauthored fallback needs its
@@ -117,6 +117,34 @@ describe('getWatchDestination — authored event pages', () => {
       history.replaceState(null, '', '/summit?serverTime=');
       expect(getWatchDestination(session({ isOnline: true }), 'live'))
         .to.equal('/summit/broadcast?watch=s1');
+    });
+  });
+
+  describe('withServerTime', () => {
+    const MPC = 'https://video.tv.adobe.com/v/3492665?autoplay=true&quality=9';
+
+    it('adds the simulated time to an MPC player url, keeping its params', () => {
+      history.replaceState(null, '', '/sessions/s1?serverTime=1794339000000');
+      expect(withServerTime(MPC, 1794339070000))
+        .to.equal('https://video.tv.adobe.com/v/3492665?autoplay=true&quality=9&serverTime=1794339070000');
+    });
+
+    it('replaces a serverTime already on the url', () => {
+      history.replaceState(null, '', '/sessions/s1?serverTime=2000');
+      expect(withServerTime(`${MPC}&serverTime=1`, 3000)).to.equal(`${MPC}&serverTime=3000`);
+    });
+
+    it('leaves the url untouched without a serverTime override', () => {
+      history.replaceState(null, '', '/sessions/s1');
+      expect(withServerTime(MPC, 3000)).to.equal(MPC);
+      history.replaceState(null, '', '/sessions/s1?serverTime=');
+      expect(withServerTime(MPC, 3000)).to.equal(MPC);
+    });
+
+    it('returns empty or unparsable urls as they are', () => {
+      history.replaceState(null, '', '/sessions/s1?serverTime=2000');
+      expect(withServerTime('', 3000)).to.equal('');
+      expect(withServerTime('not a url', 3000)).to.equal('not a url');
     });
   });
 });

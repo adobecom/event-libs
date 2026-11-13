@@ -80,9 +80,11 @@ export function computeDrawerCapPx(viewportHeight, titleBottom, {
   floor = 0, gap = 0, playerBottom = null, minExpanded = 0, topGap = gap,
 } = {}) {
   const viewportCap = viewportHeight - topGap;
-  if (titleBottom == null) return Math.max(floor, Math.min(viewportHeight * 0.7, viewportCap));
-  const titleCap = viewportHeight - titleBottom - gap;
   const playerCap = playerBottom == null ? Infinity : viewportHeight - playerBottom - gap;
+  if (titleBottom == null) {
+    return Math.max(floor, minExpanded, Math.min(viewportHeight * 0.7, viewportCap, playerCap));
+  }
+  const titleCap = viewportHeight - titleBottom - gap;
   return Math.max(floor, minExpanded, Math.min(titleCap, playerCap, viewportCap));
 }
 
@@ -198,17 +200,32 @@ function findSessionHeadingText(el) {
   return findSessionHeading(el)?.textContent?.trim() || '';
 }
 
-function findPlayerBottom(el) {
-  const player = findEnclosingSection(el)?.querySelector('.session-video-player');
-  return player ? player.getBoundingClientRect().bottom : null;
+function isRendered(el) {
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+// Looked up when measuring, not when the drawer is built: the session details block can add its
+// <h1> after the playlist renders, and some headings are hidden per viewport (MWPW-212790).
+export function findSessionTitle(section) {
+  if (!section) return null;
+  const headings = [...section.querySelectorAll('h1, h2')].filter(isRendered);
+  return headings.find((heading) => heading.tagName === 'H1') || headings[0] || null;
+}
+
+// The page can hold an empty placeholder player before the real one, so skip anything not rendered.
+export function findRenderedPlayer(section) {
+  if (!section) return null;
+  return [...section.querySelectorAll('.session-video-player')].find(isRendered) || null;
 }
 
 class Drawer {
-  constructor(el, { titleEl, toggleEl, handleEl, headerEl }) {
+  constructor(el, { sectionEl, toggleEl, handleEl, headerEl }) {
     this.el = el;
     this.originalParent = el.parentElement;
     this.originalNextSibling = el.nextSibling;
-    this.titleEl = titleEl;
+    // Kept because below 1024px the drawer is moved to <body>, outside its section.
+    this.sectionEl = sectionEl;
     this.toggleEl = toggleEl;
     this.handleEl = handleEl;
     this.headerEl = headerEl;
@@ -222,18 +239,20 @@ class Drawer {
   }
 
   measureTitleBottom() {
-    if (!this.titleEl) return null;
-    const rect = this.titleEl.getBoundingClientRect();
-    const lineHeight = parseFloat(getComputedStyle(this.titleEl).lineHeight) || rect.height;
+    const titleEl = findSessionTitle(this.sectionEl);
+    if (!titleEl) return null;
+    const rect = titleEl.getBoundingClientRect();
+    const lineHeight = parseFloat(getComputedStyle(titleEl).lineHeight) || rect.height;
     return clampedTitleBottom(rect.top, rect.height, lineHeight, TITLE_LINE_CAP);
   }
 
   measureCapPx() {
+    const player = findRenderedPlayer(this.sectionEl);
     const cap = computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
       floor: DRAWER_FLOOR_PX,
       gap: DRAWER_GAP_PX,
       topGap: DRAWER_TOP_GAP_PX,
-      playerBottom: findPlayerBottom(this.el),
+      playerBottom: player ? player.getBoundingClientRect().bottom : null,
       minExpanded: DRAWER_MIN_EXPANDED_PX,
     });
     return Math.min(cap, this.measureDragCapPx());
@@ -761,7 +780,7 @@ export default async function init(el) {
 
   function setUpDrawer({ header, toggle, handle }) {
     const drawer = new Drawer(el, {
-      titleEl: findSessionHeading(el),
+      sectionEl: findEnclosingSection(el),
       toggleEl: toggle,
       handleEl: handle,
       headerEl: header,
