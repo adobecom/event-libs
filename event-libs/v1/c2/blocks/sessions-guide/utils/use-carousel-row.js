@@ -26,8 +26,14 @@ export function useCarouselRow(sessions, cardStateKey) {
   const dismissingIds = state.dismissingIds || new Set();
   const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;
   const isDesktopCarousel = useIsDesktopCarousel();
+  const sessionCount = sessions?.length || 0;
+  const sessionKey = JSON.stringify(sessions?.map((s) => s.id) || []);
+  const resetKey = JSON.stringify([state.activeDay, state.searchQuery || '', state.activeFilters || {}]);
+  const resetKeyRef = useRef(resetKey);
 
   const [offset, setOffset] = useState(0);
+  const criteriaChanged = resetKeyRef.current !== resetKey;
+  const rowOffset = criteriaChanged ? 0 : Math.min(offset, Math.max(0, sessionCount - 1));
   // Cards outside [offset, lastVisible] are marked `inert` so Tab can't focus cards the user can't see.
   const [{ tx, showNext, lastVisible }, setMeasure] = useState({ tx: 0, showNext: false, lastVisible: Infinity });
   const stripRef = useRef(null);
@@ -37,6 +43,16 @@ export function useCarouselRow(sessions, cardStateKey) {
   const collapsingRef = useRef(false);
   const [resizeTick, setResizeTick] = useState(0);
   const measuredViewportRef = useRef(0);
+  const pendingRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (criteriaChanged) {
+      resetKeyRef.current = resetKey;
+      stripRef.current?.scrollTo({ left: 0, behavior: 'instant' });
+    }
+    pendingRef.current = null;
+    if (offset !== rowOffset) setOffset(rowOffset);
+  }, [resetKey, sessionKey, rowOffset, offset]);
 
   // Pins max-height to the real captured height before animating to 0, so the collapse doesn't start from the 600px CSS baseline.
   useLayoutEffect(() => {
@@ -73,7 +89,7 @@ export function useCarouselRow(sessions, cardStateKey) {
     let totalWidth = 0;
     cards.forEach((card, i) => {
       const w = card.offsetWidth;
-      if (i < offset) newTx += w + gap;
+      if (i < rowOffset) newTx += w + gap;
       totalWidth += w + (i < cards.length - 1 ? gap : 0);
     });
     // Reserves room for the last card's hover-expanded width so its action buttons stay reachable.
@@ -81,9 +97,9 @@ export function useCarouselRow(sessions, cardStateKey) {
     const effectiveTotal = totalWidth - cards[cards.length - 1].offsetWidth + HOVER_CARD_WIDTH;
 
     let used = 0;
-    let last = offset;
-    for (let i = offset; i < cards.length; i += 1) {
-      used += cards[i].offsetWidth + (i > offset ? gap : 0);
+    let last = rowOffset;
+    for (let i = rowOffset; i < cards.length; i += 1) {
+      used += cards[i].offsetWidth + (i > rowOffset ? gap : 0);
       if (used > viewport.offsetWidth + 1) break;
       last = i;
     }
@@ -95,11 +111,10 @@ export function useCarouselRow(sessions, cardStateKey) {
     };
     setMeasure((prev) => (prev.tx === next.tx && prev.showNext === next.showNext
       && prev.lastVisible === next.lastVisible ? prev : next));
-  }, [offset, cardStateKey, isDesktopCarousel, resizeTick]);
+  }, [rowOffset, cardStateKey, sessionKey, resetKey, isDesktopCarousel, resizeTick]);
 
   // Below 1280px the arrows' disabled state follows the native scroll position.
   const [edges, setEdges] = useState({ atStart: true, atEnd: true });
-  const sessionCount = sessions?.length || 0;
 
   // Re-measure on viewport/card resize (e.g. cards animating in after crossing into desktop),
   // skipping hover expansion and running width transitions unless the viewport itself changed.
@@ -122,15 +137,14 @@ export function useCarouselRow(sessions, cardStateKey) {
       ro.disconnect();
       strip.removeEventListener('transitionend', onTransitionEnd);
     };
-  }, [isDesktopCarousel, sessionCount]);
+  }, [isDesktopCarousel, sessionKey]);
   useEffect(() => {
     if (isDesktopCarousel) return undefined;
     return watchScrollEdges(stripRef.current, (next) => setEdges((prev) => (
       prev.atStart === next.atStart && prev.atEnd === next.atEnd ? prev : next)));
-  }, [isDesktopCarousel, sessionCount]);
+  }, [isDesktopCarousel, sessionKey]);
 
   const [announcement, setAnnouncement] = useState('');
-  const pendingRef = useRef(null);
   const pressedRef = useRef(null);
   const announce = (index) => {
     const title = sessions?.[index]?.title;
@@ -140,7 +154,7 @@ export function useCarouselRow(sessions, cardStateKey) {
   const step = (direction, button) => {
     pressedRef.current = { button, at: performance.now() };
     if (isDesktopCarousel) {
-      const next = Math.min(Math.max(0, offset + direction), sessionCount - 1);
+      const next = Math.min(Math.max(0, rowOffset + direction), sessionCount - 1);
       setOffset(next);
       announce(next);
       return;
@@ -149,7 +163,7 @@ export function useCarouselRow(sessions, cardStateKey) {
     if (target) announce(target.index);
   };
 
-  const prevDisabled = isDesktopCarousel ? offset <= 0 : edges.atStart;
+  const prevDisabled = isDesktopCarousel ? rowOffset <= 0 : edges.atStart;
   const nextDisabled = isDesktopCarousel ? !showNext : edges.atEnd;
 
   useEffect(() => { handOffArrowFocus(pressedRef); }, [prevDisabled, nextDisabled]);
@@ -157,7 +171,7 @@ export function useCarouselRow(sessions, cardStateKey) {
   return {
     dismissingIds,
     allDismissing,
-    offset,
+    offset: isDesktopCarousel ? rowOffset : 0,
     tx,
     lastVisible,
     stripRef,
