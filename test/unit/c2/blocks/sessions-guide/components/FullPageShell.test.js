@@ -114,8 +114,13 @@ describe('FullPageShell/layout', () => {
       const restingWidths = cards.map((card) => win.getComputedStyle(card).width);
       const restingColor = color(cards[0]);
       cards.forEach((card) => expect(color(card)).to.equal(restingColor));
-      let activeColor;
       frame.focus();
+      const focusedColors = cards.map((card) => {
+        card.querySelector('button').focus();
+        return color(card);
+      });
+      expect(focusedColors[1]).to.not.equal('rgb(255, 255, 255)');
+      expect(focusedColors[1]).to.not.equal(restingColor);
       for (const width of [375, 768, 1100, 1279, 1280, 1440, 1920, 1100, 1440]) {
         frame.style.width = `${width}px`;
         rowFocus.focus();
@@ -126,19 +131,13 @@ describe('FullPageShell/layout', () => {
             expect(win.getComputedStyle(card).width).to.equal(restingWidths[index]);
           }
         });
-        for (const card of cards) {
+        for (const [index, card] of cards.entries()) {
           const cardAction = card.querySelector('button');
           cardAction.focus();
           expect(doc.activeElement).to.equal(cardAction);
           expect(card.matches(':focus-within')).to.equal(true);
-          const darkFocus = width >= 1280 && win.matchMedia('(hover: hover)').matches;
-          if (darkFocus && !activeColor) {
-            activeColor = color(card);
-            expect(activeColor).to.not.equal('rgb(255, 255, 255)');
-            expect(activeColor).to.not.equal(restingColor);
-          }
           expect(color(card), `${card.className} at ${width}px`)
-            .to.equal(darkFocus ? activeColor : restingColor);
+            .to.equal(width >= 1280 ? focusedColors[index] : restingColor);
         }
       }
     });
