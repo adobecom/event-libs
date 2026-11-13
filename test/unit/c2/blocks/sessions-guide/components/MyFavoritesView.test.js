@@ -3,7 +3,7 @@ import * as preact from '../../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import { buildMyFavoritesView } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/MyFavoritesView.js';
 import {
-  sessions, scheduled, favorited, liveStreamActiveIds, auth,
+  sessions, scheduled, favorited, liveStreamActiveIds, auth, rfAuthStatus,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
 
 // Offset from real "now" (the component derives session state from the real clock, so
@@ -54,6 +54,7 @@ const BASE_CONFIG = {
 function makeStore({
   isRegistered = true,
   isLoggedIn = true,
+  rfStatus = 'ready',
   sessionList = [],
   favoritedIds = new Set(),
   myFavoritesTab = 'upcoming',
@@ -62,6 +63,7 @@ function makeStore({
   searchQuery = '',
 } = {}) {
   auth.value = { isLoggedIn, isRegistered, userFirstName: null };
+  rfAuthStatus.value = rfStatus;
   sessions.value = sessionList;
   scheduled.value = new Set();
   favorited.value = favoritedIds;
@@ -102,6 +104,40 @@ describe('MyFavoritesView', () => {
     const store = makeStore();
     const View = buildMyFavoritesView(preact, store);
     expect(View({})).to.include('sg-view--my-favorites');
+  });
+
+  it('renders saved favorites post-event for a token-bearing unregistered visitor', () => {
+    const store = makeStore({
+      isRegistered: false, sessionList: [PAST_SESSION], favoritedIds: new Set(['p-1']),
+    });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.include('sg-my-favorites__on-demand');
+    expect(View({})).to.include('track="Video"');
+  });
+
+  it('waits for post-event RF auth instead of leaving an unregistered visitor blank', () => {
+    const store = makeStore({ isRegistered: false, rfStatus: 'loading', sessionList: [PAST_SESSION] });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.include('sg-loading-state');
+  });
+
+  it('does not render a personal view for a confirmed tokenless post-event visitor', () => {
+    const store = makeStore({ rfStatus: 'missing', sessionList: [PAST_SESSION] });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.be.null;
+  });
+
+  it('shows an explicit auth lookup error rather than an empty favorites list', () => {
+    const store = makeStore({ isRegistered: false, rfStatus: 'error', sessionList: [PAST_SESSION] });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.include('role="alert"');
+    expect(View({})).to.include('Unable to load your favorites.');
+  });
+
+  it('still blocks unregistered visitors before/during the event even with RF credentials', () => {
+    const store = makeStore({ isRegistered: false, sessionList: [UPCOMING_SESSION] });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.be.null;
   });
 
   it('shows empty state when no sessions are favorited', () => {

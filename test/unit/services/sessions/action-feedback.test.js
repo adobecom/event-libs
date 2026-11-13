@@ -2,12 +2,13 @@ import { expect } from '@esm-bundle/chai';
 
 import {
   runSessionAction, toggleScheduleWithFeedback, checkViewAccess, isAuthResolved, showAuthToast,
+  getPersonalViewAccess,
 } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { SessionActionError } from '../../../../event-libs/v1/services/sessions/session-actions.js';
 import { toasts } from '../../../../event-libs/v1/features/toast/toast.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
 import {
-  auth, sessions, sessionsStatus, liveStreamActiveIds, scheduled, pendingActions,
+  auth, rfAuthStatus, sessions, sessionsStatus, liveStreamActiveIds, scheduled, pendingActions,
 } from '../../../../event-libs/v1/utils/session-store.js';
 
 describe('services/sessions/action-feedback', () => {
@@ -17,6 +18,7 @@ describe('services/sessions/action-feedback', () => {
   let originalLog;
 
   beforeEach(() => {
+    rfAuthStatus.value = 'ready';
     toasts.value = [];
     conflict.value = null;
     loggedMessages = [];
@@ -25,6 +27,7 @@ describe('services/sessions/action-feedback', () => {
   });
 
   afterEach(() => {
+    rfAuthStatus.value = 'loading';
     window.lana.log = originalLog;
   });
 
@@ -119,6 +122,21 @@ describe('services/sessions/action-feedback', () => {
     expect(toasts.value[0].message).to.equal('Something went wrong. Please try again.');
     expect(toasts.value[0].variant).to.equal('negative');
     expect(loggedMessages[0]).to.include('add to schedule failed');
+  });
+
+  it('shows an informative toast without a registration CTA for missing RF auth', async () => {
+    let blocked = false;
+    await runSessionAction(() => Promise.reject(new SessionActionError('rf-auth-required')), {
+      eventConfig,
+      actionLabel: 'favorite',
+      onBlocked: () => { blocked = true; },
+    });
+    expect(toasts.value).to.have.lengthOf(1);
+    expect(toasts.value[0].message).to.equal('Favoriting is only available to registered attendees.');
+    expect(toasts.value[0].variant).to.equal('informative');
+    expect(toasts.value[0].ctaLabel).to.be.null;
+    expect(blocked).to.be.true;
+    expect(loggedMessages).to.have.lengthOf(0);
   });
 
   // No tier-1-event-config metadata authored anywhere in this file, so
@@ -223,6 +241,23 @@ describe('services/sessions/action-feedback', () => {
     });
 
     ['my-sessions', 'my-favorites'].forEach((view) => {
+      it(`redirects tokenless post-event ${view} even when the registration flag is true`, () => {
+        auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
+        rfAuthStatus.value = 'missing';
+        sessionsStatus.value = 'ready';
+        sessions.value = [PAST_SESSION];
+        expect(checkViewAccess(view, { eventConfig })).to.equal('on-demand');
+        expect(toasts.value).to.have.lengthOf(0);
+      });
+
+      it(`allows token-bearing unregistered visitors into post-event ${view}`, () => {
+        auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
+        sessionsStatus.value = 'ready';
+        sessions.value = [PAST_SESSION];
+        expect(checkViewAccess(view, { eventConfig })).to.be.null;
+        expect(toasts.value).to.have.lengthOf(0);
+      });
+
       it(`shows post-event sign-in copy for ${view} once the event has ended`, () => {
         auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
         sessionsStatus.value = 'ready';
@@ -231,6 +266,18 @@ describe('services/sessions/action-feedback', () => {
         expect(toasts.value[0].message).to.equal(`Sign in to view ${view.replace('-', ' ')}.`);
         expect(toasts.value[0].ctaLabel).to.equal('Sign in');
         expect(toasts.value[0].ctaHref).to.equal('/register');
+      });
+    });
+
+    ['loading', 'error'].forEach((status) => {
+      it(`does not classify RF auth ${status} as a tokenless account`, () => {
+        auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
+        rfAuthStatus.value = status;
+        sessionsStatus.value = 'ready';
+        sessions.value = [PAST_SESSION];
+        expect(getPersonalViewAccess()).to.equal(status);
+        expect(checkViewAccess('my-favorites', { eventConfig })).to.be.null;
+        expect(toasts.value).to.have.lengthOf(0);
       });
     });
   });
