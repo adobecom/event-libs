@@ -21,7 +21,7 @@ export const eventConfig = {
         "codeRoot": "http://localhost:3000/events",
         "contentRoot": "/events",
         "imsClientId": "events-milo",
-        "miloLibs": "http://main--milo--adobecom.aem.live/libs",
+        "miloLibs": "https://main--milo--adobecom.aem.live/libs",
         "prodDomains": [
             "milo.adobe.com",
             "business.adobe.com",
