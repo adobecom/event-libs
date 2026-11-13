@@ -87,6 +87,15 @@ token shows the blue informative toast: "Favoriting is only available to registe
 The frontend registration boolean is not used for this fallback because it can be forced.
 Pre-event gating and unrelated failures keep their existing behavior.
 
+After the event, My sessions and My favorites use RF authentication availability rather than
+registration status. Once a missing token is confirmed, both dropdown options are hidden and direct
+links or restored drawer views fall back to On demand. Token-bearing unregistered visitors retain
+access. Token lookup loading shows a loading state; lookup failures keep the options available and
+show an explicit error rather than treating the account as tokenless. Pre/during-event registration
+and signed-out prompts are unchanged. This does not create tokens or start RF registration.
+RF availability is UI-only: the existing token extraction and private data-loading guard are
+unchanged. Signing out still blocks access, but does not relabel an already-acquired token as missing.
+
 ## sessions-api.js
 
 ### sessionPageUrlForEnv
@@ -348,6 +357,13 @@ content is taller and scrolls.
 ---
 
 ## Deep linking
+
+### Post-event view initialization
+
+The automatic Live & upcoming to On demand transition checks the reducer's current view before
+applying. This prevents a queued startup transition from overwriting an explicit URL-selected
+My sessions or My favorites view and clearing its search/filter state. The normal transition
+from Live & upcoming keeps its existing behavior; authorization still gates personal views.
 
 ### Server time across Watch navigation
 
