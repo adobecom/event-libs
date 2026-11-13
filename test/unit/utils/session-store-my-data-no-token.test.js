@@ -11,7 +11,7 @@ import { resetNotifications } from '../features/swan-notifications/mocks/notific
 // @web/test-runner does not reliably reset between test files sharing a worker session —
 // cache-bust the import so this file gets its own fresh instance regardless.
 const {
-  initSessionState, sessionsStatus, auth,
+  initSessionState, sessionsStatus, auth, rfAuthStatus,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 function waitForSessionsReady() {
@@ -39,9 +39,9 @@ describe('session-store: myData is skipped without an rfAuthToken', () => {
     dismissEntry('RF-dismissed');
     myDataCalled = false;
     window.fetch = async (url) => {
-      // jwt exchange returns no recognizable token field — rfAuthToken stays null.
+      // RF has no linked attendee for this identity — rfAuthToken stays null.
       if (url.includes('/jwt')) {
-        return { ok: true, status: 200, json: async () => ({}) };
+        return { ok: true, status: 200, json: async () => ({ responseCode: '104' }) };
       }
       if (url.includes('session-catalog')) {
         return { ok: true, status: 200, json: async () => ({ sessions: [], sessionTimes: [], speakers: [] }) };
@@ -71,6 +71,7 @@ describe('session-store: myData is skipped without an rfAuthToken', () => {
 
   it('never calls myData when the jwt exchange returns no token', () => {
     expect(myDataCalled).to.be.false;
+    expect(rfAuthStatus.value).to.equal('missing');
   });
 
   it('settles isRegistered to null (checked, unknown) rather than leaving it undefined forever', () => {
@@ -81,5 +82,30 @@ describe('session-store: myData is skipped without an rfAuthToken', () => {
     await clock.tickAsync(45_000);
     expect(getEntry('RF-dismissed').dismissed).to.equal(true);
     expect(notificationsReady.value).to.equal(false);
+  });
+
+  [
+    { name: 'HTTP failure', response: { ok: false, status: 503 } },
+    { name: 'RF API failure', response: { ok: true, json: async () => ({ responseCode: '500' }) } },
+  ].forEach(({ name, response }) => {
+    it(`does not classify an auth ${name} as confirmed missing credentials`, async () => {
+      const failedStore = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
+      const previousFetch = window.fetch;
+      window.fetch = async (url) => (url.includes('/jwt') ? response : previousFetch(url));
+      try {
+        await new Promise((resolve) => {
+          const unsubscribe = failedStore.rfAuthStatus.subscribe((status) => {
+            if (status === 'loading') return;
+            unsubscribe();
+            resolve();
+          });
+          failedStore.initSessionState();
+        });
+        expect(failedStore.rfAuthStatus.value).to.equal('error');
+        expect(myDataCalled).to.be.false;
+      } finally {
+        window.fetch = previousFetch;
+      }
+    });
   });
 });

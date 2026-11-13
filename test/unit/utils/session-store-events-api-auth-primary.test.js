@@ -6,7 +6,7 @@ import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 // @web/test-runner does not reliably reset between test files sharing a worker session —
 // cache-bust the import so this file gets its own fresh instance regardless.
 const {
-  initSessionState, sessionsStatus, auth,
+  initSessionState, sessionsStatus, auth, rfAuthStatus,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 function waitForSessionsReady() {
@@ -61,6 +61,7 @@ describe('session-store: window.events.getRegistrationDetails — primary path',
 
   it('sources isRegistered and rfAuthToken from window.events', () => {
     expect(auth.value.isRegistered).to.be.true;
+    expect(rfAuthStatus.value).to.equal('ready');
     expect(myDataRequestUrl).to.include('rfAuthToken=events-api-token');
   });
 
