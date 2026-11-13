@@ -79,6 +79,13 @@ rest, in the same order among themselves. A keynote and its ASL version share a 
 time, so the session code breaks ties (`GS1` before `GS1-0`). Every on-demand track row
 uses this order: On Demand, My Sessions and My Favorites.
 
+## Post-event personal session days (MWPW-215376)
+
+After the event, My Sessions and My Favorites show on-demand sessions from all days in the user's
+scheduled/favorited catalog selection, ignoring the retained active day because date tabs are hidden.
+Before/during-event on-demand lists remain day-scoped. Search, facets, ordering, authorization and
+catalog eligibility still apply; RF data and the live/upcoming selections are unchanged.
+
 ## Post-event favorite authentication (MWPW-212845)
 
 Signed-in visitors can favorite after the event without completing registration when they have an
