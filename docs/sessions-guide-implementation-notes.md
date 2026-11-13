@@ -79,6 +79,13 @@ rest, in the same order among themselves. A keynote and its ASL version share a 
 time, so the session code breaks ties (`GS1` before `GS1-0`). Every on-demand track row
 uses this order: On Demand, My Sessions and My Favorites.
 
+## Scheduled on-demand row interaction (MWPW-215139)
+
+At desktop widths, a row-hover/focus rule turns resting scheduled, non-favorited on-demand cards
+white without removing their base background declaration. This preserves pressed-only states
+outside row interactions as well as the card's own dark hover/focus state, dimensions and
+saved-state classes. Mobile/tablet row-tint suppression remains unchanged.
+
 ## Post-event personal session days (MWPW-215376)
 
 After the event, My Sessions and My Favorites show on-demand sessions from all days in the user's
