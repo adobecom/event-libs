@@ -127,14 +127,18 @@ describe('FullPageShell/layout', () => {
           }
         });
         for (const card of cards) {
-          card.querySelector('button').focus();
-          if (width >= 1280 && !activeColor) {
+          const cardAction = card.querySelector('button');
+          cardAction.focus();
+          expect(doc.activeElement).to.equal(cardAction);
+          expect(card.matches(':focus-within')).to.equal(true);
+          const darkFocus = width >= 1280 && win.matchMedia('(hover: hover)').matches;
+          if (darkFocus && !activeColor) {
             activeColor = color(card);
             expect(activeColor).to.not.equal('rgb(255, 255, 255)');
             expect(activeColor).to.not.equal(restingColor);
           }
           expect(color(card), `${card.className} at ${width}px`)
-            .to.equal(width >= 1280 ? activeColor : restingColor);
+            .to.equal(darkFocus ? activeColor : restingColor);
         }
       }
     });
