@@ -3115,6 +3115,11 @@
     z-index: 2;
   }
 
+  /* Only the row interaction changes; retain the card's own hover/focus and pressed states. */
+  :is(.sessions-guide, .sessions-guide-full-page, .sg-portal) .sg-time-row:is(:hover, :focus-within) .sg-card.is-scheduled.sg-card--on-demand:not(.is-favorited):not(:hover, :focus-within, :active) {
+    background: #fff;
+  }
+
   .sg-card__body {
     flex: none;
     width: 331px;
