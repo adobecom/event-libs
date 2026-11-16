@@ -380,12 +380,11 @@ function findFieldControl(form, field) {
   return control ? { wrapper: control.closest('.field-wrapper') || control.parentElement, control } : null;
 }
 
+const fieldErrorCleanups = new WeakMap();
+
 export function clearFieldErrors(form) {
-  form.querySelectorAll('.field-error').forEach((el) => el.remove());
-  form.querySelectorAll('[aria-invalid="true"]').forEach((el) => {
-    el.removeAttribute('aria-invalid');
-    el.removeAttribute('aria-describedby');
-  });
+  fieldErrorCleanups.get(form)?.forEach((cleanup) => cleanup());
+  fieldErrorCleanups.delete(form);
 }
 
 /**
@@ -396,6 +395,7 @@ export async function showFieldErrors(form, fieldErrors) {
   clearFieldErrors(form);
   await dictionaryManager.initialize();
   const unmatched = [];
+  const cleanups = [];
   let firstControl = null;
 
   fieldErrors.forEach(({ field, code }, i) => {
@@ -406,22 +406,28 @@ export async function showFieldErrors(form, fieldErrors) {
     }
     const { wrapper, control } = target;
     const id = `${field}-error-${i}`;
-    const msgEl = createTag('p', { class: 'field-error', id, role: 'alert' }, getRsvpFieldErrorMessage(dictionaryManager, code));
+    const msgEl = createTag('p', { class: 'field-error', id }, getRsvpFieldErrorMessage(dictionaryManager, code));
     wrapper.append(msgEl);
+    const previousDescribedBy = control?.getAttribute('aria-describedby');
     if (control) {
       control.setAttribute('aria-invalid', 'true');
-      control.setAttribute('aria-describedby', id);
+      control.setAttribute('aria-describedby', [previousDescribedBy, id].filter(Boolean).join(' '));
       firstControl = firstControl || control;
     }
     const clear = () => {
       msgEl.remove();
-      control?.removeAttribute('aria-invalid');
-      control?.removeAttribute('aria-describedby');
       wrapper.removeEventListener('input', clear);
+      if (!control) return;
+      control.removeAttribute('aria-invalid');
+      const remaining = (control.getAttribute('aria-describedby') || '').split(' ').filter((token) => token && token !== id);
+      if (remaining.length) control.setAttribute('aria-describedby', remaining.join(' '));
+      else control.removeAttribute('aria-describedby');
     };
+    cleanups.push(clear);
     wrapper.addEventListener('input', clear);
   });
 
+  fieldErrorCleanups.set(form, cleanups);
   firstControl?.focus?.();
   return unmatched;
 }
@@ -568,6 +574,47 @@ async function autoRegisterSessions() {
   BlockMediator.set('registeredSessionIds', new Set([...existing, ...newIds]));
 }
 
+export async function handleSubmitResult(bp, button, respJson) {
+  if (respJson.ok) {
+    BlockMediator.set('rsvpData', respJson.data);
+    eventFormSendAnalytics(bp, 'Form Submit');
+    if (shouldAutoRegisterSessions(respJson.data?.registrationStatus, BlockMediator.get('imsProfile'))) autoRegisterSessions();
+  } else {
+    const { status, error } = respJson;
+    const { code, fieldErrors } = getRsvpErrorDetails(error);
+
+    // Code and field names only — never submitted values.
+    const fieldNames = fieldErrors.map((fe) => fe.field).join(',');
+    eventFormSendAnalytics(bp, `Form Submit Error | ${code ?? status}${fieldNames ? ` | ${fieldNames}` : ''}`);
+
+    const unmatchedFields = code === 'RsvpValidationError'
+      ? await showFieldErrors(bp.form, fieldErrors)
+      : [];
+
+    if (isEventFullError(status, error)) {
+      const eventObj = await getEvent(getMetadata('event-id'));
+      if (isWaitlistingEnabled(eventObj)) {
+        button.textContent = dictionaryManager.getValue('waitlist-cta-text');
+        button.disabled = false;
+      } else {
+        button.textContent = dictionaryManager.getValue('event-full-cta-text');
+        button.disabled = true;
+      }
+    }
+
+    // A validation failure is atomic, so it says nothing about an existing registration.
+    if (status === 400 && code !== 'RsvpValidationError') {
+      BlockMediator.set('rsvpData', null);
+    }
+
+    // Field-level messages carry the detail; the general banner is only needed when
+    // there are no matching controls (or the failure isn't a field validation).
+    if (code !== 'RsvpValidationError' || unmatchedFields.length || !fieldErrors.length) {
+      await buildErrorMsg(bp.form, status, error);
+    }
+  }
+}
+
 function createButton({ type, label }, bp) {
   const button = createTag('button', { class: 'button' }, dictionaryManager.getValue(label, 'rsvp-fields'));
   if (type === 'submit') {
@@ -584,43 +631,7 @@ function createButton({ type, label }, bp) {
           return;
         }
 
-        if (respJson.ok) {
-          BlockMediator.set('rsvpData', respJson.data);
-          eventFormSendAnalytics(bp, 'Form Submit');
-          if (shouldAutoRegisterSessions(respJson.data?.registrationStatus, BlockMediator.get('imsProfile'))) autoRegisterSessions();
-        } else {
-          const { status, error } = respJson;
-          const { code, fieldErrors } = getRsvpErrorDetails(error);
-
-          // Code and field names only — never submitted values.
-          const fieldNames = fieldErrors.map((fe) => fe.field).join(',');
-          eventFormSendAnalytics(bp, `Form Submit Error | ${code ?? status}${fieldNames ? ` | ${fieldNames}` : ''}`);
-
-          const unmatchedFields = code === 'RsvpValidationError'
-            ? await showFieldErrors(bp.form, fieldErrors)
-            : [];
-
-          if (isEventFullError(status, error)) {
-            const eventObj = await getEvent(getMetadata('event-id'));
-            if (isWaitlistingEnabled(eventObj)) {
-              button.textContent = dictionaryManager.getValue('waitlist-cta-text');
-              button.disabled = false;
-            } else {
-              button.textContent = dictionaryManager.getValue('event-full-cta-text');
-              button.disabled = true;
-            }
-          }
-
-          if (status === 400) {
-            BlockMediator.set('rsvpData', null);
-          }
-
-          // Field-level messages carry the detail; the general banner is only needed when
-          // there are no matching controls (or the failure isn't a field validation).
-          if (code !== 'RsvpValidationError' || unmatchedFields.length || !fieldErrors.length) {
-            buildErrorMsg(bp.form, status, error);
-          }
-        }
+        await handleSubmitResult(bp, button, respJson);
 
         button.removeAttribute('disabled');
         button.classList.remove('submitting');

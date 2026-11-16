@@ -1114,6 +1114,7 @@ describe('Events Form', () => {
     });
 
     function stubFetchByUrl(eventResponse, campaignResponse = null) {
+      window.fetch.restore?.();
       sandbox.stub(window, 'fetch').callsFake((url) => {
         if (typeof url === 'string' && url.includes('/campaigns/')) {
           return Promise.resolve(campaignResponse != null ? campaignResponse : { json: () => ({}), ok: false, status: 404 });
@@ -1404,7 +1405,7 @@ describe('Events Form', () => {
       expect(input.getAttribute('aria-invalid')).to.equal('true');
       const described = form.querySelector(`#${input.getAttribute('aria-describedby')}`);
       expect(described.textContent).to.equal('This field is required.');
-      expect(described.getAttribute('role')).to.equal('alert');
+      expect(described.hasAttribute('role')).to.be.false;
       expect(form.querySelector('[data-field-id="industry"] .field-error').textContent).to.equal('Please choose a valid option.');
     });
 
@@ -1431,6 +1432,30 @@ describe('Events Form', () => {
       expect(input.hasAttribute('aria-invalid')).to.be.false;
     });
 
+    it('appends to existing aria-describedby and restores it when the error clears', async () => {
+      const input = form.querySelector('#companyName');
+      input.setAttribute('aria-describedby', 'company-hint');
+
+      await showFieldErrors(form, [{ field: 'companyName', code: 'FieldRequired' }]);
+      expect(input.getAttribute('aria-describedby')).to.match(/^company-hint companyName-error-0$/);
+
+      clearFieldErrors(form);
+      expect(input.getAttribute('aria-describedby')).to.equal('company-hint');
+    });
+
+    it('does not accumulate input listeners across resubmits', async () => {
+      const wrapper = form.querySelector('[data-field-id="companyName"]');
+      const add = sinon.spy(wrapper, 'addEventListener');
+      const remove = sinon.spy(wrapper, 'removeEventListener');
+
+      await showFieldErrors(form, [{ field: 'companyName', code: 'FieldRequired' }]);
+      await showFieldErrors(form, [{ field: 'companyName', code: 'FieldTooLong' }]);
+      clearFieldErrors(form);
+
+      expect(add.callCount).to.equal(2);
+      expect(remove.callCount).to.equal(2);
+    });
+
     it('replaces earlier messages on re-validation and clearFieldErrors removes everything', async () => {
       await showFieldErrors(form, [{ field: 'companyName', code: 'FieldRequired' }]);
       await showFieldErrors(form, [{ field: 'industry', code: 'FieldInvalidOption' }]);
@@ -1440,6 +1465,96 @@ describe('Events Form', () => {
       clearFieldErrors(form);
       expect(form.querySelectorAll('.field-error')).to.have.length(0);
       expect(form.querySelector('[aria-invalid]')).to.be.null;
+    });
+  });
+
+  describe('handleSubmitResult', () => {
+    let handleSubmitResult;
+    let form;
+    let button;
+    let bp;
+    let tracked;
+    let originalSatellite;
+    let fetchStub;
+    let getStub;
+    let setStub;
+
+    before(async () => {
+      ({ handleSubmitResult } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js'));
+    });
+
+    beforeEach(() => {
+      const modal = document.createElement('div');
+      modal.className = 'dialog-modal';
+      form = document.createElement('form');
+      form.innerHTML = '<div class="field-wrapper" data-field-id="companyName"><input id="companyName" type="text"></div>';
+      modal.append(form);
+      document.body.append(modal);
+      button = document.createElement('button');
+      bp = { block: form, form };
+      tracked = [];
+      originalSatellite = window._satellite;
+      window._satellite = { track: (_, data) => tracked.push(data.data.web.webInteraction.name) };
+      fetchStub = sinon.stub(window, 'fetch').resolves({ json: () => ({ allowWaitlisting: false }), ok: true });
+      // Isolated store: subscribers leaked by earlier init tests would throw on a real set().
+      const store = { rsvpData: { registrationStatus: 'registered' } };
+      getStub = sinon.stub(BlockMediator, 'get').callsFake((key) => store[key]);
+      setStub = sinon.stub(BlockMediator, 'set').callsFake((key, value) => { store[key] = value; });
+    });
+
+    afterEach(() => {
+      getStub.restore();
+      setStub.restore();
+      fetchStub.restore();
+      window._satellite = originalSatellite;
+      form.closest('.dialog-modal').remove();
+    });
+
+    it('keeps rsvpData, shows field messages only, and tracks code + field names for a validation error', async () => {
+      await handleSubmitResult(bp, button, {
+        ok: false,
+        status: 400,
+        error: { code: 'RsvpValidationError', message: 'Event is full', fieldErrors: [{ field: 'companyName', code: 'FieldRequired' }] },
+      });
+
+      expect(BlockMediator.get('rsvpData')).to.deep.equal({ registrationStatus: 'registered' });
+      expect(form.querySelectorAll('.field-error')).to.have.length(1);
+      expect(form.querySelector('.error')).to.be.null;
+      expect(button.disabled).to.be.false;
+      expect(tracked).to.deep.equal(['Form Submit Error | RsvpValidationError | companyName']);
+    });
+
+    it('shows the general banner when a validation field matches no control', async () => {
+      await handleSubmitResult(bp, button, {
+        ok: false,
+        status: 400,
+        error: { code: 'RsvpValidationError', fieldErrors: [{ field: 'notOnForm', code: 'FieldUnknown' }] },
+      });
+
+      expect(form.querySelector('.error')).to.not.be.null;
+      expect(BlockMediator.get('rsvpData')).to.deep.equal({ registrationStatus: 'registered' });
+    });
+
+    it('clears rsvpData and disables the button for EventFull', async () => {
+      await handleSubmitResult(bp, button, { ok: false, status: 400, error: { code: 'EventFull', message: 'Event is full' } });
+
+      expect(BlockMediator.get('rsvpData')).to.be.null;
+      expect(button.disabled).to.be.true;
+      expect(tracked).to.deep.equal(['Form Submit Error | EventFull']);
+    });
+
+    it('falls back to the status in analytics when there is no error code', async () => {
+      await handleSubmitResult(bp, button, { ok: false, status: 500, error: 'boom' });
+
+      expect(tracked).to.deep.equal(['Form Submit Error | 500']);
+      expect(form.querySelector('.error')).to.not.be.null;
+    });
+
+    it('stores rsvpData and tracks Form Submit on success', async () => {
+      await handleSubmitResult(bp, button, { ok: true, status: 201, data: { attendeeId: 'a1', registrationStatus: 'waitlisted' } });
+
+      expect(BlockMediator.get('rsvpData')).to.deep.equal({ attendeeId: 'a1', registrationStatus: 'waitlisted' });
+      expect(tracked).to.deep.equal(['Form Submit']);
     });
   });
 

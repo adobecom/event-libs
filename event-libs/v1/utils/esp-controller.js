@@ -364,7 +364,7 @@ export async function submitRsvp(eventId, payload, rsvpToken = null) {
       const error = await parseFailureBody(response);
       const { code, fieldErrors } = getRsvpErrorDetails(error);
       const fields = fieldErrors.map((fe) => fe.field).join(',');
-      const summary = `POST /v1/events/{eventId}/attendees/{attendeeId} status=${response.status} code=${code ?? 'none'}${fields ? ` fields=${fields}` : ''}`;
+      const summary = `POST /v1/events/{eventId}/attendees/{attendeeId} eventId=${eventId} status=${response.status} code=${code ?? 'none'}${fields ? ` fields=${fields}` : ''}`;
       // Validation failures are user input errors, not service failures.
       if (code === 'RsvpValidationError') logWarning('esp-controller,submit-rsvp', summary);
       else logCritical('esp-controller,submit-rsvp', summary);
@@ -375,7 +375,7 @@ export async function submitRsvp(eventId, payload, rsvpToken = null) {
 
     return { ok: true, status: response.status, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,submit-rsvp', 'POST /v1/events/{eventId}/attendees/{attendeeId} network failure', error);
+    logCritical('esp-controller,submit-rsvp', `POST /v1/events/{eventId}/attendees/{attendeeId} eventId=${eventId} network failure`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
