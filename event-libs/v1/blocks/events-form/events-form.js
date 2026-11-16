@@ -625,16 +625,10 @@ function createButton({ type, label }, bp) {
         button.classList.add('submitting');
         clearFieldErrors(bp.form);
         const respJson = await submitForm(bp);
-        if (!respJson) {
-          button.removeAttribute('disabled');
-          button.classList.remove('submitting');
-          return;
-        }
-
-        await handleSubmitResult(bp, button, respJson);
-
+        // Re-enable first so handleSubmitResult can leave the button disabled (event full).
         button.removeAttribute('disabled');
         button.classList.remove('submitting');
+        if (respJson) await handleSubmitResult(bp, button, respJson);
       }
     });
   }

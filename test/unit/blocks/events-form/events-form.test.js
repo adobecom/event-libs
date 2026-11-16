@@ -48,7 +48,6 @@ describe('Events Form', () => {
       getValue: (text) => text,
       fetchDictionary: () => Promise.resolve(),
     };
-    window.getAndCreateAndAddAttendee = () => Promise.resolve({ ok: true, data: {} });
     window.getEvent = () => Promise.resolve({ ok: true, data: {} });
     window.getAttendee = () => Promise.resolve({ ok: true, data: {} });
     window.deleteAttendeeFromEvent = () => Promise.resolve({ ok: true, data: {} });
@@ -84,7 +83,6 @@ describe('Events Form', () => {
     delete window.BlockMediator;
     delete window.dictionaryManager;
 
-    delete window.getAndCreateAndAddAttendee;
     delete window.getEvent;
     delete window.getAttendee;
     delete window.deleteAttendeeFromEvent;
@@ -1105,6 +1103,8 @@ describe('Events Form', () => {
       sandbox = sinon.createSandbox();
       originalHref = window.location.href;
       window.adobeIMS = window.adobeIMS || { getAccessToken: () => ({ token: 'test-token' }) };
+      fetchResponses = { eventResponse: { json: () => ({}), ok: true }, campaignResponse: null };
+      sandbox.stub(window, 'fetch').callsFake(routeFetchByUrl);
     });
 
     afterEach(() => {
@@ -1113,14 +1113,18 @@ describe('Events Form', () => {
       BlockMediator.set('imsProfile', undefined);
     });
 
+    let fetchResponses;
+
     function stubFetchByUrl(eventResponse, campaignResponse = null) {
-      window.fetch.restore?.();
-      sandbox.stub(window, 'fetch').callsFake((url) => {
-        if (typeof url === 'string' && url.includes('/campaigns/')) {
-          return Promise.resolve(campaignResponse != null ? campaignResponse : { json: () => ({}), ok: false, status: 404 });
-        }
-        return Promise.resolve(eventResponse);
-      });
+      fetchResponses = { eventResponse, campaignResponse };
+    }
+
+    function routeFetchByUrl(url) {
+      const { eventResponse, campaignResponse } = fetchResponses;
+      if (typeof url === 'string' && url.includes('/campaigns/')) {
+        return Promise.resolve(campaignResponse != null ? campaignResponse : { json: () => ({}), ok: false, status: 404 });
+      }
+      return Promise.resolve(eventResponse);
     }
 
     it('getFullState returns event-based full when no campaign in URL', async () => {
