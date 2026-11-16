@@ -61,6 +61,60 @@ describe('in-person-banner', () => {
     delete window.events;
   });
 
+  describe('section rounding', () => {
+    let section;
+
+    beforeEach(async () => {
+      document.body.innerHTML = '<main><div class="section"></div></main>';
+      section = document.querySelector('main > .section');
+      await new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = '/event-libs/v1/c2/blocks/in-person-banner/in-person-banner.css';
+        link.onload = resolve;
+        link.onerror = reject;
+        document.head.append(link);
+      });
+    });
+
+    it('rounds only after rendering and stops when the banner is hidden', () => {
+      const el = buildBlock();
+      expect(getComputedStyle(section).borderTopLeftRadius).to.equal('0px');
+
+      init(el);
+      expect(getComputedStyle(section).borderTopLeftRadius).not.to.equal('0px');
+
+      el.hidden = true;
+      expect(getComputedStyle(section).borderTopLeftRadius).to.equal('0px');
+      expect(getComputedStyle(section).marginTop).to.equal('0px');
+    });
+
+    [false, true].forEach((inPersonAttendee) => {
+      it(`keeps the section square while registration is pending, then ${inPersonAttendee ? 'rounds' : 'stays square'}`, async () => {
+        BlockMediator.set('imsProfile', signedInProfile);
+        let resolveRegistration;
+        window.events = {
+          getRegistrationStatus: () => new Promise((resolve) => {
+            resolveRegistration = resolve;
+          }),
+        };
+        const el = buildBlock({ config: { audience: 'in-person' } });
+        init(el);
+        await flush();
+        expect(el.hidden).to.be.true;
+        expect(getComputedStyle(section).borderTopLeftRadius).to.equal('0px');
+        expect(getComputedStyle(section).marginTop).to.equal('0px');
+
+        resolveRegistration({ isRegistered: true, inPersonAttendee });
+        await flush();
+        expect(el.isConnected).to.equal(inPersonAttendee);
+        const radius = getComputedStyle(section).borderTopLeftRadius;
+        if (inPersonAttendee) expect(radius).not.to.equal('0px');
+        else expect(radius).to.equal('0px');
+      });
+    });
+  });
+
   describe('audience: all (default)', () => {
     it('renders immediately for everyone, synchronously (no await needed)', () => {
       const el = buildBlock({ message: 'Everyone sees this.' });
