@@ -1,4 +1,3 @@
-import { PHONE_PATTERN } from './constances.js';
 import { logWarning } from './lana-log.js';
 
 /**
@@ -89,63 +88,25 @@ function coerceBoolean(key, value) {
   return undefined;
 }
 
-export function getEventAttendeePayload(attendeeData) {
-  if (!attendeeData) return attendeeData;
-  return Object.entries(attendeeData).reduce((acc, [key, value]) => {
-    if (!EVENT_ATTENDEE_DATA_FILTER[key]) return acc;
-    const nextValue = EVENT_ATTENDEE_DATA_FILTER[key].type === 'boolean'
-      ? coerceBoolean(key, value)
-      : value;
-    if (isValidAttribute(nextValue)) {
-      acc[key] = nextValue;
-    }
-    return acc;
-  }, {});
-}
-
-export function getBaseAttendeePayload(attendeeData) {
-  if (!attendeeData) return attendeeData;
-  return Object.entries(attendeeData).reduce((acc, [key, value]) => {
-    if (BASE_ATTENDEE_DATA_FILTER[key] && isValidAttribute(value)) {
-      acc[key] = value;
-    }
-    return acc;
-  }, {});
-}
-
-const PHONE_RE = new RegExp(PHONE_PATTERN);
-
-const LEGACY_PHONE_FIELDS = new Set(
-  Object.keys(BASE_ATTENDEE_DATA_FILTER).filter((key) => /phone$/i.test(key)),
-);
-
-export function sanitizeLegacyPhoneFields(existingData, newData) {
-  if (!existingData) return existingData;
-  const submitted = newData || {};
-  return Object.entries(existingData).reduce((acc, [key, value]) => {
-    const isStaleInvalidPhone = LEGACY_PHONE_FIELDS.has(key)
-      && !Object.prototype.hasOwnProperty.call(submitted, key)
-      && typeof value === 'string'
-      && !PHONE_RE.test(value);
-    if (!isStaleInvalidPhone) acc[key] = value;
-    return acc;
-  }, {});
-}
-
-// Unlike the two allowlists above, this key-space isn't fixed, so explicitly
-// reject prototype-chain property names rather than relying on the filter
-// lookups incidentally treating them as "recognized".
+// The submitted key-space isn't fixed, so explicitly reject prototype-chain property names.
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
-export function getUnrecognizedAttendeeFields(attendeeData) {
-  if (!attendeeData) return {};
-  return Object.entries(attendeeData).reduce((acc, [key, value]) => {
-    if (!UNSAFE_KEYS.has(key)
-      && !EVENT_ATTENDEE_DATA_FILTER[key]
-      && !BASE_ATTENDEE_DATA_FILTER[key]
-      && isValidAttribute(value)) {
-      acc[key] = value;
-    }
+/**
+ * Builds the flat payload for the atomic RSVP submit: every submitted form field
+ * (base profile, event, and custom) in one object. Which fields belong to the base
+ * profile vs. the event registration is decided server-side, so no routing happens here.
+ * Empty values and prototype-chain keys are dropped; boolean event fields are coerced.
+ * @param {Object} attendeeData - Raw form payload.
+ * @param {string} registrationStatus - 'registered' | 'waitlisted'.
+ * @returns {Object}
+ */
+export function getRsvpPayload(attendeeData, registrationStatus) {
+  return Object.entries({ ...attendeeData, registrationStatus }).reduce((acc, [key, value]) => {
+    if (UNSAFE_KEYS.has(key)) return acc;
+    const nextValue = EVENT_ATTENDEE_DATA_FILTER[key]?.type === 'boolean'
+      ? coerceBoolean(key, value)
+      : value;
+    if (isValidAttribute(nextValue)) acc[key] = nextValue;
     return acc;
   }, {});
 }

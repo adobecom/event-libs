@@ -236,101 +236,183 @@ describe('Adobe Event Service API', () => {
     });
   });
 
-  describe('createAttendee', () => {
-    it('should create an attendee and receive complete attendee data', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+  describe('submitRsvp', () => {
+    const payload = { firstName: 'John', lastName: 'Doe', email: 'john@test.com', jobTitle: 'Engineer', customQ: 'yes' };
 
-      const rsvpData = await api.createAttendee('123', { name: 'John Doe' });
-      expect(rsvpData.data).to.be.an('object');
+    it('makes exactly one POST to the event attendee endpoint with the complete flat payload', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true, status: 201 });
+
+      const result = await api.submitRsvp('event-123', payload);
+
+      expect(fetchStub.callCount).to.equal(1);
+      const [url, options] = fetchStub.firstCall.args;
+      expect(url).to.match(/\/v1\/events\/event-123\/attendees\/me$/);
+      expect(url).to.not.match(/\/v1\/attendees(\/|$)/);
+      expect(options.method).to.equal('POST');
+      expect(JSON.parse(options.body)).to.deep.equal(payload);
+      expect(result.ok).to.be.true;
+      expect(result.status).to.equal(201);
+      expect(result.data.registrationStatus).to.equal('registered');
     });
 
-    it('should return an error if attendee creation fails', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
+    it('uses payload.attendeeId as the path identifier when present', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true, status: 200 });
 
-      const error = await api.createAttendee('123', { name: 'John Doe' });
-      expect(error).to.be.an('object');
-      expect(error.ok).to.be.false;
+      await api.submitRsvp('event-123', { ...payload, attendeeId: 'att-1' });
+
+      expect(fetchStub.firstCall.args[0]).to.match(/\/v1\/events\/event-123\/attendees\/att-1$/);
     });
 
-    it('should report the failure to lana with the eventId', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
+    it('returns false without making a request when eventId or payload is missing', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      expect(await api.submitRsvp('event-123', null)).to.be.false;
+      expect(await api.submitRsvp('', payload)).to.be.false;
+      expect(fetchStub.called).to.be.false;
+    });
+
+    it('treats a followed 303 (signed-in duplicate) as the existing resource', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true, status: 200, redirected: true });
+
+      const result = await api.submitRsvp('event-123', payload);
+
+      expect(result.ok).to.be.true;
+      expect(result.data.attendeeId).to.equal('att-1');
+    });
+
+    it('parses a structured RsvpValidationError with code and fieldErrors', async () => {
+      const body = {
+        code: 'RsvpValidationError',
+        message: 'Validation failed',
+        fieldErrors: [
+          { field: 'companyName', code: 'FieldRequired', message: 'required' },
+          { field: 'industry', code: 'FieldInvalidOption', message: 'bad option' },
+        ],
+      };
+      sandbox.stub(window, 'fetch').resolves({ text: () => JSON.stringify(body), ok: false, status: 400 });
+
+      const result = await api.submitRsvp('event-123', payload);
+
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(400);
+      expect(result.code).to.equal('RsvpValidationError');
+      expect(result.fieldErrors).to.deep.equal(body.fieldErrors);
+      expect(result.error).to.deep.equal(body);
+    });
+
+    it('parses non-field JSON error codes (duplicate, event full)', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ text: () => JSON.stringify({ code: 'AttendeeAlreadyRegistered', message: 'dup' }), ok: false, status: 409 });
+      fetchStub.onCall(1).resolves({ text: () => JSON.stringify({ code: 'EventFull', message: 'full' }), ok: false, status: 400 });
+
+      const dup = await api.submitRsvp('event-123', payload);
+      const full = await api.submitRsvp('event-123', payload);
+
+      expect(dup).to.include({ ok: false, status: 409, code: 'AttendeeAlreadyRegistered' });
+      expect(dup.fieldErrors).to.deep.equal([]);
+      expect(full).to.include({ ok: false, status: 400, code: 'EventFull' });
+    });
+
+    it('falls back safely for plain-text error bodies', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => 'Event is full', ok: false, status: 400 });
+
+      const result = await api.submitRsvp('event-123', payload);
+
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(400);
+      expect(result.error).to.equal('Event is full');
+      expect(result.code).to.be.undefined;
+      expect(result.fieldErrors).to.deep.equal([]);
+    });
+
+    it('drops fieldErrors entries whose field is not a safe field name', async () => {
+      const body = {
+        code: 'RsvpValidationError',
+        fieldErrors: [{ field: 'ok_field', code: 'FieldRequired' }, { field: 'bad field <script>', code: 'FieldUnsafe' }, { code: 'FieldRequired' }],
+      };
+      sandbox.stub(window, 'fetch').resolves({ text: () => JSON.stringify(body), ok: false, status: 400 });
+
+      const result = await api.submitRsvp('event-123', payload);
+
+      expect(result.fieldErrors.map((fe) => fe.field)).to.deep.equal(['ok_field']);
+    });
+
+    it('returns a Network Error result when fetch rejects', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('offline'));
+
+      const result = await api.submitRsvp('event-123', payload);
+
+      expect(result).to.deep.equal({ ok: false, status: 'Network Error', error: 'offline' });
+    });
+
+    it('logs endpoint, status, code and field names only — never submitted values', async () => {
+      const secret = 'secret-value-123@example.com';
+      const body = { code: 'RsvpValidationError', fieldErrors: [{ field: 'email', code: 'FieldInvalidFormat', message: 'bad' }] };
+      sandbox.stub(window, 'fetch').resolves({ text: () => JSON.stringify(body), ok: false, status: 400 });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
-      await api.createAttendee('event-123', { name: 'John Doe' });
-      expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
+
+      await api.submitRsvp('event-123', { ...payload, email: secret });
+
+      expect(lanaLogStub.calledOnce).to.be.true;
+      const message = lanaLogStub.firstCall.args[0];
+      expect(message).to.include('/v1/events/{eventId}/attendees/{attendeeId}');
+      expect(message).to.include('code=RsvpValidationError');
+      expect(message).to.include('fields=email');
+      expect(message).to.not.include(secret);
+      expect(message).to.not.include('John');
+      expect(lanaLogStub.firstCall.args[1].severity).to.equal('warning');
+    });
+
+    it('reports non-validation failures as critical with the status and code', async () => {
+      sandbox.stub(window, 'fetch').resolves({ text: () => JSON.stringify({ code: 'EventFull', message: 'full' }), ok: false, status: 400 });
+      const lanaLogStub = sandbox.stub(window.lana, 'log');
+
+      await api.submitRsvp('event-123', payload);
+
+      expect(lanaLogStub.firstCall.args[0]).to.include('code=EventFull');
       expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
       expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
     });
 
-    it('should report the failure to lana even if the response body never resolves', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => new Promise(() => {}), ok: false, status: 400 });
-      const lanaLogStub = sandbox.stub(window.lana, 'log');
-      api.createAttendee('event-123', { name: 'John Doe' });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(lanaLogStub.calledOnce).to.equal(true);
-    });
-
-    it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => 'Event is full', ok: false, status: 400 });
-
-      const result = await api.createAttendee('123', { name: 'John Doe' });
-      expect(result.ok).to.be.false;
-      expect(result.status).to.equal(400);
-      expect(result.error).to.equal('Event is full');
-    });
-
-    it('should still parse a JSON schema-validation error body', async () => {
-      sandbox.stub(window, 'fetch').resolves({
-        text: () => JSON.stringify({ message: 'Invalid request', errors: [{ path: '.email', message: 'must match format "email"' }] }),
-        ok: false,
-        status: 400,
-      });
-
-      const result = await api.createAttendee('123', { name: 'John Doe' });
-      expect(result.status).to.equal(400);
-      expect(result.error).to.deep.equal({ message: 'Invalid request', errors: [{ path: '.email', message: 'must match format "email"' }] });
-    });
-
-    it('should send both the guest IMS token and the rsvp-token header when a token is passed', async () => {
+    it('sends both the guest IMS token and the rsvp-token header when a token is passed', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      await api.createAttendee('123', { name: 'John Doe' }, 'tok-1');
+      await api.submitRsvp('123', payload, 'tok-1');
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
 
-    it('should still forward a real signed-in session\'s IMS token alongside the rsvp-token header — Cluster Gateway requires one either way', async () => {
+    it('still forwards a real signed-in session\'s IMS token alongside the rsvp-token header — Cluster Gateway requires one either way', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      await api.createAttendee('123', { name: 'John Doe' }, 'tok-1');
+      await api.submitRsvp('123', payload, 'tok-1');
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
       expect(options.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
     });
 
-    it('should omit the rsvp-token header when no token is passed, and still authenticate via IMS', async () => {
+    it('omits the rsvp-token header when no token is passed, and still authenticates via IMS', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      await api.createAttendee('123', { name: 'John Doe' });
+      await api.submitRsvp('123', payload);
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
       expect(options.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
     });
 
-    it('should degrade gracefully (no throw, no Authorization) when a token is passed with no IMS session', async () => {
+    it('degrades gracefully (no throw, no Authorization) when a token is passed with no IMS session', async () => {
       delete window.adobeIMS;
       const clock = sandbox.useFakeTimers();
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
       try {
-        const attendeePromise = api.createAttendee('123', { name: 'John Doe' }, 'tok-1');
+        const attendeePromise = api.submitRsvp('123', payload, 'tok-1');
         await clock.tickAsync(10000);
         await attendeePromise;
 
@@ -344,149 +426,6 @@ describe('Adobe Event Service API', () => {
           signIn: () => {},
         };
       }
-    });
-  });
-
-  describe('addAttendeeToEvent', () => {
-    it('should add an attendee to an event and receive complete attendee data', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
-
-      const rsvpData = await api.addAttendeeToEvent('123', { name: 'John Doe' });
-      expect(rsvpData.data).to.be.an('object');
-    });
-
-    it('should return an error if attendee addition fails', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
-
-      const error = await api.addAttendeeToEvent('123', { name: 'John Doe' });
-      expect(error).to.be.an('object');
-      expect(error.ok).to.be.false;
-    });
-
-    it('should report the failure to lana with the eventId and attendeeId', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
-      const lanaLogStub = sandbox.stub(window.lana, 'log');
-      await api.addAttendeeToEvent('event-123', { attendeeId: 'att-1' });
-      expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
-      expect(lanaLogStub.firstCall.args[0]).to.include('att-1');
-      expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
-      expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
-    });
-
-    it('should report the failure to lana even if the response body never resolves', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => new Promise(() => {}), ok: false, status: 400 });
-      const lanaLogStub = sandbox.stub(window.lana, 'log');
-      api.addAttendeeToEvent('event-123', { attendeeId: 'att-1' });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(lanaLogStub.calledOnce).to.equal(true);
-    });
-
-    it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => 'Event is full', ok: false, status: 400 });
-
-      const result = await api.addAttendeeToEvent('123', { attendeeId: 'att-1' });
-      expect(result.ok).to.be.false;
-      expect(result.status).to.equal(400);
-      expect(result.error).to.equal('Event is full');
-    });
-
-    it('should send both the guest IMS token and the rsvp-token header when a token is passed', async () => {
-      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
-      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
-
-      await api.addAttendeeToEvent('123', { name: 'John Doe' }, 'tok-1');
-
-      const options = fetchStub.firstCall.args[1];
-      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
-    });
-
-    it('should still forward a real signed-in session\'s IMS token alongside the rsvp-token header — Cluster Gateway requires one either way', async () => {
-      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
-      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
-
-      await api.addAttendeeToEvent('123', { name: 'John Doe' }, 'tok-1');
-
-      const options = fetchStub.firstCall.args[1];
-      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(options.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
-    });
-
-    it('should omit the rsvp-token header when no token is passed, and still authenticate via IMS', async () => {
-      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
-      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
-
-      await api.addAttendeeToEvent('123', { name: 'John Doe' });
-
-      const options = fetchStub.firstCall.args[1];
-      expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
-      expect(options.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
-    });
-
-    it('should degrade gracefully (no throw, no Authorization) when a token is passed with no IMS session', async () => {
-      delete window.adobeIMS;
-      const clock = sandbox.useFakeTimers();
-      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
-
-      try {
-        const attendeePromise = api.addAttendeeToEvent('123', { name: 'John Doe' }, 'tok-1');
-        await clock.tickAsync(10000);
-        await attendeePromise;
-
-        const options = fetchStub.firstCall.args[1];
-        expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-        expect(options.headers.has('Authorization')).to.be.false;
-      } finally {
-        window.adobeIMS = {
-          getAccessToken: () => ({ token: 'fake-token' }),
-          getProfile: () => Promise.resolve({ name: 'Test User' }),
-          signIn: () => {},
-        };
-      }
-    });
-  });
-
-  describe('updateAttendee', () => {
-    it('should update attendee details and fetch complete attendee data', async () => {
-      sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
-      const rsvpData = await api.updateAttendee('123', { name: 'John Doe' });
-      expect(rsvpData.data).to.be.an('object');
-    });
-
-    it('should return an error if attendee update fails', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
-      const error = await api.updateAttendee('123', { name: 'John Doe' });
-      expect(error).to.be.an('object');
-      expect(error.ok).to.be.false;
-    });
-
-    it('should report the failure to lana with the eventId and attendeeId', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => '{}', ok: false, status: 400 });
-      const lanaLogStub = sandbox.stub(window.lana, 'log');
-      await api.updateAttendee('event-123', { attendeeId: 'att-1', name: 'John Doe' });
-      expect(lanaLogStub.calledOnce).to.equal(true);
-      expect(lanaLogStub.firstCall.args[0]).to.include('event-123');
-      expect(lanaLogStub.firstCall.args[0]).to.include('att-1');
-      expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
-      expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
-    });
-
-    it('should report the failure to lana even if the response body never resolves', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => new Promise(() => {}), ok: false, status: 400 });
-      const lanaLogStub = sandbox.stub(window.lana, 'log');
-      api.updateAttendee('event-123', { attendeeId: 'att-1', name: 'John Doe' });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(lanaLogStub.calledOnce).to.equal(true);
-    });
-
-    it('should preserve the true status and plain-text message for a hand-thrown business error, instead of collapsing into a Network Error', async () => {
-      sandbox.stub(window, 'fetch').resolves({ text: () => 'Authorization token is not valid for attendeeId', ok: false, status: 400 });
-
-      const result = await api.updateAttendee('123', { attendeeId: 'att-1', name: 'John Doe' });
-      expect(result.ok).to.be.false;
-      expect(result.status).to.equal(400);
-      expect(result.error).to.equal('Authorization token is not valid for attendeeId');
     });
   });
 
@@ -723,229 +662,181 @@ describe('Adobe Event Service API', () => {
     });
   });
 
-  describe('getAndCreateAndAddAttendee', () => {
+  describe('registerForEvent', () => {
     const eventId = 'event-123';
     const attendeeData = { firstName: 'John', lastName: 'Doe', email: 'john@test.com' };
-    const attendeeResp = { attendeeId: 'att-1', firstName: 'John', lastName: 'Doe', email: 'john@test.com' };
+    const writeCalls = (stub) => stub.getCalls().filter((c) => c.args[1]?.method === 'POST');
+    const stubFlow = ({ event = { eventId, isFull: false }, campaign, submit = { registrationStatus: 'registered' } } = {}) => {
+      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (url.includes('/campaigns/')) {
+          return Promise.resolve(campaign || { json: () => ({ message: 'Not found' }), ok: false, status: 404 });
+        }
+        if (url.includes('/attendees')) return Promise.resolve({ json: () => submit, ok: true, status: 201 });
+        return Promise.resolve({ json: () => event, ok: true });
+      });
+      return fetchStub;
+    };
 
     beforeEach(() => {
       BlockMediator.set('imsProfile', { account_type: 'type1' });
     });
 
-    it('should register when event is not full and no campaign', async () => {
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true, status: 200 });
-      fetchStub.onCall(2).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+    it('registers an authenticated user with exactly one write request', async () => {
+      const fetchStub = stubFlow();
 
-      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+      const result = await api.registerForEvent(eventId, attendeeData);
+
       expect(result.ok).to.be.true;
       expect(result.data.registrationStatus).to.equal('registered');
+      const writes = writeCalls(fetchStub);
+      expect(writes).to.have.length(1);
+      expect(writes[0].args[0]).to.match(/\/v1\/events\/event-123\/attendees\/me$/);
+      expect(fetchStub.getCalls().some((c) => /\/v1\/attendees/.test(c.args[0]))).to.be.false;
+      expect(JSON.parse(writes[0].args[1].body)).to.deep.equal({ ...attendeeData, registrationStatus: 'registered' });
     });
 
-    it('should drop a dirty legacy businessPhone from the update payload when the current form does not ask for it', async () => {
-      const fetchStub = sandbox.stub(window, 'fetch');
-      const staleAttendeeResp = { ...attendeeResp, businessPhone: 'None' };
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (staleAttendeeResp), ok: true, status: 200 });
-      fetchStub.onCall(2).resolves({ json: () => (staleAttendeeResp), ok: true });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
-
-      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
-
-      const updateOptions = fetchStub.getCall(2).args[1];
-      const updateBody = JSON.parse(updateOptions.body);
-      expect(updateBody).to.not.have.property('businessPhone');
-      expect(result.ok).to.be.true;
-    });
-
-    it('should still send a phone field to update when the current form explicitly submits it, even if the stale profile value was invalid', async () => {
-      const fetchStub = sandbox.stub(window, 'fetch');
-      const staleAttendeeResp = { ...attendeeResp, businessPhone: 'None' };
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (staleAttendeeResp), ok: true, status: 200 });
-      fetchStub.onCall(2).resolves({ json: () => (staleAttendeeResp), ok: true });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
-
-      const dataWithPhone = { ...attendeeData, businessPhone: '+1 555 123 4567' };
-      await api.getAndCreateAndAddAttendee(eventId, dataWithPhone);
-
-      const updateOptions = fetchStub.getCall(2).args[1];
-      const updateBody = JSON.parse(updateOptions.body);
-      expect(updateBody.businessPhone).to.equal('+1 555 123 4567');
-    });
-
-    it('should still forward a stale non-phone field on update', async () => {
-      const fetchStub = sandbox.stub(window, 'fetch');
-      const staleAttendeeResp = { ...attendeeResp, companyName: 'N/A' };
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (staleAttendeeResp), ok: true, status: 200 });
-      fetchStub.onCall(2).resolves({ json: () => (staleAttendeeResp), ok: true });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
-
-      await api.getAndCreateAndAddAttendee(eventId, attendeeData);
-
-      const updateOptions = fetchStub.getCall(2).args[1];
-      const updateBody = JSON.parse(updateOptions.body);
-      expect(updateBody.companyName).to.equal('N/A');
-    });
-
-    it('should authenticate the create-attendee and add-to-event calls via the rsvp-token header when a guest registers with a token', async () => {
-      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(2).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
-
-      await api.getAndCreateAndAddAttendee(eventId, attendeeData, 'tok-1');
-
-      const createOptions = fetchStub.getCall(1).args[1];
-      const addToEventOptions = fetchStub.getCall(2).args[1];
-      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-    });
-
-    it('should preserve the upstream status when create-attendee fails (e.g. an rsvp token that went stale between page load and submit)', async () => {
-      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ text: () => JSON.stringify({ message: 'Gone' }), ok: false, status: 410 });
-
-      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData, 'tok-1');
-      expect(result.ok).to.be.false;
-      expect(result.status).to.equal(410);
-      expect(fetchStub.callCount).to.equal(2);
-    });
-
-    it('should waitlist when event is full regardless of campaign', async () => {
+    it('does not look up or write the base profile for a guest', async () => {
       BlockMediator.set('imsProfile', { account_type: 'guest' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: true }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(2).resolves({ json: () => ({ registrationStatus: 'waitlisted' }), ok: true });
+      const fetchStub = stubFlow();
 
-      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
-      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
+      const result = await api.registerForEvent(eventId, attendeeData);
+
       expect(result.ok).to.be.true;
-      expect(fetchStub.callCount).to.equal(3);
+      expect(writeCalls(fetchStub)).to.have.length(1);
+      expect(fetchStub.getCalls().some((c) => /\/v1\/attendees(\/|$)/.test(c.args[0]))).to.be.false;
     });
 
-    it('should register with campaign when campaign has no attendeeLimit', async () => {
-      BlockMediator.set('imsProfile', { account_type: 'guest' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(2).resolves({
-        json: () => ({ campaignId: 'camp-1', attendeeCount: 50, waitlistAttendeeCount: 0 }),
-        ok: true,
-      });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered', campaignId: 'camp-1' }), ok: true });
+    it('sends base, event and custom fields together in one flat payload without routing by field name', async () => {
+      const fetchStub = stubFlow();
 
-      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
-      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
-      expect(result.ok).to.be.true;
-      expect(result.data.registrationStatus).to.equal('registered');
-    });
-
-    it('should register when campaign has capacity and no waitlist', async () => {
-      BlockMediator.set('imsProfile', { account_type: 'guest' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(2).resolves({
-        json: () => ({ campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 50, waitlistAttendeeCount: 0 }),
-        ok: true,
-      });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered', campaignId: 'camp-1' }), ok: true });
-
-      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
-      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
-      expect(result.ok).to.be.true;
-      expect(result.data.registrationStatus).to.equal('registered');
-    });
-
-    it('should waitlist when campaign attendeeLimit equals attendeeCount', async () => {
-      BlockMediator.set('imsProfile', { account_type: 'guest' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(2).resolves({
-        json: () => ({ campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 100, waitlistAttendeeCount: 0 }),
-        ok: true,
-      });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'waitlisted', campaignId: 'camp-1' }), ok: true });
-
-      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
-      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
-      expect(result.ok).to.be.true;
-      expect(result.data.registrationStatus).to.equal('waitlisted');
-    });
-
-    it('should waitlist when campaign has capacity but waitlist backlog exists', async () => {
-      BlockMediator.set('imsProfile', { account_type: 'guest' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(2).resolves({
-        json: () => ({ campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 80, waitlistAttendeeCount: 5 }),
-        ok: true,
-      });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'waitlisted', campaignId: 'camp-1' }), ok: true });
-
-      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
-      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
-      expect(result.ok).to.be.true;
-      expect(result.data.registrationStatus).to.equal('waitlisted');
-    });
-
-    it('should forward custom fields unrecognized by either filter into the add-to-event payload, but not fields recognized only by the base attendee filter', async () => {
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true, status: 200 });
-      fetchStub.onCall(2).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
-
-      const dataWithCustomField = {
+      await api.registerForEvent(eventId, {
         ...attendeeData,
         jobTitle: 'Engineer',
+        requiresTicket: ['Yes'],
         customEventQuestion: 'Yes, I will attend the workshop',
-      };
-      await api.getAndCreateAndAddAttendee(eventId, dataWithCustomField);
+        empty: '',
+      });
 
-      const addToEventOptions = fetchStub.getCall(3).args[1];
-      const addToEventBody = JSON.parse(addToEventOptions.body);
-      expect(addToEventBody.customEventQuestion).to.equal('Yes, I will attend the workshop');
-      expect(addToEventBody).to.not.have.property('jobTitle');
+      const body = JSON.parse(writeCalls(fetchStub)[0].args[1].body);
+      expect(body).to.deep.equal({
+        ...attendeeData,
+        jobTitle: 'Engineer',
+        requiresTicket: true,
+        customEventQuestion: 'Yes, I will attend the workshop',
+        registrationStatus: 'registered',
+      });
     });
 
-    it('should fall back to event-level status when campaign lookup fails', async () => {
+    it('drops prototype-chain keys from the payload', async () => {
+      const fetchStub = stubFlow();
+
+      await api.registerForEvent(eventId, JSON.parse('{"__proto__":{"polluted":true},"constructor":"x","firstName":"John"}'));
+
+      const body = JSON.parse(writeCalls(fetchStub)[0].args[1].body);
+      expect(Object.keys(body).sort()).to.deep.equal(['firstName', 'registrationStatus']);
+    });
+
+    it('sends the rsvp-token header on the single request when a guest registers with a token', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1' });
+      const fetchStub = stubFlow();
+
+      await api.registerForEvent(eventId, attendeeData, 'tok-1');
+
+      const writes = writeCalls(fetchStub);
+      expect(writes).to.have.length(1);
+      expect(writes[0].args[1].headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+    });
+
+    it('preserves the upstream status and code when the single request fails (e.g. a stale rsvp token)', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1' });
+      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (url.includes('/attendees')) {
+          return Promise.resolve({ text: () => JSON.stringify({ code: 'InvalidAttendeeToken', message: 'Gone' }), ok: false, status: 410 });
+        }
+        return Promise.resolve({ json: () => ({ eventId, isFull: false }), ok: true });
+      });
+
+      const result = await api.registerForEvent(eventId, attendeeData, 'tok-1');
+
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(410);
+      expect(result.code).to.equal('InvalidAttendeeToken');
+      expect(writeCalls(fetchStub)).to.have.length(1);
+    });
+
+    it('returns a failure without any write when the event lookup fails', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: false, status: 404 });
+
+      const result = await api.registerForEvent(eventId, attendeeData);
+
+      expect(result.ok).to.be.false;
+      expect(writeCalls(fetchStub)).to.have.length(0);
+    });
+
+    it('waitlists when event is full regardless of campaign', async () => {
       BlockMediator.set('imsProfile', { account_type: 'guest' });
-      const fetchStub = sandbox.stub(window, 'fetch');
-      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
-      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
-      fetchStub.onCall(2).resolves({ json: () => ({ message: 'Not found' }), ok: false, status: 404 });
-      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered', campaignId: 'camp-1' }), ok: true });
+      const fetchStub = stubFlow({ event: { eventId, isFull: true }, submit: { registrationStatus: 'waitlisted' } });
 
-      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
-      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
+      const result = await api.registerForEvent(eventId, { ...attendeeData, campaignId: 'camp-1' });
+
       expect(result.ok).to.be.true;
-      expect(result.data.registrationStatus).to.equal('registered');
+      expect(JSON.parse(writeCalls(fetchStub)[0].args[1].body)).to.include({ registrationStatus: 'waitlisted', campaignId: 'camp-1' });
+      expect(fetchStub.getCalls().some((c) => c.args[0].includes('/campaigns/'))).to.be.false;
     });
 
-    it('should catch an unexpected/synchronous error and report it to lana with the eventId', async () => {
-      BlockMediator.set('imsProfile', undefined);
-      sandbox.stub(window, 'fetch').onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+    [
+      ['has no attendeeLimit', { campaignId: 'camp-1', attendeeCount: 50, waitlistAttendeeCount: 0 }, 'registered'],
+      ['has capacity and no waitlist', { campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 50, waitlistAttendeeCount: 0 }, 'registered'],
+      ['attendeeLimit equals attendeeCount', { campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 100, waitlistAttendeeCount: 0 }, 'waitlisted'],
+      ['has capacity but a waitlist backlog', { campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 80, waitlistAttendeeCount: 5 }, 'waitlisted'],
+    ].forEach(([title, campaignData, expected]) => {
+      it(`sends registrationStatus ${expected} when the campaign ${title}`, async () => {
+        const fetchStub = stubFlow({ campaign: { json: () => campaignData, ok: true }, submit: { registrationStatus: expected } });
+
+        const result = await api.registerForEvent(eventId, { ...attendeeData, campaignId: 'camp-1' });
+
+        expect(result.ok).to.be.true;
+        const writes = writeCalls(fetchStub);
+        expect(writes).to.have.length(1);
+        expect(JSON.parse(writes[0].args[1].body)).to.include({ registrationStatus: expected, campaignId: 'camp-1' });
+      });
+    });
+
+    it('falls back to event-level status when campaign lookup fails', async () => {
+      const fetchStub = stubFlow();
+
+      const result = await api.registerForEvent(eventId, { ...attendeeData, campaignId: 'camp-1' });
+
+      expect(result.ok).to.be.true;
+      expect(JSON.parse(writeCalls(fetchStub)[0].args[1].body).registrationStatus).to.equal('registered');
+    });
+
+    it('surfaces a structured validation failure without a second request', async () => {
+      const body = { code: 'RsvpValidationError', message: 'x', fieldErrors: [{ field: 'companyName', code: 'FieldRequired', message: 'required' }] };
+      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (url.includes('/attendees')) return Promise.resolve({ text: () => JSON.stringify(body), ok: false, status: 400 });
+        return Promise.resolve({ json: () => ({ eventId, isFull: false }), ok: true });
+      });
+
+      const result = await api.registerForEvent(eventId, attendeeData);
+
+      expect(result.ok).to.be.false;
+      expect(result.code).to.equal('RsvpValidationError');
+      expect(result.fieldErrors).to.have.length(1);
+      expect(writeCalls(fetchStub)).to.have.length(1);
+    });
+
+    it('catches an unexpected error and reports it to lana with the eventId', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId, isFull: false }), ok: true });
       const lanaLogStub = sandbox.stub(window.lana, 'log');
 
-      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+      const result = await api.registerForEvent(eventId, null);
 
       expect(result.ok).to.be.false;
       expect(result.status).to.equal('Unexpected Error');
       expect(lanaLogStub.calledOnce).to.equal(true);
       expect(lanaLogStub.firstCall.args[0]).to.include(eventId);
       expect(lanaLogStub.firstCall.args[1].severity).to.equal('critical');
-      expect(lanaLogStub.firstCall.args[1].sampleRate).to.equal(100);
     });
   });
 

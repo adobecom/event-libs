@@ -1,11 +1,5 @@
 import { LIBS } from './utils.js';
-import BlockMediator from '../deps/block-mediator.min.js';
-import {
-  getBaseAttendeePayload,
-  getEventAttendeePayload,
-  getUnrecognizedAttendeeFields,
-  sanitizeLegacyPhoneFields,
-} from './data-utils.js';
+import { getRsvpPayload } from './data-utils.js';
 import { ENV_MAP, sessionCatalogHost } from './constances.js';
 import { getEventConfig, getEventServiceEnv, waitForImsInstance } from './utils.js';
 import {
@@ -326,83 +320,62 @@ export async function getAttendee(eventId) {
   }
 }
 
-export async function createAttendee(eventId, attendeeData, rsvpToken = null) {
-  if (!attendeeData) return false;
+// Field names only — never values — so they're safe to log and send to analytics.
+const SAFE_FIELD_NAME = /^[\w.[\]-]{1,64}$/;
 
-  const eventServiceEnv = getEventServiceEnv();
-  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const raw = JSON.stringify(attendeeData);
-  // Cluster Gateway requires a valid IMS credential on every request regardless of the
-  // rsvp-token header, so this always forwards whatever IMS token exists (guest or a real
-  // signed-in session) rather than suppressing it — omitting it would get the request
-  // rejected at the gateway before it ever reaches ESP. Which identity actually gets
-  // registered is the backend's call, not ours: ESP's attendee routes give the rsvp-token
-  // header precedence over any IMS identity, so an assistant registering a VIP via the link
-  // while signed into their own Adobe ID still registers the VIP, not themselves.
-  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
-
-  try {
-    const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
-
-    if (!response.ok) {
-      logCritical('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, response);
-      const error = await parseFailureBody(response);
-      return { ok: response.ok, status: response.status, error };
-    }
-
-    return { ok: true, data: await response.json() };
-  } catch (error) {
-    logCritical('esp-controller,create-attendee', `Failed to create attendee for event ${eventId}`, error);
-    return { ok: false, status: 'Network Error', error: error.message };
-  }
+export function getRsvpErrorDetails(error) {
+  const code = typeof error?.code === 'string' ? error.code : undefined;
+  const fieldErrors = Array.isArray(error?.fieldErrors)
+    ? error.fieldErrors.filter((fe) => typeof fe?.field === 'string' && SAFE_FIELD_NAME.test(fe.field))
+    : [];
+  return { code, fieldErrors };
 }
 
-export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
-  if (!eventId || !attendee) return false;
+/**
+ * Atomic RSVP submission: exactly ONE write request carrying the complete flat payload
+ * (base profile + event + custom fields). ESP/ESL validate and write everything together,
+ * so a rejected registration never mutates the attendee profile.
+ *
+ * Cluster Gateway requires a valid IMS credential on every request regardless of the
+ * rsvp-token header, so this always forwards whatever IMS token exists (guest or a real
+ * signed-in session). Which identity actually gets registered is the backend's call: the
+ * rsvp-token header takes precedence over any IMS identity. A successful token registration
+ * consumes the token server-side.
+ *
+ * @param {string} eventId
+ * @param {Object} payload - Flat attendee payload. `payload.attendeeId` is used as the path
+ *   identifier when present; otherwise `me`, which the backend resolves from the credentials.
+ * @param {string|null} [rsvpToken]
+ * @returns {Promise<{ok: boolean, status?: number|string, data?: Object, error?: any,
+ *   code?: string, fieldErrors?: Array<{field: string, code: string, message: string}>}>}
+ */
+export async function submitRsvp(eventId, payload, rsvpToken = null) {
+  if (!eventId || !payload) return false;
 
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const raw = JSON.stringify(attendee);
-  // Same identity handling as createAttendee above. This call also consumes
-  // the rsvp token server-side once the registration succeeds.
-  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
+  const attendeeKey = payload.attendeeId ? encodeURIComponent(payload.attendeeId) : 'me';
+  const options = await constructRequestOptions('POST', JSON.stringify(payload), true, false, rsvpToken);
 
   try {
-    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${encodeURIComponent(eventId)}/attendees/${attendeeKey}`, options);
 
     if (!response.ok) {
-      logCritical('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, response);
       const error = await parseFailureBody(response);
-      return { ok: response.ok, status: response.status, error };
+      const { code, fieldErrors } = getRsvpErrorDetails(error);
+      const fields = fieldErrors.map((fe) => fe.field).join(',');
+      const summary = `POST /v1/events/{eventId}/attendees/{attendeeId} eventId=${eventId} status=${response.status} code=${code ?? 'none'}${fields ? ` fields=${fields}` : ''}`;
+      // Validation failures are user input errors, not service failures.
+      if (code === 'RsvpValidationError') logWarning('esp-controller,submit-rsvp', summary);
+      else logCritical('esp-controller,submit-rsvp', summary);
+      return {
+        ok: false, status: response.status, error, code, fieldErrors,
+      };
     }
 
-    return { ok: true, data: await response.json() };
+    return { ok: true, status: response.status, data: await response.json() };
   } catch (error) {
-    logCritical('esp-controller,add-attendee-to-event', `Failed to add attendee ${attendee.attendeeId} for event ${eventId}`, error);
-    return { ok: false, status: 'Network Error', error: error.message };
-  }
-}
-
-export async function updateAttendee(eventId, attendeeData) {
-  if (!attendeeData) return false;
-
-  const eventServiceEnv = getEventServiceEnv();
-  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const raw = JSON.stringify(attendeeData);
-  const options = await constructRequestOptions('PUT', raw);
-
-  try {
-    const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
-
-    if (!response.ok) {
-      logCritical('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, response);
-      const error = await parseFailureBody(response);
-      return { ok: response.ok, status: response.status, error };
-    }
-
-    return { ok: true, data: await response.json() };
-  } catch (error) {
-    logCritical('esp-controller,update-attendee', `Failed to update attendee ${attendeeData.attendeeId} for event ${eventId}`, error);
+    logCritical('esp-controller,submit-rsvp', `POST /v1/events/{eventId}/attendees/{attendeeId} eventId=${eventId} network failure`, error);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -473,8 +446,8 @@ export async function getCampaign(eventId, campaignId) {
 // Validate-on-load for a guest rsvp token — authenticated solely by the
 // x-adobe-esp-rsvp-token header. This call never consumes the token; actual
 // registration (and consumption) happens via the normal attendee endpoints
-// (createAttendee / addAttendeeToEvent above), with the token threaded through
-// as auth instead of a separate submission endpoint.
+// (submitRsvp above), with the token threaded through as auth instead of a
+// separate submission endpoint.
 const RSVP_TOKEN_INVALID_STATUSES = [401, 404, 409, 410];
 
 export async function validateRsvpToken(eventId, token) {
@@ -714,47 +687,13 @@ export async function unregisterFromSessionTime(sessionTimeId) {
 }
 
 // compound helper functions
-export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToken = null) {
+export async function registerForEvent(eventId, attendeeData, rsvpToken = null) {
   try {
-    const profile = BlockMediator.get('imsProfile');
     const eventObj = await getEvent(eventId);
 
     if (!eventObj.ok) return { ok: false, error: 'Failed to get event' };
 
-    let attendee;
     let registrationStatus = 'registered';
-
-    if (profile.account_type === 'guest') {
-      // Use BaseAttendee filter for creating new attendee. A guest arriving via an rsvp
-      // token still forwards whatever IMS token exists alongside it — see createAttendee
-      // for why (Cluster Gateway requires one either way; the backend, not us, decides
-      // which credential's identity the registration actually uses).
-      const filteredPayload = getBaseAttendeePayload(attendeeData);
-      attendee = await createAttendee(eventId, filteredPayload, rsvpToken);
-    } else {
-      const attendeeResp = await getAttendee(eventId);
-
-      if (!attendeeResp.ok && attendeeResp.status === 404) {
-        // Use BaseAttendee filter for creating new attendee
-        const filteredPayload = getBaseAttendeePayload(attendeeData);
-        attendee = await createAttendee(eventId, filteredPayload);
-      } else if (attendeeResp.data?.attendeeId) {
-        // Use BaseAttendee filter for updating existing attendee
-        const payload = {
-          ...sanitizeLegacyPhoneFields(attendeeResp.data, attendeeData),
-          ...attendeeData,
-        };
-        const filteredPayload = getBaseAttendeePayload(payload);
-        attendee = await updateAttendee(eventId, filteredPayload);
-      }
-    }
-
-    // Preserve the upstream status (e.g. 401/404/409/410 for a guest whose rsvp
-    // token went stale between page load and submit) so callers can show the
-    // specific error copy instead of a generic failure message.
-    if (!attendee?.ok) return { ok: false, status: attendee?.status, error: attendee?.error || 'Failed to create or update attendee' };
-
-    const newAttendeeData = attendee.data;
 
     if (eventObj.data.isFull) registrationStatus = 'waitlisted';
 
@@ -769,22 +708,9 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
       }
     }
 
-    // Use EventAttendee filter for adding attendee to event; forward any
-    // custom fields the RSVP form submitted that neither filter recognizes.
-    const eventAttendeePayload = {
-      ...getEventAttendeePayload({
-        ...newAttendeeData,
-        ...attendeeData,
-        registrationStatus,
-      }),
-      ...getUnrecognizedAttendeeFields(attendeeData),
-    };
-
-    // For a guest, this call both registers and consumes the rsvp token
-    // server-side in one step.
-    return await addAttendeeToEvent(eventId, eventAttendeePayload, rsvpToken);
+    return await submitRsvp(eventId, getRsvpPayload(attendeeData, registrationStatus), rsvpToken);
   } catch (error) {
-    logCritical('esp-controller,get-and-create-and-add-attendee', `Unexpected error submitting RSVP for event ${eventId} (campaignId=${attendeeData?.campaignId ?? 'none'})`, error);
+    logCritical('esp-controller,register-for-event', `Unexpected error submitting RSVP for event ${eventId} (campaignId=${attendeeData?.campaignId ?? 'none'})`, error);
     return { ok: false, status: 'Unexpected Error', error: error.message };
   }
 }

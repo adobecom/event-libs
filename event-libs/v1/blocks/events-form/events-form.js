@@ -1,7 +1,7 @@
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
+import { deleteAttendeeFromEvent, registerForEvent, getRsvpErrorDetails, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getRsvpInvalidSubmissionMessage, getRsvpDeclinedMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getRsvpInvalidSubmissionMessage, getRsvpFieldErrorMessage, getRsvpDeclinedMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN, STANDARD_FIELD_MAX_LENGTHS } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
@@ -286,13 +286,13 @@ export async function submitForm(bp) {
   }
 
   // A valid RSVP token never reaches submitForm unless it's still usable (an
-  // invalid token short-circuits before the form is built, see onProfile). A guest
-  // registers via the same normal attendee flow as an IMS user — the rsvp token
-  // is just threaded through as auth instead of a bearer token, and the final
-  // add-to-event call consumes it server-side once the registration succeeds.
-  // campaignId (set on payload above) rides along in that call like any other flow.
+  // invalid token short-circuits before the form is built, see onProfile). Every flow
+  // (signed-in, guest, rsvp-token, campaign, waitlist) sends one atomic request with the
+  // complete flat payload; the rsvp token is just threaded through as auth instead of a
+  // bearer token and is consumed server-side once the registration succeeds.
+  // campaignId (set on payload above) rides along like any other field.
   const rsvpToken = BlockMediator.get('imsProfile')?.rsvpToken;
-  return getAndCreateAndAddAttendee(getMetadata('event-id'), payload, rsvpToken);
+  return registerForEvent(getMetadata('event-id'), payload, rsvpToken);
 }
 
 function clearForm(form) {
@@ -367,29 +367,106 @@ function getErrorMessage(error) {
   return typeof error === 'string' ? error : error?.message;
 }
 
+export function isEventFullError(status, error) {
+  const { code } = getRsvpErrorDetails(error);
+  if (code) return code === 'EventFull';
+  return status === 400 && getErrorMessage(error) === 'Event is full';
+}
+
+function findFieldControl(form, field) {
+  const wrapper = form.querySelector(`[data-field-id="${CSS.escape(field)}"]`);
+  if (wrapper) return { wrapper, control: wrapper.querySelector('input, select, textarea') };
+  const control = form.querySelector(`#${CSS.escape(field)}, [name="${CSS.escape(field)}"]`);
+  return control ? { wrapper: control.closest('.field-wrapper') || control.parentElement, control } : null;
+}
+
+const fieldErrorCleanups = new WeakMap();
+
+export function clearFieldErrors(form) {
+  fieldErrorCleanups.get(form)?.forEach((cleanup) => cleanup());
+  fieldErrorCleanups.delete(form);
+}
+
+/**
+ * Shows a field-level message next to each control named in `fieldErrors`.
+ * @returns {Promise<string[]>} Field names that matched no control on the form.
+ */
+export async function showFieldErrors(form, fieldErrors) {
+  clearFieldErrors(form);
+  await dictionaryManager.initialize();
+  const unmatched = [];
+  const cleanups = [];
+  let firstControl = null;
+
+  fieldErrors.forEach(({ field, code }, i) => {
+    const target = findFieldControl(form, field);
+    if (!target?.wrapper) {
+      unmatched.push(field);
+      return;
+    }
+    const { wrapper, control } = target;
+    const id = `${field}-error-${i}`;
+    const msgEl = createTag('p', { class: 'field-error', id }, getRsvpFieldErrorMessage(dictionaryManager, code));
+    wrapper.append(msgEl);
+    const previousDescribedBy = control?.getAttribute('aria-describedby');
+    if (control) {
+      control.setAttribute('aria-invalid', 'true');
+      control.setAttribute('aria-describedby', [previousDescribedBy, id].filter(Boolean).join(' '));
+      firstControl = firstControl || control;
+    }
+    const clear = () => {
+      msgEl.remove();
+      wrapper.removeEventListener('input', clear);
+      if (!control) return;
+      control.removeAttribute('aria-invalid');
+      const remaining = (control.getAttribute('aria-describedby') || '').split(' ').filter((token) => token && token !== id);
+      if (remaining.length) control.setAttribute('aria-describedby', remaining.join(' '));
+      else control.removeAttribute('aria-describedby');
+    };
+    cleanups.push(clear);
+    wrapper.addEventListener('input', clear);
+  });
+
+  fieldErrorCleanups.set(form, cleanups);
+  firstControl?.focus?.();
+  return unmatched;
+}
+
 export async function buildErrorMsg(parent, status, error) {
   const message = getErrorMessage(error);
+  const { code } = getRsvpErrorDetails(error);
+  const hasToken = Boolean(BlockMediator.get('imsProfile')?.rsvpToken);
 
   let errorMsg;
-  if (status === 400 && message === 'Event is full') {
+  if (code === 'EventFull' || (!code && status === 400 && message === 'Event is full')) {
     const errorKey = await getFullMessageKey('event-full-error-msg', 'event-full-no-waitlist-error-msg');
     errorMsg = dictionaryManager.getValue(errorKey);
-  } else if (status === 400 && message === 'Authorization token is not valid for attendeeId') {
-    await dictionaryManager.initialize();
-    errorMsg = getRsvpTokenInvalidMessage(dictionaryManager);
-  } else if (status === 400) {
-    await dictionaryManager.initialize();
-    errorMsg = getRsvpInvalidSubmissionMessage(dictionaryManager);
-  } else if (status === 409 && message === 'Campaign is full') {
+  } else if (code === 'WaitlistingNotAllowed') {
+    errorMsg = dictionaryManager.getValue('event-full-no-waitlist-error-msg');
+  } else if (code === 'CampaignFull' || (!code && status === 409 && message === 'Campaign is full')) {
     const errorKey = await getFullMessageKey('campaign-full-error-msg', 'campaign-full-no-waitlist-error-msg');
     errorMsg = dictionaryManager.getValue(errorKey);
-  } else if (status === 409 && BlockMediator.get('imsProfile')?.rsvpToken) {
-    // AttendeeAlreadyRegistered — this email is already registered for the event.
+  } else if (code === 'InviteOnlyEvent' || code === 'CampaignNotFound') {
+    await dictionaryManager.initialize();
+    errorMsg = getInviteOnlyNoCampaignMessage(dictionaryManager);
+  } else if (code === 'InvalidAttendeeToken' || (!code && status === 400 && message === 'Authorization token is not valid for attendeeId')) {
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpTokenInvalidMessage(dictionaryManager);
+  } else if (code === 'RsvpValidationError') {
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpInvalidSubmissionMessage(dictionaryManager);
+  } else if (code === 'AttendeeAlreadyRegistered' || (!code && status === 409 && hasToken)) {
     // The token is NOT consumed on this error, so it stays usable for a different
     // guest; the copy must not imply the link itself is dead.
     await dictionaryManager.initialize();
     errorMsg = getRsvpTokenAlreadyRegisteredMessage(dictionaryManager);
-  } else if ((status === 401 || status === 404 || status === 410) && BlockMediator.get('imsProfile')?.rsvpToken) {
+  } else if (code) {
+    await dictionaryManager.initialize();
+    errorMsg = dictionaryManager.getValue('rsvp-error-msg');
+  } else if (status === 400) {
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpInvalidSubmissionMessage(dictionaryManager);
+  } else if ((status === 401 || status === 404 || status === 410) && hasToken) {
     // Token header missing (401), not found (404), or expired/revoked (410) — it
     // became invalid between page load and submit (e.g. the same link used in
     // another tab), or the RSVP token header failed to reach the server.
@@ -497,6 +574,47 @@ async function autoRegisterSessions() {
   BlockMediator.set('registeredSessionIds', new Set([...existing, ...newIds]));
 }
 
+export async function handleSubmitResult(bp, button, respJson) {
+  if (respJson.ok) {
+    BlockMediator.set('rsvpData', respJson.data);
+    eventFormSendAnalytics(bp, 'Form Submit');
+    if (shouldAutoRegisterSessions(respJson.data?.registrationStatus, BlockMediator.get('imsProfile'))) autoRegisterSessions();
+  } else {
+    const { status, error } = respJson;
+    const { code, fieldErrors } = getRsvpErrorDetails(error);
+
+    // Code and field names only — never submitted values.
+    const fieldNames = fieldErrors.map((fe) => fe.field).join(',');
+    eventFormSendAnalytics(bp, `Form Submit Error | ${code ?? status}${fieldNames ? ` | ${fieldNames}` : ''}`);
+
+    const unmatchedFields = code === 'RsvpValidationError'
+      ? await showFieldErrors(bp.form, fieldErrors)
+      : [];
+
+    if (isEventFullError(status, error)) {
+      const eventObj = await getEvent(getMetadata('event-id'));
+      if (isWaitlistingEnabled(eventObj)) {
+        button.textContent = dictionaryManager.getValue('waitlist-cta-text');
+        button.disabled = false;
+      } else {
+        button.textContent = dictionaryManager.getValue('event-full-cta-text');
+        button.disabled = true;
+      }
+    }
+
+    // A validation failure is atomic, so it says nothing about an existing registration.
+    if (status === 400 && code !== 'RsvpValidationError') {
+      BlockMediator.set('rsvpData', null);
+    }
+
+    // Field-level messages carry the detail; the general banner is only needed when
+    // there are no matching controls (or the failure isn't a field validation).
+    if (code !== 'RsvpValidationError' || unmatchedFields.length || !fieldErrors.length) {
+      await buildErrorMsg(bp.form, status, error);
+    }
+  }
+}
+
 function createButton({ type, label }, bp) {
   const button = createTag('button', { class: 'button' }, dictionaryManager.getValue(label, 'rsvp-fields'));
   if (type === 'submit') {
@@ -505,41 +623,12 @@ function createButton({ type, label }, bp) {
         event.preventDefault();
         button.setAttribute('disabled', true);
         button.classList.add('submitting');
+        clearFieldErrors(bp.form);
         const respJson = await submitForm(bp);
-        if (!respJson) {
-          button.removeAttribute('disabled');
-          button.classList.remove('submitting');
-          return;
-        }
-
-        if (respJson.ok) {
-          BlockMediator.set('rsvpData', respJson.data);
-          eventFormSendAnalytics(bp, 'Form Submit');
-          if (shouldAutoRegisterSessions(respJson.data?.registrationStatus, BlockMediator.get('imsProfile'))) autoRegisterSessions();
-        } else {
-          const { status, error } = respJson;
-          const message = getErrorMessage(error);
-
-          if (status === 400 && message === 'Event is full') {
-            const eventObj = await getEvent(getMetadata('event-id'));
-            if (isWaitlistingEnabled(eventObj)) {
-              button.textContent = dictionaryManager.getValue('waitlist-cta-text');
-              button.disabled = false;
-            } else {
-              button.textContent = dictionaryManager.getValue('event-full-cta-text');
-              button.disabled = true;
-            }
-          }
-
-          if (status === 400) {
-            BlockMediator.set('rsvpData', null);
-          }
-
-          buildErrorMsg(bp.form, status, error);
-        }
-
+        // Re-enable first so handleSubmitResult can leave the button disabled (event full).
         button.removeAttribute('disabled');
         button.classList.remove('submitting');
+        if (respJson) await handleSubmitResult(bp, button, respJson);
       }
     });
   }
