@@ -3,7 +3,7 @@ import * as preact from '../../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import { buildMyFavoritesView } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/MyFavoritesView.js';
 import {
-  sessions, scheduled, favorited, liveStreamActiveIds, auth,
+  sessions, scheduled, favorited, liveStreamActiveIds, auth, rfAuthStatus,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
 
 // Offset from real "now" (the component derives session state from the real clock, so
@@ -39,6 +39,17 @@ const PAST_SESSION = {
   mrStreamId: null, thumbnailUrl: null,
 };
 
+const CROSS_DAY_SESSIONS = [
+  {
+    ...PAST_SESSION, id: 'day-1', title: 'Earlier day', primaryTrack: 'Design',
+    startTimeUtc: '2020-01-01T18:00:00Z', endTimeUtc: '2020-01-01T19:00:00Z',
+  },
+  {
+    ...PAST_SESSION, id: 'day-2', title: 'Later day', primaryTrack: 'Video',
+    startTimeUtc: '2020-01-02T18:00:00Z', endTimeUtc: '2020-01-02T19:00:00Z',
+  },
+];
+
 const LIVE_NOW_SESSION = {
   id: 'l-1', title: 'Live now', description: '', primaryTrack: 'Design',
   startTimeUtc: h(-0.25), endTimeUtc: h(0.25),
@@ -54,6 +65,7 @@ const BASE_CONFIG = {
 function makeStore({
   isRegistered = true,
   isLoggedIn = true,
+  rfStatus = 'ready',
   sessionList = [],
   favoritedIds = new Set(),
   myFavoritesTab = 'upcoming',
@@ -62,6 +74,7 @@ function makeStore({
   searchQuery = '',
 } = {}) {
   auth.value = { isLoggedIn, isRegistered, userFirstName: null };
+  rfAuthStatus.value = rfStatus;
   sessions.value = sessionList;
   scheduled.value = new Set();
   favorited.value = favoritedIds;
@@ -102,6 +115,81 @@ describe('MyFavoritesView', () => {
     const store = makeStore();
     const View = buildMyFavoritesView(preact, store);
     expect(View({})).to.include('sg-view--my-favorites');
+  });
+
+  it('renders saved favorites post-event for a token-bearing unregistered visitor', () => {
+    const store = makeStore({
+      isRegistered: false, sessionList: [PAST_SESSION], favoritedIds: new Set(['p-1']),
+    });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.include('sg-my-favorites__on-demand');
+    expect(View({})).to.include('track="Video"');
+  });
+
+  ['2020-01-02', ''].forEach((activeDay) => {
+    it(`shows only favorited on-demand sessions across all days post-event with activeDay="${activeDay}"`, () => {
+      const store = makeStore({
+        sessionList: [...CROSS_DAY_SESSIONS, { ...CROSS_DAY_SESSIONS[0], id: 'other', primaryTrack: 'Unselected' }],
+        favoritedIds: new Set(['day-1', 'day-2']),
+        activeDay,
+      });
+      const html = buildMyFavoritesView(preact, store)({});
+      expect(html).to.include('track="Design"');
+      expect(html).to.include('track="Video"');
+      expect(html).to.not.include('track="Unselected"');
+    });
+  });
+
+  [
+    { name: 'search', searchQuery: 'Earlier day' },
+    { name: 'facets', activeFilters: { primaryTrack: new Set(['Design']) } },
+  ].forEach(({ name, ...filters }) => {
+    it(`still applies ${name} to the post-event all-days selection`, () => {
+      const store = makeStore({
+        sessionList: CROSS_DAY_SESSIONS, favoritedIds: new Set(['day-1', 'day-2']),
+        activeDay: '2020-01-02', ...filters,
+      });
+      const html = buildMyFavoritesView(preact, store)({});
+      expect(html).to.include('track="Design"');
+      expect(html).to.not.include('track="Video"');
+    });
+  });
+
+  [UPCOMING_SESSION, LIVE_NOW_SESSION].forEach((session) => {
+    it(`retains the selected-day scope while the catalog has ${session.title} sessions`, () => {
+      const store = makeStore({
+        sessionList: [...CROSS_DAY_SESSIONS, session], favoritedIds: new Set(['day-1', 'day-2']),
+        activeDay: '2020-01-02', myFavoritesTab: 'on-demand',
+      });
+      const html = buildMyFavoritesView(preact, store)({});
+      expect(html).to.include('track="Video"');
+      expect(html).to.not.include('track="Design"');
+    });
+  });
+
+  it('waits for post-event RF auth instead of leaving an unregistered visitor blank', () => {
+    const store = makeStore({ isRegistered: false, rfStatus: 'loading', sessionList: [PAST_SESSION] });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.include('sg-loading-state');
+  });
+
+  it('does not render a personal view for a confirmed tokenless post-event visitor', () => {
+    const store = makeStore({ rfStatus: 'missing', sessionList: [PAST_SESSION] });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.be.null;
+  });
+
+  it('shows an explicit auth lookup error rather than an empty favorites list', () => {
+    const store = makeStore({ isRegistered: false, rfStatus: 'error', sessionList: [PAST_SESSION] });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.include('role="alert"');
+    expect(View({})).to.include('Unable to load your favorites.');
+  });
+
+  it('still blocks unregistered visitors before/during the event even with RF credentials', () => {
+    const store = makeStore({ isRegistered: false, sessionList: [UPCOMING_SESSION] });
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.be.null;
   });
 
   it('shows empty state when no sessions are favorited', () => {

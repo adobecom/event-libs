@@ -72,6 +72,51 @@ heading and track rows (MWPW-208777). The heading stays above the empty or no-re
 state when Recommended is absent or hidden. This is DOM order, not a CSS reorder,
 so visual and reading order agree on both page and drawer surfaces.
 
+Within each track row, cards run by start time, earliest first (MWPW-215102,
+`sortTrackSessions`). In-person on-demand sessions (`hasOnDemandFormat`) and cards still
+showing AVAILABLE SOON (`isDvrPending`, the same check as the card label) come after the
+rest, in the same order among themselves. A keynote and its ASL version share a start
+time, so the session code breaks ties (`GS1` before `GS1-0`). Every on-demand track row
+uses this order: On Demand, My Sessions and My Favorites.
+
+## Filtered carousel row position (MWPW-215192)
+
+Track/time-slot rows reset to the first card when search, filters or the active day changes.
+Desktop offsets are clamped when results shrink, and measurements/observers follow session IDs
+even when a replacement list has the same count. Saved-state changes alone preserve position.
+Below 1280px, rows scroll natively and no cards inherit desktop off-screen `inert` state.
+
+## Scheduled on-demand row interaction (MWPW-215139)
+
+At desktop widths, a row-hover/focus rule turns resting scheduled, non-favorited on-demand cards
+white without removing their base background declaration. This preserves pressed-only states
+outside row interactions as well as the card's own dark hover/focus state, dimensions and
+saved-state classes. Mobile/tablet row-tint suppression remains unchanged.
+
+## Post-event personal session days (MWPW-215376)
+
+After the event, My Sessions and My Favorites show on-demand sessions from all days in the user's
+scheduled/favorited catalog selection, ignoring the retained active day because date tabs are hidden.
+Before/during-event on-demand lists remain day-scoped. Search, facets, ordering, authorization and
+catalog eligibility still apply; RF data and the live/upcoming selections are unchanged.
+
+## Post-event favorite authentication (MWPW-212845)
+
+Signed-in visitors can favorite after the event without completing registration when they have an
+RF token. As a temporary fallback, a favorite write rejected with RF response code `103` and no
+token shows the blue informative toast: "Favoriting is only available to registered attendees."
+The frontend registration boolean is not used for this fallback because it can be forced.
+Pre-event gating and unrelated failures keep their existing behavior.
+
+After the event, My sessions and My favorites use RF authentication availability rather than
+registration status. Once a missing token is confirmed, both dropdown options are hidden and direct
+links or restored drawer views fall back to On demand. Token-bearing unregistered visitors retain
+access. Token lookup loading shows a loading state; lookup failures keep the options available and
+show an explicit error rather than treating the account as tokenless. Pre/during-event registration
+and signed-out prompts are unchanged. This does not create tokens or start RF registration.
+RF availability is UI-only: the existing token extraction and private data-loading guard are
+unchanged. Signing out still blocks access, but does not relabel an already-acquired token as missing.
+
 ## sessions-api.js
 
 ### sessionPageUrlForEnv
@@ -333,6 +378,13 @@ content is taller and scrolls.
 ---
 
 ## Deep linking
+
+### Post-event view initialization
+
+The automatic Live & upcoming to On demand transition checks the reducer's current view before
+applying. This prevents a queued startup transition from overwriting an explicit URL-selected
+My sessions or My favorites view and clearing its search/filter state. The normal transition
+from Live & upcoming keeps its existing behavior; authorization still gates personal views.
 
 ### Server time across Watch navigation
 

@@ -13,7 +13,10 @@ export default async function init(el) {
   const background = readBackgroundConfig(el);
   const statusLabels = readStatusLabels(el);
   el.replaceChildren();
-  if (background) el.style.background = background;
+  if (background) {
+    el.style.background = background;
+    el.closest('main')?.style.setProperty('--session-details-bg', background);
+  }
 
   initTierOneEventConfig();
 

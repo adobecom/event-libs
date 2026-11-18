@@ -23,6 +23,7 @@ export const liveStreamActiveIds = signal(new Set());
 export const favorited = signal(new Set());
 export const scheduled = signal(new Set());
 export const auth = signal({ isLoggedIn: null, isRegistered: undefined, userFirstName: null });
+export const rfAuthStatus = signal('loading'); // UI only: loading | ready | missing | error
 export const pendingActions = signal(new Set());
 // Re-render dependency only.
 export const sessionStateVersion = signal(0);
@@ -73,11 +74,20 @@ function defaultRfApiUrlForEnv() {
 async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
+  rfAuthStatus.value = 'loading';
   try {
     const data = await fetchAuthToken(clientId, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     rfAuthToken = data?.rfAuthToken ?? data?.token ?? data?.jwt ?? data?.authToken ?? null;
-    if (!rfAuthToken) logWarning('session-store,rf-auth-token', 'jwt exchange returned no recognizable token field');
+    if (rfAuthToken) {
+      rfAuthStatus.value = 'ready';
+    } else {
+      // RF 104 means no identity is linked yet, not a failed credential lookup.
+      const lookupFailed = data?.responseCode && !['0', '104'].includes(String(data.responseCode));
+      rfAuthStatus.value = lookupFailed ? 'error' : 'missing';
+      logWarning('session-store,rf-auth-token', 'jwt exchange returned no recognizable token field');
+    }
   } catch (err) {
+    rfAuthStatus.value = 'error';
     logError('session-store,rf-auth-token', 'jwt exchange failed', err);
   }
   rfAuthTokenSettled = true;
@@ -108,6 +118,7 @@ function syncAuth() {
   } else {
     // Not logged in (or no userId) is itself a final answer, not "still don't know."
     rfAuthTokenSettled = true;
+    if (!rfAuthToken && !rfAuthTokenStarted) rfAuthStatus.value = 'missing';
     maybeLoadMyData();
   }
 }
@@ -122,6 +133,7 @@ async function resolveRegistrationAndAuth() {
     if (authToken) {
       rfAuthToken = authToken;
       rfAuthTokenSettled = true;
+      rfAuthStatus.value = 'ready';
       maybeLoadMyData();
       return;
     }
@@ -177,8 +189,13 @@ function maybeLoadMyData() {
   loadMyData();
 }
 
-async function loadSessions() {
-  sessionsStatus.value = 'loading';
+// Status stays 'loading' until a retry succeeds or they run out (worst case ~37s with the 10s timeout).
+export const SESSIONS_RETRY_DELAYS_MS = [2000, 5000];
+// Offline: retry on 'online' (same attempt) or after this delay (next attempt), whichever is first.
+export const SESSIONS_OFFLINE_RETRY_MS = 30000;
+
+async function loadSessions(attempt = 0) {
+  if (attempt === 0) sessionsStatus.value = 'loading';
   try {
     const fetched = await fetchSessions(eventApiConfig.eventId);
     // Batched so components reading both `sessions` and `sessionsStatus` re-render once.
@@ -199,7 +216,28 @@ async function loadSessions() {
     );
     maybeLoadMyData();
   } catch (err) {
-    logError('session-store,sessions', `sessions fetch failed for event ${eventApiConfig.eventId} on ${getEventServiceEnv()?.name}`, err);
+    const context = `sessions fetch failed for event ${eventApiConfig.eventId} on ${getEventServiceEnv()?.name} (attempt ${attempt + 1})`;
+    if (navigator.onLine === false && attempt < SESSIONS_RETRY_DELAYS_MS.length) {
+      // Offline requests fail instantly; the short delays would use up every attempt in ~7s.
+      logWarning('session-store,sessions', `${context}, offline; retrying when back online`, err);
+      let fallbackTimer;
+      let onOnline;
+      const retry = (nextAttempt) => {
+        window.removeEventListener('online', onOnline);
+        clearTimeout(fallbackTimer);
+        loadSessions(nextAttempt);
+      };
+      onOnline = () => retry(attempt);
+      window.addEventListener('online', onOnline, { once: true });
+      fallbackTimer = setTimeout(() => retry(attempt + 1), SESSIONS_OFFLINE_RETRY_MS);
+      return;
+    }
+    if (attempt < SESSIONS_RETRY_DELAYS_MS.length) {
+      logWarning('session-store,sessions', `${context}, retrying`, err);
+      setTimeout(() => loadSessions(attempt + 1), SESSIONS_RETRY_DELAYS_MS[attempt]);
+      return;
+    }
+    logError('session-store,sessions', context, err);
     sessionsStatus.value = 'error';
   }
 }

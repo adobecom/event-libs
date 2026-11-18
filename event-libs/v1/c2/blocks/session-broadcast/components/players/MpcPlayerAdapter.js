@@ -2,6 +2,7 @@ import { html, useEffect, useRef } from '../../../../../deps/htm-preact.js';
 import { LIBS, getEventConfig } from '../../../../../utils/utils.js';
 import { trackBroadcastEvent } from '../../utils/broadcast-analytics.js';
 import { guardPlayerScroll } from '../../../../utils/player-scroll-guard.js';
+import { withServerTime } from '../../../../../utils/session-state.js';
 
 // adobetv.css never auto-loads since Milo's block-loader never mounted this block — inject
 // once, same pattern as scripts.js's C2 foundation stylesheet.
@@ -47,7 +48,7 @@ export function MpcPlayerAdapter({ session }) {
       // init() expects a live anchor and builds the iframe from it — no direct "iframe for
       // this ID" export exists.
       const anchor = document.createElement('a');
-      anchor.href = `https://video.tv.adobe.com/v/${session.mpcId}?autoplay=true`;
+      anchor.href = withServerTime(`https://video.tv.adobe.com/v/${session.mpcId}?autoplay=true`);
       container.appendChild(anchor);
       initAdobeTv(anchor);
     })();

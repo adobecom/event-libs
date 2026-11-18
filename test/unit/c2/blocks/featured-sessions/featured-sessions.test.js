@@ -1,6 +1,10 @@
 import { expect } from '@esm-bundle/chai';
 import init, { formatSessionDateTime, toRelativeMediaUrl } from '../../../../../event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Relative to now so the default session stays upcoming ("Learn more") whenever the suite runs.
+const UPCOMING_START_MS = Date.now() + DAY_MS;
+
 function entry(overrides = {}) {
   return {
     sessionId: 'session-1',
@@ -9,8 +13,8 @@ function entry(overrides = {}) {
     url: 'https://example.com/sessions/s-001',
     imageUrl: 'https://example.com/image.jpg',
     sessionTime: {
-      startTimeMillis: Date.parse('2026-11-11T18:00:00.000Z'),
-      endTimeMillis: Date.parse('2026-11-11T19:00:00.000Z'),
+      startTimeMillis: UPCOMING_START_MS,
+      endTimeMillis: UPCOMING_START_MS + 60 * 60 * 1000,
     },
     ...overrides,
   };

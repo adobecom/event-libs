@@ -845,22 +845,6 @@
   gap: var(--s2a-spacing-md);
 }
 
-.sg-filter-panel__close {
-  position: absolute;
-  top: var(--s2a-spacing-xs);
-  right: var(--s2a-spacing-xs);
-  z-index: 1;
-  padding: var(--s2a-spacing-xs);
-  background: transparent;
-  border: none;
-  font-size: var(--s2a-font-size-lg);
-  line-height: 1;
-  color: var(--s2a-color-content-subtle);
-  cursor: pointer;
-}
-
-.sg-filter-panel__close:hover { color: var(--s2a-color-content-default); }
-
 .sg-filter-panel__sidebar {
   grid-area: sidebar;
   min-width: 0;
@@ -1264,10 +1248,6 @@
   .sg-filter-panel__options {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     padding: var(--s2a-spacing-lg);
-  }
-
-  .sg-filter-panel__close {
-    display: none;
   }
 }
 

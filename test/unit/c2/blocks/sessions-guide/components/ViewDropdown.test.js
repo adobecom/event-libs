@@ -53,6 +53,15 @@ describe('ViewDropdown visibleViews', () => {
     expect(values(true)).to.deep.equal(['my-sessions', 'my-favorites', 'on-demand']);
   });
 
+  it('only offers On demand for confirmed tokenless post-event visitors', () => {
+    expect(visibleViews(true, true).map((v) => v.value)).to.deep.equal(['on-demand']);
+  });
+
+  it('retains the registration-gated options before/during the event without RF credentials', () => {
+    expect(visibleViews(false, true).map((v) => v.value))
+      .to.deep.equal(['live-upcoming', 'my-sessions', 'my-favorites', 'on-demand']);
+  });
+
   it('never offers a view the store would immediately transition away from', () => {
     expect(values(true)).to.not.include('live-upcoming');
   });

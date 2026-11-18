@@ -18,8 +18,7 @@ export const RF_PROFILE_IDS = {
 // Current/upcoming event — update when the next MAX supersedes it.
 export const DEFAULT_RF_PROFILE_ID = RF_PROFILE_IDS.max26;
 
-// Same for every event so far; per-event widget ids retired.
-export const RF_WIDGET_ID = 'RCitHYXguvb7I6o4Ps9T5weDqIK9xRYb';
+export const RF_WIDGET_ID = 'iot1q1elrXqtAcu5vRDqoZLpoMeHWDfe';
 
 const ENDPOINTS = {
   AUTH: 'jwt',
@@ -64,6 +63,13 @@ export class RfAccessError extends Error {
   constructor(message) {
     super(message);
     this.name = 'RfAccessError';
+  }
+}
+
+export class RfAuthRequiredError extends Error {
+  constructor(message = 'RainFocus authentication required') {
+    super(message);
+    this.name = 'RfAuthRequiredError';
   }
 }
 
@@ -135,8 +141,11 @@ export async function dropAndSwapSession(sessionTimeId, dropSessionItems, rfAuth
 
 export async function toggleSessionInterest(sessionTimeId, sessionId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.TOGGLE_FAVORITES, {
-    rfApiProfileId, rfAuthToken, sessionTimeId, sessionId,
+    rfApiProfileId, rfAuthToken, sessionTimeId, sessionId, rfWidgetId: RF_WIDGET_ID,
   });
+  if (!rfAuthToken && data?.responseCode === '103') {
+    throw new RfAuthRequiredError(data.responseMessage);
+  }
   return handleWriteResponse(data);
 }
 

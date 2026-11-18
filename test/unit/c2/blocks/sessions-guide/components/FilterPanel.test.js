@@ -180,7 +180,7 @@ describe('FilterPanel', () => {
     });
   });
 
-  describe('responsive panel close button', () => {
+  describe('responsive filter panel', () => {
     let frame;
     let originalMatchMedia;
 
@@ -208,7 +208,7 @@ describe('FilterPanel', () => {
     [375, 767, 768, 1024, 1279, 1280, 1440].forEach((width) => {
       ['sg-portal', 'sessions-guide-full-page'].forEach((surface) => {
         ['light', 'dark'].forEach((theme) => {
-          it(`hides only the desktop panel close button for ${surface}, ${theme}, ${width}px`, async () => {
+          it(`renders no panel close button for ${surface}, ${theme}, ${width}px`, async () => {
             frame.style.width = `${width}px`;
             await new Promise((resolve, reject) => {
               frame.onload = resolve;
@@ -240,9 +240,9 @@ describe('FilterPanel', () => {
             expect(style.borderTopColor).to.not.equal('rgba(0, 0, 0, 0)');
             expect(Number(style.fontWeight)).to.be.at.least(700);
             expect(frame.contentWindow.getComputedStyle(productIcon.querySelector('svg')).display).to.not.equal('none');
-            expect(frame.contentWindow.getComputedStyle(close).display === 'none').to.equal(width >= 1280);
-            close.focus();
-            expect(doc.activeElement === close).to.equal(width < 1280);
+            // Users leave Filters with Apply (or Escape / click-away), so there's no close button.
+            expect(close).to.equal(null);
+            expect(doc.querySelector('.sg-filter-panel__apply')).to.exist;
           });
         });
       });
