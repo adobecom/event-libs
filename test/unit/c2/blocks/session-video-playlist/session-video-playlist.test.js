@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { setViewport } from '@web/test-runner-commands';
 import init, {
   getVideoProgress,
   computeProgressPercent,
@@ -999,6 +1000,13 @@ describe('session-video-playlist', () => {
       expect(playlist.querySelector('.session-video-playlist-show-more')).to.exist;
     });
 
+    it('keeps playlist scrolling native instead of letting page-level Lenis consume input', async () => {
+      const playlist = await renderWithRows(6);
+      const wrapper = playlist.querySelector('.session-video-playlist-wrapper');
+
+      expect(wrapper.hasAttribute('data-lenis-prevent')).to.be.true;
+    });
+
     it('toggles label, aria-expanded and aria-label on click', async () => {
       const playlist = await renderWithRows(6);
       const button = playlist.querySelector('.session-video-playlist-show-more');
@@ -1042,6 +1050,64 @@ describe('session-video-playlist', () => {
 
       expect(list.style.maxHeight === '' || parseFloat(list.style.maxHeight) > list.scrollHeight)
         .to.be.true;
+    });
+
+    describe('scroll layout', () => {
+      let originalViewport;
+
+      beforeEach(() => {
+        originalViewport = { width: window.innerWidth, height: window.innerHeight };
+      });
+
+      afterEach(async () => {
+        await setViewport(originalViewport);
+      });
+
+      async function renderStyledRows(count) {
+        const playlist = await renderWithRows(count);
+        playlist.style.width = getComputedStyle(playlist).flexBasis;
+        const stylesheet = document.getElementById('session-video-playlist-css');
+        if (!stylesheet.sheet) {
+          await new Promise((resolve, reject) => {
+            stylesheet.addEventListener('load', resolve, { once: true });
+            stylesheet.addEventListener('error', reject, { once: true });
+          });
+        }
+        return playlist;
+      }
+
+      [1024, 1440, 1920].forEach((width) => {
+        it(`scrolls expanded desktop rows without compressing them at ${width}px`, async () => {
+          await setViewport({ width, height: 900 });
+          const playlist = await renderStyledRows(12);
+          const wrapper = playlist.querySelector('.session-video-playlist-wrapper');
+          const firstRow = playlist.querySelector('.session-video-playlist-row');
+          const rowHeight = firstRow.getBoundingClientRect().height;
+
+          playlist.querySelector('.session-video-playlist-show-more').click();
+
+          expect(firstRow.getBoundingClientRect().height).to.be.closeTo(rowHeight, 1);
+          expect(wrapper.scrollHeight).to.be.greaterThan(wrapper.clientHeight);
+          wrapper.scrollTop = wrapper.scrollHeight;
+          expect(wrapper.scrollTop).to.be.greaterThan(0);
+          const lastRow = playlist.querySelector('.session-video-playlist-row:last-child');
+          expect(lastRow.getBoundingClientRect().bottom)
+            .to.be.at.most(wrapper.getBoundingClientRect().bottom + 1);
+
+          playlist.querySelector('.session-video-playlist-show-more').click();
+          expect(wrapper.style.maxHeight).to.equal('');
+          expect(wrapper.scrollHeight).to.equal(wrapper.clientHeight);
+        });
+      });
+
+      it('does not add scrolling when expanded desktop rows fit', async () => {
+        await setViewport({ width: 1440, height: 1600 });
+        const playlist = await renderStyledRows(4);
+        playlist.querySelector('.session-video-playlist-show-more').click();
+        const wrapper = playlist.querySelector('.session-video-playlist-wrapper');
+
+        expect(wrapper.scrollHeight).to.equal(wrapper.clientHeight);
+      });
     });
 
   });
