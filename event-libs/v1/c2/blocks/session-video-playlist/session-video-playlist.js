@@ -538,7 +538,10 @@ function buildTopicView(el, allRows, {
 } = {}) {
 
   const rows = allRows;
-  const wrapper = createTag('div', { class: 'session-video-playlist-wrapper' }, '', { parent: el });
+  const wrapper = createTag('div', {
+    class: 'session-video-playlist-wrapper',
+    'data-lenis-prevent': '',
+  }, '', { parent: el });
   const list = createTag('div', { class: 'session-video-playlist-list', role: 'list' }, '', { parent: wrapper });
   rows.forEach((session) => {
     const row = buildRow(
