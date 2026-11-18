@@ -86,6 +86,63 @@ describe('FullPageShell/layout', () => {
     });
   });
 
+  ['sessions-guide-full-page', 'sg-portal'].forEach((surface) => {
+    it(`keeps scheduled on-demand row interactions consistent in ${surface}`, async () => {
+      frame.style.width = '1440px';
+      await new Promise((resolve, reject) => {
+        frame.onload = resolve;
+        frame.onerror = reject;
+        frame.src = '/test/unit/c2/blocks/sessions-guide/mocks/full-page-spacing.html';
+        document.body.appendChild(frame);
+      });
+      const doc = frame.contentDocument;
+      const win = frame.contentWindow;
+      doc.body.innerHTML = `<div class="${surface}">
+        <div class="sg-time-row" style="display:block">
+          <button id="row-focus" type="button">Row action</button>
+          <div style="display:grid;grid-template-columns:repeat(2,450px);gap:8px">
+            ${['', 'is-scheduled', 'is-favorited', 'is-scheduled is-favorited'].map((state) => `
+              <article class="sg-card sg-card--on-demand ${state}" style="transition:none">
+                <button type="button">Card action</button>
+              </article>`).join('')}
+          </div>
+        </div>
+      </div>`;
+      const cards = [...doc.querySelectorAll('.sg-card')];
+      const rowFocus = doc.getElementById('row-focus');
+      const color = (card) => win.getComputedStyle(card).backgroundColor;
+      const restingWidths = cards.map((card) => win.getComputedStyle(card).width);
+      const restingColor = color(cards[0]);
+      cards.forEach((card) => expect(color(card)).to.equal(restingColor));
+      frame.focus();
+      const focusedColors = cards.map((card) => {
+        card.querySelector('button').focus();
+        return color(card);
+      });
+      expect(focusedColors[1]).to.not.equal('rgb(255, 255, 255)');
+      expect(focusedColors[1]).to.not.equal(restingColor);
+      for (const width of [375, 768, 1100, 1279, 1280, 1440, 1920, 1100, 1440]) {
+        frame.style.width = `${width}px`;
+        rowFocus.focus();
+        cards.forEach((card, index) => {
+          expect(color(card), `${card.className} at ${width}px`)
+            .to.equal(width >= 1280 ? 'rgb(255, 255, 255)' : restingColor);
+          if (width >= 1280) {
+            expect(win.getComputedStyle(card).width).to.equal(restingWidths[index]);
+          }
+        });
+        for (const [index, card] of cards.entries()) {
+          const cardAction = card.querySelector('button');
+          cardAction.focus();
+          expect(doc.activeElement).to.equal(cardAction);
+          expect(card.matches(':focus-within')).to.equal(true);
+          expect(color(card), `${card.className} at ${width}px`)
+            .to.equal(width >= 1280 ? focusedColors[index] : restingColor);
+        }
+      }
+    });
+  });
+
   [375, 767, 768, 1024, 1279, 1280, 1440, 1920].forEach((width) => {
     ['sessions-guide', 'sessions-guide-full-page'].forEach((blockClass) => {
       it(`joins the header and Recommended section for ${blockClass} at ${width}px`, async () => {

@@ -56,7 +56,8 @@ export function MyFavoritesView() {
       const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
       return st === 'upcoming';
     });
-    const onDemandRaw = onDemandSessions(dayFavorited, liveStreamActiveIds, nowMs);
+    const onDemandSource = isPost ? favoritedSessions : dayFavorited;
+    const onDemandRaw = onDemandSessions(onDemandSource, liveStreamActiveIds, nowMs);
 
     const filteredUpcomingSessions = filterSessions(activeAndUpcoming, activeFilters, searchQuery);
     return {
@@ -64,7 +65,10 @@ export function MyFavoritesView() {
       timeSlots: groupByStartTime(filteredUpcomingSessions),
       filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
     };
-  }, [sessions, favorited, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
+  }, [
+    sessions, favorited, liveStreamActiveIds, activeDay, userTz, nowMs,
+    activeFilters, searchQuery, isPost,
+  ]);
 
   // Avoids a blank view in the gap between the catalog resolving and registration resolving.
   if (access === 'loading') {

@@ -56,7 +56,8 @@ export function MySessionsView() {
       const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
       return st === 'upcoming';
     });
-    const onDemandRaw = onDemandSessions(dayScheduled, liveStreamActiveIds, nowMs);
+    const onDemandSource = isPost ? scheduledSessions : dayScheduled;
+    const onDemandRaw = onDemandSessions(onDemandSource, liveStreamActiveIds, nowMs);
 
     const filteredUpcomingSessions = filterSessions(activeAndUpcoming, activeFilters, searchQuery);
     return {
@@ -64,7 +65,10 @@ export function MySessionsView() {
       timeSlots: groupByStartTime(filteredUpcomingSessions),
       filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
     };
-  }, [sessions, scheduled, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
+  }, [
+    sessions, scheduled, liveStreamActiveIds, activeDay, userTz, nowMs,
+    activeFilters, searchQuery, isPost,
+  ]);
 
   // Avoids a blank view in the gap between the catalog resolving and registration resolving.
   if (access === 'loading') {

@@ -707,17 +707,25 @@ function lowercaseKeys(obj) {
   }, {});
 }
 
-async function loadConsent(form, consentData) {
+export async function loadConsent(form, consentData) {
   const { path, countryCode } = consentData;
   const submitWrapper = form.querySelector('.events-form-submit-wrapper');
   const submit = submitWrapper.querySelector('button');
   const termsWrapper = form.querySelector('.terms-and-conditions-wrapper');
 
+  // Consent fragments only load from event-libs' own origin.
+  const fragmentUrl = new URL(path, import.meta.url);
+  if (fragmentUrl.origin !== new URL(import.meta.url).origin) {
+    logError('events-form', `consent fragment path is not on the event-libs origin: ${path}`);
+    return;
+  }
+
   submit.disabled = true;
-  termsWrapper.innerHTML = '';
+  termsWrapper.replaceChildren();
   termsWrapper.classList.add('transparent');
 
-  const termsFragLink = createTag('a', { href: `${new URL(path, import.meta.url).href}`, target: '_blank' }, path, { parent: termsWrapper });
+  const termsFragLink = createTag('a', { href: fragmentUrl.href, target: '_blank' }, '', { parent: termsWrapper });
+  termsFragLink.textContent = path;
 
   await loadFragment(termsFragLink);
 
@@ -746,7 +754,8 @@ async function loadConsent(form, consentData) {
 
         const checkbox = createTag('input', { id: valKebab, type: 'checkbox', class: 'submit-blocker no-submit check-item-input checkbox-input', value: valKebab });
         const checkboxButton = createTag('span', { class: 'check-item-button checkbox-button' });
-        const label = createTag('label', { class: 'check-item-label checkbox-label', for: valKebab }, o.innerHTML);
+        const label = createTag('label', { class: 'check-item-label checkbox-label', for: valKebab });
+        label.append(...o.childNodes);
 
         checkWrap.append(checkbox, checkboxButton, label);
         termsWrapper.append(checkWrap);
@@ -942,7 +951,8 @@ async function addConsentSuite(form) {
         value: c.countryCode,
         'data-country-code': c.countryCode,
         'data-consent-id': c.consentId,
-      }, c.countryName);
+      });
+      option.textContent = c.countryName;
       countrySelect.append(option);
     });
 

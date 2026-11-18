@@ -20,6 +20,10 @@ export function getNowMs() {
   return SERVER_TIME_ORIGIN + (Date.now() - PAGE_LOAD_MS);
 }
 
+export function shouldAvoidStreamEnd() {
+  return new URLSearchParams(window.location.search).get('avoidStreamEndFlag') === 'true';
+}
+
 const HOUR_MS = 3_600_000;
 
 // Unlock = sessionEnd + DVR delay, falling back to the event start when there is no session end.
@@ -95,6 +99,19 @@ export function buildWatchUrl(path, sessionId, nowMs = getNowMs()) {
   if (sessionId) params.set('watch', sessionId);
   if (serverTime) params.set('serverTime', String(nowMs));
   return `${base}?${params}${hash}`;
+}
+
+// Forwards a test `?serverTime` to an absolute URL (e.g. an MPC player iframe) as the simulated
+// current time; returns `url` unchanged without one, or when it can't be parsed.
+export function withServerTime(url, nowMs = getNowMs()) {
+  if (!url || !new URLSearchParams(window.location.search).get('serverTime')) return url;
+  try {
+    const target = new URL(url);
+    target.searchParams.set('serverTime', String(nowMs));
+    return target.href;
+  } catch {
+    return url;
+  }
 }
 
 // Root-relative, falls back to MAX's pages for pre-authorable configs. `?watch=<id>` tells the

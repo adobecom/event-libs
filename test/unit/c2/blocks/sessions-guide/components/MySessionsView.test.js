@@ -39,6 +39,17 @@ const PAST_SESSION = {
   mrStreamId: null, thumbnailUrl: null,
 };
 
+const CROSS_DAY_SESSIONS = [
+  {
+    ...PAST_SESSION, id: 'day-1', title: 'Earlier day', primaryTrack: 'Design',
+    startTimeUtc: '2020-01-01T18:00:00Z', endTimeUtc: '2020-01-01T19:00:00Z',
+  },
+  {
+    ...PAST_SESSION, id: 'day-2', title: 'Later day', primaryTrack: 'Video',
+    startTimeUtc: '2020-01-02T18:00:00Z', endTimeUtc: '2020-01-02T19:00:00Z',
+  },
+];
+
 const LIVE_NOW_SESSION = {
   id: 'l-1', title: 'Live now', description: '', primaryTrack: 'Design',
   startTimeUtc: h(-0.25), endTimeUtc: h(0.25),
@@ -123,6 +134,47 @@ describe('MySessionsView', () => {
     const View = buildMySessionsView(preact, store);
     expect(View({})).to.include('sg-my-sessions__on-demand');
     expect(View({})).to.include('track="Video"');
+  });
+
+  ['2020-01-02', ''].forEach((activeDay) => {
+    it(`shows only saved on-demand sessions across all days post-event with activeDay="${activeDay}"`, () => {
+      const store = makeStore({
+        sessionList: [...CROSS_DAY_SESSIONS, { ...CROSS_DAY_SESSIONS[0], id: 'other', primaryTrack: 'Unselected' }],
+        scheduledIds: new Set(['day-1', 'day-2']),
+        activeDay,
+      });
+      const html = buildMySessionsView(preact, store)({});
+      expect(html).to.include('track="Design"');
+      expect(html).to.include('track="Video"');
+      expect(html).to.not.include('track="Unselected"');
+    });
+  });
+
+  [
+    { name: 'search', searchQuery: 'Earlier day' },
+    { name: 'facets', activeFilters: { primaryTrack: new Set(['Design']) } },
+  ].forEach(({ name, ...filters }) => {
+    it(`still applies ${name} to the post-event all-days selection`, () => {
+      const store = makeStore({
+        sessionList: CROSS_DAY_SESSIONS, scheduledIds: new Set(['day-1', 'day-2']),
+        activeDay: '2020-01-02', ...filters,
+      });
+      const html = buildMySessionsView(preact, store)({});
+      expect(html).to.include('track="Design"');
+      expect(html).to.not.include('track="Video"');
+    });
+  });
+
+  [UPCOMING_SESSION, LIVE_NOW_SESSION].forEach((session) => {
+    it(`retains the selected-day scope while the catalog has ${session.title} sessions`, () => {
+      const store = makeStore({
+        sessionList: [...CROSS_DAY_SESSIONS, session], scheduledIds: new Set(['day-1', 'day-2']),
+        activeDay: '2020-01-02', mySessionsTab: 'on-demand',
+      });
+      const html = buildMySessionsView(preact, store)({});
+      expect(html).to.include('track="Video"');
+      expect(html).to.not.include('track="Design"');
+    });
   });
 
   it('waits for post-event RF auth instead of leaving an unregistered visitor blank', () => {

@@ -1,5 +1,5 @@
 import { createTag, createOptimizedPicture, loadStyle } from '../../../utils/utils.js';
-import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
+import { deriveSessionState, getNowMs, shouldAvoidStreamEnd } from '../../../utils/session-state.js';
 import { subscribe, registerStreamIds } from '../../../services/sessions/poller.js';
 
 const VARIANTS = ['media-square', 'media-standard', 'media-standard-rev', 'standard-m', 'media-wide', 'media-tall'];
@@ -12,7 +12,7 @@ function refreshCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction) {
   const state = deriveSessionState({
     startTimeUtc: el.dataset.startTimeUtc,
     endTimeUtc: el.dataset.endTimeUtc,
-    mrStreamId: el.dataset.mrStreamId,
+    mrStreamId: shouldAvoidStreamEnd() ? undefined : el.dataset.mrStreamId,
   }, getLiveStreamActiveIds(), getNowMs());
   const text = cta.dataset[CTA_STATE_ATTR[state]];
   if (text) cta.textContent = text;
@@ -30,7 +30,7 @@ function scheduleBoundary(atMs, onBoundary) {
 }
 
 function attachLiveCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction) {
-  const mrStreamId = el.dataset.mrStreamId;
+  const mrStreamId = shouldAvoidStreamEnd() ? undefined : el.dataset.mrStreamId;
   const startMs = Date.parse(el.dataset.startTimeUtc);
   const endMs = Date.parse(el.dataset.endTimeUtc);
   const refresh = () => refreshCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction);
@@ -45,7 +45,7 @@ function attachLiveCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction) {
     registerStreamIds([mrStreamId]);
     subscribe(refresh, [mrStreamId]);
   } else if (state !== 'on-demand') {
-    scheduleBoundary(endMs, refresh);
+    scheduleBoundary(endMs + 1, refresh);
   }
 }
 

@@ -188,7 +188,6 @@ export function FilterPanel({ onClose }) {
       aria-modal=${isTakeover() ? 'true' : undefined}
       aria-labelledby="sg-filter-panel-title"
     >
-      <button class="sg-filter-panel__close" onclick=${onClose} type="button" aria-label="Close filter panel"></button>
       <div class="sg-filter-panel__body">
         <div class="sg-filter-panel__sidebar">
           <h3 class="sg-filter-panel__title" id="sg-filter-panel-title">

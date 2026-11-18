@@ -108,6 +108,49 @@ describe('event-card session routing', () => {
       expect(action).to.deep.equal({ type: 'none' });
     });
 
+    describe('avoidStreamEndFlag', () => {
+      let originalPath;
+      const dataset = {
+        sessionId: 'sess-1',
+        sessionUrl: 'https://adobe.com/sessions/s1',
+        mrStreamId: 'mr-1',
+        watchDestination: 'homepage',
+        homepageAnchorId: 'video',
+        startTimeUtc: iso(NOW - HOUR),
+        endTimeUtc: iso(NOW + HOUR),
+      };
+
+      beforeEach(() => {
+        originalPath = window.location.pathname + window.location.search;
+        window.history.replaceState(null, '', '/max-new?avoidStreamEndFlag=true');
+      });
+
+      afterEach(() => {
+        window.history.replaceState(null, '', originalPath);
+      });
+
+      it('uses the homepage anchor during the slot despite an inactive MR stream', () => {
+        expect(resolveCardAction(dataset, NOW, new Set()))
+          .to.deep.equal({ type: 'scroll', anchorId: 'video' });
+      });
+
+      it('keeps the session upcoming before its slot despite an active MR stream', () => {
+        expect(resolveCardAction(dataset, NOW - 2 * HOUR, new Set(['mr-1'])))
+          .to.deep.equal({ type: 'session-guide', sessionId: 'sess-1' });
+      });
+
+      it('routes to on-demand after the slot despite an active MR stream', () => {
+        expect(resolveCardAction(dataset, NOW + 2 * HOUR, new Set(['mr-1'])))
+          .to.deep.equal({ type: 'navigate', url: dataset.sessionUrl });
+      });
+
+      it('does not bypass MR status when the flag is false', () => {
+        window.history.replaceState(null, '', '/max-new?avoidStreamEndFlag=false');
+        expect(resolveCardAction(dataset, NOW, new Set()))
+          .to.deep.equal({ type: 'navigate', url: dataset.sessionUrl });
+      });
+    });
+
     describe('authored watchDestination (overrides tag-derived isLivestreamed/isOnline)', () => {
       const originalPath = window.location.pathname + window.location.search;
 

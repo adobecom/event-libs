@@ -12,6 +12,30 @@
   background: var(--s2a-color-gray-25, #fff);
 }
 
+@media (max-width: 767px) {
+  /* Milo extends section backgrounds upward by 1px; keep beige from bleeding into the card panel. */
+  main > .session-video-container:first-child:has(+ .session-video-playlist-container .event-session-details) > .section-background,
+  main > .session-video-container:first-child + .session-video-playlist-container:has(.event-session-details) > .section-background {
+    top: 0;
+  }
+
+  main > .session-video-container:first-child:has(+ .session-video-playlist-container .event-session-details) > .section-background > div {
+    background: var(--session-details-bg, var(--s2a-color-gray-25, #fff)) !important;
+  }
+
+  /* Paint above the positioned section background, including the existing space below the video. */
+  main > .session-video-container:first-child + .session-video-playlist-container > .grid-column:has(.event-session-details) {
+    position: relative;
+    background: var(--session-details-bg, var(--s2a-color-gray-25, #fff));
+  }
+
+  main > .session-video-container:first-child:has(.session-video-player[data-embedded='true']) + .session-video-playlist-container .event-session-details,
+  main > .session-video-container:first-child + .session-video-playlist-container > .grid-column:has(.session-video-player[data-embedded='true']) .event-session-details {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+}
+
 .session-eyebrow {
   display: flex;
   align-items: stretch;
