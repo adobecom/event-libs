@@ -52,6 +52,7 @@ const EVENT_BLOCKS_C2 = [
   'event-experience-everything-ad',
   'event-explore-adobe-summit',
   'event-pricing',
+  'event-hero',
 ];
 
 // Only the utilities scripts.js actually needs directly

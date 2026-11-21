@@ -44,5 +44,6 @@ export default async function init(el) {
 
   el.replaceChildren(list);
   const cols = tableLike ? 1 : Math.min(list.children.length, MAX_COLS);
-  el.style.setProperty('--event-faq-cols', String(cols));
+  // Auto column count; a theme can override it with --event-faq-cols in CSS.
+  el.style.setProperty('--event-faq-auto-cols', String(cols));
 }
