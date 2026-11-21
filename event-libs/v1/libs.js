@@ -42,16 +42,6 @@ const EVENT_BLOCKS_C2 = [
   'event-speakers',
   'event-session-resources',
   'event-youtube',
-  'event-session',
-  'event-agenda-static',
-  'event-quote',
-  'event-sponsor',
-  'event-accordion',
-  'event-faq',
-  'event-speaker',
-  'event-experience-everything-ad',
-  'event-explore-adobe-summit',
-  'event-pricing',
 ];
 
 // Only the utilities scripts.js actually needs directly
