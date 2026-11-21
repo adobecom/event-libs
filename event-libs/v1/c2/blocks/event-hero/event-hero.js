@@ -23,7 +23,8 @@ export default async function init(el) {
   const content = createTag('div', { class: 'event-hero-content' }, cells);
 
   const children = [];
-  const href = mediaRow?.querySelector('a')?.href || '';
+  // Milo may already have swapped the MP4 link for an adobetv iframe; read the URL from either.
+  const href = mediaRow?.querySelector('a')?.href || mediaRow?.querySelector('iframe')?.getAttribute('src') || '';
   if (VIDEO_RE.test(href)) {
     const video = createTag('video', {
       class: 'event-hero-video', loop: '', playsinline: '', preload: 'metadata', 'aria-hidden': 'true',
