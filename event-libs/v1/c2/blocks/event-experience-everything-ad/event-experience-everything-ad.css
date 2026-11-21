@@ -65,8 +65,18 @@
   --event-experience-everything-ad-cols: 2;
 }
 
+.section:has(> .event-experience-everything-ad) {
+  padding-bottom: 84px;
+}
+
+/* Source heading: 56px type on a 168px line-height (336px for two lines), 80px above the cards. */
+.section:has(> .event-experience-everything-ad) > .content > h2 {
+  line-height: 168px;
+  margin-bottom: 80px;
+}
+
 .event-experience-everything-ad .event-experience-everything-ad-list {
-  gap: 48px 24px;
+  gap: 8px;
   max-width: 1200px;
   margin-inline: auto;
 }
@@ -78,8 +88,20 @@
   border-radius: 0 0 16px 16px;
 }
 
+.event-experience-everything-ad .event-experience-everything-ad-item:has(ul) {
+  grid-column: 1 / -1;
+}
+
 .event-experience-everything-ad .event-experience-everything-ad-text {
-  padding: 24px;
+  padding: 0 24px 24px;
+}
+
+.event-experience-everything-ad .event-experience-everything-ad-text img {
+  width: calc(100% + 48px);
+  max-width: none;
+  height: 244px;
+  margin: 0 -24px 38px;
+  object-fit: cover;
 }
 
 .event-experience-everything-ad .event-experience-everything-ad-text h2,
@@ -100,14 +122,6 @@
   padding-inline-start: 20px;
   font: 400 16px/24px adobe-clean, sans-serif;
   color: #707070;
-}
-
-.event-experience-everything-ad .event-experience-everything-ad-text img,
-.event-experience-everything-ad .event-experience-everything-ad-item > .event-experience-everything-ad-text:first-child img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: 16px 16px 0 0;
 }
 
 @media (max-width: 899px) {

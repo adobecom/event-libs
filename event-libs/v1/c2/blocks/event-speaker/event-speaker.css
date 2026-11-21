@@ -56,23 +56,39 @@
 }
 
 /* Speakers: .speaker-card 317px, photo 560/700 radius 16, name 24/24, title 14/16.8 */
-.event-speaker {
-  --event-speaker-cols: 4;
+/* Source is a one-row carousel: 124px above the heading, 148px between intro and cards, 102px below. */
+.section:has(> .event-speaker) {
+  padding-top: 124px;
+  padding-bottom: 102px;
+}
+
+.section:has(> .event-speaker) > .content > p:has(+ h2) {
+  margin-bottom: 8px;
+}
+
+.section:has(> .event-speaker) > .content > h2 + p {
+  margin: 5px auto 148px;
 }
 
 .event-speaker .event-speaker-list {
-  gap: 8px;
-  padding: 0 4px;
+  display: flex;
+  gap: 0;
+  padding: 0 14px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
 }
 
 .event-speaker .event-speaker-item {
   box-sizing: border-box;
+  flex: 0 0 317px;
   padding: 4px;
+  scroll-snap-align: start;
 }
 
 .event-speaker .event-speaker-media img {
   border-radius: 16px;
-  aspect-ratio: 560 / 700;
+  aspect-ratio: 309 / 377;
   object-fit: cover;
 }
 
@@ -100,8 +116,17 @@
   text-decoration: none;
 }
 
-@media (max-width: 899px) {
-  .event-speaker {
-    --event-speaker-cols: 2;
+@media (max-width: 767px) {
+  .section:has(> .event-speaker) {
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+
+  .section:has(> .event-speaker) > .content > h2 + p {
+    margin-bottom: 48px;
+  }
+
+  .event-speaker .event-speaker-item {
+    flex-basis: 260px;
   }
 }
