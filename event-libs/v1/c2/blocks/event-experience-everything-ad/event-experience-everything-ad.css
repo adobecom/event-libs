@@ -93,15 +93,28 @@
 }
 
 .event-experience-everything-ad .event-experience-everything-ad-text {
-  padding: 0 24px 24px;
+  padding: 0 48px 82px;
+}
+
+/* Images run edge to edge: 244px on the first two cards, 333px on the full-width card, 436px on the last two. */
+.event-experience-everything-ad .event-experience-everything-ad-text p:has(> img) {
+  margin: 0 -48px 38px;
 }
 
 .event-experience-everything-ad .event-experience-everything-ad-text img {
-  width: calc(100% + 48px);
+  display: block;
+  width: 100%;
   max-width: none;
   height: 244px;
-  margin: 0 -24px 38px;
   object-fit: cover;
+}
+
+.event-experience-everything-ad .event-experience-everything-ad-item:has(ul) .event-experience-everything-ad-text img {
+  height: 333px;
+}
+
+.event-experience-everything-ad .event-experience-everything-ad-item:nth-child(n + 4) .event-experience-everything-ad-text img {
+  height: 436px;
 }
 
 .event-experience-everything-ad .event-experience-everything-ad-text h2,
