@@ -5,12 +5,6 @@
   min-height: 727px;
 }
 
-[data-event-experience="summit"] .event-marquee .event-marquee-text > p:first-child {
-  margin: 0 0 8px;
-  font: 800 16px/14.4px adobe-clean-display, sans-serif;
-  letter-spacing: 0.01em;
-}
-
 [data-event-experience="summit"] .event-marquee .event-marquee-text > h1 {
   max-width: 435px;
   font: 900 48px/43.2px adobe-clean-display, sans-serif;
@@ -43,6 +37,13 @@
   font: 400 20px/24px adobe-clean, sans-serif;
   color: #707070;
   text-align: center;
+}
+
+/* Hero eyebrow line (kept after the shared heading rules: higher specificity) */
+[data-event-experience="summit"] .event-marquee .event-marquee-text > p:first-child {
+  margin: 0 0 8px;
+  font: 800 16px/14.4px adobe-clean-display, sans-serif;
+  letter-spacing: 0.01em;
 }
 
 /* Speakers: event-carousel + event-card (media-standard-rev) */
