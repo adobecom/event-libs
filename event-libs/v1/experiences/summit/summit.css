@@ -189,7 +189,7 @@
 }
 
 [data-event-experience="summit"] .section.summit-explore .event-card .card-media {
-  aspect-ratio: auto;
+  aspect-ratio: 560 / 479;
   border-radius: 16px;
 }
 
