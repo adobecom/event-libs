@@ -51,7 +51,7 @@
 @media (max-width: 767px) {
   .section:has(> .event-speaker) > .content > h2 {
     font-size: 36px;
-    line-height: 36px;
+    line-height: 32px;
   }
 }
 
@@ -117,16 +117,25 @@
 }
 
 @media (max-width: 767px) {
+  /* Mobile measured at 390px: 40px above the heading, cards at 314px, 67px below. */
   .section:has(> .event-speaker) {
-    padding-top: 64px;
-    padding-bottom: 64px;
+    padding-top: 40px;
+    padding-bottom: 67px;
   }
 
   .section:has(> .event-speaker) > .content > h2 + p {
-    margin-bottom: 48px;
+    margin-bottom: 129px;
+  }
+
+  .event-speaker .event-speaker-list {
+    padding: 0 18px;
   }
 
   .event-speaker .event-speaker-item {
-    flex-basis: 260px;
+    flex-basis: 248px;
+  }
+
+  .event-speaker .event-speaker-media img {
+    aspect-ratio: 240 / 300;
   }
 }

@@ -51,7 +51,7 @@
 @media (max-width: 767px) {
   .section:has(> .event-sponsor) > .content > h2 {
     font-size: 36px;
-    line-height: 36px;
+    line-height: 32px;
   }
 }
 
@@ -81,8 +81,23 @@
   object-fit: contain;
 }
 
-@media (max-width: 899px) {
-  .event-sponsor {
-    --event-sponsor-cols: 2;
+@media (max-width: 767px) {
+  /* Mobile measured at 390px: one scrolling row of logos, section 464px tall. */
+  .section:has(> .event-sponsor) {
+    padding-top: 40px;
+    padding-bottom: 119px;
+  }
+
+  .event-sponsor .event-sponsor-list {
+    display: flex;
+    gap: 40px;
+    margin-top: 105px;
+    padding-inline: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .event-sponsor .event-sponsor-item {
+    flex: 0 0 184px;
   }
 }

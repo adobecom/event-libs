@@ -82,10 +82,37 @@
   .event-explore-adobe-summit {
     --event-explore-adobe-summit-cols: 1;
   }
+}
+
+/* Mobile measured at 390px: 24px heading, 293px images, 35px item titles, 96px between items. */
+@media (max-width: 767px) {
+  .section:has(> .event-explore-adobe-summit) {
+    padding-block: 0 80px;
+  }
+
+  .section:has(> .event-explore-adobe-summit) > .content > h2 {
+    margin-bottom: 56px;
+    font-size: 24px;
+    line-height: 26.4px;
+  }
+
+  .event-explore-adobe-summit .event-explore-adobe-summit-list {
+    gap: 96px;
+  }
+
+  .event-explore-adobe-summit .event-explore-adobe-summit-media img {
+    width: 100%;
+    height: 293px;
+    object-fit: cover;
+  }
+
+  .event-explore-adobe-summit .event-explore-adobe-summit-text {
+    padding-inline: 24px;
+  }
 
   .event-explore-adobe-summit .event-explore-adobe-summit-text h3,
   .event-explore-adobe-summit .event-explore-adobe-summit-text h2 {
     font-size: 32px;
-    line-height: 32px;
+    line-height: 35px;
   }
 }

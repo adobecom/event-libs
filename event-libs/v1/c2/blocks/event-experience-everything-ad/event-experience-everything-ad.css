@@ -51,7 +51,7 @@
 @media (max-width: 767px) {
   .section:has(> .event-experience-everything-ad) > .content > h2 {
     font-size: 36px;
-    line-height: 36px;
+    line-height: 32px;
   }
 }
 
@@ -152,5 +152,36 @@
 
   .event-experience-everything-ad .event-experience-everything-ad-text ul {
     columns: 1;
+  }
+}
+
+/* Mobile measured at 390px: images 272px (95px on the list card), cards 510/552/639/561/582px. */
+@media (max-width: 767px) {
+  .section:has(> .event-experience-everything-ad) > .content > h2 {
+    line-height: 48px;
+  }
+
+  .event-experience-everything-ad .event-experience-everything-ad-text img {
+    height: 272px;
+  }
+
+  .event-experience-everything-ad .event-experience-everything-ad-item:has(ul) .event-experience-everything-ad-text img {
+    height: 95px;
+  }
+
+  .event-experience-everything-ad .event-experience-everything-ad-item:nth-child(n + 4) .event-experience-everything-ad-text img {
+    height: 272px;
+  }
+
+  .event-experience-everything-ad .event-experience-everything-ad-text {
+    padding-bottom: 144px;
+  }
+
+  .event-experience-everything-ad .event-experience-everything-ad-item:has(ul) .event-experience-everything-ad-text {
+    padding-bottom: 94px;
+  }
+
+  .event-experience-everything-ad .event-experience-everything-ad-item:nth-child(n + 4) .event-experience-everything-ad-text {
+    padding-bottom: 124px;
   }
 }
