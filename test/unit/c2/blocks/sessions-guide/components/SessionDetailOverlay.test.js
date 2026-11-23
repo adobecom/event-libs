@@ -81,6 +81,7 @@ describe('SessionDetailOverlay', () => {
   });
 
   beforeEach(() => {
+    sinon.stub(window, 'matchMedia').returns({ matches: false });
     scheduled.value = new Set();
     favorited.value = new Set();
     pendingActions.value = new Set();
@@ -273,7 +274,7 @@ describe('SessionDetailOverlay', () => {
   });
 
   // The count is only meaningful when the list is truncated, so it appears under exactly the
-  // condition that grows the Show more toggle -- over 6 products, over 5 speakers.
+  // condition that grows the Show more toggle.
   describe('pod heading counts', () => {
     const products = (n) => Array.from({ length: n }, (_, i) => `Product ${i}`);
     const speakers = (n) => Array.from({ length: n }, (_, i) => ({ name: `Speaker ${i}`, title: '' }));
@@ -364,6 +365,34 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.include('(7)');
       expect(out).to.include('Speaker 5');
       expect(out).to.not.include('Speaker 6');
+      expect(out).to.include('aria-controls="sg-detail-speakers"');
+    });
+
+    it('shows all six speakers without a count or toggle on tablet', () => {
+      window.matchMedia.withArgs('(min-width: 768px)')
+        .returns({ matches: true });
+      const out = render({ speakers: speakers.slice(0, 6) });
+      expect(out).to.include('Speaker 6');
+      expect(out).to.not.include('sg-detail__count');
+      expect(out).to.not.include('aria-controls="sg-detail-speakers"');
+    });
+
+    it('collapses past six and reports the true total on tablet', () => {
+      window.matchMedia.withArgs('(min-width: 768px)')
+        .returns({ matches: true });
+      const out = render({ speakers });
+      expect(out).to.include('Speaker 6');
+      expect(out).to.not.include('Speaker 7');
+      expect(out).to.include('<span class="sg-detail__count">(7)</span>');
+      expect(out).to.include('aria-controls="sg-detail-speakers"');
+    });
+
+    it('retains the five-speaker limit on desktop', () => {
+      window.matchMedia.returns({ matches: true });
+      const out = render({ speakers: speakers.slice(0, 6) });
+      expect(out).to.include('Speaker 5');
+      expect(out).to.not.include('Speaker 6');
+      expect(out).to.include('<span class="sg-detail__count">(6)</span>');
       expect(out).to.include('aria-controls="sg-detail-speakers"');
     });
 

@@ -28,22 +28,23 @@ import { sessionDaaLh, toDaaLh } from '../../../../utils/analytics.js';
 // Collapsed list-pod lengths (Figma products 1325:141847, speakers 1325:141990).
 const COLLAPSED_PRODUCTS = 6;
 const COLLAPSED_SPEAKERS = 5;
+const TABLET_COLLAPSED_SPEAKERS = 6;
 
 // Desktop splits pods into two columns (1323:139140); tracked reactively so DOM order
 // (used for tab order, not CSS `order`) always matches what's on screen.
 const DESKTOP_QUERY = '(min-width: 1280px)';
-const matchesDesktop = () => !!window.matchMedia?.(DESKTOP_QUERY).matches;
+const TABLET_QUERY = '(min-width: 768px)';
 
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(matchesDesktop);
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => !!window.matchMedia?.(query).matches);
   useEffect(() => {
-    const mq = window.matchMedia?.(DESKTOP_QUERY);
+    const mq = window.matchMedia?.(query);
     if (!mq) return undefined;
-    const onChange = (e) => setIsDesktop(e.matches);
+    const onChange = (e) => setMatches(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return isDesktop;
+  }, [query]);
+  return matches;
 }
 
 export function SessionDetailOverlay({ onBack }) {
@@ -54,7 +55,9 @@ export function SessionDetailOverlay({ onBack }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const [productsExpanded, setProductsExpanded] = useState(false);
   const [speakersExpanded, setSpeakersExpanded] = useState(false);
-  const isDesktop = useIsDesktop();
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
+  const isTablet = useMediaQuery(TABLET_QUERY) && !isDesktop;
+  const collapsedSpeakers = isTablet ? TABLET_COLLAPSED_SPEAKERS : COLLAPSED_SPEAKERS;
 
   // On open, move focus to Back before paint (pre-empts the browser's own blur-to-<body>
   // fixup); on unmount (Back), restore focus to whatever was focused before this opened.
@@ -156,7 +159,7 @@ export function SessionDetailOverlay({ onBack }) {
   const products = session.products || [];
   const speakers = session.speakers || [];
   const shownProducts = productsExpanded ? products : products.slice(0, COLLAPSED_PRODUCTS);
-  const shownSpeakers = speakersExpanded ? speakers : speakers.slice(0, COLLAPSED_SPEAKERS);
+  const shownSpeakers = speakersExpanded ? speakers : speakers.slice(0, collapsedSpeakers);
 
   // Shared "Show more"/"Show less" toggle for the list pods.
   const showMoreToggle = (expanded, setExpanded, label, controls) => html`
@@ -320,7 +323,7 @@ export function SessionDetailOverlay({ onBack }) {
   const speakersPod = speakers.length > 0 && html`
               <div class="sg-detail__group sg-detail__group--speakers">
                 <h3 class="sg-detail__section-label">
-                  Speakers ${speakers.length > COLLAPSED_SPEAKERS
+                  Speakers ${speakers.length > collapsedSpeakers
     && html`<span class="sg-detail__count">(${speakers.length})</span>`}
                 </h3>
                 <div class="sg-detail__speakers" id="sg-detail-speakers">
@@ -336,7 +339,7 @@ export function SessionDetailOverlay({ onBack }) {
                     </div>
                   `)}
                 </div>
-                ${speakers.length > COLLAPSED_SPEAKERS
+                ${speakers.length > collapsedSpeakers
     && showMoreToggle(speakersExpanded, setSpeakersExpanded, 'speakers', 'sg-detail-speakers')}
               </div>
   `;
