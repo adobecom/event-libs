@@ -11,6 +11,7 @@ const MODAL_FOCUSABLES_SELECTOR = 'a:not(.hide-video, .faas), button:not([disabl
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/default.html' });
 const profileCss = await readFile({ path: '../../../../event-libs/v1/blocks/profile-cards/profile-cards.css' });
+const miloCss = await readFile({ path: '../../../../node_modules/@adobecom/milo/libs/styles/styles.css' });
 
 async function waitForSocialIcons(el, timeoutMs = 5000) {
   const start = Date.now();
@@ -378,7 +379,7 @@ describe('Profile Cards Module', () => {
       document.body.innerHTML = '';
       document.head.innerHTML = '';
       const style = document.createElement('style');
-      style.textContent = `${profileCss}
+      style.textContent = `${miloCss}\n${profileCss}
         .profile-cards .card-desc { margin-bottom: 0; }
         :root {
           --body-font-family: Arial, sans-serif;
@@ -428,6 +429,10 @@ describe('Profile Cards Module', () => {
         expect(btn.getBoundingClientRect().bottom).to.be.at.most(content.getBoundingClientRect().bottom);
         expect(card.querySelector('.card-social-icons').getBoundingClientRect().bottom)
           .to.be.at.most(content.getBoundingClientRect().bottom);
+        expect(card.querySelector('.card-social-icons').getBoundingClientRect().top)
+          .to.be.at.least(desc.getBoundingClientRect().bottom);
+        expect(desc.getBoundingClientRect().top)
+          .to.be.at.least(card.querySelector('.card-name').getBoundingClientRect().bottom);
 
         btn.click();
         syncBiosOverflow(el);
