@@ -1,0 +1,161 @@
+/* forge-max-quote-animation — dark testimonial + staggered photo wall.
+   Keys ONLY on the part classes init() stamps on the RECONSTRUCTED DOM
+   (.max-quote / .max-quote-text / .max-quote-cite / .max-quote-tile-columns /
+   .max-quote-tile-column / .max-quote-tile) — never on the authored Figma
+   classes, which DA strips before init() runs. Figma design-width pixels are
+   expressed as responsive units (%, clamp, fr, flexible gaps) so the section
+   reflows to its container (L27). No motion is emitted here (C10/C13): the
+   column scroll is applied later from the design-system catalog; this renders
+   the frozen, overflow-clipped staggered wall. */
+
+.forge-max-quote-animation {
+  --mqa-text: var(--s2a-color-text-inverse, #fff);
+  --mqa-text-muted: rgba(255, 255, 255, 0.72);
+  --mqa-gap: var(--s2a-spacing-16, 16px);
+  --mqa-radius: var(--s2a-rounded-lg, 16px);
+  --mqa-wall-height: 760px;
+
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: clamp(32px, 4vw, 80px);
+  width: 100%;
+  overflow: hidden;
+  background: #000;
+  color: var(--mqa-text);
+  padding: var(--s2a-layout-section-top, 124px) var(--s2a-layout-lg, 64px) var(--s2a-layout-section-bottom, 80px);
+}
+
+/* Links inside a dark section must never inherit the global a{color:#000} (C20). */
+.forge-max-quote-animation a {
+  color: inherit;
+}
+
+/* ---- Quote (left column) ---- */
+.forge-max-quote-animation .max-quote {
+  flex: 0 1 auto;
+  width: clamp(280px, 32%, 460px);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-16, 16px);
+}
+
+.forge-max-quote-animation .max-quote-text {
+  margin: 0;
+  color: var(--mqa-text);
+  font-size: clamp(1.75rem, 1.1rem + 2.6vw, 3rem);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  quotes: none;
+}
+
+.forge-max-quote-animation .max-quote-text::before,
+.forge-max-quote-animation .max-quote-text::after {
+  content: none;
+}
+
+.forge-max-quote-animation .max-quote-cite {
+  color: var(--mqa-text-muted);
+  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 1rem);
+  font-style: normal;
+  line-height: 1.4;
+}
+
+/* ---- Photo wall (right column) ---- */
+.forge-max-quote-animation .max-quote-tile-columns {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--mqa-gap);
+  max-height: var(--mqa-wall-height);
+  overflow: hidden;
+  align-self: stretch;
+}
+
+.forge-max-quote-animation .max-quote-tile-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mqa-gap);
+  min-width: 0;
+}
+
+/* Frozen vertical stagger between the columns (the scroll is applied later). The
+   columns overflow the clipped wall, so a negative shift never leaves a gap. */
+.forge-max-quote-animation .max-quote-tile-column.column-02 {
+  transform: translateY(-56px);
+}
+
+.forge-max-quote-animation .max-quote-tile-column.column-03 {
+  transform: translateY(-24px);
+}
+
+.forge-max-quote-animation .max-quote-tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--mqa-radius);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Square tiles reserve their box via the wrapper's aspect-ratio; the image fills
+   it with object-fit:cover (CLS-safe — the box is reserved before load, C19). */
+.forge-max-quote-animation .max-quote-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.forge-max-quote-animation .max-quote-tile picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1200px) {
+  .forge-max-quote-animation {
+    --mqa-wall-height: 620px;
+
+    gap: clamp(24px, 3vw, 48px);
+    padding: var(--s2a-layout-section-top-sm, 80px) var(--s2a-layout-md, 40px) var(--s2a-layout-section-bottom-sm, 64px);
+  }
+}
+
+@media (max-width: 900px) {
+  .forge-max-quote-animation {
+    --mqa-wall-height: 520px;
+
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s2a-spacing-40, 40px);
+  }
+
+  .forge-max-quote-animation .max-quote {
+    width: 100%;
+    max-width: 640px;
+  }
+}
+
+@media (max-width: 600px) {
+  .forge-max-quote-animation {
+    --mqa-wall-height: 420px;
+    --mqa-gap: var(--s2a-spacing-8, 8px);
+
+    padding: 64px var(--s2a-layout-sm, 24px) 56px;
+  }
+
+  .forge-max-quote-animation .max-quote-tile-column.column-02 {
+    transform: translateY(-32px);
+  }
+
+  .forge-max-quote-animation .max-quote-tile-column.column-03 {
+    transform: translateY(-16px);
+  }
+}

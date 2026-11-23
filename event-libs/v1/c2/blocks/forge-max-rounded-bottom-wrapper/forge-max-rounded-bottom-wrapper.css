@@ -1,0 +1,136 @@
+/* forge-max-rounded-bottom-wrapper — Adobe Summit in-person agenda grid.
+   A white, rounded-bottom card wrapping a 3-up staggered card grid.
+   Every selector is scoped to .forge-max-rounded-bottom-wrapper (L10/L19).
+   Layout intent is expressed relatively (fr tracks, aspect-ratio, max-width)
+   — never pinned to Figma-frame pixels (L27). */
+
+.forge-max-rounded-bottom-wrapper {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  /* C21 section rhythm: generous top, lighter bottom (matches C2 siblings). */
+  padding: var(--s2a-spacing-800, 124px) var(--s2a-spacing-400, 24px) var(--s2a-spacing-600, 80px);
+  background: var(--s2a-color-gray-25, #fff);
+  border-bottom-left-radius: 32px;
+  border-bottom-right-radius: 32px;
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--s2a-spacing-300, 16px);
+  box-sizing: border-box;
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s2a-spacing-700, 48px) var(--s2a-spacing-500, 32px);
+  align-items: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid-item {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+/* Staggered masonry cascade (desktop only): columns step down left-to-right,
+   echoing the Figma frame. Kept well under the section's bottom padding so the
+   offset column never bleeds past the rounded-bottom edge. */
+@media (min-width: 1024px) {
+  .forge-max-rounded-bottom-wrapper .information-grid-item:nth-child(3n + 2) {
+    transform: translateY(28px);
+  }
+
+  .forge-max-rounded-bottom-wrapper .information-grid-item:nth-child(3n + 3) {
+    transform: translateY(56px);
+  }
+}
+
+/* Media: authored <picture>/<img> moved in by init. Reserve the box via
+   aspect-ratio + width/height:auto so the grid never shifts on image load (C19). */
+.forge-max-rounded-bottom-wrapper .information-grid-item-image {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--s2a-spacing-400, 20px);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid-item-image img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 768 / 610;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid-item-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid-item-title {
+  margin: 0 0 var(--s2a-spacing-100, 8px);
+  font-size: var(--s2a-font-size-300, 1.375rem);
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--s2a-color-gray-900, #222);
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid-item-description {
+  margin: 0;
+  font-size: var(--s2a-font-size-100, 1rem);
+  line-height: 1.5;
+  color: var(--s2a-color-gray-700, #4b4b4b);
+}
+
+/* CTA: plain text link with a trailing chevron. Colour set explicitly inside
+   the scope (never relying on the global a{color}) — C20. */
+.forge-max-rounded-bottom-wrapper .information-grid-item-text-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: var(--s2a-spacing-300, 16px);
+  font-size: var(--s2a-font-size-100, 1rem);
+  font-weight: 700;
+  color: var(--s2a-color-gray-900, #222);
+  text-decoration: none;
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid-item-text-link::after {
+  content: "\203A";
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.forge-max-rounded-bottom-wrapper .information-grid-item-text-link:hover {
+  text-decoration: underline;
+}
+
+/* Tablet: 2-up, no stagger. */
+@media (max-width: 1023px) {
+  .forge-max-rounded-bottom-wrapper .information-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile: single column. */
+@media (max-width: 599px) {
+  .forge-max-rounded-bottom-wrapper {
+    padding: var(--s2a-spacing-700, 64px) var(--s2a-spacing-400, 20px) var(--s2a-spacing-600, 48px);
+  }
+
+  .forge-max-rounded-bottom-wrapper .information-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s2a-spacing-700, 48px);
+  }
+}

@@ -1,0 +1,100 @@
+/* forge-max-marquee — centered editorial marquee (eyebrow + headline + copy).
+   Keyed ONLY on the .forge-max-marquee-* hooks that init() stamps on the
+   reconstructed DOM: DA strips the authored Figma classes
+   (.heading-title-container/.w-800/.eyebrow/.description) at runtime, so the
+   visual intent of truth-target.css is TRANSLATED onto these hooks, not ported.
+   All layout is expressed in responsive units (rem/clamp/%) so the section
+   reflows to its own container rather than a fixed Figma frame width. */
+
+.forge-max-marquee {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* C21 vertical rhythm: generous top, lighter bottom, like C2 siblings. */
+  padding:
+    var(--s2a-layout-section-top, 124px)
+    var(--s2a-layout-lg, 48px)
+    var(--s2a-layout-section-bottom, 80px);
+  background: var(--s2a-color-bg, #fff);
+  text-align: center;
+}
+
+.forge-max-marquee-foreground {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  /* authored column was .w-800 (~800px); expressed responsively. */
+  max-width: 50rem;
+  margin: 0 auto;
+}
+
+.forge-max-marquee-eyebrow {
+  margin: 0 0 var(--s2a-spacing-12, 12px);
+  font-size: var(--s2a-font-size-100, 1rem);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--s2a-color-text-secondary, #707070);
+}
+
+.forge-max-marquee-title {
+  margin: 0;
+  font-family: var(--s2a-font-family, "adobe-clean", sans-serif);
+  /* ~40px → ~60px, fluid between mobile and desktop. */
+  font-size: clamp(2.5rem, 1.6rem + 3vw, 3.75rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--s2a-color-text, #2c2c2c);
+}
+
+.forge-max-marquee-copy {
+  margin: var(--s2a-spacing-24, 24px) 0 0;
+  /* copy column is narrower than the headline, matching the comp. */
+  max-width: 40rem;
+  font-size: clamp(1rem, 0.95rem + 0.4vw, 1.25rem);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--s2a-color-text-secondary, #707070);
+}
+
+.forge-max-marquee-copy + .forge-max-marquee-copy {
+  margin-top: var(--s2a-spacing-12, 12px);
+}
+
+.forge-max-marquee-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s2a-spacing-16, 16px);
+  margin-top: var(--s2a-spacing-32, 32px);
+}
+
+/* A CTA in this section inherits the readable section text colour rather than
+   the global anchor colour (C20 defensiveness). */
+.forge-max-marquee-actions a,
+.forge-max-marquee-actions button {
+  color: inherit;
+}
+
+@media (min-width: 1200px) {
+  .forge-max-marquee {
+    padding-left: var(--s2a-layout-xl, 64px);
+    padding-right: var(--s2a-layout-xl, 64px);
+  }
+}
+
+@media (max-width: 600px) {
+  .forge-max-marquee {
+    padding:
+      var(--s2a-layout-section-top-mobile, 72px)
+      var(--s2a-layout-sm, 24px)
+      var(--s2a-layout-section-bottom-mobile, 48px);
+  }
+
+  .forge-max-marquee-copy {
+    margin-top: var(--s2a-spacing-16, 16px);
+  }
+}

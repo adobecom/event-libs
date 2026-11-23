@@ -42,6 +42,11 @@ const EVENT_BLOCKS_C2 = [
   'event-speakers',
   'event-session-resources',
   'event-youtube',
+  'forge-customer-journey-pod',
+  'forge-max-marquee',
+  'forge-max-quote-animation',
+  'forge-max-rounded-bottom-wrapper',
+  'forge-max-rounded-top-wrapper',
 ];
 
 // Only the utilities scripts.js actually needs directly
