@@ -79,7 +79,8 @@
   min-width: 0;
 }
 
-.profile-cards.blade .blade-read-more {
+.profile-cards.blade .blade-read-more,
+.profile-cards .bio-read-more {
   background: none;
   border: 0;
   padding: 0;
@@ -94,7 +95,8 @@
   display: block;
 }
 
-.profile-cards.blade .blade-read-more[hidden] {
+.profile-cards.blade .blade-read-more[hidden],
+.profile-cards .bio-read-more[hidden] {
   display: none;
 }
 
@@ -318,6 +320,34 @@
 .profile-cards.blade .cards-wrapper .card-container:only-child {
   grid-column: 1 / -1;
   justify-self: center;
+}
+
+/* Collapsed text, including its controls and social links, fits the rendered image height. */
+.profile-cards .collapsible-bio:not(.expanded) .card-content {
+  box-sizing: border-box;
+  height: var(--profile-image-height);
+  max-height: var(--profile-image-height);
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.profile-cards .collapsible-bio:not(.expanded) .card-text-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.profile-cards .collapsible-bio:not(.expanded) .card-desc {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.profile-cards .collapsible-bio .card-title,
+.profile-cards .collapsible-bio .card-name,
+.profile-cards .collapsible-bio .bio-read-more,
+.profile-cards .collapsible-bio .card-social-icons {
+  flex-shrink: 0;
 }
 
 .profile-cards.blade .card-container.expanded .card-desc {
