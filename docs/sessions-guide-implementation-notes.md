@@ -86,12 +86,13 @@ Desktop offsets are clamped when results shrink, and measurements/observers foll
 even when a replacement list has the same count. Saved-state changes alone preserve position.
 Below 1280px, rows scroll natively and no cards inherit desktop off-screen `inert` state.
 
-## Scheduled on-demand row interaction (MWPW-215139)
+## Session card row interaction (MWPW-215139)
 
-At desktop widths, a row-hover/focus rule turns resting scheduled, non-favorited on-demand cards
-white without removing their base background declaration. This preserves pressed-only states
-outside row interactions as well as the card's own dark hover/focus state, dimensions and
-saved-state classes. Mobile/tablet row-tint suppression remains unchanged.
+At desktop widths, a row-hover/focus rule turns all resting upcoming and on-demand cards white,
+regardless of scheduled/favorited state, without removing their base background declarations.
+This preserves pressed-only states outside row interactions as well as the card's own dark
+hover/focus state, dimensions and saved-state classes. Mobile/tablet row-tint suppression remains
+unchanged.
 
 ## Post-event personal session days (MWPW-215376)
 
