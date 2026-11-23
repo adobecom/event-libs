@@ -1,0 +1,120 @@
+/* forge-max-marquee — centered "Sponsors" marquee/hero.
+   Scoped entirely under .forge-max-marquee and keyed on the .forge-max-marquee-*
+   classes init() stamps on the reconstructed DOM (DA strips the authored Figma
+   classes). --s2a-* tokens carry px fallbacks so the block renders correctly
+   whether or not Milo's C2 globals are present. */
+
+.forge-max-marquee {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  padding: var(--s2a-layout-section-top, 124px) var(--s2a-layout-lg, 48px) var(--s2a-layout-section-bottom, 80px);
+  color: var(--s2a-color-text, #1d1d1d);
+}
+
+.forge-max-marquee .forge-max-marquee-foreground {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2a-spacing-24, 24px);
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.forge-max-marquee .forge-max-marquee-eyebrow {
+  margin: 0;
+  font-size: var(--s2a-font-size-detail, 15px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--s2a-color-text, #1d1d1d);
+}
+
+.forge-max-marquee .forge-max-marquee-heading {
+  max-width: 14ch;
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(36px, 5.2vw, 60px);
+  line-height: 1.07;
+  letter-spacing: -0.015em;
+  color: var(--s2a-color-text, #1d1d1d);
+}
+
+.forge-max-marquee .forge-max-marquee-subheading {
+  max-width: 40ch;
+  margin: 0;
+  font-weight: 600;
+  font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1.2;
+  color: var(--s2a-color-text, #1d1d1d);
+}
+
+.forge-max-marquee .forge-max-marquee-body {
+  max-width: 640px;
+  margin: 0;
+  font-size: var(--s2a-font-size-body, 18px);
+  line-height: 1.5;
+  color: var(--s2a-color-text-secondary, #4a4a4a);
+}
+
+.forge-max-marquee .forge-max-marquee-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s2a-spacing-16, 16px);
+  margin-top: var(--s2a-spacing-8, 8px);
+}
+
+/* Actions-nested selector (0,3,0) so this design beats Milo's global
+   .con-button.outline (0,2,0) regardless of stylesheet load order. */
+.forge-max-marquee .forge-max-marquee-actions .forge-max-marquee-cta {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 26px;
+  border: 2px solid currentColor;
+  border-radius: var(--s2a-radius-pill, 999px);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  color: var(--s2a-color-text, #1d1d1d);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.forge-max-marquee .forge-max-marquee-actions .forge-max-marquee-cta:hover,
+.forge-max-marquee .forge-max-marquee-actions .forge-max-marquee-cta:focus-visible {
+  background: var(--s2a-color-text, #1d1d1d);
+  color: var(--s2a-color-bg, #fff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forge-max-marquee .forge-max-marquee-actions .forge-max-marquee-cta {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .forge-max-marquee {
+    padding: 88px 24px 64px;
+  }
+}
+
+@media (max-width: 600px) {
+  .forge-max-marquee {
+    padding: 64px 20px 48px;
+  }
+
+  .forge-max-marquee .forge-max-marquee-heading {
+    max-width: 18ch;
+    font-size: clamp(30px, 8.5vw, 40px);
+  }
+}

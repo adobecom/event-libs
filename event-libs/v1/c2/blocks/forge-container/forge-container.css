@@ -1,0 +1,111 @@
+/* forge-container — Adobe Summit sponsor tier grid.
+   Scoped to .forge-container. Tile size per tier is expressed RELATIVELY via a
+   --forge-cols count + % calc (large 4-up, medium 5-up, small 6-up) so the block
+   reflows to its own container — no pinned Figma-frame pixels (L27). */
+
+.forge-container {
+  /* Local design tokens (prefer Milo --s2a-* at runtime, fall back when absent). */
+  --forge-text: var(--s2a-color-foreground, #1b1b1b);
+  --forge-tile-bg: var(--s2a-color-gray-100, #f5f5f5);
+  --forge-tile-radius: 16px;
+  --forge-grid-gap: clamp(12px, 1.6vw, 24px);
+  --forge-tile-pad: 28px;
+  --forge-cols: 6;
+
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 124px 24px 80px;
+}
+
+.forge-container * {
+  box-sizing: border-box;
+}
+
+.forge-container .sponsors-grid-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(48px, 6vw, 88px);
+}
+
+.forge-container .sponsor-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.forge-container .sponsor-level-size-large {
+  --forge-cols: 4;
+  --forge-tile-pad: clamp(24px, 2.6vw, 40px);
+}
+
+.forge-container .sponsor-level-size-medium {
+  --forge-cols: 5;
+  --forge-tile-pad: clamp(20px, 2.2vw, 32px);
+}
+
+.forge-container .sponsor-level-size-small {
+  --forge-cols: 6;
+  --forge-tile-pad: clamp(14px, 1.8vw, 24px);
+}
+
+.forge-container .sponsor-level-name {
+  margin: 0 0 clamp(24px, 3vw, 48px);
+  color: var(--forge-text);
+  font-weight: 700;
+  font-size: clamp(28px, 3vw, 40px);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.forge-container .sponsors-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: var(--forge-grid-gap);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.forge-container .sponsor-card {
+  position: relative;
+  width: calc((100% - (var(--forge-cols) - 1) * var(--forge-grid-gap)) / var(--forge-cols));
+  max-width: 100%;
+  /* Landscape tile. The fixed aspect-ratio reserves the box before the logo loads
+     (no CLS) and stays authoritative because the logo is taken out of flow below. */
+  aspect-ratio: 16 / 10;
+  margin: 0;
+  background: var(--forge-tile-bg);
+  border-radius: var(--forge-tile-radius);
+  list-style: none;
+}
+
+/* Authored logo images: absolutely positioned inside the tile padding so their
+   intrinsic height can never defeat the tile's aspect-ratio; contain-fit keeps
+   each logo centered and undistorted. */
+.forge-container .sponsor-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: var(--forge-tile-pad);
+  object-fit: contain;
+}
+
+/* Tablet: step the columns down so tiles stay legible as the container narrows. */
+@media (max-width: 1200px) {
+  .forge-container .sponsor-level-size-large { --forge-cols: 3; }
+  .forge-container .sponsor-level-size-medium { --forge-cols: 4; }
+  .forge-container .sponsor-level-size-small { --forge-cols: 4; }
+}
+
+@media (max-width: 700px) {
+  .forge-container { padding: 72px 16px 48px; }
+  .forge-container .sponsor-level-size-large { --forge-cols: 2; }
+  .forge-container .sponsor-level-size-medium { --forge-cols: 2; }
+  .forge-container .sponsor-level-size-small { --forge-cols: 3; }
+}
