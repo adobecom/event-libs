@@ -86,8 +86,8 @@ describe('FullPageShell/layout', () => {
     });
   });
 
-  ['sessions-guide-full-page', 'sg-portal'].forEach((surface) => {
-    it(`keeps scheduled on-demand row interactions consistent in ${surface}`, async () => {
+  ['sessions-guide', 'sessions-guide-full-page', 'sg-portal'].forEach((surface) => {
+    it(`keeps upcoming and on-demand row interactions consistent in ${surface}`, async () => {
       frame.style.width = '1440px';
       await new Promise((resolve, reject) => {
         frame.onload = resolve;
@@ -101,10 +101,10 @@ describe('FullPageShell/layout', () => {
         <div class="sg-time-row" style="display:block">
           <button id="row-focus" type="button">Row action</button>
           <div style="display:grid;grid-template-columns:repeat(2,450px);gap:8px">
-            ${['', 'is-scheduled', 'is-favorited', 'is-scheduled is-favorited'].map((state) => `
-              <article class="sg-card sg-card--on-demand ${state}" style="transition:none">
+            ${['', 'sg-card--on-demand'].flatMap((variant) => ['', 'is-scheduled', 'is-favorited', 'is-scheduled is-favorited'].map((state) => `
+              <article class="sg-card ${variant} ${state}" style="transition:none">
                 <button type="button">Card action</button>
-              </article>`).join('')}
+              </article>`)).join('')}
           </div>
         </div>
       </div>`;
@@ -138,6 +138,10 @@ describe('FullPageShell/layout', () => {
           expect(card.matches(':focus-within')).to.equal(true);
           expect(color(card), `${card.className} at ${width}px`)
             .to.equal(width >= 1280 ? focusedColors[index] : restingColor);
+          cards.filter((sibling) => sibling !== card).forEach((sibling) => {
+            expect(color(sibling), `${sibling.className} beside focused ${card.className} at ${width}px`)
+              .to.equal(width >= 1280 ? 'rgb(255, 255, 255)' : restingColor);
+          });
         }
       }
     });
