@@ -342,6 +342,7 @@
 .profile-cards .collapsible-bio:not(.expanded) .card-desc {
   min-height: 0;
   max-height: var(--bio-preview-height, none);
+  padding-inline-end: 28px;
   overflow: hidden;
   /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
@@ -362,8 +363,26 @@
   align-items: center;
   justify-content: center;
   align-self: flex-start;
+  flex-shrink: 0;
   width: 24px;
   height: 24px;
+}
+
+.profile-cards .bio-preview {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-cards .collapsible-bio:not(.expanded) .bio-read-more {
+  position: absolute;
+  inset-inline-end: 0;
+  bottom: 0;
+}
+
+.profile-cards .collapsible-bio .bio-preview .card-desc {
+  margin-bottom: 0;
 }
 
 .profile-cards .bio-read-more[aria-expanded="true"] svg {
@@ -372,7 +391,6 @@
 
 .profile-cards .collapsible-bio .card-title,
 .profile-cards .collapsible-bio .card-name,
-.profile-cards .collapsible-bio .bio-read-more,
 .profile-cards .collapsible-bio .card-social-icons {
   flex-shrink: 0;
 }

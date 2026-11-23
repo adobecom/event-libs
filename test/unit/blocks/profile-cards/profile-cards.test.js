@@ -421,6 +421,9 @@ describe('Profile Cards Module', () => {
         const lineHeight = parseFloat(getComputedStyle(desc).lineHeight);
         expect(desc.getBoundingClientRect().height % lineHeight).to.be.closeTo(0, 0.1);
         expect(getComputedStyle(desc).webkitLineClamp).to.equal(String(desc.clientHeight / lineHeight));
+        expect(btn.getBoundingClientRect().bottom).to.be.closeTo(desc.getBoundingClientRect().bottom, 1);
+        expect(btn.getBoundingClientRect().top)
+          .to.be.at.least(desc.getBoundingClientRect().bottom - lineHeight);
         expect(collapsedHeight).to.be.closeTo(image.getBoundingClientRect().height, 1);
         expect(btn.getBoundingClientRect().bottom).to.be.at.most(content.getBoundingClientRect().bottom);
         expect(card.querySelector('.card-social-icons').getBoundingClientRect().bottom)

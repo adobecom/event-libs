@@ -222,7 +222,9 @@ function appendCollapsibleBio(container, bio, fullName, blade = false) {
   } else {
     desc.textContent = trimmedBio;
   }
-  container.append(desc);
+  const bioContainer = blade ? container : createTag('div', { class: 'bio-preview' });
+  if (!blade) container.append(bioContainer);
+  bioContainer.append(desc);
 
   const btn = createTag('button', {
     type: 'button',
@@ -244,7 +246,7 @@ function appendCollapsibleBio(container, bio, fullName, blade = false) {
     if (!expanded) syncBioOverflow(cardContainer);
   });
 
-  container.append(btn);
+  bioContainer.append(btn);
 }
 
 function syncBioOverflow(cardContainer) {
