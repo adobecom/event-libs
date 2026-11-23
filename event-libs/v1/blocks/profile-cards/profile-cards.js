@@ -230,17 +230,18 @@ function appendCollapsibleBio(container, bio, fullName, blade = false) {
     hidden: '',
     'aria-expanded': 'false',
     'aria-controls': desc.id,
-    'aria-label': `Read more about ${fullName}'s bio`,
-  }, 'Read more');
+    'aria-label': blade ? `Read more about ${fullName}'s bio` : `Expand ${fullName}'s bio`,
+  }, blade ? 'Read more' : '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 
   btn.addEventListener('click', () => {
     const cardContainer = btn.closest('.card-container');
     const expanded = cardContainer.classList.toggle('expanded');
-    btn.textContent = expanded ? 'Collapse' : 'Read more';
+    if (blade) btn.textContent = expanded ? 'Collapse' : 'Read more';
     btn.setAttribute('aria-expanded', String(expanded));
     btn.setAttribute('aria-label', expanded
       ? `Collapse ${fullName}'s bio`
-      : `Read more about ${fullName}'s bio`);
+      : `${blade ? 'Read more about' : 'Expand'} ${fullName}'s bio`);
+    if (!expanded) syncBioOverflow(cardContainer);
   });
 
   container.append(btn);
@@ -263,8 +264,19 @@ function syncBioOverflow(cardContainer) {
   }
 
   // Measure without the control first so it cannot cause its own overflow after a resize.
+  desc.style.removeProperty('--bio-preview-lines');
+  desc.style.removeProperty('--bio-preview-height');
   btn.hidden = true;
   btn.hidden = desc.scrollHeight <= desc.clientHeight;
+
+  if (!btn.hidden && cardContainer.classList.contains('collapsible-bio')) {
+    const lineHeight = parseFloat(getComputedStyle(desc).lineHeight);
+    if (lineHeight > 0) {
+      const lines = Math.max(1, Math.floor(desc.getBoundingClientRect().height / lineHeight));
+      desc.style.setProperty('--bio-preview-lines', lines);
+      desc.style.setProperty('--bio-preview-height', `${lines * lineHeight}px`);
+    }
+  }
 }
 
 /**

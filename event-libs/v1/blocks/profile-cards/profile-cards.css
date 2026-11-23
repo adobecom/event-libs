@@ -341,7 +341,33 @@
 
 .profile-cards .collapsible-bio:not(.expanded) .card-desc {
   min-height: 0;
+  max-height: var(--bio-preview-height, none);
   overflow: hidden;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-line-clamp: var(--bio-preview-lines, none);
+  -webkit-box-orient: vertical;
+}
+
+.profile-cards .collapsible-bio .card-desc > :first-child {
+  margin-top: 0;
+}
+
+.profile-cards .collapsible-bio .card-desc > :last-child {
+  margin-bottom: 0;
+}
+
+.profile-cards .bio-read-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: 24px;
+  height: 24px;
+}
+
+.profile-cards .bio-read-more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
 }
 
 .profile-cards .collapsible-bio .card-title,

@@ -410,11 +410,17 @@ describe('Profile Cards Module', () => {
         const collapsedHeight = content.getBoundingClientRect().height;
 
         expect(btn.hidden).to.be.false;
+        expect(btn.textContent).to.equal('');
+        expect(btn.querySelector('svg').getAttribute('aria-hidden')).to.equal('true');
+        expect(btn.getAttribute('aria-label')).to.include('Expand Speaker');
         expect(btn.getAttribute('aria-expanded')).to.equal('false');
         expect(btn.getAttribute('aria-controls')).to.equal(desc.id);
         expect(desc.querySelector('p')).to.not.be.null;
         expect(desc.scrollHeight).to.be.greaterThan(desc.clientHeight);
         expect(desc.clientHeight).to.be.greaterThan(0);
+        const lineHeight = parseFloat(getComputedStyle(desc).lineHeight);
+        expect(desc.getBoundingClientRect().height % lineHeight).to.be.closeTo(0, 0.1);
+        expect(getComputedStyle(desc).webkitLineClamp).to.equal(String(desc.clientHeight / lineHeight));
         expect(collapsedHeight).to.be.closeTo(image.getBoundingClientRect().height, 1);
         expect(btn.getBoundingClientRect().bottom).to.be.at.most(content.getBoundingClientRect().bottom);
         expect(card.querySelector('.card-social-icons').getBoundingClientRect().bottom)
@@ -424,6 +430,8 @@ describe('Profile Cards Module', () => {
         syncBiosOverflow(el);
         expect(btn.hidden).to.be.false;
         expect(btn.getAttribute('aria-expanded')).to.equal('true');
+        expect(btn.getAttribute('aria-label')).to.include('Collapse Speaker');
+        expect(btn.querySelector('svg')).to.not.be.null;
         expect(content.getBoundingClientRect().height).to.be.greaterThan(collapsedHeight);
         expect(desc.innerHTML).to.equal(longBio);
         expect(desc.scrollHeight).to.equal(desc.clientHeight);
