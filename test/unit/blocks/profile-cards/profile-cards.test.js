@@ -379,6 +379,7 @@ describe('Profile Cards Module', () => {
       document.head.innerHTML = '';
       const style = document.createElement('style');
       style.textContent = `${profileCss}
+        .profile-cards .card-desc { margin-bottom: 0; }
         :root {
           --body-font-family: Arial, sans-serif;
           --type-body-xs-size: 14px;
@@ -413,6 +414,7 @@ describe('Profile Cards Module', () => {
         expect(btn.getAttribute('aria-controls')).to.equal(desc.id);
         expect(desc.querySelector('p')).to.not.be.null;
         expect(desc.scrollHeight).to.be.greaterThan(desc.clientHeight);
+        expect(desc.clientHeight).to.be.greaterThan(0);
         expect(collapsedHeight).to.be.closeTo(image.getBoundingClientRect().height, 1);
         expect(btn.getBoundingClientRect().bottom).to.be.at.most(content.getBoundingClientRect().bottom);
         expect(card.querySelector('.card-social-icons').getBoundingClientRect().bottom)

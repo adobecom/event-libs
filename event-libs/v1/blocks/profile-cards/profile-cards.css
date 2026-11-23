@@ -326,6 +326,7 @@
 .profile-cards .collapsible-bio:not(.expanded) .card-content {
   box-sizing: border-box;
   height: var(--profile-image-height);
+  min-height: var(--profile-image-height);
   max-height: var(--profile-image-height);
   min-width: 0;
   flex: 1 1 0;
