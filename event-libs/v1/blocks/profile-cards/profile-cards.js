@@ -258,6 +258,23 @@ function syncBioOverflow(cardContainer) {
     const imageHeight = cardContainer.querySelector('.card-image-container').getBoundingClientRect().height;
     if (!imageHeight) return;
     cardContainer.style.setProperty('--profile-image-height', `${imageHeight}px`);
+    const content = cardContainer.querySelector('.card-content');
+    const title = cardContainer.querySelector('.card-title');
+    const name = cardContainer.querySelector('.card-name');
+    const socialIcons = cardContainer.querySelector('.card-social-icons');
+    const contentStyle = getComputedStyle(content);
+    const outerHeight = (element) => {
+      if (!element) return 0;
+      const style = getComputedStyle(element);
+      return element.getBoundingClientRect().height
+        + parseFloat(style.marginTop)
+        + parseFloat(style.marginBottom);
+    };
+    const padding = parseFloat(contentStyle.paddingTop) + parseFloat(contentStyle.paddingBottom);
+    const gap = socialIcons ? parseFloat(contentStyle.rowGap) : 0;
+    const availableBioHeight = imageHeight - padding - outerHeight(title)
+      - outerHeight(name) - outerHeight(socialIcons) - gap;
+    cardContainer.style.setProperty('--bio-preview-height', `${Math.max(0, availableBioHeight)}px`);
   }
 
   if (cardContainer.classList.contains('expanded')) {
@@ -267,7 +284,9 @@ function syncBioOverflow(cardContainer) {
 
   // Measure without the control first so it cannot cause its own overflow after a resize.
   desc.style.removeProperty('--bio-preview-lines');
-  desc.style.removeProperty('--bio-preview-height');
+  if (!cardContainer.classList.contains('collapsible-bio')) {
+    desc.style.removeProperty('--bio-preview-height');
+  }
   btn.hidden = true;
   btn.hidden = desc.scrollHeight <= desc.clientHeight;
 
@@ -276,7 +295,9 @@ function syncBioOverflow(cardContainer) {
     if (lineHeight > 0) {
       const lines = Math.max(1, Math.floor(desc.getBoundingClientRect().height / lineHeight));
       desc.style.setProperty('--bio-preview-lines', lines);
-      desc.style.setProperty('--bio-preview-height', `${lines * lineHeight}px`);
+      if (!cardContainer.classList.contains('collapsible-bio')) {
+        desc.style.setProperty('--bio-preview-height', `${lines * lineHeight}px`);
+      }
     }
   }
 }
@@ -320,7 +341,7 @@ function connectBiosOverflowObserver(el) {
   const debouncedSync = debounce(() => syncBiosOverflow(el), 100);
   const ro = new ResizeObserver(() => debouncedSync());
   ro.observe(cardsWrapper);
-  el.querySelectorAll('.collapsible-bio .card-image-container, .collapsible-bio .card-desc')
+  el.querySelectorAll('.collapsible-bio .card-image-container, .collapsible-bio .card-desc, .collapsible-bio .card-social-icons')
     .forEach((target) => ro.observe(target));
   bioOverflowObservers.set(el, () => ro.disconnect());
 }

@@ -330,12 +330,14 @@
   max-height: var(--profile-image-height);
   min-width: 0;
   flex: 1 1 0;
+  justify-content: flex-start;
+  gap: 16px;
 }
 
 .profile-cards .collapsible-bio:not(.expanded) .card-text-container {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
 }
 
@@ -383,6 +385,10 @@
 
 .profile-cards .collapsible-bio .bio-preview .card-desc {
   margin-bottom: 0;
+}
+
+.profile-cards .collapsible-bio .card-social-icons {
+  margin-top: 0;
 }
 
 .profile-cards .bio-read-more[aria-expanded="true"] svg {

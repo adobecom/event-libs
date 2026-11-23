@@ -431,6 +431,8 @@ describe('Profile Cards Module', () => {
           .to.be.at.most(content.getBoundingClientRect().bottom);
         expect(card.querySelector('.card-social-icons').getBoundingClientRect().top)
           .to.be.at.least(desc.getBoundingClientRect().bottom);
+        expect(card.querySelector('.card-social-icons').getBoundingClientRect().top
+          - desc.getBoundingClientRect().bottom).to.be.closeTo(16, 1);
         expect(desc.getBoundingClientRect().top)
           .to.be.at.least(card.querySelector('.card-name').getBoundingClientRect().bottom);
 
@@ -492,6 +494,10 @@ describe('Profile Cards Module', () => {
       cards.forEach((card) => {
         expect(card.getBoundingClientRect().height)
           .to.be.closeTo(cards[0].getBoundingClientRect().height, 1);
+        if (card.querySelector('.card-social-icons') && card.querySelector('.card-desc')) {
+          expect(card.querySelector('.card-social-icons').getBoundingClientRect().top
+            - card.querySelector('.card-desc').getBoundingClientRect().bottom).to.be.closeTo(16, 1);
+        }
       });
     });
 
