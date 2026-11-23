@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { readFile, setViewport } from '@web/test-runner-commands';
+import { executeServerCommand, readFile, setViewport } from '@web/test-runner-commands';
 import init, {
   createSocialIcon, buildModalContent, syncBladeBiosOverflow, syncBiosOverflow,
 } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
@@ -361,7 +361,7 @@ describe('Profile Cards Module', () => {
       setMetadata('speakers', JSON.stringify(bios.map((bio, index) => ({
         firstName: 'Speaker',
         lastName: String(index),
-        title: 'Designer',
+        title: 'Graphic Design & Executive Creative Director at Sunday After',
         bio,
         photo: { imageUrl: '/event-libs/v1/icons/preview-eye.svg' },
         socialLinks: [{ link: 'https://www.instagram.com/speaker', serviceName: 'Instagram' }],
@@ -395,7 +395,7 @@ describe('Profile Cards Module', () => {
       await setViewport(originalViewport);
     });
 
-    [375, 1200].forEach((width) => {
+    [375, 499, 600, 768, 899, 900, 1200].forEach((width) => {
       it(`fits collapsed text and controls within the image height at ${width}px and toggles the full rich bio`, async () => {
         await setViewport({ width, height: 900 });
         const el = makeBlock([longBio]);
@@ -443,6 +443,35 @@ describe('Profile Cards Module', () => {
         expect(btn.getAttribute('aria-expanded')).to.equal('false');
         expect(content.getBoundingClientRect().height).to.be.closeTo(collapsedHeight, 1);
       });
+    });
+
+    it('keeps the bio and inline control visible when resizing a single card between desktop and tablet', async function responsiveBio() {
+      this.timeout(10000);
+      await executeServerCommand('focus-test-page');
+      await setViewport({ width: 1200, height: 900 });
+      const el = makeBlock([longBio]);
+      await waitForSocialIcons(el);
+      const card = el.querySelector('.card-container');
+      const desc = card.querySelector('.card-desc');
+      const button = card.querySelector('.bio-read-more');
+      const image = card.querySelector('.card-image-container');
+      const content = card.querySelector('.card-content');
+
+      for (const width of [768, 499, 900, 1200]) {
+        await setViewport({ width, height: 900 });
+        await waitFor(() => {
+          const lineHeight = parseFloat(getComputedStyle(desc).lineHeight);
+          return content.getBoundingClientRect().height === image.getBoundingClientRect().height
+            && desc.clientHeight >= lineHeight
+            && Math.abs(button.getBoundingClientRect().bottom
+              - desc.getBoundingClientRect().bottom) < 1;
+        });
+        expect(button.hidden).to.be.false;
+        button.click();
+        expect(desc.scrollHeight).to.equal(desc.clientHeight);
+        button.click();
+        expect(desc.clientHeight).to.be.greaterThan(0);
+      }
     });
 
     it('keeps collapsed row heights equal and hides controls for short or missing bios', async () => {
