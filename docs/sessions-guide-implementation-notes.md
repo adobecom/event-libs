@@ -358,7 +358,10 @@ doesn't exist in the real catalog either.
 ### Pod heading counts
 
 `sg-detail__count` appears only when the list is actually truncated, so it tracks the Show more
-toggle exactly: over 6 products (`COLLAPSED_PRODUCTS`), over 5 speakers (`COLLAPSED_SPEAKERS`).
+toggle exactly: over 6 products (`COLLAPSED_PRODUCTS`), over 5 speakers on mobile/desktop
+(`COLLAPSED_SPEAKERS`), or over 6 speakers in the two-column tablet layout at 768–1279px
+(`TABLET_COLLAPSED_SPEAKERS`, MWPW-212857). Speaker limits update on resize; an explicitly
+expanded list stays expanded.
 
 ### Session resources and legal disclaimer are pre-event sensitive
 
