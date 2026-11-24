@@ -470,6 +470,12 @@
   color: white;
 }
 
+.events-form p.field-error {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--color-red);
+}
+
 .events-form form.rsvp-form-disabled {
   opacity: 0.5;
   pointer-events: none;

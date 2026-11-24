@@ -205,6 +205,30 @@ export function getRsvpInvalidSubmissionMessage(manager) {
     : text;
 }
 
+const RSVP_FIELD_ERROR_DEFAULTS = {
+  FieldRequired: 'This field is required.',
+  FieldInvalidOption: 'Please choose a valid option.',
+  FieldInvalidFormat: 'Please enter a valid value.',
+  FieldInvalidType: 'Please enter a valid value.',
+  FieldTooLong: 'This entry is too long.',
+  FieldUnsafe: 'This entry contains characters that are not allowed.',
+};
+
+/**
+ * Localized field-level message for a structured RSVP validation error code
+ * (e.g. FieldRequired -> dictionary key `rsvp-field-error-field-required`).
+ * Server messages are never shown, so submitted values can't leak into the UI.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @param {string} code - `fieldErrors[].code` from the RsvpValidationError body
+ * @returns {string}
+ */
+export function getRsvpFieldErrorMessage(manager, code) {
+  const key = `rsvp-field-error-${String(code).replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}`;
+  const text = manager.getValue(key);
+  if (text !== key) return text;
+  return RSVP_FIELD_ERROR_DEFAULTS[code] || getRsvpInvalidSubmissionMessage(manager);
+}
+
 export const RSVP_DECLINED_MESSAGE_KEY = 'rsvp-declined-cta-text';
 
 /**

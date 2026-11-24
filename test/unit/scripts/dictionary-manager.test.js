@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { DictionaryManager, dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage } from '../../../event-libs/v1/utils/dictionary-manager.js';
+import { DictionaryManager, dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getRsvpFieldErrorMessage } from '../../../event-libs/v1/utils/dictionary-manager.js';
 import { setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 
 describe('DictionaryManager', () => {
@@ -268,5 +268,57 @@ describe('getRsvpTokenAlreadyRegisteredMessage', () => {
     globalThis.fetch = () => Promise.resolve(mockResponse);
     await manager.initialize();
     expect(getRsvpTokenAlreadyRegisteredMessage(manager)).to.equal('You are already on the list.');
+  });
+});
+
+describe('getRsvpFieldErrorMessage', () => {
+  let originalFetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    DictionaryManager._clearCache();
+    setEventConfig({}, {
+      miloLibs: 'http://localhost:2000/test/unit/blocks/promotional-content/mocks/libs',
+      locales: { '': { ietf: 'en-US', tk: 'hah7vzn.css' } },
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    DictionaryManager._clearCache();
+  });
+
+  it('returns English defaults for each known field error code', () => {
+    const manager = new DictionaryManager();
+    expect(getRsvpFieldErrorMessage(manager, 'FieldRequired')).to.equal('This field is required.');
+    expect(getRsvpFieldErrorMessage(manager, 'FieldInvalidOption')).to.equal('Please choose a valid option.');
+    expect(getRsvpFieldErrorMessage(manager, 'FieldTooLong')).to.equal('This entry is too long.');
+  });
+
+  it('falls back to the invalid-submission message for unknown codes', () => {
+    const manager = new DictionaryManager();
+    expect(getRsvpFieldErrorMessage(manager, 'FieldUnknown')).to.equal(
+      'There was a problem with the information you submitted. Please check your entries and try again.',
+    );
+  });
+
+  it('uses the kebab-case dictionary key when configured', async () => {
+    const manager = new DictionaryManager();
+    globalThis.fetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        data: {
+          total: 1,
+          offset: 0,
+          limit: 1,
+          data: [{ key: 'rsvp-field-error-field-required', value: 'Required!' }],
+        },
+        ':version': 3,
+        ':names': ['data'],
+        ':type': 'multi-sheet',
+      }),
+    });
+    await manager.initialize();
+    expect(getRsvpFieldErrorMessage(manager, 'FieldRequired')).to.equal('Required!');
   });
 });
