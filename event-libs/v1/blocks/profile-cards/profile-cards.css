@@ -85,13 +85,16 @@
   border: 0;
   padding: 0;
   margin: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.profile-cards.blade .blade-read-more {
   font: inherit;
   font-size: var(--type-body-xs-size);
   line-height: var(--type-body-xs-lh);
   font-weight: 400;
   text-decoration: underline;
-  cursor: pointer;
-  color: inherit;
   display: block;
 }
 
@@ -325,7 +328,6 @@
 /* Collapsed text, including its controls and social links, fits the rendered image height. */
 .profile-cards .collapsible-bio:not(.expanded) .card-content {
   box-sizing: border-box;
-  height: var(--profile-image-height);
   min-height: var(--profile-image-height);
   max-height: var(--profile-image-height);
   min-width: 0;
@@ -337,7 +339,6 @@
 .profile-cards .collapsible-bio:not(.expanded) .card-text-container {
   display: flex;
   flex-direction: column;
-  flex: 0 1 auto;
   min-height: 0;
 }
 

@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
-import { executeServerCommand, readFile, setViewport } from '@web/test-runner-commands';
+import {
+  executeServerCommand, readFile, sendKeys, setViewport,
+} from '@web/test-runner-commands';
 import init, {
   createSocialIcon, buildModalContent, syncBladeBiosOverflow, syncBiosOverflow,
 } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
@@ -479,6 +481,30 @@ describe('Profile Cards Module', () => {
         button.click();
         expect(desc.clientHeight).to.be.greaterThan(0);
       }
+    });
+
+    it('preserves keyboard focus after collapsing and remeasuring an overflowing bio', async function bioToggleFocus() {
+      this.timeout(10000);
+      await executeServerCommand('focus-test-page');
+      const el = makeBlock([longBio]);
+      await waitForSocialIcons(el);
+      syncBiosOverflow(el);
+      const button = el.querySelector('.bio-read-more');
+      button.focus();
+      expect(document.activeElement).to.equal(button);
+
+      await sendKeys({ press: 'Enter' });
+      expect(button.getAttribute('aria-expanded')).to.equal('true');
+      expect(document.activeElement).to.equal(button);
+
+      await sendKeys({ press: 'Enter' });
+      expect(button.getAttribute('aria-expanded')).to.equal('false');
+      expect(button.hidden).to.be.false;
+      expect(document.activeElement).to.equal(button);
+
+      syncBiosOverflow(el);
+      expect(button.hidden).to.be.false;
+      expect(document.activeElement).to.equal(button);
     });
 
     it('keeps collapsed row heights equal and hides controls for short or missing bios', async () => {

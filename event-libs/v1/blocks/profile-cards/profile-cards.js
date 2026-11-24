@@ -282,12 +282,10 @@ function syncBioOverflow(cardContainer) {
     return;
   }
 
-  // Measure without the control first so it cannot cause its own overflow after a resize.
   desc.style.removeProperty('--bio-preview-lines');
   if (!cardContainer.classList.contains('collapsible-bio')) {
     desc.style.removeProperty('--bio-preview-height');
   }
-  btn.hidden = true;
   btn.hidden = desc.scrollHeight <= desc.clientHeight;
 
   if (!btn.hidden && cardContainer.classList.contains('collapsible-bio')) {
