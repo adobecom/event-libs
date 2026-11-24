@@ -79,22 +79,27 @@
   min-width: 0;
 }
 
-.profile-cards.blade .blade-read-more {
+.profile-cards.blade .blade-read-more,
+.profile-cards .bio-read-more {
   background: none;
   border: 0;
   padding: 0;
   margin: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.profile-cards.blade .blade-read-more {
   font: inherit;
   font-size: var(--type-body-xs-size);
   line-height: var(--type-body-xs-lh);
   font-weight: 400;
   text-decoration: underline;
-  cursor: pointer;
-  color: inherit;
   display: block;
 }
 
-.profile-cards.blade .blade-read-more[hidden] {
+.profile-cards.blade .blade-read-more[hidden],
+.profile-cards .bio-read-more[hidden] {
   display: none;
 }
 
@@ -318,6 +323,99 @@
 .profile-cards.blade .cards-wrapper .card-container:only-child {
   grid-column: 1 / -1;
   justify-self: center;
+}
+
+/* Keep controls and social links 16px apart in both states at every viewport. */
+.profile-cards .collapsible-bio .card-content {
+  justify-content: flex-start;
+  gap: 16px;
+}
+
+/* Collapsed text, including its controls and social links, fits the rendered image height. */
+.profile-cards .collapsible-bio:not(.expanded) .card-content {
+  box-sizing: border-box;
+  min-height: var(--profile-image-height);
+  max-height: var(--profile-image-height);
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.profile-cards .collapsible-bio:not(.expanded) .card-text-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.profile-cards .collapsible-bio:not(.expanded) .card-desc {
+  min-height: 0;
+  max-height: var(--bio-preview-height, none);
+  overflow: hidden;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-line-clamp: var(--bio-preview-lines, none);
+  -webkit-box-orient: vertical;
+}
+
+/* Keep the float inside a normal block for Safari; reserve only the last line. */
+.profile-cards .collapsible-bio:not(.expanded) .bio-text::before {
+  content: '';
+  float: inline-end;
+  width: 28px;
+  height: calc(var(--bio-preview-lines, 0) * 1lh);
+  shape-outside: inset(calc(100% - 1lh) 0 0);
+}
+
+.profile-cards .collapsible-bio .bio-text > :first-child {
+  margin-top: 0;
+}
+
+.profile-cards .collapsible-bio .bio-text > :last-child {
+  margin-bottom: 0;
+}
+
+.profile-cards .bio-read-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.profile-cards .bio-preview {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-cards .collapsible-bio.expanded .bio-preview {
+  gap: 16px;
+}
+
+.profile-cards .collapsible-bio:not(.expanded) .bio-read-more {
+  position: absolute;
+  inset-inline-end: 0;
+  bottom: 0;
+}
+
+.profile-cards .collapsible-bio .bio-preview .card-desc {
+  margin-bottom: 0;
+}
+
+.profile-cards .collapsible-bio .card-social-icons {
+  margin-top: 0;
+}
+
+.profile-cards .bio-read-more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.profile-cards .collapsible-bio .card-title,
+.profile-cards .collapsible-bio .card-name,
+.profile-cards .collapsible-bio .card-social-icons {
+  flex-shrink: 0;
 }
 
 .profile-cards.blade .card-container.expanded .card-desc {

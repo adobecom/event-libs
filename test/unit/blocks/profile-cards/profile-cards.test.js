@@ -1,7 +1,9 @@
 import { expect } from '@esm-bundle/chai';
-import { readFile } from '@web/test-runner-commands';
+import {
+  executeServerCommand, readFile, sendKeys, setViewport,
+} from '@web/test-runner-commands';
 import init, {
-  createSocialIcon, buildModalContent, syncBladeBiosOverflow,
+  createSocialIcon, buildModalContent, syncBladeBiosOverflow, syncBiosOverflow,
 } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
@@ -10,6 +12,8 @@ const MODAL_FOCUSABLES_SELECTOR = 'a:not(.hide-video, .faas), button:not([disabl
 
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/default.html' });
+const profileCss = await readFile({ path: '../../../../event-libs/v1/blocks/profile-cards/profile-cards.css' });
+const miloCss = await readFile({ path: '../../../../node_modules/@adobecom/milo/libs/styles/styles.css' });
 
 async function waitForSocialIcons(el, timeoutMs = 5000) {
   const start = Date.now();
@@ -349,6 +353,268 @@ describe('Profile Cards Module', () => {
       init(el);
       const configRows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)')).slice(1);
       expect(configRows).to.have.lengthOf(0);
+    });
+  });
+
+  describe('image-height bio truncation', () => {
+    const longBio = `<p>${'A speaker biography with enough detail to overflow the card. '.repeat(60)}</p>`;
+    const originalViewport = { width: window.innerWidth, height: window.innerHeight };
+
+    function makeBlock(bios, classes = '') {
+      setMetadata('speakers', JSON.stringify(bios.map((bio, index) => ({
+        firstName: 'Speaker',
+        lastName: String(index),
+        title: 'Graphic Design & Executive Creative Director at Sunday After',
+        bio,
+        photo: { imageUrl: '/event-libs/v1/icons/preview-eye.svg' },
+        socialLinks: [{ link: 'https://www.instagram.com/speaker', serviceName: 'Instagram' }],
+      }))));
+      const el = document.createElement('div');
+      el.className = `profile-cards ${classes}`;
+      el.innerHTML = '<div><div><h2>Speakers</h2></div></div><div><div>type</div><div></div></div>';
+      document.body.append(el);
+      init(el);
+      return el;
+    }
+
+    beforeEach(() => {
+      document.body.innerHTML = '';
+      document.head.innerHTML = '';
+      const style = document.createElement('style');
+      style.textContent = `${miloCss}\n${profileCss}
+        .profile-cards .card-desc { margin-bottom: 0; }
+        :root {
+          --body-font-family: Arial, sans-serif;
+          --type-body-xs-size: 14px;
+          --type-body-xs-lh: 20px;
+          --type-body-l-size: 18px;
+          --type-body-l-lh: 24px;
+          --type-heading-l-size: 28px;
+        }`;
+      document.head.append(style);
+    });
+
+    afterEach(async () => {
+      await setViewport(originalViewport);
+    });
+
+    [375, 499, 600, 768, 899, 900, 1200].forEach((width) => {
+      it(`fits collapsed text and controls within the image height at ${width}px and toggles the full rich bio`, async () => {
+        await setViewport({ width, height: 900 });
+        const el = makeBlock([longBio]);
+        await waitForSocialIcons(el);
+        syncBiosOverflow(el);
+
+        const card = el.querySelector('.card-container');
+        const content = card.querySelector('.card-content');
+        const image = card.querySelector('.card-image-container');
+        const desc = card.querySelector('.card-desc');
+        const btn = card.querySelector('.bio-read-more');
+        const collapsedHeight = content.getBoundingClientRect().height;
+
+        expect(btn.hidden).to.be.false;
+        expect(btn.textContent).to.equal('');
+        expect(btn.querySelector('svg').getAttribute('aria-hidden')).to.equal('true');
+        expect(btn.getAttribute('aria-label')).to.include('Expand Speaker');
+        expect(btn.getAttribute('aria-expanded')).to.equal('false');
+        expect(btn.getAttribute('aria-controls')).to.equal(desc.id);
+        expect(desc.querySelector('p')).to.not.be.null;
+        expect(desc.scrollHeight).to.be.greaterThan(desc.clientHeight);
+        expect(desc.clientHeight).to.be.greaterThan(0);
+        const lineHeight = parseFloat(getComputedStyle(desc).lineHeight);
+        expect(desc.getBoundingClientRect().height % lineHeight).to.be.closeTo(0, 0.1);
+        expect(getComputedStyle(desc).webkitLineClamp).to.equal(String(desc.clientHeight / lineHeight));
+        expect(btn.getBoundingClientRect().bottom).to.be.closeTo(desc.getBoundingClientRect().bottom, 1);
+        expect(btn.getBoundingClientRect().top)
+          .to.be.at.least(desc.getBoundingClientRect().bottom - lineHeight);
+        expect(collapsedHeight).to.be.closeTo(image.getBoundingClientRect().height, 1);
+        expect(btn.getBoundingClientRect().bottom).to.be.at.most(content.getBoundingClientRect().bottom);
+        expect(card.querySelector('.card-social-icons').getBoundingClientRect().bottom)
+          .to.be.at.most(content.getBoundingClientRect().bottom);
+        expect(card.querySelector('.card-social-icons').getBoundingClientRect().top)
+          .to.be.at.least(desc.getBoundingClientRect().bottom);
+        expect(card.querySelector('.card-social-icons').getBoundingClientRect().top
+          - desc.getBoundingClientRect().bottom).to.be.closeTo(16, 1);
+        expect(desc.getBoundingClientRect().top)
+          .to.be.at.least(card.querySelector('.card-name').getBoundingClientRect().bottom);
+        const bioRange = document.createRange();
+        bioRange.selectNodeContents(desc.querySelector('p'));
+        // Chrome may return both the full and ellipsized rect for the same final line.
+        const collapsedLines = [...bioRange.getClientRects()]
+          .filter((rect, index, rects) => rect.top < desc.getBoundingClientRect().bottom
+            && (!index || rect.top !== rects[index - 1].top));
+        expect(collapsedLines.length).to.equal(desc.clientHeight / lineHeight);
+        expect(collapsedLines[collapsedLines.length - 1].right)
+          .to.be.at.most(btn.getBoundingClientRect().left - 4);
+
+        btn.click();
+        syncBiosOverflow(el);
+        expect(btn.hidden).to.be.false;
+        expect(btn.getAttribute('aria-expanded')).to.equal('true');
+        expect(btn.getAttribute('aria-label')).to.include('Collapse Speaker');
+        expect(btn.querySelector('svg')).to.not.be.null;
+        expect(content.getBoundingClientRect().height).to.be.greaterThan(collapsedHeight);
+        expect(desc.querySelector('.bio-text').innerHTML).to.equal(longBio);
+        expect(desc.scrollHeight).to.equal(desc.clientHeight);
+        const expandedLines = [...bioRange.getClientRects()];
+        collapsedLines.slice(0, -1).forEach((line, index) => {
+          expect(expandedLines[index].width).to.be.closeTo(line.width, 0.1);
+        });
+        expect(btn.getBoundingClientRect().top
+          - desc.getBoundingClientRect().bottom).to.be.closeTo(16, 1);
+        expect(card.querySelector('.card-social-icons').getBoundingClientRect().top
+          - btn.getBoundingClientRect().bottom).to.be.closeTo(16, 1);
+
+        btn.click();
+        expect(btn.getAttribute('aria-expanded')).to.equal('false');
+        expect(content.getBoundingClientRect().height).to.be.closeTo(collapsedHeight, 1);
+      });
+    });
+
+    it('reserves the expand icon space only on the last line of a plain-text bio', async () => {
+      await setViewport({ width: 768, height: 900 });
+      const el = makeBlock(['A speaker biography with enough detail to overflow the card. '.repeat(60)]);
+      await waitForSocialIcons(el);
+      syncBiosOverflow(el);
+      const desc = el.querySelector('.card-desc');
+      const button = el.querySelector('.bio-read-more');
+      const range = document.createRange();
+      range.selectNodeContents(desc.querySelector('.bio-text'));
+      const collapsedLines = [...range.getClientRects()]
+        .filter((rect, index, rects) => rect.top < desc.getBoundingClientRect().bottom
+          && (!index || rect.top !== rects[index - 1].top));
+      expect(collapsedLines.length).to.be.greaterThan(1);
+      expect(collapsedLines[collapsedLines.length - 1].right)
+        .to.be.at.most(button.getBoundingClientRect().left - 4);
+
+      button.click();
+      const expandedLines = [...range.getClientRects()];
+      collapsedLines.slice(0, -1).forEach((line, index) => {
+        expect(expandedLines[index].width).to.be.closeTo(line.width, 0.1);
+      });
+    });
+
+    it('keeps the bio and inline control visible when resizing a single card between desktop and tablet', async function responsiveBio() {
+      this.timeout(10000);
+      await executeServerCommand('focus-test-page');
+      await setViewport({ width: 1200, height: 900 });
+      const el = makeBlock([longBio]);
+      await waitForSocialIcons(el);
+      const card = el.querySelector('.card-container');
+      const desc = card.querySelector('.card-desc');
+      const button = card.querySelector('.bio-read-more');
+      const image = card.querySelector('.card-image-container');
+      const content = card.querySelector('.card-content');
+
+      for (const width of [768, 499, 900, 1200]) {
+        await setViewport({ width, height: 900 });
+        await waitFor(() => {
+          const lineHeight = parseFloat(getComputedStyle(desc).lineHeight);
+          return content.getBoundingClientRect().height === image.getBoundingClientRect().height
+            && desc.clientHeight >= lineHeight
+            && Math.abs(button.getBoundingClientRect().bottom
+              - desc.getBoundingClientRect().bottom) < 1;
+        });
+        expect(button.hidden).to.be.false;
+        button.click();
+        expect(desc.scrollHeight).to.equal(desc.clientHeight);
+        button.click();
+        expect(desc.clientHeight).to.be.greaterThan(0);
+      }
+    });
+
+    it('preserves keyboard focus after collapsing and remeasuring an overflowing bio', async function bioToggleFocus() {
+      this.timeout(10000);
+      await executeServerCommand('focus-test-page');
+      const el = makeBlock([longBio]);
+      await waitForSocialIcons(el);
+      syncBiosOverflow(el);
+      const button = el.querySelector('.bio-read-more');
+      button.focus();
+      expect(document.activeElement).to.equal(button);
+
+      await sendKeys({ press: 'Enter' });
+      expect(button.getAttribute('aria-expanded')).to.equal('true');
+      expect(document.activeElement).to.equal(button);
+
+      await sendKeys({ press: 'Enter' });
+      expect(button.getAttribute('aria-expanded')).to.equal('false');
+      expect(button.hidden).to.be.false;
+      expect(document.activeElement).to.equal(button);
+
+      syncBiosOverflow(el);
+      expect(button.hidden).to.be.false;
+      expect(document.activeElement).to.equal(button);
+    });
+
+    it('keeps collapsed row heights equal and hides controls for short or missing bios', async () => {
+      await setViewport({ width: 1200, height: 900 });
+      const el = makeBlock([longBio, 'Short bio.', '']);
+      await waitForSocialIcons(el);
+      syncBiosOverflow(el);
+
+      const cards = [...el.querySelectorAll('.card-container')];
+      expect(cards[0].querySelector('.bio-read-more').hidden).to.be.false;
+      expect(cards[1].querySelector('.bio-read-more').hidden).to.be.true;
+      expect(cards[2].querySelector('.bio-read-more')).to.be.null;
+      cards.forEach((card) => {
+        expect(card.getBoundingClientRect().height)
+          .to.be.closeTo(cards[0].getBoundingClientRect().height, 1);
+        if (card.querySelector('.card-social-icons') && card.querySelector('.card-desc')) {
+          expect(card.querySelector('.card-social-icons').getBoundingClientRect().top
+            - card.querySelector('.card-desc').getBoundingClientRect().bottom).to.be.closeTo(16, 1);
+        }
+      });
+    });
+
+    it('removes the last-line spacer when a previously overflowing bio becomes short', async () => {
+      const el = makeBlock([longBio]);
+      await waitForSocialIcons(el);
+      syncBiosOverflow(el);
+      const desc = el.querySelector('.card-desc');
+      const button = el.querySelector('.bio-read-more');
+      expect(button.hidden).to.be.false;
+
+      desc.querySelector('.bio-text').textContent = 'Short bio.';
+      syncBiosOverflow(el);
+      expect(button.hidden).to.be.true;
+      expect(desc.getBoundingClientRect().height)
+        .to.be.closeTo(parseFloat(getComputedStyle(desc).lineHeight), 0.1);
+      expect(desc.scrollHeight).to.equal(desc.clientHeight);
+    });
+
+    it('updates the collapsed height when the image resizes', () => {
+      const el = makeBlock([longBio]);
+      const card = el.querySelector('.card-container');
+      const image = card.querySelector('.card-image-container');
+      image.style.height = '320px';
+      syncBiosOverflow(el);
+      expect(card.style.getPropertyValue('--profile-image-height')).to.equal('320px');
+      expect(card.querySelector('.card-content').getBoundingClientRect().height).to.be.closeTo(320, 1);
+    });
+
+    it('collapses static-authored rich bios but leaves modal cards and profiles without images intact', () => {
+      const el = document.createElement('div');
+      el.className = 'profile-cards';
+      el.innerHTML = `<div><div><h2>Speakers</h2></div></div>
+        <div><div><img src="/event-libs/v1/icons/preview-eye.svg"><p>Designer</p><h3>Static Speaker</h3>${longBio}</div></div>`;
+      document.body.append(el);
+      init(el);
+      expect(el.querySelector('.bio-read-more').hidden).to.be.false;
+      expect(el.querySelector('.card-desc').scrollHeight)
+        .to.be.greaterThan(el.querySelector('.card-desc').clientHeight);
+
+      const modal = makeBlock([longBio], 'modal');
+      expect(modal.querySelector('.bio-read-more')).to.be.null;
+      expect(modal.querySelector('.modal-trigger')).to.not.be.null;
+      const noImage = document.createElement('div');
+      noImage.className = 'profile-cards';
+      noImage.innerHTML = `<div><div><h2>Speakers</h2></div></div>
+        <div><div><h3>No Image</h3>${longBio}</div></div>`;
+      document.body.append(noImage);
+      init(noImage);
+      expect(noImage.querySelector('.bio-read-more')).to.be.null;
+      expect(noImage.querySelector('.card-desc').innerHTML).to.equal(longBio);
     });
   });
 

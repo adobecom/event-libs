@@ -239,6 +239,21 @@ describe('Carousel Functions', () => {
       expect(carouselElements.slides[0].getAttribute('aria-hidden')).to.equal('true');
     });
 
+    it('keeps bio expand buttons out of the tab order on hidden slides', () => {
+      carouselElements.slides.forEach((slide) => {
+        slide.append(createTag('button', { type: 'button' }, 'Read more'));
+      });
+
+      moveSlides({
+        currentTarget: carouselElements.nextPreviousBtns[1],
+        type: 'click',
+      }, carouselElements);
+
+      expect(carouselElements.slides[0].querySelector('button').getAttribute('tabindex')).to.equal('-1');
+      expect(carouselElements.slides[1].querySelector('button').getAttribute('tabindex')).to.equal('0');
+      expect(carouselElements.slides[2].querySelector('button').getAttribute('tabindex')).to.equal('-1');
+    });
+
     it('should clear ariaLive text before updating', () => {
       carouselElements.ariaLive.textContent = 'Previous content';
       const event = {

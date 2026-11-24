@@ -9,6 +9,7 @@ import {
 import { logError } from '../../utils/lana-log.js';
 
 let modalLoader;
+let bioId = 0;
 
 function decorateImage(card, photo) {
   if (!photo) return;
@@ -165,7 +166,7 @@ async function decorateSocialIcons(cardContainer, socialLinks) {
   }
 }
 
-function decorateContent(cardContainer, data) {
+function decorateContent(cardContainer, data, { collapsible = true } = {}) {
   const contentContainer = createTag('div', { class: 'card-content' });
 
   const textContainer = createTag('div', { class: 'card-text-container' });
@@ -174,18 +175,11 @@ function decorateContent(cardContainer, data) {
 
   textContainer.append(title, name);
 
-  if (data.bio) {
-    // Check if bio contains HTML tags (from static authoring)
-    if (data.bio.includes('<')) {
-      // Bio is HTML - insert it directly
-      const bioContainer = createTag('div', { class: 'card-desc' });
-      bioContainer.innerHTML = data.bio;
-      textContainer.append(bioContainer);
-    } else {
-      // Bio is plain text (from metadata) - wrap in paragraph
-      const description = createTag('p', { class: 'card-desc' }, data.bio);
-      textContainer.append(description);
-    }
+  if (collapsible && cardContainer.querySelector('.card-image-container') && data.bio?.trim()) {
+    cardContainer.classList.add('collapsible-bio');
+    appendCollapsibleBio(textContainer, data.bio, getProfileName(data));
+  } else {
+    appendBio(textContainer, data.bio);
   }
 
   contentContainer.append(textContainer);
@@ -214,59 +208,109 @@ function getSocialLinks(data) {
   return data?.socialLinks || data?.socialMedia || [];
 }
 
-function appendBioBlade(container, bio, fullName) {
+function appendCollapsibleBio(container, bio, fullName, blade = false) {
   const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
   if (!trimmedBio) return;
 
-  const desc = createTag('div', { class: 'card-desc blade-desc' });
+  bioId += 1;
+  const desc = createTag('div', {
+    class: blade ? 'card-desc blade-desc' : 'card-desc',
+    id: `profile-bio-${bioId}`,
+  });
+  const text = blade ? desc : createTag('div', { class: 'bio-text' });
   if (trimmedBio.includes('<')) {
-    desc.innerHTML = trimmedBio;
+    text.innerHTML = trimmedBio;
   } else {
-    desc.textContent = trimmedBio;
+    text.textContent = trimmedBio;
   }
-  container.append(desc);
+  if (!blade) desc.append(text);
+  const bioContainer = blade ? container : createTag('div', { class: 'bio-preview' });
+  if (!blade) container.append(bioContainer);
+  bioContainer.append(desc);
 
   const btn = createTag('button', {
     type: 'button',
-    class: 'blade-read-more',
+    class: blade ? 'blade-read-more' : 'bio-read-more',
     hidden: '',
     'aria-expanded': 'false',
-    'aria-label': `Read more about ${fullName}'s bio`,
-  }, 'Read more');
+    'aria-controls': desc.id,
+    'aria-label': blade ? `Read more about ${fullName}'s bio` : `Expand ${fullName}'s bio`,
+  }, blade ? 'Read more' : '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 
   btn.addEventListener('click', () => {
     const cardContainer = btn.closest('.card-container');
     const expanded = cardContainer.classList.toggle('expanded');
-    btn.textContent = expanded ? 'Collapse' : 'Read more';
+    if (blade) btn.textContent = expanded ? 'Collapse' : 'Read more';
     btn.setAttribute('aria-expanded', String(expanded));
     btn.setAttribute('aria-label', expanded
       ? `Collapse ${fullName}'s bio`
-      : `Read more about ${fullName}'s bio`);
+      : `${blade ? 'Read more about' : 'Expand'} ${fullName}'s bio`);
+    if (!expanded) syncBioOverflow(cardContainer);
   });
 
-  container.append(btn);
+  bioContainer.append(btn);
 }
 
-function syncBladeBioOverflow(cardContainer) {
-  const desc = cardContainer.querySelector('.blade-desc');
-  const btn = cardContainer.querySelector('.blade-read-more');
+function syncBioOverflow(cardContainer) {
+  const desc = cardContainer.querySelector('.card-desc');
+  const btn = cardContainer.querySelector('.blade-read-more, .bio-read-more');
   if (!desc || !btn) return;
+
+  if (cardContainer.classList.contains('collapsible-bio')) {
+    const imageHeight = cardContainer.querySelector('.card-image-container').getBoundingClientRect().height;
+    if (!imageHeight) return;
+    cardContainer.style.setProperty('--profile-image-height', `${imageHeight}px`);
+    const content = cardContainer.querySelector('.card-content');
+    const title = cardContainer.querySelector('.card-title');
+    const name = cardContainer.querySelector('.card-name');
+    const socialIcons = cardContainer.querySelector('.card-social-icons');
+    const contentStyle = getComputedStyle(content);
+    const outerHeight = (element) => {
+      if (!element) return 0;
+      const style = getComputedStyle(element);
+      return element.getBoundingClientRect().height
+        + parseFloat(style.marginTop)
+        + parseFloat(style.marginBottom);
+    };
+    const padding = parseFloat(contentStyle.paddingTop) + parseFloat(contentStyle.paddingBottom);
+    const gap = socialIcons ? parseFloat(contentStyle.rowGap) : 0;
+    const availableBioHeight = imageHeight - padding - outerHeight(title)
+      - outerHeight(name) - outerHeight(socialIcons) - gap;
+    cardContainer.style.setProperty('--bio-preview-height', `${Math.max(0, availableBioHeight)}px`);
+  }
 
   if (cardContainer.classList.contains('expanded')) {
     btn.hidden = false;
     return;
   }
 
+  desc.style.removeProperty('--bio-preview-lines');
+  if (!cardContainer.classList.contains('collapsible-bio')) {
+    desc.style.removeProperty('--bio-preview-height');
+  }
   btn.hidden = desc.scrollHeight <= desc.clientHeight;
+
+  if (!btn.hidden && cardContainer.classList.contains('collapsible-bio')) {
+    const lineHeight = parseFloat(getComputedStyle(desc).lineHeight);
+    if (lineHeight > 0) {
+      const lines = Math.max(1, Math.floor(desc.getBoundingClientRect().height / lineHeight));
+      desc.style.setProperty('--bio-preview-lines', lines);
+      if (!cardContainer.classList.contains('collapsible-bio')) {
+        desc.style.setProperty('--bio-preview-height', `${lines * lineHeight}px`);
+      }
+    }
+  }
 }
 
 /**
- * Reveals the Read more toggle only for blade cards whose 2-line-clamped
- * bio actually overflows. Exported so tests can call it directly after
- * stubbing scrollHeight/clientHeight, matching the sessions-hub pattern.
+ * Reveals Read more only when the collapsed bio overflows its available space.
  */
+export function syncBiosOverflow(el) {
+  el.querySelectorAll('.card-container').forEach(syncBioOverflow);
+}
+
 export function syncBladeBiosOverflow(el) {
-  el.querySelectorAll('.card-container').forEach(syncBladeBioOverflow);
+  syncBiosOverflow(el);
 }
 
 function debounce(fn, delay) {
@@ -277,31 +321,34 @@ function debounce(fn, delay) {
   };
 }
 
-const bladeOverflowObservers = new WeakMap();
+const bioOverflowObservers = new WeakMap();
 
-function disconnectBladeBiosOverflowObserver(el) {
-  const disconnect = bladeOverflowObservers.get(el);
+function disconnectBiosOverflowObserver(el) {
+  const disconnect = bioOverflowObservers.get(el);
   if (disconnect) {
     disconnect();
-    bladeOverflowObservers.delete(el);
+    bioOverflowObservers.delete(el);
   }
 }
 
-function connectBladeBiosOverflowObserver(el) {
+function connectBiosOverflowObserver(el) {
   if (typeof ResizeObserver === 'undefined') return;
-  disconnectBladeBiosOverflowObserver(el);
+  disconnectBiosOverflowObserver(el);
 
   const cardsWrapper = el.querySelector('.cards-wrapper');
   if (!cardsWrapper) return;
 
-  const debouncedSync = debounce(() => syncBladeBiosOverflow(el), 100);
+  const debouncedSync = debounce(() => syncBiosOverflow(el), 100);
   const ro = new ResizeObserver(() => debouncedSync());
   ro.observe(cardsWrapper);
-  bladeOverflowObservers.set(el, () => ro.disconnect());
+  el.querySelectorAll('.collapsible-bio .card-image-container, .collapsible-bio .card-desc, .collapsible-bio .card-social-icons')
+    .forEach((target) => ro.observe(target));
+  bioOverflowObservers.set(el, () => ro.disconnect());
 }
 
 /** Waits for fonts.ready first - otherwise the ResizeObserver's unconditional initial observe() callback would measure against fallback-font metrics. */
-async function initBladeBiosOverflowSync(el) {
+async function initBiosOverflowSync(el) {
+  el.querySelectorAll('.collapsible-bio').forEach(syncBioOverflow);
   try {
     await document.fonts?.ready;
   } catch {
@@ -309,10 +356,10 @@ async function initBladeBiosOverflowSync(el) {
   }
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      syncBladeBiosOverflow(el);
+      syncBiosOverflow(el);
     });
   });
-  connectBladeBiosOverflowObserver(el);
+  connectBiosOverflowObserver(el);
 }
 
 function decorateContentBlade(cardContainer, data) {
@@ -325,7 +372,7 @@ function decorateContentBlade(cardContainer, data) {
   if (data.title) {
     textContainer.append(createTag('p', { class: 'card-title' }, data.title));
   }
-  appendBioBlade(textContainer, data.bio, fullName);
+  appendCollapsibleBio(textContainer, data.bio, fullName, true);
 
   contentContainer.append(textContainer);
   cardContainer.append(contentContainer);
@@ -580,7 +627,7 @@ function decorateStaticCards(el, { modal, blade } = {}) {
     if (blade) {
       decorateContentBlade(cardContainer, cardData);
     } else {
-      decorateContent(cardContainer, cardData);
+      decorateContent(cardContainer, cardData, { collapsible: !modal });
     }
     if (modal && !blade) {
       decorateModalTrigger(cardContainer, cardData, index);
@@ -602,7 +649,7 @@ function decorateStaticCards(el, { modal, blade } = {}) {
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
 
-  if (blade) initBladeBiosOverflowSync(el);
+  if (blade || el.querySelector('.collapsible-bio')) initBiosOverflowSync(el);
 }
 
 function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
@@ -625,7 +672,7 @@ function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
     } else if (simple) {
       decorateContentSimple(cardContainer, speaker);
     } else {
-      decorateContent(cardContainer, speaker);
+      decorateContent(cardContainer, speaker, { collapsible: !modal });
     }
     if (modal && !blade) {
       decorateModalTrigger(cardContainer, speaker, index);
@@ -645,7 +692,7 @@ function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
 
-  if (blade) initBladeBiosOverflowSync(el);
+  if (blade || el.querySelector('.collapsible-bio')) initBiosOverflowSync(el);
 }
 
 function sortDataByOrdinals(data) {

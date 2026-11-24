@@ -18,7 +18,7 @@ export const KEY_CODES = {
   ARROW_RIGHT: 'ArrowRight',
 };
 
-const FOCUSABLE_SELECTOR = 'a';
+const FOCUSABLE_SELECTOR = 'a, button';
 
 function getPreviousAriaLabel(currentIndex, totalSlides) {
   return currentIndex === 0 && totalSlides > 0
