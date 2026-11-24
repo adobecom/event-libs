@@ -325,6 +325,12 @@
   justify-self: center;
 }
 
+/* Keep controls and social links 16px apart in both states at every viewport. */
+.profile-cards .collapsible-bio .card-content {
+  justify-content: flex-start;
+  gap: 16px;
+}
+
 /* Collapsed text, including its controls and social links, fits the rendered image height. */
 .profile-cards .collapsible-bio:not(.expanded) .card-content {
   box-sizing: border-box;
@@ -332,8 +338,6 @@
   max-height: var(--profile-image-height);
   min-width: 0;
   flex: 1 1 0;
-  justify-content: flex-start;
-  gap: 16px;
 }
 
 .profile-cards .collapsible-bio:not(.expanded) .card-text-container {
@@ -345,7 +349,6 @@
 .profile-cards .collapsible-bio:not(.expanded) .card-desc {
   min-height: 0;
   max-height: var(--bio-preview-height, none);
-  padding-inline-end: 28px;
   overflow: hidden;
   /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
@@ -353,11 +356,20 @@
   -webkit-box-orient: vertical;
 }
 
-.profile-cards .collapsible-bio .card-desc > :first-child {
+/* Keep the float inside a normal block for Safari; reserve only the last line. */
+.profile-cards .collapsible-bio:not(.expanded) .bio-text::before {
+  content: '';
+  float: inline-end;
+  width: 28px;
+  height: calc(var(--bio-preview-lines, 0) * 1lh);
+  shape-outside: inset(calc(100% - 1lh) 0 0);
+}
+
+.profile-cards .collapsible-bio .bio-text > :first-child {
   margin-top: 0;
 }
 
-.profile-cards .collapsible-bio .card-desc > :last-child {
+.profile-cards .collapsible-bio .bio-text > :last-child {
   margin-bottom: 0;
 }
 
@@ -376,6 +388,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.profile-cards .collapsible-bio.expanded .bio-preview {
+  gap: 16px;
 }
 
 .profile-cards .collapsible-bio:not(.expanded) .bio-read-more {

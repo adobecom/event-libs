@@ -217,11 +217,13 @@ function appendCollapsibleBio(container, bio, fullName, blade = false) {
     class: blade ? 'card-desc blade-desc' : 'card-desc',
     id: `profile-bio-${bioId}`,
   });
+  const text = blade ? desc : createTag('div', { class: 'bio-text' });
   if (trimmedBio.includes('<')) {
-    desc.innerHTML = trimmedBio;
+    text.innerHTML = trimmedBio;
   } else {
-    desc.textContent = trimmedBio;
+    text.textContent = trimmedBio;
   }
+  if (!blade) desc.append(text);
   const bioContainer = blade ? container : createTag('div', { class: 'bio-preview' });
   if (!blade) container.append(bioContainer);
   bioContainer.append(desc);
