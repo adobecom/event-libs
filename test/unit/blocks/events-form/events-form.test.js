@@ -1373,6 +1373,34 @@ describe('Events Form', () => {
     });
   });
 
+  describe('getConsentRows', () => {
+    let getConsentRows;
+    const rows = [{ countryCode: 'US', countryName: 'United States', consentId: 'cs1B;ve1;en' }];
+
+    before(async () => {
+      ({ getConsentRows } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js'));
+    });
+
+    it('reads rows from a single-sheet consent index', () => {
+      expect(getConsentRows({ ':type': 'sheet', total: 1, data: rows })).to.deep.equal(rows);
+    });
+
+    it('reads the data sheet from a multi-sheet consent index (e.g. with a dnt tab)', () => {
+      const index = {
+        ':type': 'multi-sheet',
+        ':names': ['data', 'dnt'],
+        data: { total: 1, data: rows },
+        dnt: { total: 1, data: [{ 'dnt-sheet': 'data' }] },
+      };
+      expect(getConsentRows(index)).to.deep.equal(rows);
+    });
+
+    it('returns an empty list for an unexpected shape', () => {
+      expect(getConsentRows({ ':type': 'multi-sheet', dnt: { data: [] } })).to.deep.equal([]);
+      expect(getConsentRows(null)).to.deep.equal([]);
+    });
+  });
+
   describe('showFieldErrors', () => {
     let showFieldErrors;
     let clearFieldErrors;
