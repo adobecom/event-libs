@@ -1003,6 +1003,12 @@ function decorateSuccessScreen(screen) {
   screen.classList.add('hidden');
 }
 
+// The index is served multi-sheet once authors add a sheet beside 'data' (e.g. 'dnt').
+export function getConsentRows(index) {
+  const rows = index?.[':type'] === 'multi-sheet' ? index.data?.data : index?.data;
+  return Array.isArray(rows) ? rows : [];
+}
+
 async function getConsentQueryIndexUrl() {
   const eventConfig = getEventConfig();
   const miloConfig = eventConfig?.miloConfig;
@@ -1031,7 +1037,7 @@ async function addConsentSuite(form) {
   const consentStringsIndex = await fetch(queryIndexUrl).then((r) => r.json());
 
   if (consentStringsIndex) {
-    const { data } = consentStringsIndex;
+    const data = getConsentRows(consentStringsIndex);
     const defaultOption = createTag('option', { selected: '', disabled: '', value: '' }, countryText);
     countrySelect.append(defaultOption);
 
